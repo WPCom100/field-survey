@@ -15,7 +15,7 @@ It also reports taps in view points, not page points.
 
 | File | Change |
 |---|---|
-| `ios/RNPDFPdf/RNPDFPdfView.mm` | KVO on the inner `UIScrollView.contentOffset` (attached after the document loads, detached on recycle/dealloc) and on `PDFViewScaleChangedNotification`; both call `emitViewport`, which sends `viewport\|a\|b\|c\|d\|tx\|ty\|cx\|cy\|cw\|ch\|page` — the affine from the current page's PDF user space to points in the Pdf view (from PDFKit's own `convertPoint:fromPage:` of three points) plus the CropBox. Identical consecutive messages are dropped. `pageSingleTap` gains `\|pageX\|pageY` from `convertPoint:toPage:`. |
+| `ios/RNPDFPdf/RNPDFPdfView.mm` | KVO on the inner `UIScrollView.contentOffset` (attached after the document loads, detached on recycle/dealloc) and on `PDFViewScaleChangedNotification`; both call `emitViewport`, which sends `viewport\|a\|b\|c\|d\|tx\|ty\|cx\|cy\|cw\|ch\|page` — the affine from the current page's PDF user space to points in the Pdf view (from PDFKit's own `convertPoint:fromPage:` of three points) plus the CropBox. Identical consecutive messages are dropped. `pageSingleTap` gains `\|pageX\|pageY` from `convertPoint:toPage:`. `autoScales = NO` once the fit (`scaleFactor`/min/max) has been set explicitly, so `layoutDocumentView` after a prop update (e.g. `scale`) no longer snaps back to fit. |
 | `index.js` | Parses the two messages before the generic `message[4]` join and calls `onViewportChanged(viewport)` / `onPageSingleTap(page, x, y, pageX, pageY)`. |
 | `index.d.ts` | `PdfViewport` type, `onViewportChanged`, the two extra tap arguments. |
 

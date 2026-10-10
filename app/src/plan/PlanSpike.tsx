@@ -46,6 +46,13 @@ const ZOOM_CYCLES = 100;
 const ZOOM_HI = 4;
 const ZOOM_PERIOD_MS = 350;
 
+const CROSSHAIR = (() => {
+  const p = Skia.Path.Make();
+  p.moveTo(-15, 0).lineTo(15, 0).moveTo(0, -15).lineTo(0, 15);
+  p.addCircle(0, 0, 10);
+  return p;
+})();
+
 type Stroke = { points: { x: number; y: number; p: number }[]; width: number; color: string };
 
 type TapInfo = {
@@ -96,6 +103,7 @@ export function PlanSpike() {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [live, setLive] = useState<Stroke | null>(null);
   const [tap, setTap] = useState<TapInfo | null>(null);
+  const [taps, setTaps] = useState(0);
   const [cycles, setCycles] = useState(0);
   const [cycling, setCycling] = useState(false);
   const [jsFps, setJsFps] = useState<{ now: number; min: number }>({ now: 0, min: 0 });
@@ -151,6 +159,7 @@ export function PlanSpike() {
       const pdfkit = pageToSheet(viewport, { x: pageX, y: pageY });
       const k = scaleOf(m);
       const hit = nearestPin(pins, computed, HIT_PX / k);
+      setTaps((n) => n + 1);
       setTap({
         view: { x, y },
         computed,
@@ -218,7 +227,6 @@ export function PlanSpike() {
         minScale={1}
         maxScale={8}
         spacing={0}
-        singlePage
         enableAnnotationRendering={false}
         enableTextSelection={false}
         onLoadComplete={(_n, _path, size) => {
@@ -230,6 +238,8 @@ export function PlanSpike() {
         onError={(e) => setError(String(e?.message ?? e))}
       />
 
+      {/* The overlay must never take a touch: pinch/pan/tap belong to PDFKit (pan mode). */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
         {sheetMatrix ? (
           <Group matrix={Skia.Matrix(toSkiaMatrix(sheetMatrix))}>
@@ -246,6 +256,13 @@ export function PlanSpike() {
             ))}
             {livePath && live ? (
               <Path path={livePath} style="stroke" strokeWidth={live.width} strokeCap="round" strokeJoin="round" color={live.color} />
+            ) : null}
+            {tap ? (
+              // crosshair at the last tap (sheet point), constant 30 px on screen
+              <Group transform={[{ translateX: tap.computed.x }, { translateY: tap.computed.y }, { scale: 1 / zoom }]}>
+                <Path path={CROSSHAIR} style="stroke" strokeWidth={4} color="white" />
+                <Path path={CROSSHAIR} style="stroke" strokeWidth={2} color="#00bcd4" />
+              </Group>
             ) : null}
             {showPins
               ? pins.map((pin) => {
@@ -269,6 +286,7 @@ export function PlanSpike() {
           </Group>
         ) : null}
       </Canvas>
+      </View>
 
       {mode === 'draw' ? (
         <View
@@ -294,6 +312,7 @@ export function PlanSpike() {
           {tap
             ? `tap view (${tap.view.x.toFixed(0)}, ${tap.view.y.toFixed(0)}) → sheet ours (${tap.computed.x.toFixed(1)}, ${tap.computed.y.toFixed(1)}) · PDFKit (${tap.pdfkit.x.toFixed(1)}, ${tap.pdfkit.y.toFixed(1)}) · Δ ${tap.deltaPt.toFixed(2)} pt @ ×${tap.zoom.toFixed(2)} · hit ${tap.hit ?? '—'}`
             : 'tap the plan (pan mode) to compare our mapping with PDFKit’s'}
+          {` · taps ${taps}`}
         </Text>
         <Text style={styles.hudLine}>
           zoom cycles {cycles}/{ZOOM_CYCLES} {cycling ? '(running)' : ''}
