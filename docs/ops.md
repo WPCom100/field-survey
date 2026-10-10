@@ -81,7 +81,7 @@ docker compose exec worker python -m app.backup prune
 docker compose logs worker | grep backup_                        # backup_dump / backup_prune / backup_copy / backup_failed
 ```
 
-**Setting up the copy bucket** (not done yet; TASKS follow-up). In Cloudflare → R2, create the bucket (suggested `<S3_BUCKET>-copy`). Then create an API token with *Object Read & Write* on **both** buckets, or a separate token for the copy bucket. In `server/.env.production` set `BACKUP_COPY_BUCKET`, and `BACKUP_COPY_ACCESS_KEY`/`BACKUP_COPY_SECRET_KEY` (+ `BACKUP_COPY_ENDPOINT` if it is in another account) when the token differs from `S3_*`. Then `scp` it as in §1.6, run `docker compose up -d worker`, run the copy by hand once and check the bucket in the dashboard.
+**Copy bucket:** `field-survey-backup`, same account and same token as the main bucket (set up 2026-10-10; first copy 06:01:35Z, `rclone check` 0 differences). To set one up again: In Cloudflare → R2, create the bucket (suggested `<S3_BUCKET>-copy`). Then create an API token with *Object Read & Write* on **both** buckets, or a separate token for the copy bucket. In `server/.env.production` set `BACKUP_COPY_BUCKET`, and `BACKUP_COPY_ACCESS_KEY`/`BACKUP_COPY_SECRET_KEY` (+ `BACKUP_COPY_ENDPOINT` if it is in another account) when the token differs from `S3_*`. Then `scp` it as in §1.6, run `docker compose up -d worker`, run the copy by hand once and check the bucket in the dashboard.
 
 ### 3.2 Manual dump
 
