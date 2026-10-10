@@ -14,7 +14,8 @@ The projection mirrors the client store (D81) so a replayed server and a synced 
 | `link_remove` | `deleted_at`, `deleted_by_id` on the link row | — |
 
 Ops in state `review`, `superseded` or `rejected` are never materialised (the first-arrived value
-stays official, A7). A `set`/`delete` whose row is missing is logged as `materialise_orphan` and
+stays official, A7). Setting `review_item.state` to `resolved`/`dismissed` settles the ops the item
+held, as its `resolution` lists them (T15, D91). A `set`/`delete` whose row is missing is logged as `materialise_orphan` and
 skipped; the log still holds the op.
 
 Payload values arrive as JSON (UUIDs, dates and timestamps as strings) and are coerced to the
@@ -139,7 +140,32 @@ def _set(session: Session, table: Table, op: Op) -> bool:
         values["head_seq"] = _head_seq(table, op.server_seq)
     pk = table.primary_key.columns.values()[0]
     result = session.execute(update(table).where(pk == op.entity_id).values(**values))
-    return _found(result.rowcount, op)
+    found = _found(result.rowcount, op)
+    if found and op.entity_kind == "review_item" and field == "state" and op.now in SETTLED:
+        _settle_review(session, table, op.entity_id)
+    return found
+
+
+# A review item leaving `open` settles the ops it held (T15, D91).
+SETTLED = ("resolved", "dismissed")
+
+
+def _settle_review(session: Session, table: Table, item_id: uuid.UUID) -> None:
+    """The ops a resolved item held in `review` leave it as its `resolution` says: the loser
+    `rejected`, a winning side B `superseded` (its value was applied by the `Reconcile` op).
+    Only ops still in `review` move, so a replay or a second resolution changes nothing; the
+    client store does the same when it materialises this op, so every log agrees (D91)."""
+    resolution = session.execute(
+        select(table.c.resolution).where(table.c.id == item_id)
+    ).scalar_one_or_none()
+    if not isinstance(resolution, dict):
+        return
+    for state, key in (("rejected", "rejected_op_ids"), ("superseded", "superseded_op_ids")):
+        ids = [uuid.UUID(str(i)) for i in resolution.get(key) or []]
+        if ids:
+            session.execute(
+                update(Op).where(Op.op_id.in_(ids), Op.state == "review").values(state=state)
+            )
 
 
 def _delete(session: Session, table: Table, op: Op, deleted: bool) -> bool:

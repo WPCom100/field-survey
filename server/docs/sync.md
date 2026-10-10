@@ -132,6 +132,23 @@ to the log, so the item reaches every iPad through the normal pull and T15's res
 ops on it. `level_id` on the row is only set when the `level` row exists (FK); the subject
 carries it regardless.
 
+## Resolution (T15, D91)
+
+A resolution arrives as one ordinary push group from the resolver's iPad
+(`packages/core/docs/review.md`): the `Reconcile` op(s) on the subject, then `set`s on the item's
+`resolution`, `resolved_by_id`, `resolved_at` and `state`. It is decided like any group: a stale
+Reconcile op (the field moved since the resolver pulled) sends the whole group to review and the
+item stays open. Two server rules serve it:
+
+- When `review_item.state` is materialised as `resolved`/`dismissed`, `materialise._settle_review`
+  moves the ops listed in `resolution.rejected_op_ids` to `rejected` and those in
+  `superseded_op_ids` to `superseded`, only from `review` (idempotent; replay repeats it). Pulls
+  from then on return the new state; iPads that already hold the op settle it themselves from the
+  same op.
+- Step 4 exception: a `set` with `change_type = Reconcile` on a record deleted by another user is
+  **not** reviewed when that delete is at or below the push's `since` (the resolver saw it). An
+  unseen delete, or any other change type, is still reviewed.
+
 ## Server-generated ops
 
 `assign` and the review-item `create` are ops like any other: `install_id =

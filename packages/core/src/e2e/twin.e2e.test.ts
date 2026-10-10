@@ -10,6 +10,7 @@ import { deviceIdFor } from '../device-id';
 import { HttpTransport } from '../http-transport';
 import type { Op } from '../op';
 import { NUMBERED, displayNumber, type NumberedKind } from '../numbering';
+import { openReviewItems, reviewFields } from '../review';
 import {
   CTX,
   ENABLED,
@@ -21,6 +22,7 @@ import {
   drain,
   expectConverged,
   makeWorld,
+  namesOf,
   newDevice,
   outboxBody,
   restartApi,
@@ -104,6 +106,23 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
       expect(after.next_free).toBe(5);
 
       await expectConverged(a, b, w.projectId);
+
+      // T15: Bob combines the two notes; Ann's op is rejected on both iPads and the server.
+      const itemId = (await openReviewItems(b.store, w.projectId))[0]!.id;
+      expect(await reviewFields(a.store, d2)).toEqual({ notes: [itemId] });
+      const r = await b.editor.resolve(itemId, { choice: 'combine' }, { userName: namesOf(a, b) });
+      expect(r.reconcile[0]).toMatchObject({ field: 'notes', now: 'Cover plate loose; LVD card missing', change_type: 'Reconcile' });
+      expect(r.reason).toMatch(/^Review: combined A \(Bob .*\) and B \(Ann .*\)$/);
+      await sync(b, a);
+      for (const c of [a, b]) {
+        expect((await get(c, 'device', d2))!.notes).toBe('Cover plate loose; LVD card missing');
+        expect(await c.store.getOp(annNotes.op_id)).toMatchObject({ state: 'rejected' });
+        expect(await openReviewItems(c.store, w.projectId)).toEqual([]);
+        expect(await reviewFields(c.store, d2)).toEqual({});
+      }
+      const server = await expectConverged(a, b, w.projectId);
+      expect(server.find((o) => o.op_id === annNotes.op_id)!.state).toBe('rejected');
+      expect(server.filter((o) => o.change_type === 'Reconcile').every((o) => o.state === 'applied')).toBe(true);
     }, 60_000);
   });
 
@@ -307,7 +326,18 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
         expect((await get(c, 'punch_item', p1))).toMatchObject({ device_id: d, number: 1, deleted_at: null });
         expect((await get(c, 'punch_item', p2))).toMatchObject({ device_id: d, number: 2, deleted_at: null });
       }
-      await expectConverged(a, b, w.projectId, { except: [d] });
+
+      // T15: Bob keeps the device (choose A); the Reconcile restore reaches Ann's iPad.
+      const itemId = (await openReviewItems(b.store, w.projectId))[0]!.id;
+      expect(await reviewFields(a.store, d)).toEqual({ deleted_at: [itemId], notes: [itemId] });
+      const r = await b.editor.resolve(itemId, { choice: 'A' });
+      expect(r.reconcile.map((o) => o.kind)).toEqual(['restore']);
+      await sync(b, a);
+      for (const c of [a, b]) {
+        expect(await get(c, 'device', d)).toMatchObject({ deleted_at: null, notes: 'Neuron ID read' });
+        expect(await c.store.getOp(del.op_id)).toMatchObject({ state: 'rejected' });
+      }
+      await expectConverged(a, b, w.projectId);
     }, 60_000);
 
     it("A's delete arrives first; B's edit goes to review; A's restore brings the device back with its history", async () => {
@@ -329,7 +359,15 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
         expect(items[0]).toMatchObject({ op_a_id: del.op_id, op_b_id: edit.op_id });
         expect(items[0]!.subject).toMatchObject({ entity_id: d, field: 'notes' });
       }
-      await expectConverged(a, b, w.projectId, { except: [d] });
+
+      // T15: Bob accepts it stays deleted (choose A): his in-review note goes back to the official
+      // one. The Reconcile set lands on a record Ann deleted (D91: not reviewed again).
+      const itemId = (await openReviewItems(b.store, w.projectId))[0]!.id;
+      const r = await b.editor.resolve(itemId, { choice: 'A' });
+      expect(r.reconcile.map((o) => [o.kind, o.field, o.now])).toEqual([['set', 'notes', 'as found']]);
+      await sync(b, a);
+      expect((await get(b, 'device', d))!.notes).toBe('as found');
+      await expectConverged(a, b, w.projectId);
 
       // Restore: back on both iPads, punch items still attached, the op log tells the whole story.
       const back = await a.editor.restore('device', d, { ...CTX, change_type: 'Correction', reason: 'Not a duplicate after all' });
@@ -342,7 +380,8 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
         expect(history).toEqual([
           ['create', 'applied', expect.any(Number)],
           ['delete', 'applied', (await a.store.getOp(del.op_id))!.server_seq],
-          ['set', 'review', (await a.store.getOp(edit.op_id))!.server_seq],
+          ['set', 'rejected', (await a.store.getOp(edit.op_id))!.server_seq],
+          ['set', 'applied', (await a.store.getOp(r.reconcile[0]!.op_id))!.server_seq],
           ['restore', 'applied', (await a.store.getOp(back.op_id))!.server_seq],
         ]);
       }
@@ -350,11 +389,45 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
       // The ID stays with the device (D88): nothing else may take 06M-02.
       const idp = await deviceIdFor(b.store, { projectId: w.projectId, levelId: w.levels.L06M, category: 'Relay panel', number: 2 });
       expect(idp.taken_by).toEqual([d]);
-      await expectConverged(a, b, w.projectId, { except: [d] });
-      // Only Bob's in-review note differs on the restored row.
-      const ra = await get(a, 'device', d);
-      const rb = await get(b, 'device', d);
-      expect({ ...rb, notes: null, version: null }).toEqual({ ...ra, notes: null, version: null });
+      await expectConverged(a, b, w.projectId);
+      expect((await get(b, 'device', d))!.notes).toBe('as found');
+    }, 60_000);
+
+    it('T15: delete first, B restores the device with the edit; a field group resolved as one', async () => {
+      const { a, b, w } = await makeWorld();
+      const { d } = await deviceWithPunch(a, b, w.levels.L06M);
+      await a.editor.delete('device', d, { ...CTX, reason: 'Duplicate of 06M-01' });
+      const edit = (await b.editor.setField('device', d, 'notes', 'Neuron ID read', CTX))!;
+      await sync(a, b, a);
+      const [item] = await openReviewItems(b.store, w.projectId);
+      const r = await b.editor.resolve(item!.id, { choice: 'B' });
+      expect(r.reconcile.map((o) => [o.kind, o.field])).toEqual([['restore', null], ['set', 'notes']]);
+      await sync(b, a);
+      for (const c of [a, b]) {
+        expect(await get(c, 'device', d)).toMatchObject({ deleted_at: null, notes: 'Neuron ID read' });
+        expect(await c.store.getOp(edit.op_id)).toMatchObject({ state: 'superseded' });
+      }
+      await expectConverged(a, b, w.projectId);
+
+      // Field group: Bob moves the punch item on; Ann closes it offline (status + date as one group).
+      const { id: p } = await a.editor.create('punch_item', { level_id: w.levels.L06M, device_id: d, item: 'Run N', type: 'Cable not run', tracking_status: 'Open' }, CTX);
+      await sync(a, b);
+      await b.editor.setField('punch_item', p, 'tracking_status', 'In progress', CTX);
+      const closed = await a.editor.setFields('punch_item', p, { tracking_status: 'Closed', date_closed: '2026-10-10' }, CTX);
+      await sync(b, a, b);
+      const groupItem = (await openReviewItems(a.store, w.projectId)).find((i) => i.subject.entity_id === p)!;
+      expect(groupItem.subject.fields).toEqual(['tracking_status', 'date_closed']);
+      expect(await reviewFields(b.store, p)).toEqual({ tracking_status: [groupItem.id], date_closed: [groupItem.id] });
+      // Ann's iPad still shows her date while in review; choosing A clears it everywhere.
+      expect((await get(a, 'punch_item', p))!.date_closed).toBe('2026-10-10');
+      const ra = await b.editor.resolve(groupItem.id, { choice: 'A' });
+      expect(ra.reconcile.map((o) => [o.field, o.now])).toEqual([['tracking_status', 'In progress'], ['date_closed', null]]);
+      await sync(b, a);
+      for (const c of [a, b]) {
+        expect(await get(c, 'punch_item', p)).toMatchObject({ tracking_status: 'In progress', date_closed: null });
+        for (const o of closed) expect(await c.store.getOp(o.op_id)).toMatchObject({ state: 'rejected' });
+      }
+      await expectConverged(a, b, w.projectId);
     }, 60_000);
 
     it('delete vs delete merges; a clean delete then restore converges everywhere', async () => {

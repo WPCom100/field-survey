@@ -473,9 +473,19 @@ class Push:
 
     def decide_set(self, op: Op, overlay: Overlay) -> Decision:
         field = op.field or ""
-        # Step 4: set vs an existing delete by someone else → review.
+        # Step 4: set vs an existing delete by someone else → review. A `Reconcile` set made
+        # after the resolver saw the delete is the resolution of that very review (D91).
         deleted = self.head(op.entity_id, "deleted_at", overlay)
-        if deleted is not None and deleted.kind == "delete" and deleted.user_id != op.user_id:
+        if (
+            deleted is not None
+            and deleted.kind == "delete"
+            and deleted.user_id != op.user_id
+            and not (
+                op.change_type == "Reconcile"
+                and deleted.server_seq is not None
+                and not self.unseen(deleted)
+            )
+        ):
             return Decision("review", head=deleted)
         head = self.head(op.entity_id, field, overlay)
         if head is None or head.op_id == op.base_op_id:

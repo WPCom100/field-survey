@@ -20,6 +20,7 @@ import {
   type EntityKind,
   type EntitySpec,
 } from './schema/entities';
+import { resolveReview, type ResolveChoice, type ResolveOptions, type ResolveResult } from './review';
 import type { Store } from './store';
 import { CHANGE_TYPE, type ChangeType } from './vocab';
 
@@ -197,6 +198,61 @@ export class EditBatch {
     return op;
   }
 
+  /**
+   * Review resolution only (T15, D91): a `set` written even when the local value already equals
+   * `now` and even on a deleted record, based on `baseOpId` (the official head, which on the
+   * iPad whose op went to review is not its local `field_head`). The op is what brings every
+   * other iPad, including the losing one, to the chosen value.
+   */
+  async reconcileSet(
+    kind: EntityKind,
+    id: string,
+    field: string,
+    now: unknown,
+    baseOpId: string | null,
+  ): Promise<Op> {
+    const spec = this.specFor(kind, 'set');
+    if (spec.role === 'link') throw new OpError(`${kind} has no editable fields`);
+    const col = writableColumn(spec, field);
+    checkValue(spec, field, col, now);
+    const row = await this.mustRow(kind, id, true);
+    const heads = await this.headsFor(id);
+    const chained = this.ops.some((o) => o.entity_id === id && o.field === field);
+    const op = this.op({
+      entity_kind: kind,
+      entity_id: id,
+      kind: 'set',
+      field,
+      was: row[field] ?? null,
+      now: now ?? null,
+      base_op_id: chained ? (heads[field] ?? null) : baseOpId,
+    });
+    row[field] = now ?? null;
+    heads[field] = op.op_id;
+    return op;
+  }
+
+  /** Review resolution only (T15): `delete`/`restore` whatever the local row shows (see `reconcileSet`). */
+  async reconcileDeleted(kind: EntityKind, id: string, deleted: boolean, baseOpId: string | null): Promise<Op> {
+    const opKind = deleted ? 'delete' : 'restore';
+    const spec = this.specFor(kind, opKind);
+    if (spec.role !== 'record') throw new OpError(`${opKind} is not allowed on ${kind}`);
+    const row = await this.mustRow(kind, id, true);
+    const heads = await this.headsFor(id);
+    const chained = this.ops.some((o) => o.entity_id === id && (o.kind === 'delete' || o.kind === 'restore'));
+    const op = this.op({
+      entity_kind: kind,
+      entity_id: id,
+      kind: opKind,
+      base_op_id: chained ? (heads.deleted_at ?? null) : baseOpId,
+    });
+    row.deleted_at = deleted ? op.client_ts : null;
+    row.deleted_by_id = deleted ? this.opts.userId : null;
+    row.delete_reason = deleted ? this.ctx.reason : null;
+    heads.deleted_at = op.op_id;
+    return op;
+  }
+
   /** `link_add`: `ownerId` is the owning record, `key` the rest of the link row. */
   async link(kind: EntityKind, ownerId: string, key: Row): Promise<Op> {
     return this.linkOp(kind, ownerId, key, true);
@@ -356,6 +412,14 @@ export class Editor {
     const op = await this.batch(ctx).unlink(kind, ownerId, key);
     await this.store.apply(op);
     return op;
+  }
+
+  /**
+   * Resolve a review item (T15, PLAN §3.3): the Reconcile op(s) on the subject plus the item's
+   * resolution fields, as one group. See `review.ts`.
+   */
+  resolve(itemId: string, choice: ResolveChoice, opts?: ResolveOptions): Promise<ResolveResult> {
+    return resolveReview(this, itemId, choice, opts);
   }
 
   /**

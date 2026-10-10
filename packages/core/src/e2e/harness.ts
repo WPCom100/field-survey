@@ -220,6 +220,11 @@ export async function seedProjectRow(store: Store, projectId: string, userId: st
   } as Op);
 }
 
+/** `ResolveOptions.userName` for the clients' users (the iPad has no `app_user` rows yet). */
+export function namesOf(...clients: Client[]): (userId: string) => string | undefined {
+  return (id) => clients.find((c) => c.userId === id)?.name;
+}
+
 /** One sync that must succeed. */
 export async function sync(...clients: Client[]): Promise<void> {
   for (const c of clients) {
@@ -313,8 +318,7 @@ function canon(row: Row): Row {
   const out: Row = {};
   for (const [k, v] of Object.entries(row)) {
     if (k === 'version') continue; // local applies and remote applies count differently on a reviewed field
-    // The deleting iPad stamps `deleted_at` with its client_ts, the server with server_ts (follow-up T14→T15).
-    out[k] = k === 'deleted_at' ? (v == null ? null : 'set') : v;
+    out[k] = v; // `deleted_at` included: the deleting iPad re-stamps it from the echo (T15)
   }
   return out;
 }

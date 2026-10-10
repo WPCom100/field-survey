@@ -36,6 +36,29 @@ export {
 } from './schema/search';
 export { Editor, EditBatch, OpError, type EditContext, type EditorOptions } from './editor';
 export {
+  IN_REVIEW_BADGE,
+  ReviewError,
+  resolveReview,
+  getReviewItem,
+  openReviewItems,
+  reviewFields,
+  reviewItemFields,
+  isInReview,
+  sideOf,
+  combineText,
+  choicesFor,
+  officialHead,
+  resolutionReason,
+  type Candidate,
+  type ReviewSubject,
+  type ReviewItem,
+  type ResolveChoice,
+  type ChoiceName,
+  type Resolution,
+  type ResolveOptions,
+  type ResolveResult,
+} from './review';
+export {
   Store,
   StoreError,
   type LocalOutcome,

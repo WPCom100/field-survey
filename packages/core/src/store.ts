@@ -87,6 +87,8 @@ export interface ListOptions {
 
 const OP_COLUMNS = Object.keys(ENTITIES.op.columns);
 const LINK_KINDS = new Set(['link_add', 'link_remove']);
+/** Review-item states that settle the ops the item held (T15, D91). */
+const SETTLED = new Set(['resolved', 'dismissed']);
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -195,6 +197,7 @@ export class Store {
       await tx.exec(`DELETE FROM outbox WHERE op_id = ?`, [op.op_id]);
       if (state === 'applied' && op.server_seq != null) {
         await this.bumpHeadSeq(tx, entity(op.entity_kind), op.entity_id, op.server_seq);
+        if (op.kind === 'delete' && op.server_ts) await this.restampDelete(tx, op);
       }
       return { outcome: 'acknowledged', collided_pending: [] };
     }
@@ -333,7 +336,36 @@ export class Store {
         : [encodeValue(col, op.now), op.entity_id],
     );
     await this.setHead(tx, op.entity_id, field, op.op_id);
+    if (spec.table === 'review_item' && field === 'state' && SETTLED.has(op.now as string)) {
+      await this.settleReview(tx, op.entity_id);
+    }
     return true;
+  }
+
+  /**
+   * A review item leaving `open` settles the ops it held, exactly as the server does
+   * (`server/app/materialise.py`, D91): the ids in `resolution.rejected_op_ids` become
+   * `rejected`, those in `resolution.superseded_op_ids` `superseded`; only ops still in
+   * `review` move, so every install's log ends with the same states.
+   */
+  private async settleReview(tx: SqlDriver, itemId: string): Promise<void> {
+    const rows = await tx.query<{ resolution: string | null }>(
+      `SELECT resolution FROM review_item WHERE id = ?`,
+      [itemId],
+    );
+    const raw = rows[0]?.resolution;
+    if (!raw) return;
+    const resolution = JSON.parse(raw) as Record<string, unknown> | null;
+    if (!resolution || typeof resolution !== 'object') return;
+    for (const [state, key] of [
+      ['rejected', 'rejected_op_ids'],
+      ['superseded', 'superseded_op_ids'],
+    ] as const) {
+      const ids = Array.isArray(resolution[key]) ? (resolution[key] as string[]) : [];
+      for (const id of ids) {
+        await tx.exec(`UPDATE op SET state = ? WHERE op_id = ? AND state = 'review'`, [state, id]);
+      }
+    }
   }
 
   private async materialiseDelete(
@@ -405,6 +437,20 @@ export class Store {
       ]);
     }
     return true;
+  }
+
+  /**
+   * Our own applied delete came back: `deleted_at` takes the server's timestamp, as on the server
+   * and every other iPad (it was the local `client_ts` until now). Only while this delete is
+   * still the record's `deleted_at` head.
+   */
+  private async restampDelete(tx: SqlDriver, op: Op): Promise<void> {
+    const spec = entity(op.entity_kind);
+    if (spec.role !== 'record') return;
+    await tx.exec(
+      `UPDATE ${spec.table} SET deleted_at = ? WHERE id = ? AND deleted_at IS NOT NULL AND EXISTS (SELECT 1 FROM field_head WHERE entity_id = ? AND field = 'deleted_at' AND op_id = ?)`,
+      [op.server_ts!, op.entity_id, op.entity_id, op.op_id],
+    );
   }
 
   private async exists(tx: SqlDriver, spec: EntitySpec, id: string): Promise<boolean> {

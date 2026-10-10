@@ -138,6 +138,8 @@ export class FakeServer implements SyncTransport {
             subject: { entity_kind: op.entity_kind, entity_id: op.entity_id, field },
             op_a_id: head!.op_id,
             op_b_id: op.op_id,
+            candidates: [candidate('A', head!, field), candidate('B', op, field)],
+            ruling: false,
             state: 'open',
           };
           caused.push(item);
@@ -226,6 +228,22 @@ export class FakeServer implements SyncTransport {
       : 0;
     return { ops: page, server_seq: top, has_more: all.length > limit };
   }
+}
+
+/** Same shape as the server's `Push.candidate` (server/app/sync.py). */
+function candidate(side: 'A' | 'B', op: Op, field: string): Record<string, unknown> {
+  return {
+    side,
+    op_id: op.op_id,
+    user_id: op.user_id,
+    install_id: op.install_id,
+    client_ts: op.client_ts,
+    entity_kind: op.entity_kind,
+    entity_id: op.entity_id,
+    field,
+    kind: op.kind,
+    value: valueOf(op, field) ?? null,
+  };
 }
 
 function valueOf(head: Op, field: string): unknown {
