@@ -2,7 +2,7 @@
  * In-process stand-in for `POST /ops` / `GET /ops` (server/docs/sync.md) for `SyncEngine`
  * tests. It keeps the parts of the apply loop the engine depends on — contiguous `server_seq`,
  * idempotent `op_id`, heads per field, review on a different user's conflicting `set`, the
- * review-item `create` op, `assign` numbers for created punch items — and offers failure
+ * review-item `create` op, `assign` numbers per numbering group for numbered creates — and offers failure
  * injection (network drops, HTTP refusals, lost responses). Test-only: never imported by the
  * app or the public entry.
  */
@@ -96,8 +96,9 @@ export class FakeServer implements SyncTransport {
       case 'create': {
         for (const f of Object.keys(op.payload ?? {})) if (f !== 'id') this.setHead(op.entity_id, f, stored);
         const field = NUMBERED[op.entity_kind];
-        if (field) {
-          const key = `${op.project_id}|${op.entity_kind}`;
+        // Like the server, a create without a level stays unnumbered (`assign_skipped`, D84).
+        if (field && (op.payload ?? {}).level_id) {
+          const key = `${this.groupOf(op)}|${op.entity_kind}`;
           const n = (this.counters.get(key) ?? 0) + 1;
           this.counters.set(key, n);
           const assign = this.serverOp(stored, {
@@ -157,6 +158,18 @@ export class FakeServer implements SyncTransport {
     this.serverOpsFor.set(op.op_id, caused);
     serverOps.push(...caused);
     return { op_id: op.op_id, outcome: 'applied', server_seq: stored.server_seq ?? null };
+  }
+
+  /**
+   * The numbering group a create counts in (D33): its level's `numbering_group_id` from a
+   * level create in the log, else the level itself (tests that never create levels get one
+   * group per level, so their numbers still start at 1).
+   */
+  private groupOf(op: Op): string {
+    const levelId = (op.payload ?? {}).level_id as string | undefined;
+    const level = this.log.find((o) => o.entity_kind === 'level' && o.entity_id === levelId && o.kind === 'create');
+    const group = (level?.payload ?? {}).numbering_group_id as string | undefined;
+    return `${op.project_id}|${group ?? `level:${levelId ?? '-'}`}`;
   }
 
   private store(op: Op, state: Op['state']): Op {

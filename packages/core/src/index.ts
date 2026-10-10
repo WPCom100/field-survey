@@ -81,3 +81,29 @@ export {
   type BlobQueueOptions,
 } from './blobs';
 export { HttpBlobTransport, type HttpBlobTransportOptions } from './http-blob-transport';
+export {
+  NUMBERED,
+  NUMBERED_KINDS,
+  NEW_BADGE,
+  isNumbered,
+  isNew,
+  displayNumber,
+  unnumbered,
+  type NumberedKind,
+  type UnnumberedReason,
+  type UnnumberedRecord,
+} from './numbering';
+export {
+  DeviceIdError,
+  TAG_PREFIX,
+  defaultIdScheme,
+  parseDeviceId,
+  formatNumberId,
+  nextFreeNumber,
+  tagDeviceId,
+  deviceIdFor,
+  type IdScheme,
+  type ParsedDeviceId,
+  type DeviceIdRequest,
+  type DeviceIdProposal,
+} from './device-id';

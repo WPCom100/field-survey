@@ -1,0 +1,153 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  DeviceIdError,
+  defaultIdScheme,
+  deviceIdFor,
+  formatNumberId,
+  nextFreeNumber,
+  parseDeviceId,
+  tagDeviceId,
+} from './device-id';
+import { Editor, type EditContext } from './editor';
+import { uuidv7 } from './ids';
+import { BetterSqliteDriver } from './node';
+import { Store } from './store';
+
+const CTX: EditContext = { change_type: 'Field survey', reason: 'test' };
+
+describe('pure rules', () => {
+  it('parses the master ID shapes', () => {
+    expect(parseDeviceId('06M-04')).toEqual({ level: '06M', prefix: '', n: 4 });
+    expect(parseDeviceId('01-S15')).toEqual({ level: '01', prefix: 'S', n: 15 });
+    expect(parseDeviceId('B2-D1')).toEqual({ level: 'B2', prefix: 'D', n: 1 });
+    expect(parseDeviceId('CT06LCPA')).toBeNull();
+    expect(parseDeviceId(null)).toBeNull();
+  });
+
+  it('defaults the scheme by category', () => {
+    expect(defaultIdScheme('Station')).toBe('level_tag');
+    expect(defaultIdScheme('Sensor')).toBe('level_tag');
+    for (const c of ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', null]) {
+      expect(defaultIdScheme(c)).toBe('level_number');
+    }
+  });
+
+  it('next free = highest number on that level code + 1, two digits, gaps kept', () => {
+    const ids = ['06M-01', '06M-02', '06M-04', '06-07', '06M-S3', '06M-D12', null];
+    expect(nextFreeNumber('06M', ids)).toBe(5);
+    expect(nextFreeNumber('06', ids)).toBe(8);
+    expect(nextFreeNumber('07', ids)).toBe(1);
+    expect(formatNumberId('06M', 5)).toBe('06M-05');
+    expect(formatNumberId('B2', 100)).toBe('B2-100');
+    expect(() => formatNumberId('B2', 0)).toThrow(DeviceIdError);
+  });
+
+  it('builds tag IDs from what the surveyor types', () => {
+    expect(tagDeviceId('01', 'Station', 'S15')).toBe('01-S15');
+    expect(tagDeviceId('01', 'Station', ' s 15 ')).toBe('01-S15');
+    expect(tagDeviceId('01', 'Station', '15')).toBe('01-S15');
+    expect(tagDeviceId('01', 'Station', 'S09')).toBe('01-S9');
+    expect(tagDeviceId('B2', 'Sensor', 'd1')).toBe('B2-D1');
+    expect(tagDeviceId('B2', 'Sensor', 'B2-D1')).toBe('B2-D1');
+    expect(tagDeviceId('03', 'Touchscreen', 'T2')).toBe('03-T2'); // library says level_tag
+  });
+
+  it('refuses tags that contradict the category or level', () => {
+    expect(() => tagDeviceId('01', 'Station', 'D15')).toThrow(/starts with S/);
+    expect(() => tagDeviceId('01', 'Station', '02-S15')).toThrow(/level 02/);
+    expect(() => tagDeviceId('01', 'Station', 'S')).toThrow(DeviceIdError);
+    expect(() => tagDeviceId('01', 'Station', 'S0')).toThrow(DeviceIdError);
+    expect(() => tagDeviceId('03', 'Touchscreen', '2')).toThrow(/needs its letter/);
+  });
+});
+
+describe('deviceIdFor', () => {
+  const PROJECT = uuidv7();
+  const OTHER = uuidv7();
+  let store: Store;
+  let editor: Editor;
+  let L06M: string;
+  let L06: string;
+
+  const device = async (level_id: string, display_id: string, category = 'Relay panel') =>
+    (await editor.create('device', { level_id, display_id, category, status: 'Not installed' }, CTX)).id;
+
+  beforeEach(async () => {
+    store = await Store.open(new BetterSqliteDriver(), { installId: 'ipad', search: 'like' });
+    editor = new Editor(store, { projectId: PROJECT, userId: uuidv7() });
+    const level = async (project_id: string, code: string) =>
+      (await editor.create('level', { project_id, level: code, numbering_group_id: uuidv7() }, CTX)).id;
+    L06M = await level(PROJECT, '06M');
+    L06 = await level(PROJECT, '06');
+    const otherL06M = await level(OTHER, '06M');
+    await device(L06M, '06M-01');
+    await device(L06M, '06M-02', 'EBDK');
+    await device(L06M, '06M-S1', 'Station');
+    await device(L06, '06-01');
+    await device(otherL06M, '06M-09'); // another project never counts
+  });
+
+  it('proposes the next free number for panels and equipment', async () => {
+    expect(await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Foundry panel' })).toEqual({
+      display_id: '06M-03',
+      scheme: 'level_number',
+      next_free: 3,
+      taken_by: [],
+    });
+    // 06 and 06M share a numbering group, but device IDs are per level code.
+    expect((await deviceIdFor(store, { projectId: PROJECT, levelId: L06, category: 'NSPS' })).display_id).toBe('06-02');
+  });
+
+  it('keeps a deleted device’s ID used', async () => {
+    const d = await device(L06M, '06M-03');
+    await editor.delete('device', d, CTX);
+    expect((await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'EBDK' })).display_id).toBe('06M-04');
+  });
+
+  it('reports, but allows, a picked number that is already used', async () => {
+    const res = await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'EBDK', number: 2 });
+    expect(res.display_id).toBe('06M-02');
+    expect(res.next_free).toBe(3);
+    expect(res.taken_by).toHaveLength(1);
+  });
+
+  it('a device being renumbered does not collide with itself', async () => {
+    const own = (await store.list<{ id: string; display_id: string }>('device')).find((d) => d.display_id === '06M-02')!;
+    const res = await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, number: 2, deviceId: own.id });
+    expect(res.taken_by).toEqual([]);
+  });
+
+  it('uses the confirmed tag for stations and sensors', async () => {
+    expect(await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Sensor', tag: 'D4' })).toEqual({
+      display_id: '06M-D4',
+      scheme: 'level_tag',
+      next_free: null,
+      taken_by: [],
+    });
+    const dup = await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Station', tag: '1' });
+    expect(dup.display_id).toBe('06M-S1');
+    expect(dup.taken_by).toHaveLength(1);
+    await expect(deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Station' })).rejects.toThrow(
+      /drawing tag/,
+    );
+  });
+
+  it('the library type’s scheme wins over the category default', async () => {
+    const { id: sensorAsNumber } = await editor.create(
+      'library_type',
+      { project_id: PROJECT, model: 'PI1002-LVD', category: 'Sensor', id_scheme: 'level_number' },
+      CTX,
+    );
+    const res = await deviceIdFor(store, {
+      projectId: PROJECT,
+      levelId: L06M,
+      category: 'Sensor',
+      libraryTypeId: sensorAsNumber,
+    });
+    expect(res).toMatchObject({ display_id: '06M-03', scheme: 'level_number' });
+  });
+
+  it('refuses an unknown level', async () => {
+    await expect(deviceIdFor(store, { projectId: PROJECT, levelId: uuidv7() })).rejects.toThrow(/Unknown level/);
+  });
+});

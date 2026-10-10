@@ -15,6 +15,7 @@ How the local SQLite store works. Normative references: PLAN §2.1 (versioning, 
 | `src/op.ts` | The `Op` type. |
 | `src/editor.ts` | `Editor` / `EditBatch` (T08): the mutation API screens call; builds ops with `was`, `base_op_id` and `group_id` and applies them through the store. |
 | `src/sync.ts`, `src/http-transport.ts` | `SyncEngine` and the HTTPS transport (T11): see `docs/sync.md`. |
+| `src/numbering.ts`, `src/device-id.ts` | `NEW` state, `unnumbered()`, device ID rules (T13): see `docs/numbering.md`. |
 | `src/ids.ts` | UUID v7; `setRandomSource` for runtimes without `crypto.getRandomValues`. |
 | `src/node.ts` | `BetterSqliteDriver` (Node tests only). The iPad driver is `app/src/db/expo-sqlite-driver.ts`. |
 
