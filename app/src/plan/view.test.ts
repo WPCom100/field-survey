@@ -103,7 +103,8 @@ describe('layout and clustering', () => {
   it('splits as the zoom grows and never clusters at or above offZoom', () => {
     const mid = layoutPins(pins, sheetToView(vp(0.5)), 4000, 4000);
     expect(mid.clusters.map((c) => c.members)).toEqual([[0, 1]]);
-    const close = layoutPins(pins, sheetToView(vp(1)), 5000, 5000);
+    expect(layoutPins(pins, sheetToView(vp(1)), 5000, 5000).clusters.map((c) => c.members)).toEqual([[0, 1]]);
+    const close = layoutPins(pins, sheetToView(vp(2)), 9000, 9000);
     expect(close.clusters).toHaveLength(0);
     expect(close.pins).toHaveLength(4);
   });

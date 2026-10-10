@@ -47,7 +47,8 @@ export type LayoutOptions = {
   marginPx: number;
 };
 
-export const LAYOUT_DEFAULTS: LayoutOptions = { clusterPx: 30, offZoom: 1, marginPx: 60 };
+/** offZoom 2 (T17 on-device): at ×1 devices a couple of feet apart still overlapped unclustered. */
+export const LAYOUT_DEFAULTS: LayoutOptions = { clusterPx: 30, offZoom: 2, marginPx: 60 };
 
 export function layoutPins(
   pins: readonly RenderPin[],

@@ -139,10 +139,14 @@ gained the `setNativeFocus` command, D101); see `TASKS.md` T17 for the build id.
 
 | Measure | Threshold | Result |
 |---|---|---|
-| RAM at Fit | < 600 MB | |
-| RAM at ×4 | < 600 MB | |
-| RAM 10 s after 100 cycles | < 600 MB | |
-| UI fps pinching (pins on) | ≥ 50 | |
-| JS fps pinching | — | |
-| Pins glued during pinch | yes | |
-| Fit shows the whole sheet | yes | |
+| RAM at Fit | < 600 MB | **479 MB** |
+| RAM at ×4 | < 600 MB | **530 MB** |
+| RAM 10 s after 100 cycles | < 600 MB | **512 MB**; no crash. Transient **peak 620 MB** near cycle 90 |
+| UI fps pinching (pins on) | ≥ 50 | **60** |
+| JS fps pinching | — | **60** |
+| Pins glued during pinch | yes | **no — trails**, settles exactly when the fingers stop |
+| Fit shows the whole sheet | yes | **yes** (opens at fit; ⌖ Fit centres) |
+
+Run: Landry's iPad Air, dev build `a5f5c323` with JS from Metro (debug bundle, so RAM is higher than a release build would be), 2026-10-10, after the D102 driver fix. Also confirmed: pins on their drawing at Fit/×2/×4 when still, D64 shapes/colours/glyphs, "+" and camera marks, clusters at fit and cluster tap zooms in, pin ↔ row highlight both ways, filters (Status, Owner incl. the EC/ETC rule, Open punch = 16) and layers, prefs kept per level.
+
+**Reading against §4:** the TP-6 rule (RAM ≥ 600 MB at ×4 after the cycles reopens the decision) is **not** triggered: 512 MB after the cycles, 530 MB at ×4. The 620 MB transient peak during the stress cycles is a watch item: re-measure on a release (TestFlight) build when a Perf Monitor reading is possible, and on a real level sheet when T45 delivers one. UI-thread drawing (D95 step 1) did **not** remove the pinch trail; D95's native step is task T64.

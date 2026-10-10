@@ -21,6 +21,7 @@ import {
   View,
 } from 'react-native';
 import Pdf, { type PdfRef } from 'react-native-pdf';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedValue } from 'react-native-reanimated';
 
 import { loadLevelPlan, type LevelPlan, type PlanDevice, type PlanSheet } from './data';
@@ -59,7 +60,7 @@ import {
 
 const HIT_PX = PIN_PX; // tap radius, screen points
 /** Zoom used to bring a single pin into view: past the cluster cut-off, so it stands alone. */
-const REVEAL_ZOOM = LAYOUT_DEFAULTS.offZoom * 1.25;
+const REVEAL_ZOOM = LAYOUT_DEFAULTS.offZoom * 1.25; // 2.5: neighbours a couple of feet apart stand clear
 const ROW_H = 52;
 
 type Menu = 'category' | 'status' | 'owner' | 'layers' | null;
@@ -103,6 +104,7 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const insets = useSafeAreaInsets();
 
   const matrix = useSharedValue<Affine | null>(null);
   const vpRef = useRef<PdfViewport | null>(null);
@@ -268,18 +270,26 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
   return (
     <View style={styles.root}>
       {/* top bar */}
-      <View style={styles.bar}>
+      <View style={[styles.bar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={onBack} style={styles.back} hitSlop={8}>
           <Text style={styles.backText}>◀ {plan?.level.code ?? '…'}</Text>
         </Pressable>
         <BarButton label="Category" count={prefs.filter.categories.length} open={menu === 'category'} onPress={() => setMenu(menu === 'category' ? null : 'category')} />
         <BarButton label="Status" count={prefs.filter.statuses.length} open={menu === 'status'} onPress={() => setMenu(menu === 'status' ? null : 'status')} />
         <BarButton label="Owner" count={prefs.filter.owners.length} open={menu === 'owner'} onPress={() => setMenu(menu === 'owner' ? null : 'owner')} />
-        <Pressable style={[styles.chip, prefs.filter.openPunch && styles.chipOn]} onPress={() => setFilter((f) => ({ ...f, openPunch: !f.openPunch }))}>
+        <Pressable style={[styles.chip, prefs.filter.openPunch && styles.chipOn]} onPress={() => {
+            setMenu(null);
+            setFilter((f) => ({ ...f, openPunch: !f.openPunch }));
+          }}>
           <Text style={[styles.chipText, prefs.filter.openPunch && styles.chipTextOn]}>{prefs.filter.openPunch ? '☑' : '☐'} Open punch</Text>
         </Pressable>
         {filtering ? (
-          <Pressable style={styles.chip} onPress={() => setFilter(() => EMPTY_FILTER)}>
+          <Pressable
+            style={styles.chip}
+            onPress={() => {
+              setMenu(null);
+              setFilter(() => EMPTY_FILTER);
+            }}>
             <Text style={styles.chipText}>Clear</Text>
           </Pressable>
         ) : null}
@@ -508,7 +518,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 12,
-    paddingTop: 12,
     paddingBottom: 8,
     backgroundColor: '#fff',
     borderBottomWidth: StyleSheet.hairlineWidth,
