@@ -62,6 +62,12 @@ import {
 const HIT_PX = PIN_PX; // tap radius, screen points
 /** Zoom used to bring a single pin into view: past the cluster cut-off, so it stands alone. */
 const REVEAL_ZOOM = LAYOUT_DEFAULTS.offZoom * 1.25; // 2.5: neighbours a couple of feet apart stand clear
+/**
+ * Deepest zoom as a multiple of the patch's fit (view width / page width): the 06M composite fits at
+ * ~0.2 view pt per sheet pt, so 32 allows ~6.4 (D107; 8 capped it at ~1.6, below REVEAL_ZOOM).
+ * Must stay a constant: a `maxScale` prop change makes the patch reset the zoom to fit.
+ */
+const MAX_SCALE = 32;
 const ROW_H = 52;
 
 type Menu = 'category' | 'status' | 'owner' | 'layers' | null;
@@ -321,7 +327,7 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
                 page={plan.sheet.page}
                 fitPolicy={2}
                 minScale={1}
-                maxScale={8}
+                maxScale={MAX_SCALE}
                 spacing={0}
                 enableAnnotationRendering={false}
                 enableTextSelection={false}

@@ -170,10 +170,11 @@ committed (no JS-thread hop, no wait for the next frame). JS only, so the **T17 
 | Check | Expected | Result |
 |---|---|---|
 | UI-thread log line | present | |
-| Pins glued during pinch | yes | |
+| Pins glued during pinch | yes | **"much more sticky. Good"** (Landry, 2026-10-10) |
 | Pins glued during pan / fling | yes | |
 | Pin size constant during pinch | yes | |
 | Fit, row tap, pin tap, clusters | unchanged | |
 | UI fps pinching (pins on) | ≥ 50 | |
+| RAM at the deepest zoom (×32 of fit, D107) | < 600 MB | |
 
 "Still trails" → the native step in D106 (layer transform from the KVO turn; new dev build).
