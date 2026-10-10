@@ -1,0 +1,33 @@
+[project]
+name = "field-survey-server"
+version = "0.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "sqlalchemy>=2",
+  "alembic",
+  "psycopg[binary]",
+  "pydantic-settings",
+  "boto3",
+  "python-multipart",
+]
+
+[dependency-groups]
+dev = ["pytest", "httpx", "ruff"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

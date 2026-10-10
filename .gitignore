@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.expo/
+web-build/
+ios/
+android/
+*.tsbuildinfo
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+.env
+.env.*
+!.env.example
+.DS_Store
