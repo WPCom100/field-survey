@@ -145,3 +145,37 @@ DigitalOcean → Droplet → Power off → Resize → **CPU and RAM only** (keep
 | Add a team name | `TEAM_NAMES_CSV` in `.env` or `POST /team` |
 
 Monitoring: an external uptime monitor pings `https://survey.wpcom.cloud/health` (PLAN §8). The worker heartbeat row arrives with the job runner.
+
+## 5. iOS builds and TestFlight (T06b, D59, D70)
+
+All on the PC in `app/`, in **your own terminal** (EAS asks for the Apple ID password and 2FA code interactively). Needs the Apple Developer Program membership **active** (developer.apple.com → Account → Membership shows a Team ID). Nothing here needs a Mac.
+
+### 5.1 Once per project
+
+1. `eas login` (the Expo account), then `eas init` → writes `extra.eas.projectId` and `owner` into `app.json`; commit that.
+2. **App Store Connect API key.** appstoreconnect.apple.com → Users and Access → Integrations → App Store Connect API → Team Keys → **+**, name `EAS`, access **Admin** → download the `.p8` (once only; keep it in the password manager, never in the repo) and note the Key ID and Issuer ID. Then `eas credentials` → iOS → production → App Store Connect: Manage your API Key → set up a new key with those three values.
+3. **Devices.** `eas device:create` → "Website" → open the link/QR on each team iPad in Safari → install the profile (Settings → General → VPN & Device Management). Every new iPad needs this **and** a new development build (the build's profile lists the devices).
+4. **App record.** App Store Connect → Apps → **+** New App: iOS, name `Field Survey`, language English (U.S.), bundle ID `productions.luminarytechnology.fieldsurvey` (EAS registers the bundle ID on the first build; if it is not in the list yet, do 5.2 first), SKU `field-survey`, Full Access. Copy the Apple ID (numeric) of the app into `eas.json` → `submit.production.ios.ascAppId`.
+5. **Team.** Users and Access → **+** for each team member (role Developer is enough), then TestFlight → Internal Testing → **+** group `LTP team` → add them; "Automatically distribute" on.
+
+### 5.2 Development build (whenever a native module changes)
+
+```
+eas build --profile development --platform ios
+```
+
+Install from the QR/link on the build page. First launch on iPadOS 17: Settings → Privacy & Security → **Developer Mode** on → restart. Daily work: `npx expo start --dev-client` on the PC, iPad on the same Wi-Fi, open the project from the dev client (allow Node.js through Windows Firewall on private networks if the iPad cannot connect).
+
+### 5.3 TestFlight build (at least every 60 days, D59)
+
+```
+eas build --profile production --platform ios
+eas submit --platform ios --latest
+```
+
+The build number auto-increments in EAS (`appVersionSource: remote`). Export compliance is pre-answered (`ITSAppUsesNonExemptEncryption: false`, HTTPS only). Processing in App Store Connect takes 5–30 min; the `LTP team` group gets it automatically. TestFlight builds expire after 90 days.
+
+### 5.4 Build log
+
+| Date | Profile | EAS build id | Build no. | Notes |
+|---|---|---|---|---|

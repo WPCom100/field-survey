@@ -11,7 +11,8 @@
       "bundleIdentifier": "productions.luminarytechnology.fieldsurvey",
       "supportsTablet": true,
       "infoPlist": {
-        "UIDeviceFamily": [2]
+        "UIDeviceFamily": [2],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "plugins": ["expo-router"],
