@@ -230,7 +230,9 @@ export function PlanSpike() {
         enableAnnotationRendering={false}
         enableTextSelection={false}
         onLoadComplete={(_n, _path, size) => {
-          setLoadMs(Math.round(now() - mountedAt.current));
+          // keep the first value: PDFKit re-posts the document-changed notification later
+          // (the TestFlight run showed 210 s after a 169 ms first viewport)
+          setLoadMs((t) => t ?? Math.round(now() - mountedAt.current));
           setPageSize(size);
         }}
         onViewportChanged={onViewportChanged}

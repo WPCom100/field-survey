@@ -67,36 +67,54 @@ pan/zoom pass and again after the zoom cycles. Load/first-viewport, Δ, hit, ink
 are measured the same way. Installing TestFlight replaces the dev client on the iPad (same bundle
 id); reinstall the dev build from its EAS page when back at the PC.
 
-## 3. Results (iPad Air, fill in)
+## 3. Results (iPad Air, TestFlight 1.0.0 (4), Landry, 2026-10-10)
 
-| Measure | Threshold | ×1 (fit) | ×2 | ×4 | Notes |
-|---|---|---|---|---|---|
-| Load (`load … ms`, cached) | < 2000 ms | | — | — | |
-| First viewport (`first viewport … ms`) | < 2000 ms | | — | — | |
-| Drawing fully visible (stopwatch) | < 2 s | | | | |
-| UI fps while panning | ≥ 50 | | | | |
-| UI fps while pinching | ≥ 50 | | | | |
-| JS fps while panning (overlay) | ≥ 50 | | | | pins on |
-| JS fps while panning, pins off | — | | | | |
-| RAM (perf monitor) | < 600 MB | | | | |
-| Tap Δ ours vs PDFKit (pt) | ≈ 0 | | | | |
-| Tap hit = tapped pin | yes | | | | |
-| Ink stays registered after zoom | yes | | | | strokes: |
-| 100 zoom cycles | no crash | peak RAM: | after: | | |
-| Viewport events during a 5 s pan | — | | | | HUD counter |
+Two TestFlight runs. Build 3 loaded in 169 ms and drew in 1–2 s but had no pinch/pan, no taps and
+an inert `scale` prop (`singlePage` had switched PDFKit's user interaction off; `autoScales`
+snapped the zoom back) — fixed in build 4 (`3653092`). Build 4 numbers, from the HUD photo and
+Landry's report ("all functional; pins and pen are accurate, with jitter while zooming"):
 
-iPad model / iPadOS: ______ · dev build: `d5842b4e…` · date: ______
+| Measure | Threshold | Result | Notes |
+|---|---|---|---|
+| First viewport (`first viewport … ms`) | < 2000 ms | **169 ms** | laid out and scrollable |
+| Drawing fully visible | < 2 s | **1–2 s** (both runs) | |
+| Load (`load … ms`) | < 2000 ms | 169 ms (build 3); HUD showed 210,496 ms in build 4 | `loadComplete` is re-posted by PDFKit later and overwrote the first value; HUD now keeps the first (`3653092`+) |
+| JS fps while panning/zooming, pins on | ≥ 50 | **119 (min 106)** | after ~7,000 viewport events, 2 strokes, 100 cycles |
+| JS fps, pins off | — | not taken | |
+| UI fps (PDFKit) | ≥ 50 | **not measurable on TestFlight** | pinch/pan reported smooth; overlay jitters one event behind |
+| RAM | < 600 MB | **not measurable on TestFlight** | → first check of the T17 dev-client session |
+| Tap Δ ours vs PDFKit | ≈ 0 | **0.00 pt** at ×0.93 — ours (1060.0, 624.6) = PDFKit (1060.0, 624.6); 23 taps | accurate at every zoom per Landry |
+| Tap hit = tapped pin | yes | crosshair lands where tapped; hit `—` on the photographed empty tap | |
+| Ink stays registered after zoom | yes | **yes** (2 strokes, 55 pts) | jitter during the pinch, locked when still |
+| 100 zoom cycles | no crash | **100/100, app alive** | |
+| Viewport events | — | 6,892 over the session | |
 
-## 4. Decision
+Oddities for T17: at **Fit** PDFKit sits at ×0.93 (page reported 3920×3336 at `loadComplete`,
+i.e. the sheet is ≈ 3.3 screens wide), so `react-native-pdf`'s fit-both does not compute from the
+real frame on the new architecture — harmless here because the overlay reads the true transform, but
+T17 must set its own fit. The overlay **jitters during a pinch**: it is redrawn on the JS thread one
+viewport event behind PDFKit's native zoom (expected from the architecture, D92).
 
-**Pending the iPad numbers.** When filled in:
+iPad: Landry's iPad Air (UDID …801C), iPadOS 17+ · TestFlight build 4 (`214ccaa2…`) · 2026-10-10
 
-- **Pass** (all thresholds met, Δ ≈ 0 at three zooms, no crash): T17 proceeds on this foundation;
-  D92 moves to Approved. If only the overlay's JS fps misses 50 while PDFKit's UI fps holds, T17
-  starts by moving the overlay matrix to a Reanimated shared value (already autolinked) — note it
-  as a T17 sub-step, not a fail.
-- **Fail** (crash in the zoom cycles, RAM ≥ 600 MB, or PDFKit's own UI fps < 50): add **T17b** —
-  server job renders the display sheet into a PNG tile pyramid (e.g. 256-px tiles, 5 levels, R2),
-  the client shows it in a zoomable image viewer with the same Skia overlay and the same sheet
-  coordinates (`viewport.ts` is unchanged: the affine then comes from our own gesture state).
-  The `react-native-pdf` patch and dependency are removed in T17b.
+## 4. Decision (2026-10-10)
+
+**Pass — T17 proceeds on `react-native-pdf` (PDFKit) + the Skia overlay; T17b is not added.**
+
+Grounds: first render 169 ms / drawn in 1–2 s (threshold 2 s); 100 zoom cycles without a crash on
+the 153K-segment composite (the K1 risk); page↔screen mapping exact (Δ 0.00 pt, ours = PDFKit) and
+reported accurate at every zoom; overlay JS thread at 106–119 fps; ink registered after zoom.
+
+Caveats carried into T17 (recorded as follow-ups in `TASKS.md`):
+1. **RAM** and PDFKit's **UI fps** could not be read on TestFlight. T17's first on-device step is a
+   Perf Monitor run on a rebuilt dev client (the current dev build predates the build-4 fix). If RAM
+   ≥ 600 MB at ×4 after the cycles, this decision is reopened and T17b is added then.
+2. **Pinch jitter**: the overlay lags one viewport event behind PDFKit. T17 moves the sheet→view
+   matrix to a Reanimated shared value updated from the native event (UI thread), or, if that is
+   still a frame behind, hides the overlay during an active pinch and re-shows it on end — a
+   D-number before Reanimated becomes a direct dependency.
+3. **Fit**: T17 computes its own fit scale from the viewport (page size vs. view size) instead of
+   relying on `fitPolicy`.
+4. `loadComplete` fires more than once; use the first viewport as the "ready" signal.
+
+D92 (dependencies, patch, sheet coordinates) stands and should move to Approved with this decision.
