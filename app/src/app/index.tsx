@@ -1,50 +1,186 @@
 import { Link } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { describeBlobs, useBlobStatus } from '../blobs/useBlobStatus';
 import { openAppStore } from '../db';
-import { levelsWithPlans } from '../plan/data';
-import { getSyncEngine } from '../sync/engine';
-import { describeSync, useSyncStatus } from '../sync/useSyncStatus';
+import {
+  filterLevels,
+  listProjects,
+  loadProjectHome,
+  type HomeLevel,
+  type HomeProject,
+  type ProjectHome,
+} from '../home/data';
+import { useCurrentUser } from '../identity/IdentityGate';
+import { useSyncStatus } from '../sync/useSyncStatus';
 
-export default function Home() {
+/** Sidebar targets (PLAN §5). Each lights up when its task lands; Levels is this screen. */
+const SIDEBAR = [
+  'Levels',
+  'Cable / riser',
+  'Needs review',
+  'Dashboard',
+  'Rulings',
+  'Lint',
+  'Export',
+  'Setup',
+  'Library',
+  'Sync',
+] as const;
+
+const CACHE_LABEL: Record<HomeLevel['cache'], string> = {
+  cached: 'Cached',
+  downloading: 'Downloading…',
+  'not cached': 'Not cached',
+  'no sheet': 'No sheet',
+};
+
+export default function ProjectHomeScreen() {
+  const user = useCurrentUser();
   const sync = useSyncStatus();
-  const blobs = describeBlobs(useBlobStatus());
-  const [levels, setLevels] = useState<{ id: string; code: string }[]>([]);
+  const [projects, setProjects] = useState<HomeProject[]>([]);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [home, setHome] = useState<ProjectHome | null>(null);
+  const [mineOnly, setMineOnly] = useState(false);
 
-  // Until the project home (T18): every level on this iPad that has a display sheet.
+  // Reload after each sync: pulls change counts, reviews, assignments and the sheet cache.
   useEffect(() => {
-    openAppStore()
-      .then(levelsWithPlans)
-      .then(setLevels, (e: unknown) => console.warn('[home] levels', e));
-  }, [sync.lastSyncAt]);
+    let live = true;
+    (async () => {
+      const store = await openAppStore();
+      const list = await listProjects(store);
+      if (!live) return;
+      setProjects(list);
+      const id = projectId && list.some((p) => p.id === projectId) ? projectId : (list[0]?.id ?? null);
+      if (id !== projectId) setProjectId(id);
+      setHome(id ? await loadProjectHome(store, id, user.id) : null);
+    })().catch((e: unknown) => console.warn('[home] load', e));
+    return () => {
+      live = false;
+    };
+  }, [projectId, user.id, sync.lastSyncAt, sync.pendingOps]);
+
+  const rows = useMemo(() => (home ? filterLevels(home.levels, mineOnly) : []), [home, mineOnly]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Field Survey</Text>
-      <Pressable onPress={() => getSyncEngine().then((e) => e.requestSync())}>
-        <Text style={styles.status}>{describeSync(sync)}</Text>
-      </Pressable>
-      {blobs ? <Text style={styles.status}>{blobs}</Text> : null}
-      <View style={styles.levels}>
-        {levels.map((l) => (
-          <Link key={l.id} href={{ pathname: '/plan/[levelId]', params: { levelId: l.id } }} style={styles.link}>
-            Level {l.code} plan →
-          </Link>
+    <View style={styles.root}>
+      <View style={styles.sidebar}>
+        <Text style={styles.brand}>Field Survey</Text>
+        {SIDEBAR.map((name) => (
+          <View key={name} style={[styles.navItem, name === 'Levels' && styles.navActive]}>
+            <Text style={[styles.navText, name !== 'Levels' && styles.navDim]}>{name}</Text>
+          </View>
         ))}
+        <View style={{ flex: 1 }} />
+        <Link href="/demo-plan" style={styles.demo}>
+          Demo plan (06M composite) →
+        </Link>
+        <Text style={styles.user}>{user.name}</Text>
       </View>
-      <Link href="/demo-plan" style={styles.link}>
-        Demo plan (06M composite) →
-      </Link>
+
+      <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
+        {projects.length > 1 ? (
+          <View style={styles.chips}>
+            {projects.map((p) => (
+              <Pressable key={p.id} onPress={() => setProjectId(p.id)} style={[styles.chip, p.id === projectId && styles.chipOn]}>
+                <Text style={p.id === projectId ? styles.chipTextOn : styles.chipText}>{p.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {!home ? (
+          <Text style={styles.empty}>No project on this iPad yet. Connect to the server and sync, or create one in Setup.</Text>
+        ) : (
+          <>
+            <Text style={styles.title}>{home.project.name}</Text>
+            {home.project.site ? <Text style={styles.sub}>{home.project.site}</Text> : null}
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Assigned to me</Text>
+              <Switch value={mineOnly} onValueChange={setMineOnly} />
+            </View>
+
+            <View style={[styles.tr, styles.th]}>
+              <Text style={[styles.cLevel, styles.thText]}>Level</Text>
+              <Text style={[styles.cState, styles.thText]}>State</Text>
+              <Text style={[styles.cNum, styles.thText]}>Devices</Text>
+              <Text style={[styles.cNum, styles.thText]}>Issue / NI</Text>
+              <Text style={[styles.cNum, styles.thText]}>Open items</Text>
+              <Text style={[styles.cNum, styles.thText]}>Review</Text>
+              <Text style={[styles.cCache, styles.thText]}>Plan</Text>
+            </View>
+            {rows.map((l) => (
+              <LevelRow key={l.id} level={l} />
+            ))}
+            {rows.length === 0 ? (
+              <Text style={styles.empty}>{mineOnly ? 'No levels are assigned to you.' : 'This project has no levels yet.'}</Text>
+            ) : null}
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
+function LevelRow({ level: l }: { level: HomeLevel }) {
+  const cells = (
+    <View style={[styles.tr, !l.inScope && styles.outOfScope]}>
+      <View style={styles.cLevel}>
+        <Text style={styles.levelCode}>
+          {l.code}
+          {l.assignedToMe ? '  ●' : ''}
+        </Text>
+        {!l.inScope ? <Text style={styles.small}>out of scope</Text> : null}
+      </View>
+      <Text style={styles.cState}>{l.state === 'baseline_locked' ? 'Baseline locked' : 'Setup'}</Text>
+      <Text style={styles.cNum}>{l.devices}</Text>
+      <Text style={[styles.cNum, l.issueOrNi > 0 && styles.red]}>{l.issueOrNi}</Text>
+      <Text style={styles.cNum}>{l.openItems}</Text>
+      <Text style={[styles.cNum, l.reviews > 0 && styles.badge]}>{l.reviews > 0 ? `IN REVIEW ${l.reviews}` : '0'}</Text>
+      <Text style={[styles.cCache, l.cache === 'not cached' && styles.red]}>{CACHE_LABEL[l.cache]}</Text>
+    </View>
+  );
+  // A level opens its plan only with a display sheet; without one the row is informational.
+  if (l.cache === 'no sheet') return cells;
+  return (
+    <Link href={{ pathname: '/plan/[levelId]', params: { levelId: l.id } }} asChild>
+      <Pressable>{cells}</Pressable>
+    </Link>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  title: { fontSize: 32, fontWeight: '600' },
-  status: { fontSize: 16, color: '#555' },
-  levels: { gap: 8, alignItems: 'center', marginTop: 16 },
-  link: { fontSize: 16, color: '#1565c0' },
+  root: { flex: 1, flexDirection: 'row', backgroundColor: '#fff' },
+  sidebar: { width: 220, backgroundColor: '#f3f5f8', borderRightWidth: 1, borderRightColor: '#d5d9e0', padding: 12, gap: 2 },
+  brand: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
+  navItem: { paddingVertical: 9, paddingHorizontal: 10, borderRadius: 6 },
+  navActive: { backgroundColor: '#dce8fb' },
+  navText: { fontSize: 15, color: '#111' },
+  navDim: { color: '#9aa0a8' },
+  demo: { fontSize: 13, color: '#1565c0', marginBottom: 10 },
+  user: { fontSize: 13, color: '#555' },
+  main: { flex: 1 },
+  mainContent: { padding: 20, gap: 6 },
+  title: { fontSize: 28, fontWeight: '600' },
+  sub: { fontSize: 15, color: '#555' },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 },
+  filterLabel: { fontSize: 15 },
+  chips: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
+  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
+  chipText: { color: '#111' },
+  chipTextOn: { color: '#fff' },
+  tr: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
+  th: { backgroundColor: '#f3f5f8', paddingVertical: 8 },
+  thText: { fontSize: 12, fontWeight: '700', color: '#555', textTransform: 'uppercase' },
+  outOfScope: { opacity: 0.55 },
+  cLevel: { width: 110 },
+  cState: { width: 140, fontSize: 14 },
+  cNum: { width: 100, fontSize: 15, textAlign: 'right' },
+  cCache: { flex: 1, fontSize: 14, paddingLeft: 20 },
+  levelCode: { fontSize: 17, fontWeight: '600' },
+  small: { fontSize: 11, color: '#777' },
+  red: { color: '#c62828', fontWeight: '600' },
+  badge: { color: '#1565c0', fontWeight: '700', fontSize: 12 },
+  empty: { fontSize: 15, color: '#666', marginTop: 24 },
 });

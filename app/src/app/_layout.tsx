@@ -1,6 +1,9 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
+import { View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GlobalStatusBar } from '../components/StatusBar';
 import { openAppStore } from '../db';
 import { IdentityGate } from '../identity/IdentityGate';
 import { SyncRunner } from '../sync/SyncRunner';
@@ -17,7 +20,12 @@ export default function RootLayout() {
   return (
     <IdentityGate>
       <SyncRunner />
-      <Stack screenOptions={{ headerShown: false }} />
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <GlobalStatusBar />
+        <View style={{ flex: 1 }}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </View>
+      </SafeAreaView>
     </IdentityGate>
   );
 }
