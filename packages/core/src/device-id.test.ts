@@ -3,8 +3,6 @@ import {
   DeviceIdError,
   defaultIdScheme,
   deviceIdFor,
-  formatNumberId,
-  nextFreeNumber,
   parseDeviceId,
   tagDeviceId,
 } from './device-id';
@@ -30,16 +28,6 @@ describe('pure rules', () => {
     for (const c of ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', null]) {
       expect(defaultIdScheme(c)).toBe('level_number');
     }
-  });
-
-  it('next free = highest number on that level code + 1, two digits, gaps kept', () => {
-    const ids = ['06M-01', '06M-02', '06M-04', '06-07', '06M-S3', '06M-D12', null];
-    expect(nextFreeNumber('06M', ids)).toBe(5);
-    expect(nextFreeNumber('06', ids)).toBe(8);
-    expect(nextFreeNumber('07', ids)).toBe(1);
-    expect(formatNumberId('06M', 5)).toBe('06M-05');
-    expect(formatNumberId('B2', 100)).toBe('B2-100');
-    expect(() => formatNumberId('B2', 0)).toThrow(DeviceIdError);
   });
 
   it('builds tag IDs from what the surveyor types', () => {
@@ -87,64 +75,64 @@ describe('deviceIdFor', () => {
     await device(otherL06M, '06M-09'); // another project never counts
   });
 
-  it('proposes the next free number for panels and equipment', async () => {
-    expect(await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Foundry panel' })).toEqual({
-      display_id: '06M-03',
+  it('leaves level_number IDs to the server (D93)', async () => {
+    for (const category of ['Foundry panel', 'NSPS', 'EBDK', null]) {
+      expect(await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category })).toEqual({
+        scheme: 'level_number',
+        pending: true,
+      });
+    }
+    // A tag is ignored for a numbered device: the server owns the number.
+    expect(await deviceIdFor(store, { projectId: PROJECT, levelId: L06, category: 'Relay panel', tag: '4' })).toEqual({
       scheme: 'level_number',
-      next_free: 3,
-      taken_by: [],
+      pending: true,
     });
-    // 06 and 06M share a numbering group, but device IDs are per level code.
-    expect((await deviceIdFor(store, { projectId: PROJECT, levelId: L06, category: 'NSPS' })).display_id).toBe('06-02');
   });
 
-  it('keeps a deleted device’s ID used', async () => {
-    const d = await device(L06M, '06M-03');
+  it('a device being retagged does not collide with itself', async () => {
+    const own = (await store.list<{ id: string; display_id: string }>('device')).find((d) => d.display_id === '06M-S1')!;
+    const res = await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Station', tag: 'S1', deviceId: own.id });
+    expect(res).toEqual({ scheme: 'level_tag', pending: false, display_id: '06M-S1', taken_by: [] });
+  });
+
+  it('a deleted device’s tag still counts as taken', async () => {
+    const d = await device(L06M, '06M-D7', 'Sensor');
     await editor.delete('device', d, CTX);
-    expect((await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'EBDK' })).display_id).toBe('06M-04');
-  });
-
-  it('reports, but allows, a picked number that is already used', async () => {
-    const res = await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'EBDK', number: 2 });
-    expect(res.display_id).toBe('06M-02');
-    expect(res.next_free).toBe(3);
-    expect(res.taken_by).toHaveLength(1);
-  });
-
-  it('a device being renumbered does not collide with itself', async () => {
-    const own = (await store.list<{ id: string; display_id: string }>('device')).find((d) => d.display_id === '06M-02')!;
-    const res = await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, number: 2, deviceId: own.id });
-    expect(res.taken_by).toEqual([]);
+    const res = await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Sensor', tag: '7' });
+    expect(res).toMatchObject({ display_id: '06M-D7', taken_by: [d] });
   });
 
   it('uses the confirmed tag for stations and sensors', async () => {
     expect(await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Sensor', tag: 'D4' })).toEqual({
-      display_id: '06M-D4',
       scheme: 'level_tag',
-      next_free: null,
+      pending: false,
+      display_id: '06M-D4',
       taken_by: [],
     });
     const dup = await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Station', tag: '1' });
-    expect(dup.display_id).toBe('06M-S1');
-    expect(dup.taken_by).toHaveLength(1);
+    expect(dup).toMatchObject({ display_id: '06M-S1', taken_by: [expect.any(String)] });
     await expect(deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Station' })).rejects.toThrow(
       /drawing tag/,
     );
   });
 
   it('the library type’s scheme wins over the category default', async () => {
-    const { id: sensorAsNumber } = await editor.create(
-      'library_type',
-      { project_id: PROJECT, model: 'PI1002-LVD', category: 'Sensor', id_scheme: 'level_number' },
-      CTX,
-    );
-    const res = await deviceIdFor(store, {
-      projectId: PROJECT,
-      levelId: L06M,
-      category: 'Sensor',
-      libraryTypeId: sensorAsNumber,
-    });
-    expect(res).toMatchObject({ display_id: '06M-03', scheme: 'level_number' });
+    const type = async (category: string, id_scheme: string) =>
+      (await editor.create('library_type', { project_id: PROJECT, model: `m-${id_scheme}`, category, id_scheme }, CTX)).id;
+    const sensorAsNumber = await type('Sensor', 'level_number');
+    expect(
+      await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Sensor', libraryTypeId: sensorAsNumber }),
+    ).toEqual({ scheme: 'level_number', pending: true });
+    const touchscreenAsTag = await type('Touchscreen', 'level_tag');
+    expect(
+      await deviceIdFor(store, {
+        projectId: PROJECT,
+        levelId: L06,
+        category: 'Touchscreen',
+        libraryTypeId: touchscreenAsTag,
+        tag: 'T2',
+      }),
+    ).toMatchObject({ scheme: 'level_tag', display_id: '06-T2' });
   });
 
   it('refuses an unknown level', async () => {

@@ -35,7 +35,7 @@ from app.db import Base
 from app.ids import uuid7
 from app.materialise import materialise
 from app.models import FieldHead, Level, Op, Project, ReviewItem, User
-from app.numbering import NUMBERED, next_number
+from app.numbering import NUMBERED, device_scheme, next_device_id, next_number
 
 log = logging.getLogger("sync")
 
@@ -651,6 +651,9 @@ class Push:
 
     def assign(self, create: Op) -> None:
         """Step 2: a numbered record gets its display number on first receipt (PLAN §2.3)."""
+        if create.entity_kind == "device":
+            self.assign_device(create)
+            return
         if create.entity_kind not in NUMBERED:
             return
         _, field = NUMBERED[create.entity_kind]
@@ -684,6 +687,50 @@ class Push:
             reason=f"Numbered from group {assigned.group.label}",
         )
         self.set_head(create.entity_id, field, op.op_id)
+
+    def assign_device(self, create: Op) -> None:
+        """D93: a `level_number` device created without `display_id` gets `<level>-<nn>` (highest
+        ever used on that level code + 1) as an `assign` op; a `level_tag` device must arrive with
+        its tag (422 otherwise). A create carrying an ID (tag, import, copied floor) keeps it."""
+        payload = create.payload or {}
+        if self.head_value(create.entity_id, "display_id") is not None:
+            return  # carries its ID, or a replayed create: never renumber
+        if device_scheme(self.session, payload, self.head_value) == "level_tag":
+            raise PushError(
+                422,
+                {
+                    "op_id": str(create.op_id),
+                    "error": "a level_tag device needs its display_id (the drawing tag)",
+                },
+            )
+        level_id = payload.get("level_id")
+        display_id = (
+            next_device_id(self.session, self.project_id, uuid.UUID(str(level_id)), self.head_value)
+            if level_id
+            else None
+        )
+        if display_id is None:
+            log.warning(
+                json.dumps(
+                    {
+                        "event": "assign_skipped",
+                        "entity_kind": "device",
+                        "entity_id": str(create.entity_id),
+                        "level_id": jsonable(level_id),
+                    }
+                )
+            )
+            return
+        op = self.server_op(
+            create,
+            entity_kind="device",
+            entity_id=create.entity_id,
+            kind="assign",
+            field="display_id",
+            now=display_id,
+            reason="Device ID assigned by the server (D93)",
+        )
+        self.set_head(create.entity_id, "display_id", op.op_id)
 
     # ------------------------------------------------------------------ review
 

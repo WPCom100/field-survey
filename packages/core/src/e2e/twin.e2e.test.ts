@@ -9,7 +9,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { deviceIdFor } from '../device-id';
 import { HttpTransport } from '../http-transport';
 import type { Op } from '../op';
-import { NUMBERED, displayNumber, type NumberedKind } from '../numbering';
+import { NUMBERED, displayNumber, isNew, type NumberedKind } from '../numbering';
 import { openReviewItems, reviewFields } from '../review';
 import {
   CTX,
@@ -61,12 +61,14 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
       await b.editor.setField('device', d3, 'status', 'Issue', CTX);
       const { id: photoA } = await a.editor.create('photo', { level_id: L06M, device_id: d2, subject: 'Ann: relay panel' }, CTX);
       const { id: photoB } = await b.editor.create('photo', { level_id: L06M, device_id: d2, subject: 'Bob: relay panel' }, CTX);
-      // A field addition each: both pickers propose the same next free number offline (D88).
+      // A field addition each: the ID is the server's (D93), so both iPads show `06M-?` + NEW.
       const idA = await deviceIdFor(a.store, { projectId: w.projectId, levelId: L06M, category: 'Touchscreen' });
       const idB = await deviceIdFor(b.store, { projectId: w.projectId, levelId: L06M, category: 'Touchscreen' });
-      expect([idA.display_id, idB.display_id]).toEqual(['06M-04', '06M-04']);
-      const addA = await newDevice(a, L06M, idA.display_id, { category: 'Touchscreen', origin: 'field_addition' });
-      const addB = await newDevice(b, L06M, idB.display_id, { category: 'Touchscreen', origin: 'field_addition' });
+      expect([idA, idB]).toEqual([{ scheme: 'level_number', pending: true }, { scheme: 'level_number', pending: true }]);
+      const addA = await newDevice(a, L06M, null, { category: 'Touchscreen', origin: 'field_addition' });
+      const addB = await newDevice(b, L06M, null, { category: 'Touchscreen', origin: 'field_addition' });
+      expect(isNew('device', (await get(a, 'device', addA))!)).toBe(true);
+      expect(displayNumber('device', (await get(a, 'device', addA))!, '06M')).toBe('06M-?');
       const { id: pA } = await a.editor.create('punch_item', { level_id: L06M, device_id: addA, item: 'Run N', type: 'Cable not run' }, CTX);
       const { id: pB } = await b.editor.create('punch_item', { level_id: L06M, device_id: addB, item: 'Run N', type: 'Cable not run' }, CTX);
       expect(displayNumber('punch_item', (await get(a, 'punch_item', pA))!)).toBe('NEW');
@@ -98,13 +100,11 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
       expect((await get(a, 'photo', photoA))!.number).toBe(2);
       // Both field additions exist on both iPads with distinct punch numbers…
       expect([(await get(b, 'punch_item', pB))!.number, (await get(b, 'punch_item', pA))!.number]).toEqual([2, 3]);
-      expect(await get(a, 'device', addB)).toMatchObject({ display_id: '06M-04', origin: 'field_addition' });
-      expect(await get(b, 'device', addA)).toMatchObject({ display_id: '06M-04', origin: 'field_addition' });
-      // …and the colliding display ID is reported, not refused (D88): next free is now 5.
-      const after = await deviceIdFor(a.store, { projectId: w.projectId, levelId: L06M, category: 'Touchscreen', number: 4 });
-      expect(after.taken_by.sort()).toEqual([addA, addB].sort());
-      expect(after.next_free).toBe(5);
-
+      // …and distinct device IDs after sync, in arrival order (B first), never a duplicate (D93).
+      for (const c of [a, b]) {
+        expect(await get(c, 'device', addB)).toMatchObject({ display_id: '06M-04', origin: 'field_addition' });
+        expect(await get(c, 'device', addA)).toMatchObject({ display_id: '06M-05', origin: 'field_addition' });
+      }
       await expectConverged(a, b, w.projectId);
 
       // T15: Bob combines the two notes; Ann's op is rejected on both iPads and the server.
@@ -386,9 +386,10 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
         ]);
       }
       expect(await a.store.fieldHead(d, 'deleted_at')).toBe(back.op_id);
-      // The ID stays with the device (D88): nothing else may take 06M-02.
-      const idp = await deviceIdFor(b.store, { projectId: w.projectId, levelId: w.levels.L06M, category: 'Relay panel', number: 2 });
-      expect(idp.taken_by).toEqual([d]);
+      // The ID stays with the device (D93): the next server-assigned ID on 06M goes past it.
+      const next = await newDevice(b, w.levels.L06M, null);
+      await sync(b, a);
+      expect((await get(a, 'device', next))!.display_id).toBe('06M-03');
       await expectConverged(a, b, w.projectId);
       expect((await get(b, 'device', d))!.notes).toBe('as found');
     }, 60_000);

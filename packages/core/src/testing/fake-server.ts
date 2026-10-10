@@ -2,7 +2,8 @@
  * In-process stand-in for `POST /ops` / `GET /ops` (server/docs/sync.md) for `SyncEngine`
  * tests. It keeps the parts of the apply loop the engine depends on — contiguous `server_seq`,
  * idempotent `op_id`, heads per field, review on a different user's conflicting `set`, the
- * review-item `create` op, `assign` numbers per numbering group for numbered creates — and offers failure
+ * review-item `create` op, `assign` numbers per numbering group for numbered creates and device
+ * IDs per level code (D93) — and offers failure
  * injection (network drops, HTTP refusals, lost responses). Test-only: never imported by the
  * app or the public entry.
  */
@@ -112,6 +113,10 @@ export class FakeServer implements SyncTransport {
           this.setHead(op.entity_id, field, assign);
           caused.push(assign);
         }
+        if (op.entity_kind === 'device') {
+          const assign = this.assignDevice(stored);
+          if (assign) caused.push(assign);
+        }
         break;
       }
       case 'set': {
@@ -172,6 +177,45 @@ export class FakeServer implements SyncTransport {
     const level = this.log.find((o) => o.entity_kind === 'level' && o.entity_id === levelId && o.kind === 'create');
     const group = (level?.payload ?? {}).numbering_group_id as string | undefined;
     return `${op.project_id}|${group ?? `level:${levelId ?? '-'}`}`;
+  }
+
+  /**
+   * D93 like the server (`assign_device`): a device create without `display_id` gets
+   * `<level>-<nn>` = highest ever used on that level code + 1 when its scheme is
+   * `level_number`; a `level_tag` one is refused with 422 (thrown after storing: the fake does
+   * not roll back, so tests that hit it start a fresh server).
+   */
+  private assignDevice(create: Op): Op | null {
+    const payload = create.payload ?? {};
+    if (payload.display_id != null) return null;
+    const typeOp = this.log.find(
+      (o) => o.entity_kind === 'library_type' && o.kind === 'create' && o.entity_id === payload.library_type_id,
+    );
+    const scheme =
+      ((typeOp?.payload ?? {}).id_scheme as string | undefined) ??
+      (payload.category === 'Station' || payload.category === 'Sensor' ? 'level_tag' : 'level_number');
+    if (scheme === 'level_tag') throw new TransportError('rejected', 'push → 422 (level_tag device needs its tag)', 422);
+    const level = this.log.find((o) => o.entity_kind === 'level' && o.kind === 'create' && o.entity_id === payload.level_id);
+    const code = (level?.payload ?? {}).level as string | undefined;
+    if (!code) return null;
+    const re = new RegExp(`^${code}-(\\d+)$`);
+    let max = 0;
+    for (const o of this.log) {
+      if (o.project_id !== create.project_id || o.entity_kind !== 'device') continue;
+      const v = o.kind === 'create' ? (o.payload ?? {}).display_id : o.field === 'display_id' ? o.now : null;
+      const m = typeof v === 'string' ? re.exec(v) : null;
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+    const assign = this.serverOp(create, {
+      entity_kind: 'device',
+      entity_id: create.entity_id,
+      kind: 'assign',
+      field: 'display_id',
+      now: `${code}-${String(max + 1).padStart(2, '0')}`,
+      reason: 'Device ID assigned by the server (D93)',
+    });
+    this.setHead(create.entity_id, 'display_id', assign);
+    return assign;
   }
 
   private store(op: Op, state: Op['state']): Op {

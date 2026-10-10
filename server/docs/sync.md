@@ -104,6 +104,13 @@ run it inside one transaction.
   numbering group (the level row — materialised in the same transaction when it arrived as an
   op). A null `level_id` (cable ends off any level) → no number yet, logged as `assign_skipped`;
   an unknown `level_id` fails the push (409). A replayed create never renumbers.
+  **Devices (D93, T63):** a `device` create without `display_id` whose scheme is `level_number`
+  (library type's `id_scheme`, else Station/Sensor → `level_tag`, any other category →
+  `level_number`) gets an `assign` op on `device.display_id` = `<level code>-<nn>`, highest number
+  ever used on that level code in the project + 1, two digits (every device `display_id` in the
+  op log in any state, plus the device table: deleted, renamed and imported IDs stay used). Per
+  level code, not per numbering group: 06 and 06M count separately. A `level_tag` create without
+  `display_id` fails the whole push with 422; a create that carries an ID keeps it.
 - **set**: `head = field_head(entity, field)`. Record deleted by another user → review (step 4).
   `head == base_op_id` or no head → apply. Same user as the head → apply if `client_ts` is not
   older than the head's, else `superseded`. `ink_layer.*` and `photo.image_blob/thumb_blob/

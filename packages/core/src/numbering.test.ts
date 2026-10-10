@@ -172,3 +172,46 @@ describe('TP-10: numbers are never reused across two clients', () => {
     expect(new Set(assigns.map((o) => o.entity_id)).size).toBe(5);
   });
 });
+
+describe('device IDs are NEW until the server assigns them (D93, T63)', () => {
+  const panel = (level_id: string, category = 'Touchscreen') => ({ level_id, category, status: 'Not installed' });
+
+  it('shows <level>-? with NEW until the assign op arrives', async () => {
+    const { id } = await a.editor.create('device', panel(L06M), CTX);
+    const row = (await a.store.get<Record<string, unknown>>('device', id))!;
+    expect(row.display_id).toBeNull();
+    expect(isNew('device', row)).toBe(true);
+    expect(displayNumber('device', row, '06M')).toBe('06M-?');
+    expect(displayNumber('device', { ...row, level: '06M' })).toBe('06M-?');
+    expect(await unnumbered(a.store, PROJECT)).toMatchObject([
+      { entity_kind: 'device', id, level_id: L06M, reason: 'waiting' },
+    ]);
+
+    await sync(a);
+    const after = (await a.store.get<Record<string, unknown>>('device', id))!;
+    expect(isNew('device', after)).toBe(false);
+    expect(displayNumber('device', after, '06M')).toBe('06M-01');
+    expect(await unnumbered(a.store, PROJECT)).toEqual([]);
+  });
+
+  it('two iPads adding devices offline on one level get distinct IDs after sync', async () => {
+    const { id: a1 } = await a.editor.create('device', panel(L06M), CTX);
+    const { id: b1 } = await b.editor.create('device', panel(L06M, 'NSPS'), CTX);
+    const { id: b06 } = await b.editor.create('device', panel(L06), CTX);
+    await sync(b, a, b);
+    for (const c of [a, b]) {
+      const id = async (x: string) => (await c.store.get<Record<string, unknown>>('device', x))!.display_id;
+      // Arrival order: Bob pushed first. 06 and 06M count separately.
+      expect([await id(b1), await id(a1), await id(b06)]).toEqual(['06M-01', '06M-02', '06-01']);
+    }
+  });
+
+  it('a tagged device carries its ID from the start', async () => {
+    const { id } = await a.editor.create('device', { ...panel(L06M, 'Station'), display_id: '06M-S15' }, CTX);
+    const row = (await a.store.get<Record<string, unknown>>('device', id))!;
+    expect(isNew('device', row)).toBe(false);
+    expect(displayNumber('device', row)).toBe('06M-S15');
+    await sync(a);
+    expect(server.ops(PROJECT).filter((o) => o.kind === 'assign')).toEqual([]);
+  });
+});

@@ -299,10 +299,17 @@ export async function makeWorld(
 }
 
 /** A device with a display ID on a level (status Installed, untested by default). */
-export async function newDevice(c: Client, levelId: string, displayId: string, extra: Record<string, unknown> = {}): Promise<string> {
+/** A device; `displayId` null = a `level_number` field addition the server numbers (D93). */
+export async function newDevice(c: Client, levelId: string, displayId: string | null, extra: Record<string, unknown> = {}): Promise<string> {
   const { id } = await c.editor.create(
     'device',
-    { level_id: levelId, display_id: displayId, category: 'Relay panel', status: 'Installed, untested', ...extra },
+    {
+      level_id: levelId,
+      ...(displayId === null ? {} : { display_id: displayId }),
+      category: 'Relay panel',
+      status: 'Installed, untested',
+      ...extra,
+    },
     CTX,
   );
   return id;

@@ -68,7 +68,12 @@ class World:
         eid = str(uuid7())
         l06 = str(self.l06.id)
         required = {
-            "device": lambda: {"level_id": l06, "status": "Installed, untested"},
+            # Carries its ID like an imported device; D93's server-assigned IDs: test_numbering.
+            "device": lambda: {
+                "level_id": l06,
+                "display_id": "06-01",
+                "status": "Installed, untested",
+            },
             "cable": lambda: {"project_id": str(self.project.id), "cable": "X"},
             "cable_end": lambda: {"cable_id": str(self.cable().id), "side": "A", "level_id": l06},
             "punch_item": lambda: {"level_id": l06, "item": "Run X", "type": "Cable not run"},

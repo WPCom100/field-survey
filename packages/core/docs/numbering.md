@@ -1,6 +1,6 @@
 # `packages/core` numbering (T13)
 
-Normative: PLAN §2.3, D25, D33, D84 (server side), D88 (client side).
+Normative: PLAN §2.3, D25, D33, D84 (server side), D88 as amended by D93 (device IDs).
 
 ## Display numbers: server-assigned, `NEW` until then
 
@@ -15,9 +15,10 @@ On the iPad (`src/numbering.ts`):
 | API | What |
 |---|---|
 | `NUMBERED` | entity kind → server-assigned column (derived from `serverAssigned` in the registry) |
+| `SERVER_ASSIGNED` / `PENDING_KINDS` | `NUMBERED` plus `device → display_id` (D93): every kind that can be `NEW` |
 | `isNew(kind, row)` | true while that column is null |
-| `displayNumber(kind, row)` | `"12"`, `"C-07"`, or `"NEW"`, never a provisional number |
-| `unnumbered(store, projectId)` | every live `NEW` record with a reason (below), oldest create first |
+| `displayNumber(kind, row, level?)` | `"12"`, `"C-07"`, `"06M-04"`, or `"NEW"`; a `NEW` device shows `"<level>-?"` with the `NEW` badge beside it. Never a provisional number |
+| `unnumbered(store, projectId)` | every live `NEW` record, devices included, with a reason (below), oldest create first |
 
 `unnumbered()` reasons:
 
@@ -30,19 +31,29 @@ On the iPad (`src/numbering.ts`):
 
 The store refuses a local `set` or `create` that writes a server-assigned column (D81).
 
-## Device IDs: chosen on the iPad (`src/device-id.ts`)
+## Device IDs (`src/device-id.ts`, D93, T63)
 
-| Scheme | Categories (default) | ID |
-|---|---|---|
-| `level_number` | everything except Station/Sensor | `<level>-<nn>`, next free = highest used on that level code + 1, two digits (`06M-04`) |
-| `level_tag` | `Station` (`S`), `Sensor` (`D`) | `<level>-S<n>` / `<level>-D<n>` from the confirmed drawing tag, no padding (`01-S9`) |
+| Scheme | Categories (default) | ID | Who assigns |
+|---|---|---|---|
+| `level_number` | everything except Station/Sensor | `<level>-<nn>`, highest ever used on that level code + 1, two digits (`06M-04`, then `06M-100`) | **server**, as an `assign` op on `device.display_id` |
+| `level_tag` | `Station` (`S`), `Sensor` (`D`) | `<level>-S<n>` / `<level>-D<n>` from the confirmed drawing tag, no padding (`01-S9`) | iPad, in the create |
 
-The library type's `id_scheme` overrides the category default. `deviceIdFor(store, req)`
-returns `{display_id, scheme, next_free, taken_by}`:
+The library type's `id_scheme` overrides the category default. `deviceIdFor(store, req)` returns:
 
-- IDs of deleted devices stay used; gaps are never filled.
+- `{ scheme: 'level_number', pending: true }`: create the device **without** `display_id`. It is
+  `NEW` and shows `<level>-?` until the server's `assign` arrives (one sync when online). Two
+  iPads adding devices on one level offline therefore get distinct IDs, in arrival order.
+- `{ scheme: 'level_tag', pending: false, display_id, taken_by }`: store `display_id` in the
+  create. `taken_by` lists other devices in the project (deleted included) with the same ID; a
+  duplicate tag is a warning and a lint (D76), never a refusal.
+
+Server rules (`server/app/numbering.py`, `server/docs/sync.md`):
+
+- Every device `display_id` the project has ever used stays used: deleted, renamed, imported or
+  only proposed in review. Gaps are never filled. A restore keeps the ID; a replayed create never
+  renumbers.
 - Device IDs are per **level code**: 06 and 06M share a numbering group but not device IDs.
-- `taken_by` lists other devices in the project with the same ID. A duplicate is reported for
-  the UI to warn about and lint to flag (D76). It is never refused, so offline creation always works.
-- Tags: `S15`, `s 15`, `15` → `S15` for a station; a letter that contradicts the category, or
-  a full ID for another level, throws `DeviceIdError`.
+- A `level_tag` create without `display_id` is refused with 422 (the whole push). A create that
+  carries an ID keeps it (imports T27, copied floors T56).
+- Tags: `S15`, `s 15`, `15` → `S15` for a station; a letter that contradicts the category, or a
+  full ID for another level, throws `DeviceIdError`.

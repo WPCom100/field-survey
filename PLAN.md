@@ -94,7 +94,7 @@ Bold = master column (name kept verbatim for export). `*` = server-assigned.
 | Identifier | Scope | Assigned | Rule |
 |---|---|---|---|
 | `id` | global | client | never changes |
-| Device **ID** | level | at placement/creation | `<level>-<nn>` next free for panels/equipment; `<level>-S<n>` / `-D<n>` from the confirmed tag; unique per project |
+| Device **ID** | level code | `<level>-<nn>`: **server, on first receipt of the create op** (D93); tags: client, at placement/creation | `<level>-<nn>` = highest ever used on that level code + 1 for panels/equipment, never reused, client shows `<level>-?` + `NEW` until assigned (D93); `<level>-S<n>` / `-D<n>` from the confirmed tag; unique per project (a duplicate tag is a lint, D76) |
 | Punch **#**, part **#**, photo number, `C-nn` | numbering group | **server, on first receipt of the create op** | monotonic, gaps allowed, never reused; client shows `NEW` until assigned |
 | Neuron ID item | numbering group | normal number | `sort_last=true`; exports order by (`sort_last`, #) |
 | `server_seq` | project | server | total order of ops |

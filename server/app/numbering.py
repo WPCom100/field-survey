@@ -1,4 +1,5 @@
-"""Display numbers from numbering-group counters (PLAN §2.3, D25, D33).
+"""Display numbers from numbering-group counters (PLAN §2.3, D25, D33), and device IDs of the
+`level_number` scheme (D93).
 
 Punch `#`, part `#`, photo number and `C-nn` are assigned by the server on first receipt of
 the `create` op, monotonic per numbering group, never reused. A level points at its group;
@@ -7,13 +8,14 @@ inside the push transaction (the project row is locked for the whole push, so tw
 never race on a counter).
 """
 
+import re
 import uuid
 from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Level, NumberingGroup
+from app.models import Device, Level, LibraryType, NumberingGroup, Op
 
 # entity_kind → (counter attribute, display field, formatter)
 NUMBERED: dict[str, tuple[str, str]] = {
@@ -69,3 +71,70 @@ def next_number(
     setattr(group, counter, n)
     session.flush()
     return Assigned(group=group, field=field, value=display_value(entity_kind, n))
+
+
+# ------------------------------------------------------------------ device IDs (D93)
+
+# Categories whose default scheme is `level_tag` (the drawing tag letter: master S / D).
+TAG_CATEGORIES = frozenset({"Station", "Sensor"})
+
+
+def device_scheme(session: Session, payload: dict, head_value) -> str:
+    """`level_number` or `level_tag` for a device create: the library type's `id_scheme`
+    wins (from its row, else from the op log), else Station/Sensor → `level_tag`, everything
+    else (category unknown included) → `level_number`. Mirrors `defaultIdScheme` in core."""
+    type_id = payload.get("library_type_id")
+    if type_id:
+        type_id = uuid.UUID(str(type_id))
+        lt = session.get(LibraryType, type_id)
+        scheme = lt.id_scheme if lt is not None else head_value(type_id, "id_scheme")
+        if scheme:
+            return scheme
+    return "level_tag" if payload.get("category") in TAG_CATEGORIES else "level_number"
+
+
+def level_code(session: Session, level_id: uuid.UUID, head_value) -> str | None:
+    level = session.get(Level, level_id)
+    return level.level if level is not None else head_value(level_id, "level")
+
+
+def used_device_numbers(session: Session, project_id: uuid.UUID, code: str) -> set[int]:
+    """Every `<code>-<nn>` ever used in the project: any device `display_id` in the op log
+    (creates, sets, assigns — deleted, renamed, reviewed or superseded included) plus the
+    device table (rows that never came through an op). Once used, a number is retired."""
+    pattern = re.compile(rf"^{re.escape(code)}-(\d+)$")
+    values: list = list(
+        session.scalars(
+            select(Op.payload["display_id"].astext).where(
+                Op.project_id == project_id, Op.entity_kind == "device", Op.kind == "create"
+            )
+        )
+    )
+    values += session.scalars(
+        select(Op.now).where(
+            Op.project_id == project_id,
+            Op.entity_kind == "device",
+            Op.kind.in_(("set", "assign")),
+            Op.field == "display_id",
+        )
+    )
+    values += session.scalars(
+        select(Device.display_id)
+        .join(Level, Level.id == Device.level_id)
+        .where(Level.project_id == project_id)
+    )
+    return {int(m[1]) for v in values if isinstance(v, str) and (m := pattern.match(v))}
+
+
+def next_device_id(
+    session: Session, project_id: uuid.UUID, level_id: uuid.UUID, head_value
+) -> str | None:
+    """`<code>-<nn>` = highest number ever used on that level code + 1, two digits (then as
+    many as needed). Per level code, not per numbering group: 06 and 06M count separately.
+    Called inside the push, which holds the project lock, so two pushes never race. None when
+    the level is unknown."""
+    code = level_code(session, level_id, head_value)
+    if not code:
+        return None
+    n = max(used_device_numbers(session, project_id, code), default=0) + 1
+    return f"{code}-{n:02d}"
