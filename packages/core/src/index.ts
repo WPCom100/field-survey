@@ -41,6 +41,23 @@ export {
   type LocalOutcome,
   type RemoteOutcome,
   type RemoteResult,
+  type PushAck,
   type OpenOptions,
   type ListOptions,
 } from './store';
+export {
+  SyncEngine,
+  TransportError,
+  type SyncTransport,
+  type TransportFailure,
+  type PushBody,
+  type PushResponse,
+  type PullResponse,
+  type SyncState,
+  type SyncStatus,
+  type SyncReport,
+  type SyncLog,
+  type SyncEngineOptions,
+  type ReviewMark,
+} from './sync';
+export { HttpTransport, type HttpTransportOptions } from './http-transport';

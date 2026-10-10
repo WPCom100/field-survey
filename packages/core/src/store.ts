@@ -62,6 +62,14 @@ export interface RemoteResult {
   collided_pending: string[];
 }
 
+/** One `results[]` entry of `POST /ops` (server/docs/sync.md). */
+export interface PushAck {
+  op_id: string;
+  outcome: 'applied' | 'duplicate' | 'review' | 'superseded';
+  server_seq: number | null;
+  review_item_id?: string | null;
+}
+
 export interface OpenOptions {
   /** Fixed install id (tests); otherwise generated once and kept in `sync_state`. */
   installId?: string;
@@ -168,7 +176,14 @@ export class Store {
     const state = op.state ?? 'applied';
     const existing = await this.getOpIn(tx, op.op_id);
     if (existing) {
-      if (existing.server_seq != null && existing.server_seq === op.server_seq) {
+      // An op acknowledged from a push result has its seq but no server_ts yet; the echo
+      // completes it. Once complete, the same seq again is a duplicate.
+      if (
+        existing.server_seq != null &&
+        existing.server_seq === op.server_seq &&
+        existing.server_ts != null &&
+        existing.state !== 'pending'
+      ) {
         return { outcome: 'duplicate', collided_pending: [] };
       }
       await tx.exec(`UPDATE op SET server_seq = ?, server_ts = ?, state = ? WHERE op_id = ?`, [
@@ -189,6 +204,45 @@ export class Store {
     const collided = await this.pendingCollisions(tx, stored);
     const ok = await this.materialise(tx, stored);
     return { outcome: ok ? 'applied' : 'orphan', collided_pending: collided };
+  }
+
+  /**
+   * Record what the server said about our pushed ops (T11): `server_seq` and state are stored,
+   * the outbox rows go, `head_seq` moves for applied ops. The materialised value is never
+   * touched (the official value of a reviewed field arrives as the other user's op on pull).
+   * A `duplicate` result carries no state; the op keeps `pending` until its echo arrives.
+   */
+  async acknowledgeMany(acks: readonly PushAck[]): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      for (const ack of acks) {
+        const existing = await this.getOpIn(tx, ack.op_id);
+        if (!existing) continue;
+        const state: StoredOp['state'] =
+          ack.outcome === 'duplicate' ? existing.state : ack.outcome;
+        await tx.exec(`UPDATE op SET server_seq = ?, state = ? WHERE op_id = ?`, [
+          ack.server_seq ?? null,
+          state,
+          ack.op_id,
+        ]);
+        await tx.exec(`DELETE FROM outbox WHERE op_id = ?`, [ack.op_id]);
+        if (state === 'applied' && ack.server_seq != null) {
+          await this.bumpHeadSeq(tx, entity(existing.entity_kind), existing.entity_id, ack.server_seq);
+        }
+      }
+    });
+  }
+
+  /** A failed push attempt: count it and keep the error for the Sync screen (T25). */
+  async noteOutboxFailure(opIds: readonly string[], error: string): Promise<void> {
+    if (opIds.length === 0) return;
+    await this.db.transaction(async (tx) => {
+      for (const id of opIds) {
+        await tx.exec(`UPDATE outbox SET attempts = attempts + 1, last_error = ? WHERE op_id = ?`, [
+          error.slice(0, 500),
+          id,
+        ]);
+      }
+    });
   }
 
   /** Local pending ops the incoming op will collide with on the server (PLAN §3.2 pull). */
@@ -429,6 +483,14 @@ export class Store {
       projectId ? [projectId, limit] : [limit],
     );
     return rows.map((r) => decodeRow<StoredOp>(ENTITIES.op, r));
+  }
+
+  /** Projects with something waiting to be pushed. */
+  async outboxProjects(): Promise<string[]> {
+    const rows = await this.db.query<{ project_id: string }>(
+      `SELECT DISTINCT project_id FROM outbox ORDER BY project_id`,
+    );
+    return rows.map((r) => r.project_id);
   }
 
   async outboxCount(projectId?: string): Promise<number> {

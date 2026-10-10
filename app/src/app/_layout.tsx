@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 
 import { openAppStore } from '../db';
 import { IdentityGate } from '../identity/IdentityGate';
+import { SyncRunner } from '../sync/SyncRunner';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -15,6 +16,7 @@ export default function RootLayout() {
 
   return (
     <IdentityGate>
+      <SyncRunner />
       <Stack screenOptions={{ headerShown: false }} />
     </IdentityGate>
   );

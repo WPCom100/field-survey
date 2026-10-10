@@ -14,6 +14,7 @@ How the local SQLite store works. Normative references: PLAN §2.1 (versioning, 
 | `src/store.ts` | `Store.open`, `apply`, `applyMany`, `applyRemote`, `applyRemoteMany`, reads (`get`, `list`, `search`, `opsFor`, `fieldHead(s)`, `outbox`). |
 | `src/op.ts` | The `Op` type. |
 | `src/editor.ts` | `Editor` / `EditBatch` (T08): the mutation API screens call; builds ops with `was`, `base_op_id` and `group_id` and applies them through the store. |
+| `src/sync.ts`, `src/http-transport.ts` | `SyncEngine` and the HTTPS transport (T11): see `docs/sync.md`. |
 | `src/ids.ts` | UUID v7; `setRandomSource` for runtimes without `crypto.getRandomValues`. |
 | `src/node.ts` | `BetterSqliteDriver` (Node tests only). The iPad driver is `app/src/db/expo-sqlite-driver.ts`. |
 
@@ -78,13 +79,18 @@ Ops arrive in `server_seq` order with their server `state`.
 | Situation | Outcome | Effect |
 |---|---|---|
 | `op_id` already known, same `server_seq` | `duplicate` | nothing |
-| `op_id` known (our own op echoed) | `acknowledged` | `server_seq`, `server_ts`, `state` stored; outbox row removed; `head_seq` bumped if applied. The materialised value is **not** touched: if the server put our op in `review`, the official value already arrived as the other user's applied op (lower `server_seq`). |
+| `op_id` known (our own op echoed) | `acknowledged` | `server_seq`, `server_ts`, `state` stored; outbox row removed; `head_seq` bumped if applied. The materialised value is **not** touched: if the server put our op in `review`, the official value already arrived as the other user's applied op (lower `server_seq`). An op already acknowledged from a push result (`acknowledgeMany`, no `server_ts` yet) is completed by its echo; after that the same seq is a `duplicate`. |
 | new op, `state = applied` | `applied` / `orphan` | materialised as above; `orphan` when the record is unknown locally (logged by the caller, never fatal) |
 | new op, any other state | `recorded` | written to `op` only |
 
 `collided_pending` lists local pending ops on the same field (or any pending op on the record
-for an incoming delete/restore, and pending deletes for an incoming set): T11 marks those
-records "will be reviewed".
+for an incoming delete/restore, and pending deletes for an incoming set): the sync engine marks
+those ops "will be reviewed" (`docs/sync.md`).
+
+`acknowledgeMany(results)` records a push's `results[]` (T11): `server_seq` and state, outbox
+rows removed, `head_seq` moved for applied ops; a `duplicate` result keeps the op `pending`
+until its echo. `noteOutboxFailure(opIds, error)` counts a failed attempt. `outboxProjects()`
+lists projects with something to push.
 
 ## Search
 
@@ -98,5 +104,5 @@ the LIKE path is a safety net exercised by tests with `Store.open(db, { search: 
 
 `outbox(op_id, project_id, client_ts, attempts, last_error, created_at)`,
 `blob_queue(sha256, direction, kind, priority, state, attempts, next_attempt_at, last_error,
-created_at)` (T12), `sync_state(key, value)` with `install_id`, `search_mode` and, from T11,
-`last_server_seq:<project_id>`.
+created_at)` (T12), `sync_state(key, value)` with `install_id`, `search_mode`, `last_server_seq:<project_id>` (pull
+cursor) and `will_review:<project_id>` (pending ops the server will review).

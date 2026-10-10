@@ -11,13 +11,20 @@ import {
   saveUser,
 } from './api';
 
-const Ctx = createContext<TeamMember | null>(null);
+type Signed = Identity & { user: TeamMember };
+
+const Ctx = createContext<Signed | null>(null);
 
 /** The user stamped on every op (`Store.apply`, T07+). Only valid under <IdentityGate>. */
 export function useCurrentUser(): TeamMember {
-  const u = useContext(Ctx);
-  if (!u) throw new Error('useCurrentUser outside IdentityGate');
-  return u;
+  return useIdentity().user;
+}
+
+/** Server URL, token and user: what the sync engine's transport needs (T11). */
+export function useIdentity(): Signed {
+  const i = useContext(Ctx);
+  if (!i) throw new Error('useIdentity outside IdentityGate');
+  return i;
 }
 
 /** First-launch flow: server + token, then pick a name. Renders children once a user is set. */
@@ -33,7 +40,7 @@ export function IdentityGate({ children }: { children: ReactNode }) {
   if (!identity.user) {
     return <Picker identity={identity} onDone={(user) => setIdentity({ ...identity, user })} />;
   }
-  return <Ctx.Provider value={identity.user}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={identity as Signed}>{children}</Ctx.Provider>;
 }
 
 function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
