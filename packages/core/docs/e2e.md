@@ -1,0 +1,67 @@
+# Twin-client harness (T14)
+
+Two iPads as two core stores (`BetterSqliteDriver`), each driving the real `SyncEngine` +
+`HttpTransport`, against the real FastAPI server in Docker. It automates TP-1, TP-7, TP-10 and
+TP-11 (docs/history/Phase4_Delivery_Plan.md §4) and runs in GitHub Actions (`ci.yml`, job `e2e`).
+Unit tests use `FakeServer`; everything here goes over HTTP to Postgres.
+
+## Files
+
+| File | What |
+|---|---|
+| `src/e2e/harness.ts` | Server setup through compose (`seedProject`, `restartApi`), clients (`openClient`, `makeWorld`), the `Flapper` fetch wrapper, `drain`, `expectConverged`, `expectGapFree`. |
+| `src/e2e/twin.e2e.test.ts` | The TP scripts (table below). |
+| `src/blobs.e2e.test.ts` | T12's upload-resume test; same env, runs in the same CI job. |
+| `server/docker-compose.e2e.yml` | Compose override: API on `127.0.0.1:8010`, token `e2e`, local S3. |
+| `server/app/seed.py` | `python -m app.seed project <name> <group…>`: the project + numbering groups a push needs (D89). |
+
+## Running it
+
+```
+cd server && cp .env.example .env            # once
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build postgres s3 api
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml exec -T api alembic upgrade head
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml exec -T api python -m app.storage ensure-bucket
+cd .. && FIELD_SURVEY_E2E_URL=http://127.0.0.1:8010 FIELD_SURVEY_E2E_TOKEN=e2e pnpm --filter @field-survey/core test:e2e
+```
+
+Without `FIELD_SURVEY_E2E_URL` and `FIELD_SURVEY_E2E_TOKEN` every e2e test is **skipped with that
+reason** (never passed silently), so `pnpm -r test` stays a unit run. `test:e2e` runs the e2e files
+one at a time (`--no-file-parallelism`) because the restart test takes the API down for a moment.
+
+| Variable | Default | Use |
+|---|---|---|
+| `FIELD_SURVEY_E2E_URL`, `_TOKEN` | — (required) | Where the server is and its shared token |
+| `FIELD_SURVEY_E2E_COMPOSE` | `docker compose -f server/docker-compose.yml -f server/docker-compose.e2e.yml` | Compose command, run from the repo root |
+| `FIELD_SURVEY_E2E_SEED` | `<compose> exec -T api python -m app.seed` | How to run the seed CLI (e.g. `uv run --directory server python -m app.seed` against uvicorn on the host) |
+| `FIELD_SURVEY_E2E_RESTART` | `<compose> restart api` | How to restart the API; `skip` skips the restart test (host uvicorn) |
+
+Each test seeds its **own project** (one `app.seed` call, ~0.3 s), so `server_seq` and numbering
+start at 1 and tests never see each other. Users are `POST /team` (`Ann`, `Bob`); install ids are
+fresh UUID v7s. Clients open with `backoffMs: 50`, `maxBackoffMs: 200` and no log.
+
+## What is covered
+
+| TP | Test | Checks |
+|---|---|---|
+| TP-1 | two iPads edit the same floor offline, then sync (B first, then A) | 06M-03 and the photos merge silently; 06M-02 Notes → review with B's value official (D37, A7) and A's op `review` on both iPads; A's Status edit applies (different field); both field additions arrive with distinct punch numbers; both get `06M-04` offline and `deviceIdFor` reports the collision (`taken_by`, D88); the review item has A/B candidates; both stores converge |
+| TP-7 | network flaps and lost responses during a 1,200-op push | Both iPads push 100-op batches through a `Flapper` that drops requests 30–40 % of the time and throws away every 4th/5th push response (the server applied it: the resend answers `duplicate`); `drain` keeps calling `requestSync()`; afterwards every client op is on the server exactly once, `server_seq` is 1..n, all `applied`, numbers 1..5, both stores equal |
+| TP-7 | a server restart mid-push | `docker compose restart api` fires as the second 500-op batch goes out; the client converges once the API is back; 1,003 client ops once each, 6 `assign`s, no gaps |
+| TP-7 | a duplicate push | The same body pushed twice through `HttpTransport`: second answer is all `duplicate` with the same `server_seq` and the same `assign` ops; the engine's third push settles everything; numbers unchanged |
+| TP-10 | create, delete, create again (× 4 numbered kinds) | numbering.test's script against the real counters: 06/06M share, 07 counts alone, deleted numbers stay retired, restore keeps the number, five `assign`s total |
+| TP-11 | A deletes while B edits, B's edit arrives first | The delete goes to review (PLAN §3.2 step 4): official = not deleted with B's note; A keeps her deleted row (own value in review) and B's note still lands on it; punch items untouched |
+| TP-11 | A's delete arrives first, then B's edit; A restores | The edit goes to review (set vs existing delete); B's row is deleted by pull but shows his in-review note; the restore brings the device back on both with `create → delete → set(review) → restore` in the log, punch items attached, ID kept (D88) |
+| TP-11 | delete vs delete, then restore | Merges without a review item; converges everywhere |
+
+`expectConverged(a, b, project, {except})` compares every row of `level`, `device`, `punch_item`,
+`missing_part`, `photo`, `cable`, `cable_end`, `review_item` (deleted included), the field heads of
+each row, and the op log `(op_id, server_seq, state)` of both stores against the server's, which
+must be gap-free. `except` names records whose rows are expected to differ because one iPad holds
+a value still in review — that is the A7 "official + in review" state until T15 resolves it.
+
+## Known differences (not failures)
+
+- `version` is not compared: a local apply plus a later remote apply of the official value count
+  differently from a single remote apply.
+- `deleted_at` is compared for null/non-null only: the deleting iPad stamps its `client_ts`, the
+  server and other iPads `server_ts` (`Store.materialiseDelete`). Follow-up in TASKS.md.

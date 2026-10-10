@@ -14,6 +14,7 @@ references: PLAN §3.1 (the op), §3.2 (apply steps, pull), §3.3 (conflict rule
 | `app/api/ops.py` | The routes: one transaction per push (commit on success, rollback and 409/422/500 otherwise); paged pull. |
 | `tests/test_ops.py` | Every row of PLAN §3.3, D37 ordering, numbering, idempotency, validation, one-transaction. |
 | `tests/test_pull_materialise.py` | Pull paging and states; materialised rows per op kind; replay == state; no `server_seq` gaps under 8 concurrent pushers (TP-7 partial). |
+| `app/seed.py` | `python -m app.seed project <name> <group…>`: the `project` + `numbering_group` rows a push needs, until `POST /projects` exists (T41, D89). Used by the twin-client harness (`packages/core/docs/e2e.md`), which completes TP-7 (flaps, restart, duplicate push) end to end. |
 
 ## Request and response
 

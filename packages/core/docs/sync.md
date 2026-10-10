@@ -11,6 +11,7 @@ server side in `server/docs/sync.md` (T09/T10). Decisions: D37, D81, D84, D85, D
 | `src/http-transport.ts` | `HttpTransport`: `POST /ops` / `GET /ops` over `fetch` with the shared token and `X-Survey-User` (D77). |
 | `src/testing/fake-server.ts` | In-process server for tests: seq, duplicates, heads, review on conflict, review-item create op, assign numbers, fault injection. Test-only. |
 | `src/sync.test.ts`, `src/http-transport.test.ts` | 19 + 3 tests. |
+| `src/e2e/` | Twin-client harness (T14): two stores through this engine against the Docker server — TP-1, TP-7, TP-10, TP-11. See `docs/e2e.md`. |
 | `app/src/sync/` | `engine.ts` (the app's one engine), `SyncRunner.tsx` (start / foreground / 60 s), `useSyncStatus.ts` (status bar hook + `describeSync`). |
 
 ## One cycle (`engine.sync()`)

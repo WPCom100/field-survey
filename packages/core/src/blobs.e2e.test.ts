@@ -1,13 +1,13 @@
 /**
  * Opt-in: the blob queue + `HttpBlobTransport` against the real server (FastAPI + S3), including
  * a kill between chunks (TP-2) and a second iPad downloading the result. Runs only when
- * FIELD_SURVEY_E2E_URL and FIELD_SURVEY_E2E_TOKEN are set, e.g.
+ * FIELD_SURVEY_E2E_URL and FIELD_SURVEY_E2E_TOKEN are set — the same switch as the twin-client
+ * harness (T14, packages/core/docs/e2e.md), which brings the server up in Docker:
  *
- *   cd server && docker compose up -d postgres s3
- *   S3_ENDPOINT=http://localhost:9000 SURVEY_SHARED_TOKEN=e2e uv run uvicorn app.main:app --port 8011
- *   FIELD_SURVEY_E2E_URL=http://localhost:8011 FIELD_SURVEY_E2E_TOKEN=e2e pnpm --filter @field-survey/core test blobs.e2e
+ *   cd server && docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build postgres s3 api
+ *   FIELD_SURVEY_E2E_URL=http://127.0.0.1:8010 FIELD_SURVEY_E2E_TOKEN=e2e pnpm --filter @field-survey/core test:e2e
  *
- * T14's twin-client harness runs the same flow in CI against the Docker server.
+ * Runs in the CI `e2e` job.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

@@ -10,6 +10,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:e2e": "vitest run e2e --no-file-parallelism",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

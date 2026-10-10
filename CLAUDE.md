@@ -103,6 +103,9 @@ uv run uvicorn app.main:app --reload
 # client (Windows PC; Node 24 LTS, pnpm, Docker Desktop, EAS CLI logged in)
 pnpm install
 pnpm -r test                        # vitest in packages/core and packages/rules (Node + better-sqlite3)
+# twin-client harness against the Docker server (TP-1/7/10/11 + blobs; packages/core/docs/e2e.md)
+cd server && docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build postgres s3 api && cd ..
+FIELD_SURVEY_E2E_URL=http://127.0.0.1:8010 FIELD_SURVEY_E2E_TOKEN=e2e pnpm --filter @field-survey/core test:e2e
 pnpm --filter app typecheck         # tsc --noEmit
 pnpm --filter app lint
 cd app && npx expo start --dev-client     # iPad with the dev build installed loads over Wi-Fi

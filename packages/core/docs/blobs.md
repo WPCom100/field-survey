@@ -52,4 +52,5 @@ iPad sandbox and the server's `/blobs` routes (`server/docs/blobs.md`). Decision
 | `BlobFiles` | `NodeBlobFiles(dir)` | `ExpoBlobFiles`: `Documents/blobs/<sha>.<ext>`, paths stored **relative** to Documents because iOS moves the app container on every update |
 
 `src/blobs.e2e.test.ts` runs the queue against a real server when `FIELD_SURVEY_E2E_URL` and
-`FIELD_SURVEY_E2E_TOKEN` are set (instructions in the file); it skips otherwise.
+`FIELD_SURVEY_E2E_TOKEN` are set; it skips otherwise. It is part of `pnpm --filter
+@field-survey/core test:e2e` and the CI `e2e` job (T14, `docs/e2e.md`).
