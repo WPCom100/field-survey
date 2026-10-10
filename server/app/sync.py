@@ -1,7 +1,9 @@
-"""Server apply loop for `POST /ops` (PLAN §3.2 steps 1–7, §3.3; T09, D84).
+"""Server apply loop for `POST /ops` (PLAN §3.2 steps 1–7, §3.3; T09, D84) and the pull
+query behind `GET /ops` (T10).
 
-One push = one transaction, ops in arrival order. The loop works from the op log and
-`field_head` only; materialised tables are T10's. Outcomes per op:
+One push = one transaction, ops in arrival order. Decisions are made from the op log and
+`field_head`; every op stored as `applied` is also projected onto its entity table by
+`app.materialise` (T10). Outcomes per op:
 
 - `applied`     stored with a `server_seq`, heads moved.
 - `duplicate`   `op_id` already known; nothing written (the earlier `server_seq` is returned).
@@ -31,6 +33,7 @@ from sqlalchemy.orm import Session
 from app import vocab
 from app.db import Base
 from app.ids import uuid7
+from app.materialise import materialise
 from app.models import FieldHead, Level, Op, Project, ReviewItem, User
 from app.numbering import NUMBERED, next_number
 
@@ -124,6 +127,38 @@ class PushOut(BaseModel):
     server_ops: list[dict[str, Any]]
     # Highest `server_seq` in the project after the push.
     server_seq: int
+
+
+class PullOut(BaseModel):
+    """`GET /ops?project_id&since&limit`: ops with `server_seq > since`, oldest first, every
+    state included (the client acknowledges its own echoes and records reviewed ones, D81)."""
+
+    ops: list[dict[str, Any]]
+    # Highest `server_seq` in the project (not of this page): the client is caught up when the
+    # cursor reaches it.
+    server_seq: int
+    has_more: bool
+
+
+MAX_OPS_PER_PULL = 500
+
+
+def pull_ops(session: Session, project_id: uuid.UUID, since: int, limit: int) -> PullOut:
+    if session.get(Project, project_id) is None:
+        raise PushError(404, f"unknown project {project_id}")
+    limit = max(1, min(limit, MAX_OPS_PER_PULL))
+    rows = list(
+        session.scalars(
+            select(Op)
+            .where(Op.project_id == project_id, Op.server_seq > since)
+            .order_by(Op.server_seq)
+            .limit(limit + 1)
+        )
+    )
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    top = session.scalar(select(func.max(Op.server_seq)).where(Op.project_id == project_id)) or 0
+    return PullOut(ops=[op_to_json(o) for o in rows], server_seq=top, has_more=has_more)
 
 
 # ----------------------------------------------------------------- validation
@@ -570,6 +605,8 @@ class Push:
         row.state = state
         self.session.add(row)
         self.session.flush()
+        if state == "applied":
+            materialise(self.session, row)  # T10: tables follow the log inside the transaction
         return row
 
     def server_op(
@@ -662,46 +699,37 @@ class Push:
         if level_id:
             level_id = uuid.UUID(str(level_id))
             subject["level_id"] = str(level_id)
-            # The row's FK needs a materialised level (T10); the subject keeps it regardless.
+            # The row's FK needs a known level; the subject keeps it regardless.
             if self.session.get(Level, level_id) is None:
                 level_id = None
-        item = ReviewItem(
-            id=uuid7(),
-            project_id=self.project_id,
-            level_id=level_id or None,
-            kind="sync_conflict",
-            subject=subject,
-            op_a_id=heads[0].op_id if heads else None,
-            op_b_id=first.op_id,
-            candidates=candidates,
-            ruling=any(o.ruling_id is not None for o in incoming + heads),  # step 6
-            state="open",
-        )
-        self.session.add(item)
-        self.session.flush()
+        item_id = uuid7()
         payload = {
-            "id": item.id,
-            "project_id": item.project_id,
-            "level_id": item.level_id,
-            "kind": item.kind,
-            "subject": item.subject,
-            "op_a_id": item.op_a_id,
-            "op_b_id": item.op_b_id,
-            "candidates": item.candidates,
-            "ruling": item.ruling,
-            "state": item.state,
+            "id": item_id,
+            "project_id": self.project_id,
+            "level_id": level_id or None,
+            "kind": "sync_conflict",
+            "subject": subject,
+            "op_a_id": heads[0].op_id if heads else None,
+            "op_b_id": first.op_id,
+            "candidates": candidates,
+            "ruling": any(o.ruling_id is not None for o in incoming + heads),  # step 6
+            "state": "open",
         }
+        # The row itself is written by materialising this create op (T10): the log stays the
+        # only write path on the server too, and a replay reproduces the item exactly.
         op = self.server_op(
             first,
             entity_kind="review_item",
-            entity_id=item.id,
+            entity_id=item_id,
             kind="create",
             payload=jsonable(payload),
             reason=f"Sync conflict on {first.entity_kind}.{', '.join(fields)}",
         )
         for f in payload:
             if f != "id":
-                self.set_head(item.id, f, op.op_id)
+                self.set_head(item_id, f, op.op_id)
+        item = self.session.get(ReviewItem, item_id)
+        assert item is not None
         return item
 
     @staticmethod

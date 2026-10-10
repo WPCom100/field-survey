@@ -4,27 +4,14 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
+from conftest import HDR
 from sqlalchemy import func, select
 
-from app import auth, sync
-from app.config import settings
+from app import sync
 from app.ids import uuid7
-from app.main import app
-from app.models import FieldHead, Level, NumberingGroup, Op, Project, ReviewItem, User
+from app.models import Cable, FieldHead, Level, NumberingGroup, Op, Project, ReviewItem, Sheet, User
 
-TOKEN = "test-token"
-HDR = {"Authorization": f"Bearer {TOKEN}"}
 T0 = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
-
-
-@pytest.fixture
-def client(session, monkeypatch):
-    monkeypatch.setattr(settings, "auth_mode", "token")
-    monkeypatch.setattr(settings, "survey_shared_token", TOKEN)
-    app.dependency_overrides[auth.get_session] = lambda: session
-    yield TestClient(app, raise_server_exceptions=False)
-    app.dependency_overrides.clear()
 
 
 class World:
@@ -42,9 +29,20 @@ class World:
         )
         self.ann = User(id=uuid7(), name="Ann")
         self.bob = User(id=uuid7(), name="Bob")
-        session.add_all([self.project, self.group, self.l06, self.l06m, self.ann, self.bob])
+        # One display sheet so ink layers have something to reference (deferred FKs, D76).
+        self.sheet = Sheet(id=uuid7(), level_id=self.l06.id, kind="display")
+        session.add_all(
+            [self.project, self.group, self.l06, self.l06m, self.ann, self.bob, self.sheet]
+        )
         session.commit()
         self.clock = T0
+
+    def cable(self) -> Cable:
+        """A cable row for one end to hang off (ends are unique per cable and side)."""
+        c = Cable(id=uuid7(), project_id=self.project.id, cable="X")
+        self.session.add(c)
+        self.session.commit()
+        return c
 
     @staticmethod
     def install(user: User, n: int = 1) -> str:
@@ -68,16 +66,17 @@ class World:
 
     def create(self, user, entity_kind, extra=None, **kw):
         eid = str(uuid7())
+        l06 = str(self.l06.id)
         required = {
-            "device": {"level_id": str(self.l06.id), "status": "Installed, untested"},
-            "cable": {"project_id": str(self.project.id), "cable": "X"},
-            "cable_end": {"cable_id": str(uuid7()), "side": "A", "level_id": str(self.l06.id)},
-            "punch_item": {"level_id": str(self.l06.id), "item": "Run X", "type": "Cable not run"},
-            "missing_part": {"level_id": str(self.l06.id), "part": "LVD card"},
-            "photo": {"level_id": str(self.l06.id)},
-            "ink_layer": {"sheet_id": str(uuid7()), "user_id": str(user.id)},
-            "level": {"project_id": str(self.project.id), "level": "07"},
-        }.get(entity_kind, {})
+            "device": lambda: {"level_id": l06, "status": "Installed, untested"},
+            "cable": lambda: {"project_id": str(self.project.id), "cable": "X"},
+            "cable_end": lambda: {"cable_id": str(self.cable().id), "side": "A", "level_id": l06},
+            "punch_item": lambda: {"level_id": l06, "item": "Run X", "type": "Cable not run"},
+            "missing_part": lambda: {"level_id": l06, "part": "LVD card"},
+            "photo": lambda: {"level_id": l06},
+            "ink_layer": lambda: {"sheet_id": str(self.sheet.id), "user_id": str(user.id)},
+            "level": lambda: {"project_id": str(self.project.id), "level": "07"},
+        }.get(entity_kind, dict)()
         payload = {"id": eid, **required, **(extra or {})}
         return self.op(user, "create", entity_kind, eid, payload=payload, **kw)
 
@@ -242,12 +241,21 @@ def test_create_assigns_display_numbers_per_group(client, w):
     assert [o["now"] for o in res["server_ops"] if o["entity_id"] == p1["entity_id"]] == [1]
 
 
-def test_create_without_a_known_level_stays_unnumbered(client, w):
-    p = w.create(w.ann, "punch_item", {"level_id": str(uuid7())})
+def test_create_without_a_level_stays_unnumbered(client, w):
     e = w.create(w.ann, "cable_end", {"level_id": None})
-    res = w.push(client, [p, e])
-    assert outcomes(res) == ["applied", "applied"] and res["server_ops"] == []
-    assert w.head(p["entity_id"], "number") is None
+    res = w.push(client, [e])
+    assert outcomes(res) == ["applied"] and res["server_ops"] == []
+    assert w.head(e["entity_id"], "display_id") is None
+
+
+def test_create_referencing_an_unknown_level_fails_the_whole_push(client, w):
+    """Materialised tables keep their (deferred) foreign keys: nothing is stored, 409 (T10)."""
+    ok = w.create(w.ann, "device")
+    p = w.create(w.ann, "punch_item", {"level_id": str(uuid7())})
+    res = w.push(client, [ok, p], status=409)
+    assert res["detail"]["error"] == "integrity"
+    w.session.rollback()
+    assert w.op_count() == 0
 
 
 def test_level_created_by_an_op_resolves_its_group_from_the_log(client, w):

@@ -1,11 +1,17 @@
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
+from app import auth
 from app.config import settings
+from app.main import app
+
+TOKEN = "test-token"
+HDR = {"Authorization": f"Bearer {TOKEN}"}
 
 SERVER_DIR = __import__("pathlib").Path(__file__).resolve().parents[1]
 
@@ -58,3 +64,13 @@ def session(engine):
             )
         ).scalars()
         conn.execute(text("TRUNCATE " + ", ".join(f'"{t}"' for t in tables) + " CASCADE"))
+
+
+@pytest.fixture
+def client(session, monkeypatch):
+    """The API in token mode, bound to the test session (commits are the route's)."""
+    monkeypatch.setattr(settings, "auth_mode", "token")
+    monkeypatch.setattr(settings, "survey_shared_token", TOKEN)
+    app.dependency_overrides[auth.get_session] = lambda: session
+    yield TestClient(app, raise_server_exceptions=False)
+    app.dependency_overrides.clear()
