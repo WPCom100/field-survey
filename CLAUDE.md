@@ -122,6 +122,7 @@ Golden tests read `fixtures/`; if a fixture is missing the test is skipped with 
 5. Append new decisions to `DECISIONS.md`.
 6. Commit with the message `T<nn>: <title>` and a body listing what the DoD check showed.
 7. End with a 5-line summary: what was built, test results, deviations, open questions, next task.
+8. Close with a **hand-off** for the next task: its number and title, the model and effort from `TASKS.md` decoded (e.g. "S/M = Sonnet 5.5, Medium") and whether that differs from the current session, a reminder that it runs in a **new session** (`/clear` or a new chat, then `/model` to switch if needed), the prompt to paste (`Read CLAUDE.md, then do task T<nn> in TASKS.md per the session protocol in CLAUDE.md §7.`), and any decision the user should settle before starting. Do the same at the end of any reply in a session whose task is already done.
 
 Model and effort per task are in `TASKS.md` (D61). Do not switch tasks mid-session. Do not refactor beyond the task's files unless the DoD requires it.
 
