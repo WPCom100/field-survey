@@ -1,6 +1,6 @@
 # Operations — Field Survey server
 
-Production (D67 option A): one DigitalOcean Basic Droplet, 2 vCPU / 4 GB (**currently 2 GB — resize before extraction/export jobs land, see TASKS follow-ups**), Ubuntu 24.04, running the Compose stack in `server/` (Caddy → api, worker, Postgres 16 in the named volume `pgdata`). Objects live in Cloudflare R2. Public name: `https://survey.wpcom.cloud`.
+Production (D67 option A): one DigitalOcean Basic Droplet, 2 vCPU / 4 GB (**currently 2 GB — resize before extraction/export jobs land, §3.6 and TASKS follow-ups**), Ubuntu 24.04, running the Compose stack in `server/` (Caddy → api, worker, Postgres 16 in the named volume `pgdata`). Objects live in Cloudflare R2. Public name: `https://survey.wpcom.cloud`.
 
 | Thing | Where |
 |---|---|
@@ -17,7 +17,7 @@ Every command below runs on the Droplet in `/opt/field-survey/server` unless it 
 
 ## 1. Provision (once)
 
-1. **Droplet.** Basic, Regular, 2 vCPU / 4 GB, Ubuntu 24.04 LTS, the team SSH key added. Paid Droplet backups off (D67: backups go to R2, T06).
+1. **Droplet.** Basic, Regular, 2 vCPU / 4 GB, Ubuntu 24.04 LTS, the team SSH key added. Paid Droplet backups off (D67: backups go to R2, §3.1).
 2. **DNS.** In Cloudflare, add `A survey 142.93.54.143` with the proxy **off** (grey cloud). Check from the PC: `nslookup survey.wpcom.cloud 1.1.1.1`.
 3. **R2.** In Cloudflare → R2, create an API token with *Object Read & Write* scoped to the bucket. Put the account id, bucket, access key id and secret into `server/.env.production` on the PC.
 4. **Base setup** (swap, Docker, firewall, unattended upgrades). On the PC:
@@ -26,7 +26,7 @@ Every command below runs on the Droplet in `/opt/field-survey/server` unless it 
    ssh -i ~/.ssh/field_survey_droplet root@142.93.54.143 bash /root/provision.sh
    ```
    The script is idempotent. It adds a 2 GB `/swapfile` (swappiness 10), installs Docker Engine and the compose plugin, and opens only 22/80/443 in `ufw`.
-5. **Checkout.** *(Until the GitHub deploy key is set up — T05 follow-up — the first deploy copied `server/` with `tar … | ssh … tar -x` into `/opt/field-survey/server`; converting it to a clone is this step plus `cp` of `.env` into the clone.)* On the Droplet: `ssh-keygen -t ed25519 -N "" -f ~/.ssh/github_deploy`. Add the public key as a read-only deploy key (on the PC: `gh repo deploy-key add <pubkey-file> --title droplet`). Then add `Host github.com` / `IdentityFile ~/.ssh/github_deploy` to `~/.ssh/config` and run `git clone git@github.com:WPCom100/field-survey.git /opt/field-survey`.
+5. **Checkout.** *(Done 2026-10-10 in T06: deploy key titled `droplet survey.wpcom.cloud`; the earlier tar copy sits in `/opt/field-survey.pre-git`. The Compose project name stays `server`, so the `server_pgdata` volume carried over.)* On the Droplet: `ssh-keygen -t ed25519 -N "" -f ~/.ssh/github_deploy`. Add the public key as a read-only deploy key (on the PC: `gh repo deploy-key add <pubkey-file> --title droplet`). Then add `Host github.com` / `IdentityFile ~/.ssh/github_deploy` to `~/.ssh/config` and run `git clone git@github.com:WPCom100/field-survey.git /opt/field-survey`.
 6. **Config.** On the PC: `scp -i ~/.ssh/field_survey_droplet server/.env.production root@142.93.54.143:/opt/field-survey/server/.env`. On the Droplet: `chmod 600 .env`.
 7. **Start.**
    ```
@@ -53,44 +53,82 @@ docker compose run --rm api alembic upgrade head    # only when the pull brought
 docker compose ps && curl -s https://survey.wpcom.cloud/health
 ```
 
-Migrations are applied by hand, so a bad one never starts on its own. Before any migration, take a dump (§3.1). Roll back with `git checkout <previous-sha>` and `docker compose up -d --build`. If the migration already ran, also run `alembic downgrade -1` before the rebuild.
+Migrations are applied by hand, so a bad one never starts on its own. Before any migration, take a dump (§3.2). Roll back with `git checkout <previous-sha>` and `docker compose up -d --build`. If the migration already ran, also run `alembic downgrade -1` before the rebuild.
 
 Changing `.env`: edit the master copy on the PC, `scp` it as in §1.6, then `docker compose up -d` (containers whose env changed are recreated).
 
 ## 3. Backup and restore
 
-The automated nightly `pg_dump` to R2 (90-day lifecycle) and the weekly copy to a second bucket arrive with T06. Until then, take dumps by hand before every migration.
+### 3.1 Automated backups (T06, D79)
 
-### 3.1 Dump
+The `worker` runs `app/backup.py` once a minute (`backup.tick()`). With `BACKUP_ENABLED=true`:
+
+| Job | When | What |
+|---|---|---|
+| Dump | daily, first tick at or after `BACKUP_HOUR_UTC` (08 = 03:00 Houston CDT / 02:00 CST) | `pg_dump -Fc` → `S3_BUCKET/backups/pg/survey-<UTC stamp>.dump` |
+| Prune | right after each dump | deletes dumps older than `BACKUP_RETENTION_DAYS` (90), always keeping the newest. Done in code because the R2 token is Object Read & Write only and gets AccessDenied on bucket lifecycle rules |
+| Copy | once per ISO week, on or after `BACKUP_COPY_WEEKDAY` (7 = Sunday), after that day's dump | `rclone copy` (never `sync`) of the **whole** main bucket (photos, sheets, dumps) to `BACKUP_COPY_BUCKET`; writes `backups/copy-markers/<year>-W<nn>` when done. Skipped (log `backup_copy_skipped`) while `BACKUP_COPY_BUCKET` is empty |
+
+"Already done" is read from R2 (today's dump key, this week's marker), so a restart or a missed night simply runs on the next tick. A failure logs `backup_failed` and retries a minute later. It never stops the worker. The copy bucket keeps everything it has ever received, because dumps pruned in the main bucket are not deleted there.
+
+By hand (in `/opt/field-survey/server`):
+
+```
+docker compose exec worker python -m app.backup list            # dumps in R2
+docker compose exec worker python -m app.backup dump            # dump now
+docker compose exec worker python -m app.backup copy            # copy now
+docker compose exec worker python -m app.backup prune
+docker compose logs worker | grep backup_                        # backup_dump / backup_prune / backup_copy / backup_failed
+```
+
+**Setting up the copy bucket** (not done yet; TASKS follow-up). In Cloudflare → R2, create the bucket (suggested `<S3_BUCKET>-copy`). Then create an API token with *Object Read & Write* on **both** buckets, or a separate token for the copy bucket. In `server/.env.production` set `BACKUP_COPY_BUCKET`, and `BACKUP_COPY_ACCESS_KEY`/`BACKUP_COPY_SECRET_KEY` (+ `BACKUP_COPY_ENDPOINT` if it is in another account) when the token differs from `S3_*`. Then `scp` it as in §1.6, run `docker compose up -d worker`, run the copy by hand once and check the bucket in the dashboard.
+
+### 3.2 Manual dump
+
+Take one before every migration (§2), even though a nightly one exists:
 
 ```
 docker compose exec -T postgres pg_dump -U survey -Fc survey > /root/survey-$(date +%F-%H%M).dump
 ```
 
-### 3.2 Restore
+### 3.3 Restore
 
-1. Stop writers: `docker compose stop api worker`.
-2. Restore into a scratch database first and look at it:
+1. Get a dump: a manual one from `/root`, or the latest from R2:
+   ```
+   KEY=$(docker compose exec -T worker python -m app.backup list | tail -1)
+   docker compose exec -T worker python -m app.backup fetch "$KEY" > /root/restore.dump
+   ```
+   On a new Droplet with no stack yet, use the Cloudflare dashboard (R2 → bucket → `backups/pg/` → Download) and `scp` the file up.
+2. Stop writers: `docker compose stop api worker` (skip for a drill).
+3. Restore into a scratch database first and look at it:
    ```
    docker compose exec -T postgres createdb -U survey survey_restore
-   docker compose exec -T postgres pg_restore -U survey -d survey_restore --no-owner < /root/survey-<stamp>.dump
+   docker compose exec -T postgres pg_restore -U survey -d survey_restore --no-owner --exit-on-error < /root/restore.dump
    docker compose exec postgres psql -U survey -d survey_restore -c "select count(*) from op"
    ```
-3. Swap it in:
+4. Swap it in:
    ```
    docker compose exec postgres psql -U survey -d postgres -c "alter database survey rename to survey_old"
    docker compose exec postgres psql -U survey -d postgres -c "alter database survey_restore rename to survey"
    docker compose start api worker
    ```
-4. Once the app checks out, `drop database survey_old`.
+5. Once the app checks out, `drop database survey_old`.
 
-R2 objects are content-addressed and never overwritten (A14), so restoring the database never needs a matching object restore. Rows may point at blobs that were uploaded after the dump. The iPads still hold those and re-sync them.
+R2 objects are content-addressed and never overwritten (A14), so restoring the database never needs a matching object restore. Rows may point at blobs that were uploaded after the dump. The iPads still hold those and re-sync them. If the main bucket itself is lost, point `S3_BUCKET` at the copy bucket (§3.1) until a new main bucket is filled with `rclone copy` the other way.
 
-### 3.3 Lost Droplet
+### 3.4 Lost Droplet
 
-Create a new Droplet, follow §1, restore the latest dump (§3.2, step 2 straight into `survey`), then point DNS at the new IP. The iPads keep their outboxes and push again once the server answers.
+Create a new Droplet, follow §1, restore the latest dump from R2 (§3.3, step 3 straight into `survey`), then point DNS at the new IP. The iPads keep their outboxes and push again once the server answers.
 
-### 3.4 Resize the Droplet
+### 3.5 Restore drill log
+
+| Date (UTC) | Dump | Steps (§3.3, into `survey_restore`, writers left running) | Result |
+|---|---|---|---|
+| 2026-10-10 (T06) | `backups/pg/survey-2026-10-10T054850Z.dump`, 97,397 bytes, taken 05:48:50Z | start 05:50:46Z → fetched from R2 05:50:49Z → `pg_restore --exit-on-error` done 05:50:51Z → scratch dropped 05:50:52Z | Row counts identical to live on all 30 tables (incl. `app_user` = 3), `alembic_version` = `0001`. 6 s end to end at this size |
+
+Repeat the drill after T27 (first real data) and then once per milestone; add a row each time.
+
+### 3.6 Resize the Droplet
 
 DigitalOcean → Droplet → Power off → Resize → **CPU and RAM only** (keeps the disk, so it can be resized back) → Power on. Compose restarts on boot (`restart: unless-stopped`); check with `docker compose ps` and `/health`.
 
