@@ -23,7 +23,7 @@
   "scripts": {
     "start": "expo start",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint",
+    "lint": "eslint src",
     "test": "echo \"no app tests\""
   },
   "private": true

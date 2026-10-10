@@ -14,6 +14,16 @@ class Settings(BaseSettings):
     s3_secret_key: str = ""
     s3_region: str = "auto"
     worker_concurrency: int = 1
+    # Backups (T06, docs/ops.md §3): nightly pg_dump to S3_BUCKET/backups/pg/, weekly rclone
+    # copy of the whole bucket to BACKUP_COPY_BUCKET (skipped while that is empty).
+    backup_enabled: bool = False
+    backup_hour_utc: int = 8
+    backup_retention_days: int = 90
+    backup_copy_bucket: str = ""
+    backup_copy_weekday: int = 7
+    backup_copy_endpoint: str = ""
+    backup_copy_access_key: str = ""
+    backup_copy_secret_key: str = ""
 
     @property
     def team_names(self) -> list[str]:
