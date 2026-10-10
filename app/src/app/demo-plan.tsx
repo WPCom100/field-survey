@@ -11,13 +11,19 @@ import { PlanScreen } from '../plan/PlanScreen';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const SHEET = Image.resolveAssetSource(require('../../../fixtures/Level_06M_-_Lighting_Composite_vector.pdf'));
 
+/** The demo database. `demo-plan.db` was left half-seeded by the T17 transaction crash (D102). */
+const DEMO_DB = 'demo-plan-2.db';
+const STALE = ['demo-plan.db', 'probe-like.db', 'probe-fts.db', 'probe-c.db', 'probe-d.db', 'probe-e.db', 'probe-f.db', 'probe-g.db'];
+
 /** Opened once: a separate database that no sync engine ever sees (never the app store). */
 let demo: Promise<{ store: Store; levelId: string }> | null = null;
 function openDemo() {
   if (!demo) {
-    demo = ExpoSqliteDriver.open('demo-plan.db')
+    const log = (m: string) => console.log(`[plan] demo: ${m}`);
+    demo = Promise.all(STALE.map(ExpoSqliteDriver.remove))
+      .then(() => ExpoSqliteDriver.open(DEMO_DB))
       .then((driver) => Store.open(driver))
-      .then(async (store) => ({ store, levelId: await ensureDemoLevel(store) }))
+      .then(async (store) => ({ store, levelId: await ensureDemoLevel(store, log) }))
       .catch((e) => {
         demo = null;
         throw e;

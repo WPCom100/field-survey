@@ -115,6 +115,7 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
     loadLevelPlan(store, levelId).then(
       (p) => {
         if (!active) return;
+        console.log(`[plan] loaded ${p?.devices.length ?? 'no'} devices, sheet ${p?.sheet ? 'yes' : 'no'}`);
         if (p) setPlan(p);
         else setError('This level is not on this iPad.');
       },
@@ -181,7 +182,10 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
       vpRef.current = vp;
       matrix.value = sheetToView(vp);
       // The first viewport is "ready" (loadComplete re-fires much later, T16); open at fit.
-      if (first) focusSheetRect(sheetRect(vp), false);
+      if (first) {
+        console.log(`[plan] first viewport, zoom ${scaleOf(sheetToView(vp)).toFixed(3)}`);
+        focusSheetRect(sheetRect(vp), false);
+      }
     },
     [matrix, focusSheetRect],
   );
@@ -310,6 +314,7 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
                 enableTextSelection={false}
                 onViewportChanged={onViewportChanged}
                 onPageSingleTap={onPageSingleTap}
+                onLoadComplete={(pages, _path, sz) => console.log(`[plan] pdf loaded: ${pages} page(s), ${Math.round(sz.width)}×${Math.round(sz.height)}`)}
                 onError={(e) => setError(`The sheet could not be opened: ${String((e as Error)?.message ?? e)}`)}
               />
               {size.width > 0 ? (

@@ -147,10 +147,13 @@ export function demoOps(): Op[] {
 }
 
 /** Seed the demo level once per demo database; returns its level id. */
-export async function ensureDemoLevel(store: Store): Promise<string> {
+export async function ensureDemoLevel(store: Store, log: (msg: string) => void = () => {}): Promise<string> {
   if (!(await store.getState<boolean>(SEEDED_KEY))) {
-    await store.applyRemoteMany(demoOps());
+    const ops = demoOps();
+    log(`seeding ${ops.length} ops`);
+    await store.applyRemoteMany(ops);
     await store.setState(SEEDED_KEY, true);
+    log('seeded');
   }
   return DEMO_LEVEL_ID;
 }
