@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "dependencies": {
     "@field-survey/core": "workspace:*",
+    "@shopify/react-native-skia": "2.6.2",
     "expo": "~57.0.27",
     "expo-constants": "~57.0.21",
     "expo-crypto": "~57.0.3",
@@ -18,18 +19,21 @@
     "expo-system-ui": "~57.0.4",
     "react": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-blob-util": "^0.25.1",
+    "react-native-pdf": "^7.0.5",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^3.0.0"
   },
   "scripts": {
     "start": "expo start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "echo \"no app tests\""
+    "test": "vitest run"
   },
   "private": true
 }

@@ -4,3 +4,6 @@ packages:
 allowBuilds:
   better-sqlite3: true
   esbuild: true
+  "@shopify/react-native-skia": true
+patchedDependencies:
+  react-native-pdf@7.0.5: patches/react-native-pdf@7.0.5.patch
