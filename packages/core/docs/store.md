@@ -1,0 +1,68 @@
+# `packages/core` store (T07)
+
+How the local SQLite store works. Normative references: PLAN §2.1 (versioning, soft delete),
+§2.2 (entities), §3.1 (the op), §3.2 (pull/push). Column names follow D76; store rules are D81.
+
+## Files
+
+| File | What |
+|---|---|
+| `src/schema/entities.ts` | Registry of every table: columns, types, CHECK lists, primary keys, indexes, role (`record`, `link`, `plain`, `local`). `Store.apply` validates against it and codes values with it (JSON → TEXT, bool → 0/1). |
+| `src/schema/migrations/0001_initial.ts` | Frozen DDL generated from the registry on 2026-10-10. Never edited; later changes are new entries in `migrations.ts`. `schema.test.ts` fails if the migrated DB and the registry drift. |
+| `src/schema/migrations.ts` | `migrate(db)`: applies pending migrations in one transaction each, recorded in `schema_migration`; refuses a DB written by a newer app. |
+| `src/schema/search.ts` | `search_doc` (one text row per live device / punch item / missing part / photo, kept by triggers) and the FTS5 index over it when the SQLite build has FTS5, else `LIKE`. |
+| `src/store.ts` | `Store.open`, `apply`, `applyMany`, `applyRemote`, `applyRemoteMany`, reads (`get`, `list`, `search`, `opsFor`, `fieldHead(s)`, `outbox`). |
+| `src/op.ts` | The `Op` type. |
+| `src/ids.ts` | UUID v7; `setRandomSource` for runtimes without `crypto.getRandomValues`. |
+| `src/node.ts` | `BetterSqliteDriver` (Node tests only). The iPad driver is `app/src/db/expo-sqlite-driver.ts`. |
+
+## Applying a local op (`Store.apply`)
+
+One transaction: validate → insert into `op` (`state = pending`, no `server_seq`) → insert into
+`outbox` → materialise. Duplicate `op_id` → `'duplicate'`, nothing written.
+
+| Kind | Effect on the entity table | `field_head` |
+|---|---|---|
+| `create` | `INSERT` the payload (`id` = `entity_id`), `version = 1`, `head_seq = server_seq` (null locally). Replays never overwrite (`ON CONFLICT DO NOTHING`). | one row per payload column → this op |
+| `set` | `field = now`, `version + 1`, `head_seq = max(head_seq, server_seq)` | `(entity, field)` → this op |
+| `delete` | `deleted_at = ts`, `deleted_by_id = user`, `delete_reason = reason`, `version + 1` | `(entity, deleted_at)` → this op |
+| `restore` | clears the three, `version + 1` | same |
+| `link_add` | `INSERT … ON CONFLICT(pk) DO UPDATE` (revives a removed link) | — |
+| `link_remove` | `deleted_at`, `deleted_by_id` on the link row | — |
+| `assign` | refused locally (server-only) | — |
+
+Refused with `StoreError` (nothing written): unknown entity kind or column; `set`/`create` on
+`id`, `version`, `head_seq`, `deleted_*`; a local `set` or non-null `create` value on a
+server-assigned column (`punch_item.number`, `missing_part.number`, `photo.number`,
+`cable_end.display_id`); `delete`/`restore` on link or plain tables; link ops on records; a
+`set` on a record that does not exist locally; bad `kind`, `change_type` or `state`.
+
+## Applying a pulled op (`Store.applyRemote`)
+
+Ops arrive in `server_seq` order with their server `state`.
+
+| Situation | Outcome | Effect |
+|---|---|---|
+| `op_id` already known, same `server_seq` | `duplicate` | nothing |
+| `op_id` known (our own op echoed) | `acknowledged` | `server_seq`, `server_ts`, `state` stored; outbox row removed; `head_seq` bumped if applied. The materialised value is **not** touched: if the server put our op in `review`, the official value already arrived as the other user's applied op (lower `server_seq`). |
+| new op, `state = applied` | `applied` / `orphan` | materialised as above; `orphan` when the record is unknown locally (logged by the caller, never fatal) |
+| new op, any other state | `recorded` | written to `op` only |
+
+`collided_pending` lists local pending ops on the same field (or any pending op on the record
+for an incoming delete/restore, and pending deletes for an incoming set): T11 marks those
+records "will be reviewed".
+
+## Search
+
+`Store.search(text, { projectId?, levelId?, kinds?, limit? })` returns `{ entity_kind,
+entity_id, level_id }` hits. FTS5 mode quotes every term as a prefix phrase (`"06M-04"*`), so
+punctuation never produces a parser error; LIKE mode ANDs the terms. `store.searchMode` and
+`sync_state('search_mode')` say which is active. expo-sqlite compiles FTS5 in on iOS (A21), so
+the LIKE path is a safety net exercised by tests with `Store.open(db, { search: 'like' })`.
+
+## Client-only tables
+
+`outbox(op_id, project_id, client_ts, attempts, last_error, created_at)`,
+`blob_queue(sha256, direction, kind, priority, state, attempts, next_attempt_at, last_error,
+created_at)` (T12), `sync_state(key, value)` with `install_id`, `search_mode` and, from T11,
+`last_server_seq:<project_id>`.
