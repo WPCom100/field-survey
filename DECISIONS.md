@@ -114,7 +114,7 @@ Append-only. New decisions take the next D-number; assumptions the next A-number
 | A18 | Until T03/T04 land, the server is only reachable with the shared token; the team is ≤ 5 people, internal, no encryption requirement (prompt), so this is acceptable for the build period but not for the pilot | From D69 |
 | A19 | The floor-report example is a one-item-per-page Fieldwire export; "similar but denser" is the target | Confirmed by the attached file |
 | A20 | EAS free-tier build volume covers the few native builds this project needs; Starter ($19/mo) only if not | From D70 |
-| A21 | `expo-sqlite` ships SQLite with FTS5 enabled (verify in T07; LIKE-based search is the fallback) | Confirmed at source 2026-10-10 (T07): expo-sqlite 57.0.4's podspec passes `-DSQLITE_ENABLE_FTS5=1` unless `expo.sqlite.enableFTS=false`; on-device probe + LIKE fallback kept (D82) |
+| A21 | `expo-sqlite` ships SQLite with FTS5 enabled (verify in T07; LIKE-based search is the fallback) | Confirmed at source 2026-10-10 (T07): expo-sqlite 57.0.4's podspec passes `-DSQLITE_ENABLE_FTS5=1` unless `expo.sqlite.enableFTS=false`; on-device probe + LIKE fallback kept (D82). **Confirmed on device** the same day: dev build `b146b497…` on Landry's iPad logged `search=fts5` |
 
 ## Open questions carried into the build
 
