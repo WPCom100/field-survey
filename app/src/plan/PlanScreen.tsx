@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
   planTools: { position: 'absolute', right: 12, bottom: 12, gap: 8, alignItems: 'flex-end' },
   tool: { backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
   toolText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  side: { flex: 31, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
+  side: { flex: 28, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
   sideHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', padding: 12 },
   sideTitle: { fontSize: 16, fontWeight: '600' },
   sideNote: { fontSize: 13, color: '#666' },
