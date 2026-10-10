@@ -2,12 +2,16 @@ services:
   api:
     build: .
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-survey}:${POSTGRES_PASSWORD:-survey}@postgres:5432/${POSTGRES_DB:-survey}
     depends_on: [postgres, minio]
     expose: ["8000"]
   worker:
     build: .
     command: ["python", "-m", "app.worker"]
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-survey}:${POSTGRES_PASSWORD:-survey}@postgres:5432/${POSTGRES_DB:-survey}
     depends_on: [postgres, minio]
   postgres:
     image: postgres:16
