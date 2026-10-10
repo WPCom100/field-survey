@@ -2,7 +2,8 @@
  * Pin geometry and colours (D64): shape = Device Category, fill colour = Device Status,
  * with a glyph as the non-colour backup signal. Pure: no Skia here, so it runs in Node.
  * Shapes are described in screen pixels centred on the pin's sheet position; the
- * viewer scales them back by 1/zoom so pins keep a constant on-screen size.
+ * viewer scales them back by 1/zoom so pins keep a constant on-screen size. `pinShape` runs on
+ * the UI thread too (the overlay draws there, D95), hence its `'worklet'` directive.
  */
 
 import type { Point } from './viewport';
@@ -36,6 +37,7 @@ export type PinShape =
 
 /** Regular n-gon with one vertex pointing up, circumradius r. */
 function regularPolygon(n: number, r: number): Point[] {
+  'worklet';
   const pts: Point[] = [];
   for (let k = 0; k < n; k++) {
     const angle = -Math.PI / 2 + (2 * Math.PI * k) / n;
@@ -44,10 +46,15 @@ function regularPolygon(n: number, r: number): Point[] {
   return pts;
 }
 
-/** Shape for a category at a given on-screen size (the square's side). */
-export function pinShape(category: DeviceCategory, size: number): PinShape {
+/**
+ * Shape for a category at a given on-screen size (the square's side). A category outside the
+ * eight (the category list is project vocabulary) gets an octagon, so it never looks like one
+ * of the eight.
+ */
+export function pinShape(category: DeviceCategory | string | null, size: number): PinShape {
+  'worklet';
   const r = size / 2;
-  switch (category) {
+  switch (category as DeviceCategory) {
     case 'Relay panel':
       return { kind: 'rect', width: size, height: size, radius: 0 };
     case 'Foundry panel':
@@ -64,6 +71,8 @@ export function pinShape(category: DeviceCategory, size: number): PinShape {
       return { kind: 'circle', radius: r };
     case 'Sensor':
       return { kind: 'polygon', points: regularPolygon(4, r * 1.2) };
+    default:
+      return { kind: 'polygon', points: regularPolygon(8, r * 1.05) };
   }
 }
 
@@ -78,8 +87,33 @@ const STYLES: Record<PinStatus, PinStyle> = {
   'Not started': { fill: '#757575', hollow: false, glyph: '·' },
 };
 
+/** A device nobody has given a status yet: grey like `Not started`, with a dash. */
+const NO_STATUS_STYLE: PinStyle = { fill: '#757575', hollow: false, glyph: '–' };
+
 export function pinStyle(status: PinStatus): PinStyle {
   return STYLES[status];
+}
+
+/** Style for a stored device status, which may be null or (from old data) unknown. */
+export function pinStyleFor(status: string | null): PinStyle {
+  return status && status in STYLES ? STYLES[status as PinStatus] : NO_STATUS_STYLE;
+}
+
+const RANK: Record<string, number> = {
+  Issue: 6,
+  'Not installed': 5,
+  'No access': 4,
+  'Installed, untested': 2,
+  Complete: 1,
+  'Not started': 0,
+};
+
+/**
+ * How much a status needs attention, for the colour of a cluster (its most urgent member).
+ * No status ranks between `No access` and `Installed, untested`: not yet surveyed.
+ */
+export function statusRank(status: string | null): number {
+  return status && status in RANK ? RANK[status]! : 3;
 }
 
 export type DummyPin = { id: string; category: DeviceCategory; status: PinStatus; x: number; y: number };

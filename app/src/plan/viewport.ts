@@ -8,7 +8,8 @@
  * - **view**: points inside the Pdf view (y down), i.e. touch locations and what Skia draws in.
  *
  * Affine maps follow the PDF/Skia column convention: x' = a·x + c·y + tx, y' = b·x + d·y + ty.
- * No React or native imports: this file is unit-tested in Node.
+ * No React or native imports: this file is unit-tested in Node. Functions the pin overlay calls
+ * on the UI thread carry the `'worklet'` directive (a plain string in Node).
  */
 
 export type Affine = { a: number; b: number; c: number; d: number; tx: number; ty: number };
@@ -24,6 +25,7 @@ export type PdfViewport = Affine & {
 export const IDENTITY: Affine = { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 };
 
 export function apply(m: Affine, p: Point): Point {
+  'worklet';
   return { x: m.a * p.x + m.c * p.y + m.tx, y: m.b * p.x + m.d * p.y + m.ty };
 }
 
@@ -54,6 +56,7 @@ export function invert(m: Affine): Affine {
 
 /** Uniform scale of the map (view points per unit); rotation-safe. */
 export function scaleOf(m: Affine): number {
+  'worklet';
   return Math.hypot(m.a, m.b);
 }
 
@@ -79,4 +82,54 @@ export function viewToSheet(vp: PdfViewport): Affine {
 /** Row-major 3×3 for `Skia.Matrix()` / the `matrix` prop. */
 export function toSkiaMatrix(m: Affine): number[] {
   return [m.a, m.c, m.tx, m.b, m.d, m.ty, 0, 0, 1];
+}
+
+export type Rect = { x: number; y: number; width: number; height: number };
+export type Size = { width: number; height: number };
+
+/** Sheet rect → page rect (PDF user space, y up): what the native focus command takes. */
+export function sheetRectToPage(vp: PdfViewport, r: Rect): Rect {
+  return {
+    x: vp.cropBox.x + r.x,
+    y: vp.cropBox.y + vp.cropBox.height - (r.y + r.height),
+    width: r.width,
+    height: r.height,
+  };
+}
+
+/** The whole sheet (the CropBox) in sheet coordinates: what "fit" shows. */
+export function sheetRect(vp: PdfViewport): Rect {
+  return { x: 0, y: 0, width: vp.cropBox.width, height: vp.cropBox.height };
+}
+
+/**
+ * The sheet rect to show so that `points` are in view, centred, with `padPx` screen points
+ * around them, and the zoom (view points per sheet point) at most `maxZoom` — a lone pin is
+ * shown at `maxZoom`, not blown up to fill the screen. The rect keeps the view's aspect ratio,
+ * so fitting it into the view shows exactly it.
+ */
+export function focusRect(points: readonly Point[], view: Size, maxZoom: number, padPx = 48): Rect {
+  if (points.length === 0) throw new Error('focusRect: no points');
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const p of points) {
+    x0 = Math.min(x0, p.x);
+    y0 = Math.min(y0, p.y);
+    x1 = Math.max(x1, p.x);
+    y1 = Math.max(y1, p.y);
+  }
+  const innerW = Math.max(1, view.width - 2 * padPx);
+  const innerH = Math.max(1, view.height - 2 * padPx);
+  const zoom = Math.min(maxZoom, innerW / Math.max(x1 - x0, 1e-6), innerH / Math.max(y1 - y0, 1e-6));
+  const width = view.width / zoom;
+  const height = view.height / zoom;
+  return { x: (x0 + x1) / 2 - width / 2, y: (y0 + y1) / 2 - height / 2, width, height };
+}
+
+/** Is the sheet point inside the view, `marginPx` in from its edges? */
+export function inView(vp: PdfViewport, view: Size, p: Point, marginPx = 0): boolean {
+  const v = apply(sheetToView(vp), p);
+  return v.x >= marginPx && v.y >= marginPx && v.x <= view.width - marginPx && v.y <= view.height - marginPx;
 }

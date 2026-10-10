@@ -118,3 +118,31 @@ Caveats carried into T17 (recorded as follow-ups in `TASKS.md`):
 4. `loadComplete` fires more than once; use the first viewport as the "ready" signal.
 
 D92 (dependencies, patch, sheet coordinates) stands and should move to Approved with this decision.
+
+## 5. T17 follow-up run (dev client) — to do on the iPad
+
+T17 removed the spike (`/spike`, `PlanSpike.tsx`). The bench is now the **demo level**: home screen →
+**Demo plan (06M composite) →** (route `/demo-plan`), the same sheet with ~48 seeded devices in a
+separate local database that never syncs. It needs the dev build made at the end of T17 (the patch
+gained the `setNativeFocus` command, D101); see `TASKS.md` T17 for the build id.
+
+1. Install the T17 dev build, `cd app && npx expo start --dev-client`, open the demo plan (first open
+   downloads the PDF from Metro; close and reopen it once).
+2. Dev menu → **Toggle performance monitor**. Record RAM at Fit, at ×4 (pinch in on the electrical
+   room cluster), and 10 s after **TP-6: 100 zoom cycles** (bottom-right of the plan, dev only; Fit ↔
+   ×4 every 0.35 s). RAM ≥ 600 MB reopens §4 (T17b).
+3. UI fps and JS fps while pinching and panning for ~20 s with pins on.
+4. **Pinch jitter (D95):** do the pins stay glued to the drawing during a pinch, not only when the
+   fingers stop? The overlay now draws on the UI thread from a shared value (no React render per
+   event). Note "glued" / "still trails". If it still trails, the next step is native (D95).
+5. Fit: **⌖ Fit** shows the whole sheet centred (not ×0.93 of a 3.3-screens-wide page).
+
+| Measure | Threshold | Result |
+|---|---|---|
+| RAM at Fit | < 600 MB | |
+| RAM at ×4 | < 600 MB | |
+| RAM 10 s after 100 cycles | < 600 MB | |
+| UI fps pinching (pins on) | ≥ 50 | |
+| JS fps pinching | — | |
+| Pins glued during pinch | yes | |
+| Fit shows the whole sheet | yes | |

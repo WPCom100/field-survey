@@ -1,5 +1,30 @@
+diff --git a/fabric/RNPDFPdfNativeComponent.js b/fabric/RNPDFPdfNativeComponent.js
+index 43fea3bfc16a3b0c526ec96d993d2120cbb2ef0b..0375eceb1b0729f30eb7e3ba9c648dc0d3c86bd8 100644
+--- a/fabric/RNPDFPdfNativeComponent.js
++++ b/fabric/RNPDFPdfNativeComponent.js
+@@ -39,10 +39,19 @@
+     viewRef: React.ElementRef<ComponentType>,
+     page: Int32,
+   ) => void;
++  // field-survey patch: show a rect of the current page (PDF user space), centred
++  +setNativeFocus: (
++    viewRef: React.ElementRef<ComponentType>,
++    x: Double,
++    y: Double,
++    width: Double,
++    height: Double,
++    animated: boolean,
++  ) => void;
+ }
+ 
+ export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
+-  supportedCommands: ['setNativePage'],
++  supportedCommands: ['setNativePage', 'setNativeFocus'],
+ });
+ 
+  export default codegenNativeComponent<NativeProps>('RNPDFPdfView');
 diff --git a/index.d.ts b/index.d.ts
-index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..a6a36e9ced97e2f1eb6978621379666d9b5cf0ec 100644
+index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..3de3b7f6e7021fe69fd45e3d1d7e5f3e3b3011ea 100644
 --- a/index.d.ts
 +++ b/index.d.ts
 @@ -31,6 +31,17 @@ export type PdfError = Error & {
@@ -20,7 +45,7 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..a6a36e9ced97e2f1eb6978621379666d
  export type TextSelectionChangeEvent = {
    nativeEvent:
      | {
-@@ -79,8 +90,11 @@ export interface PdfProps {
+@@ -79,14 +90,19 @@ export interface PdfProps {
      onLoadComplete?: (numberOfPages: number, path: string, size: {height: number, width: number}, tableContents?: TableContent[]) => void,
      onPageChanged?: (page: number, numberOfPages: number) => void,
      onError?: (error: PdfError) => void,
@@ -33,11 +58,34 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..a6a36e9ced97e2f1eb6978621379666d
      onPressLink?: (url: string) => void,
      onTextSelectionChange?: (event: TextSelectionChangeEvent) => void,
  }
+ 
+ export interface PdfRef {
+     setPage(pageNumber: number): void
++    /** field-survey patch (iOS): zoom to and centre a rect of the current page, PDF user space (y up) */
++    focusRect(x: number, y: number, width: number, height: number, animated?: boolean): void
+ }
+ 
+ declare const Pdf: React.ForwardRefExoticComponent<PdfProps & React.RefAttributes<PdfRef>>
 diff --git a/index.js b/index.js
-index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..7fd938a8f4390ba2314d294267549a55c416b0da 100644
+index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..f286b32590fc051c4bb5f27f9b63dfbd5b4fea9f 100644
 --- a/index.js
 +++ b/index.js
-@@ -412,6 +412,21 @@ export default class Pdf extends Component {
+@@ -388,6 +388,14 @@ export default class Pdf extends Component {
+         
+     }
+ 
++    // field-survey patch (iOS, new architecture): zoom so the rect (PDF user space of the
++    // current page, y up) fills the view, centred on it; may zoom out below minScale (fit).
++    focusRect(x, y, width, height, animated = true) {
++        if (!!global?.nativeFabricUIManager && this._root) {
++            PdfViewCommands.setNativeFocus(this._root, x, y, width, height, animated);
++        }
++    }
++
+     _onChange = (event) => {
+         // Handle direct events for text selection/highlight
+         if (event.nativeEvent.type) {
+@@ -412,6 +420,21 @@ export default class Pdf extends Component {
                  return;
              }
  
@@ -60,7 +108,7 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..7fd938a8f4390ba2314d294267549a55
                  message[4] = message.splice(4).join('|');
              }
 diff --git a/ios/RNPDFPdf/RNPDFPdfView.mm b/ios/RNPDFPdf/RNPDFPdfView.mm
-index 1bc263bb95c584c950583d42485059b8bf34168b..ffd96b661464559731990af77a80e93675dada4f 100644
+index 1bc263bb95c584c950583d42485059b8bf34168b..7ad57cb1f659adf51a6120f88f3fd99130c05564 100644
 --- a/ios/RNPDFPdf/RNPDFPdfView.mm
 +++ b/ios/RNPDFPdf/RNPDFPdfView.mm
 @@ -75,8 +75,13 @@ const float MIN_SCALE = 1.0f;
@@ -85,7 +133,53 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..ffd96b661464559731990af77a80e936
      [_pdfView removeFromSuperview];
      _pdfDocument = Nil;
      _pdfView = Nil;
-@@ -476,6 +482,9 @@ using namespace facebook::react;
+@@ -234,6 +240,45 @@ using namespace facebook::react;
+     [self didSetProps:[NSArray arrayWithObject:@"page"]];
+ }
+ 
++/**
++ *  field-survey patch: zoom so the rect (PDF user space of the current page) fills the view and
++ *  centre it. Used for "fit" (the CropBox) and to bring a pin or cluster into view. The fit may be
++ *  below minScaleFactor (the stock fit from _fixScaleFactor can be off on the new architecture), so
++ *  the floor is lowered to it: the user can always pinch back out to the whole sheet.
++ */
++- (void)setNativeFocus:(double)x y:(double)y width:(double)width height:(double)height animated:(BOOL)animated
++{
++    if (!_pdfDocument || !_pdfView || width <= 0 || height <= 0) return;
++    PDFPage *page = _pdfView.currentPage ? _pdfView.currentPage : [_pdfDocument pageAtIndex:0];
++    CGSize box = _pdfView.bounds.size;
++    if (!page || box.width <= 0 || box.height <= 0) return;
++
++    CGFloat factor = MIN(box.width / width, box.height / height);
++    if (factor < _pdfView.minScaleFactor) _pdfView.minScaleFactor = factor;
++    if (factor > _pdfView.maxScaleFactor) factor = _pdfView.maxScaleFactor;
++    _pdfView.scaleFactor = factor;
++    [_pdfView layoutIfNeeded];
++
++    [self attachScrollObserver];
++    UIScrollView *scroll = _observedScrollView;
++    if (!scroll) {
++        [_pdfView goToRect:CGRectMake(x, y, width, height) onPage:page];
++        [self emitViewport];
++        return;
++    }
++    CGPoint centre = [_pdfView convertPoint:CGPointMake(x + width / 2, y + height / 2) fromPage:page];
++    centre = [scroll convertPoint:centre fromView:_pdfView];
++    CGSize size = scroll.bounds.size;
++    UIEdgeInsets inset = scroll.adjustedContentInset;
++    CGFloat minX = -inset.left, maxX = scroll.contentSize.width + inset.right - size.width;
++    CGFloat minY = -inset.top, maxY = scroll.contentSize.height + inset.bottom - size.height;
++    CGFloat ox = centre.x - size.width / 2, oy = centre.y - size.height / 2;
++    ox = maxX < minX ? (minX + maxX) / 2 : MIN(MAX(ox, minX), maxX);
++    oy = maxY < minY ? (minY + maxY) / 2 : MIN(MAX(oy, minY), maxY);
++    [scroll setContentOffset:CGPointMake(ox, oy) animated:animated];
++    [self emitViewport];
++}
++
+ #endif
+ 
+ - (instancetype)initWithBridge:(RCTBridge *)bridge
+@@ -476,6 +521,9 @@ using namespace facebook::react;
                      _pdfView.maxScaleFactor = _fixScaleFactor*_maxScale;
                  }
              }
@@ -95,7 +189,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..ffd96b661464559731990af77a80e936
  
          }
  
-@@ -567,6 +576,8 @@ using namespace facebook::react;
+@@ -567,6 +615,8 @@ using namespace facebook::react;
          _pdfView.backgroundColor = [UIColor clearColor];
          [_pdfView layoutDocumentView];
          [self setNeedsDisplay];
@@ -104,7 +198,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..ffd96b661464559731990af77a80e936
      }
  }
  
-@@ -600,6 +611,7 @@ using namespace facebook::react;
+@@ -600,6 +650,7 @@ using namespace facebook::react;
  
  - (void)dealloc{
  
@@ -112,7 +206,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..ffd96b661464559731990af77a80e936
      _pdfDocument = Nil;
      _pdfView = Nil;
  
-@@ -741,6 +753,77 @@ using namespace facebook::react;
+@@ -741,6 +792,77 @@ using namespace facebook::react;
              [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"scaleChanged|%f", _scale]]];
          }
      }
@@ -190,7 +284,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..ffd96b661464559731990af77a80e936
  }
  
  #pragma mark gesture process
-@@ -839,8 +922,10 @@ using namespace facebook::react;
+@@ -839,8 +961,10 @@ using namespace facebook::react;
      PDFPage *pdfPage = [_pdfView pageForPoint:point nearest:NO];
      if (pdfPage) {
          unsigned long page = [_pdfDocument indexForPage:pdfPage];
