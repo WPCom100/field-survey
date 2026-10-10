@@ -1,6 +1,6 @@
 /**
  * Plan view (T17, Phase 3 §4.2): the level's display sheet in PDFKit with the Skia pin layer on
- * top (left ~62 %), the device list beside it (right ~38 %, D44; T19 grows it into four tabs).
+ * top (left ~69 %), the device list beside it (right ~31 %, D104 narrows D44's 38 %; T19 grows it into four tabs).
  *
  * - Pins come from `device.pin` in sheet coordinates (D92), shaped by category and coloured by
  *   status (D64), clustered at low zoom; drawn on the UI thread from the viewport (D95).
@@ -533,12 +533,12 @@ const styles = StyleSheet.create({
   spacer: { flex: 1 },
   status: { maxWidth: 260, fontSize: 13, color: '#555' },
   body: { flex: 1, flexDirection: 'row' },
-  plan: { flex: 62, backgroundColor: '#3a3d42', overflow: 'hidden' },
+  plan: { flex: 69, backgroundColor: '#3a3d42', overflow: 'hidden' },
   pdf: { flex: 1, backgroundColor: '#3a3d42' },
   planTools: { position: 'absolute', right: 12, bottom: 12, gap: 8, alignItems: 'flex-end' },
   tool: { backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
   toolText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  side: { flex: 38, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
+  side: { flex: 31, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
   sideHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', padding: 12 },
   sideTitle: { fontSize: 16, fontWeight: '600' },
   sideNote: { fontSize: 13, color: '#666' },
