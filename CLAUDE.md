@@ -94,7 +94,8 @@ Export header strings: `ETC Lighting Controls Survey`; row 2 `Levels <first>-<la
 ```
 # server
 cd server && uv sync && cp .env.example .env
-docker compose up -d postgres minio
+docker compose up -d postgres s3
+docker compose run --rm api python -m app.storage ensure-bucket   # once per fresh s3 volume
 uv run alembic upgrade head
 uv run pytest                      # unit + API + export round-trip (needs fixtures/)
 uv run uvicorn app.main:app --reload

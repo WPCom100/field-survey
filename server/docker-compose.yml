@@ -4,7 +4,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-survey}:${POSTGRES_PASSWORD:-survey}@postgres:5432/${POSTGRES_DB:-survey}
-    depends_on: [postgres, minio]
+    depends_on: [postgres, s3]
     expose: ["8000"]
   worker:
     build: .
@@ -12,7 +12,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-survey}:${POSTGRES_PASSWORD:-survey}@postgres:5432/${POSTGRES_DB:-survey}
-    depends_on: [postgres, minio]
+    depends_on: [postgres, s3]
   postgres:
     image: postgres:16
     environment:
@@ -21,14 +21,14 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-survey}
     ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
-    ports: ["9000:9000", "9001:9001"]
-    volumes: [miniodata:/data]
+  # Local S3 stand-in (dev only; R2 everywhere else). SeaweedFS replaced MinIO, whose images left
+  # Docker Hub. No identities are configured, so any S3_ACCESS_KEY/S3_SECRET_KEY works. Create
+  # the bucket once: `docker compose run --rm api python -m app.storage ensure-bucket`.
+  s3:
+    image: chrislusf/seaweedfs:3.97
+    command: ["server", "-dir=/data", "-s3", "-s3.port=9000", "-master.volumeSizeLimitMB=64", "-volume.max=100"]
+    ports: ["9000:9000"]
+    volumes: [s3data:/data]
   caddy:
     image: caddy:2
     environment:
@@ -41,5 +41,5 @@ services:
 
 volumes:
   pgdata:
-  miniodata:
+  s3data:
   caddy_data:

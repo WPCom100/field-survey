@@ -1,7 +1,7 @@
 # Production override for the Droplet (D67 option A). Use with:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 # (docs/ops.md sets COMPOSE_FILE in .env so plain `docker compose` picks both up.)
-# Differences from dev: no MinIO (R2 from .env), Postgres not published, restarts, log caps.
+# Differences from dev: no local S3 (R2 from .env), Postgres not published, restarts, log caps.
 x-prod: &prod
   restart: unless-stopped
   logging:
@@ -20,5 +20,5 @@ services:
     ports: !reset []
   caddy:
     <<: *prod
-  minio:
+  s3:
     profiles: [dev-only]

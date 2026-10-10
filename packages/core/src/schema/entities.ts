@@ -372,8 +372,11 @@ export const ENTITIES = {
       created_at: t(),
       local_path: t(),
       last_used_at: t(),
+      // Migration 0002 (T12): what the bytes are, for cache eviction tiers. Client-only.
+      kind: enumCol(v.BLOB_KIND),
     },
     ['sha256'],
+    [['local_path']],
   ),
 
   review_item: record(

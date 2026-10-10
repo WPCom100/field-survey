@@ -61,3 +61,23 @@ export {
   type ReviewMark,
 } from './sync';
 export { HttpTransport, type HttpTransportOptions } from './http-transport';
+export { HttpClient, httpFailure, errorCode, failureOf, type HttpClientOptions } from './http';
+export {
+  BlobQueue,
+  BlobUploadError,
+  UPLOAD_PRIORITY,
+  DOWNLOAD_PRIORITY,
+  DEFAULT_MIME,
+  type BlobKind,
+  type RemoteBlob,
+  type BlobMeta,
+  type ChunkSource,
+  type BlobTransport,
+  type BlobFiles,
+  type BlobQueueState,
+  type BlobQueueStatus,
+  type BlobReport,
+  type BlobLog,
+  type BlobQueueOptions,
+} from './blobs';
+export { HttpBlobTransport, type HttpBlobTransportOptions } from './http-blob-transport';

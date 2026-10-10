@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     s3_access_key: str = ""
     s3_secret_key: str = ""
     s3_region: str = "auto"
+    # Largest blob accepted by POST /blobs/{sha} (T12); display sheets are the biggest.
+    blob_max_bytes: int = 512 * 1024 * 1024
     worker_concurrency: int = 1
     # Backups (T06, docs/ops.md §3): nightly pg_dump to S3_BUCKET/backups/pg/, weekly rclone
     # copy of the whole bucket to BACKUP_COPY_BUCKET (skipped while that is empty).

@@ -11,7 +11,7 @@ Production (D67 option A): one DigitalOcean Basic Droplet, 2 vCPU / 4 GB (resize
 | Objects | R2 bucket from `S3_BUCKET`, endpoint `https://<account-id>.r2.cloudflarestorage.com` |
 | TLS | Caddy, automatic; certificates in the `caddy_data` volume |
 
-`.env` sets `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, so on the Droplet a plain `docker compose …` already uses the production override: no MinIO, Postgres not published to the host, `restart: unless-stopped`, logs capped at 5 × 10 MB per container.
+`.env` sets `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, so on the Droplet a plain `docker compose …` already uses the production override: no local S3 service, Postgres not published to the host, `restart: unless-stopped`, logs capped at 5 × 10 MB per container.
 
 Every command below runs on the Droplet in `/opt/field-survey/server` unless it says "on the PC".
 
