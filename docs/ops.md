@@ -1,6 +1,6 @@
 # Operations — Field Survey server
 
-Production (D67 option A): one DigitalOcean Basic Droplet, 2 vCPU / 4 GB (**currently 2 GB — resize before extraction/export jobs land, §3.6 and TASKS follow-ups**), Ubuntu 24.04, running the Compose stack in `server/` (Caddy → api, worker, Postgres 16 in the named volume `pgdata`). Objects live in Cloudflare R2. Public name: `https://survey.wpcom.cloud`.
+Production (D67 option A): one DigitalOcean Basic Droplet, 2 vCPU / 4 GB (resized from 2 GB on 2026-10-10, §3.6), Ubuntu 24.04, running the Compose stack in `server/` (Caddy → api, worker, Postgres 16 in the named volume `pgdata`). Objects live in Cloudflare R2. Public name: `https://survey.wpcom.cloud`.
 
 | Thing | Where |
 |---|---|
