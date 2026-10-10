@@ -34,6 +34,7 @@ export {
   type SearchMode,
   type SearchOptions,
 } from './schema/search';
+export { Editor, EditBatch, OpError, type EditContext, type EditorOptions } from './editor';
 export {
   Store,
   StoreError,

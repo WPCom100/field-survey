@@ -13,6 +13,7 @@ How the local SQLite store works. Normative references: PLAN §2.1 (versioning, 
 | `src/schema/search.ts` | `search_doc` (one text row per live device / punch item / missing part / photo, kept by triggers) and the FTS5 index over it when the SQLite build has FTS5, else `LIKE`. |
 | `src/store.ts` | `Store.open`, `apply`, `applyMany`, `applyRemote`, `applyRemoteMany`, reads (`get`, `list`, `search`, `opsFor`, `fieldHead(s)`, `outbox`). |
 | `src/op.ts` | The `Op` type. |
+| `src/editor.ts` | `Editor` / `EditBatch` (T08): the mutation API screens call; builds ops with `was`, `base_op_id` and `group_id` and applies them through the store. |
 | `src/ids.ts` | UUID v7; `setRandomSource` for runtimes without `crypto.getRandomValues`. |
 | `src/node.ts` | `BetterSqliteDriver` (Node tests only). The iPad driver is `app/src/db/expo-sqlite-driver.ts`. |
 
@@ -36,6 +37,39 @@ Refused with `StoreError` (nothing written): unknown entity kind or column; `set
 server-assigned column (`punch_item.number`, `missing_part.number`, `photo.number`,
 `cable_end.display_id`); `delete`/`restore` on link or plain tables; link ops on records; a
 `set` on a record that does not exist locally; bad `kind`, `change_type` or `state`.
+
+## Building ops from the UI (`Editor`, T08)
+
+Screens hold one `Editor` per (store, project, user) and never construct an `Op` themselves:
+
+```ts
+const editor = new Editor(store, { projectId, userId });          // userId from useCurrentUser()
+const ctx = { change_type: 'Field survey', reason: 'LVD card missing' };
+await editor.setField('device', id, 'status', 'Issue', ctx);       // one op, group_id null
+await editor.group(ctx, async (g) => {                             // one group_id, one transaction
+  await g.setField('punch_item', p, 'tracking_status', 'Closed');
+  await g.setField('punch_item', p, 'date_closed', '2026-10-10');
+});
+```
+
+| Call | Op | `was` / `base_op_id` | Notes |
+|---|---|---|---|
+| `create(kind, payload, ctx)` | `create` | — | `payload.id` kept or a UUID v7 generated; payload is the full record incl. `id`; `undefined` values dropped. Refuses an existing id, protected / server-assigned / unknown columns and off-list values. |
+| `setField(kind, id, field, now, ctx)` | `set` | current value / `field_head` (null if never set) | Returns `null` and writes nothing when `now` equals the current value (JSON-equal). Refuses deleted records ("restore it first"). |
+| `setFields(kind, id, values, ctx)` | `set` × n | as above | One group. |
+| `delete(kind, id, ctx)` | `delete` | — / head of `deleted_at` | `reason` becomes `delete_reason`. Refuses an already-deleted record. |
+| `restore(kind, id, ctx)` | `restore` | — / head of `deleted_at` (the delete) | Refuses a live record. |
+| `link(kind, ownerId, key, ctx)` / `unlink(...)` | `link_add` / `link_remove` | — | `entity_id` = owner (`level` for `assignment`, `missing_part` for `part_source`); `key` = the other pk columns plus extras. |
+| `group(ctx, fn)` | any of the above | chained inside the group | Every op shares one `group_id`; applied with `applyMany` (all or nothing). Inside a group, a `set` after a `create` bases on the create, a second `set` on one field bases on the first. |
+
+Every call takes an `EditContext`: `change_type` (one of the seven, CLAUDE.md §3) and a
+non-empty `reason` are required (`OpError` otherwise); `ruling_id` / `proposal_id` are passed
+through. `op_id` is a UUID v7, `install_id` is `store.installId`, `client_ts` comes from the
+editor's clock (`now` option, default `new Date().toISOString()`), `state` is `pending`.
+
+Heads are read before the op is applied, in a separate transaction. If a pull lands in between
+the op carries the older head, which is exactly what the server should see: the user edited the
+value they were looking at (PLAN §3.2 step 3 decides).
 
 ## Applying a pulled op (`Store.applyRemote`)
 
