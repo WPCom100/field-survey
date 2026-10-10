@@ -1,0 +1,129 @@
+# TASKS.md — Field Survey
+
+One task per Claude Code session, run on the Windows PC (D70). Columns: **Model/Effort** per D61 (F = Fable 5.1, O = Opus 5.5, S = Sonnet 5.5; H/M/L effort). **Deps** must be `done` before starting. **DoD** = definition of done; every DoD includes "tests named here pass and `TASKS.md` updated". PLAN § references are to `PLAN.md`; "Phase 3 §" references are to `docs/history/Phase3_UX_Wireframes.md`. Status: `todo` · `doing` · `done` · `blocked` · `skipped(reason)`.
+
+Session rule: if a task turns out to need more than one session, stop at a committed, green state, mark it `doing`, and write a "resume from" note under the task.
+
+Native-build rule: a task that adds a native module (CLAUDE.md §5 list) ends with `eas build --profile development --platform ios` and a note of the build id; the next session installs that build on the iPad before starting.
+
+## M0 — Foundations (6)
+
+| # | Task | Model/Effort | Deps | Definition of done | Status |
+|---|---|---|---|---|---|
+| T01 | Repo scaffold | S/L | — | Monorepo per CLAUDE.md §2 in the GitHub repo `field-survey` (D68): pnpm workspaces; `app/` Expo project (latest stable SDK, TypeScript strict, `expo-router`, iPad only — `supportsTablet: true`, `supportsPhone: false` per D74, bundle id `productions.luminarytechnology.fieldsurvey`) showing "Field Survey"; `packages/core` and `packages/rules` with one passing `vitest` test each and a `SqlDriver` interface with the `BetterSqliteDriver` implementation; `eas.json` with development/preview/production profiles (no build run yet); `server/` with `uv`, FastAPI `GET /health`, `ruff`, `pytest` green; `docker-compose.yml` (api, worker, postgres, minio, caddy); `.env.example`; `fixtures/` with the six files and a README stating D4; `docs/history/` populated; GitHub Actions running server tests and `pnpm -r test` (D73) | todo |
+| T02 | Server data layer and migrations | O/M | T01 | SQLAlchemy models + Alembic for every entity in PLAN §2.2 (server-side columns) including `op`, `field_head`, `numbering_group`, `review_item`, `blob`, `export`, `library_type` with nullable project; `uv run alembic upgrade head` on a fresh DB; model round-trip tests | todo |
+| T60 | Interim identity: team-name picker + shared token (D69) | S/M | T02 | Server `AUTH_MODE=token`: requests must carry the shared bearer token; `X-Survey-User` header names the user, upserted with `entra_oid=null`; `GET /team` returns the name list; app first-launch picker (stored in `expo-secure-store`) stamps every op; tests for token missing/wrong and user upsert; `AUTH_MODE=entra` switch documented as the T03 hand-over | todo |
+| T05 | Deploy to the Droplet (D67 option A) | O/M | T01, T60 | Compose running on a DigitalOcean 2 vCPU/4 GB Droplet with Postgres in a named volume and Cloudflare R2 wired from `.env`; Caddy TLS for `survey.<domain>`; `WORKER_CONCURRENCY=1` + 2 GB swap; `docs/ops.md` with provision, update and restore steps; `/health` reachable over HTTPS from an iPad with the shared token | todo |
+| T06 | First EAS builds, TestFlight, backups | O/M | T01, T05 | Apple team: app record in App Store Connect, App Store Connect API key stored in EAS; `eas device:create` for each team iPad; `eas build --profile development` installed on Landry's iPad and `npx expo start --dev-client` loads the scaffold over Wi-Fi; `eas build --profile production` + `eas submit` → first empty build in TestFlight internal, team invited (D59); EAS `autoIncrement` on; nightly `pg_dump` to R2 (90-day lifecycle) + weekly `rclone` copy to a second bucket as cron in the `worker`; one restore into a scratch DB documented with timestamps in `docs/ops.md` | todo |
+| T03 | Entra sign-in: server JWT validation and `/me` (**runs at the start of M6, D69**) | O/M | T02, T60 | Bearer JWT validated against tenant JWKS (issuer, audience from `.env`); `user` upserted; interim user merged by name on first sign-in; `/me` returns id/name/email; tests with a locally signed token and a fake JWKS; `/health` stays public | todo |
+| T04 | App sign-in with Entra (`expo-auth-session`, **start of M6**) | O/M | T01, T03 | Authorization-code + PKCE flow per PLAN §4, refresh token in `expo-secure-store`, silent refresh before sync, "Sign-in needed to sync" state, merge confirmation prompt for the interim user; TP-12 manual checklist in `docs/test/tp12.md`; new dev build | todo |
+
+## M1 — Core data and sync (9)
+
+| # | Task | Model/Effort | Deps | Definition of done | Status |
+|---|---|---|---|---|---|
+| T07 | `packages/core` schema and store | F/H | T01 | SQL migrations for every entity in PLAN §2.2 (client columns), `field_head`, outbox, blob queue; FTS5 over device/punch/part/photo text (verify expo-sqlite has FTS5 — A21 — else a LIKE index); `Store.apply(op)` as the only write path (CLAUDE.md §5); `ExpoSqliteDriver` added in `app/` (native module → dev build); vitest with `BetterSqliteDriver`: create/set/delete/restore ops materialise correctly; `version`/`head_seq` maintained | todo |
+| T08 | Op model and client op generation | F/H | T07 | `Op` type per PLAN §3.1; every UI-facing mutation API (`setField`, `create`, `delete`, `restore`, `link`) produces ops with `base_op_id` from `field_head` and `group_id` for grouped edits; `change_type` and `reason` required; tests cover each kind | todo |
+| T09 | Server `POST /ops` apply loop | F/H | T02 | PLAN §3.2 steps 1–7 in one transaction per push; idempotent by `op_id`; `assign` ops for display numbers from numbering-group counters; per-op outcome returned; tests for every row of PLAN §3.3 and for same-user/different-install ordering (D37) | todo |
+| T10 | Server `GET /ops` pull and materialised state | F/H | T09 | Pull since `server_seq` with paging; server-side materialised tables updated on apply; tests: replay of the op log equals materialised state; no gaps in `server_seq` under concurrent pushes (TP-7 partial) | todo |
+| T11 | Client sync engine (push/pull/outbox) | F/H | T08, T10 | `SyncEngine` in core: outbox drains in `client_ts` order in batches ≤ 500, pull after push, applies incoming ops to tables + `field_head`, marks "will be reviewed" on local pending collisions; backoff on failure; works with no token (edits never blocked); status model for the global status bar; vitest against an in-process fake server; runs on the iPad on foreground + every 60 s while online | todo |
+| T12 | Blob upload/download with resume | O/H | T07, T11 | Server endpoints per PLAN §3.4; core queue uploads thumbnails first, 2-MB chunks via `expo-file-system` upload tasks, resumes after app kill (vitest simulates a kill between chunks — TP-2 automated part); downloads: thumbnails + display sheets prefetch for assigned levels, full-size on demand, LRU cache in the app sandbox; "N photos waiting" count | todo |
+| T13 | Numbering groups and `NEW` state | O/M | T09, T11 | Server counters per group; 06/06M sharing; `NEW` state in core until `assign` arrives; TP-10 automated (create/delete/create across two clients, numbers never reused); device **ID** assignment rules (next free / tag) in core | todo |
+| T14 | Twin-client harness (TP-1, TP-7, TP-11 automated) | F/H | T11, T12, T13 | Node test that runs two core stores (`BetterSqliteDriver`) against the real server in Docker: TP-1 script (same field → review, different fields → merge, photos merge, two field additions numbered); TP-7 (network flap injection, server restart, duplicate push → convergence, no duplicate ops); TP-11 (delete vs edit → review; restore keeps history); runs in GitHub Actions | todo |
+| T15 | Review resolution ops | O/M | T14 | `review_item` creation on server conflict; core `resolve(itemId, choice)` emitting the `Reconcile` op (A/B/Combine/value, field groups as one), loser → `rejected`; `IN REVIEW` state exposed per field; tests for each resolver choice | todo |
+
+## M2 — Field loop (11)
+
+| # | Task | Model/Effort | Deps | Definition of done | Status |
+|---|---|---|---|---|---|
+| T16 | Plan viewer spike on the 06M composite (TP-6) | F/H | T06 | `react-native-pdf` showing `fixtures/Level_06M_-_Lighting_Composite_vector.pdf` with a Skia overlay of 40 dummy pins and a stroke canvas, page↔screen coordinate mapping proven at three zoom levels; numbers recorded in `docs/perf/tp6.md` from the real iPad Air (first render, pan/zoom frame rate via the Expo perf monitor, memory, 100 zoom cycles without crash); **decision written**: pass → T17 proceeds; fail → T17 is replaced by a server-rendered PNG tile pyramid + zoomable image viewer (add as T17b, F/H). Native modules added → dev build | todo |
+| T17 | Plan view with pins, clustering, layers | O/H | T16, T07 | Pins from `device.pin` drawn in Skia, shaped by category and coloured by status (D64, glyph backup), ID labels, clustering at low zoom, layer toggles (pins/labels/boundaries/ink/photos-as-pins), tap → select (hit-test in page coordinates), pinch/pan, "fit"; filters per PLAN §5 persisted per level; two-way highlight with the side list | todo |
+| T18 | Project home and level list | S/M | T07, T11 | Levels table with state, counts, review count, cache state; "Assigned to me"; sidebar navigation (expo-router); global status bar; works offline from the local store | todo |
+| T19 | Side lists (devices, connections, punch, parts) | S/M | T17 | Four tabs beside the plan with the same filters, badges (`NEW`, `↑n`, `IN REVIEW`, `DRAFT`, `DELETED`), FTS search, row ↔ pin highlight; `FlashList` or equivalent for 2,000 rows | todo |
+| T20 | Device card | O/H | T17, T08 | All sections of Phase 3 §4.3: status buttons (one op each), Notes with vocabulary chips, accessories expected/found, Neuron ID typed entry with 12-hex validation + duplicate check, photos strip, connections list with jump, punch/parts with proposals (Accept/Edit/Reject wired to `packages/rules` in M4 — stub interface now), quick actions stubs, history from the op log; `[⋯]` delete with reason / move pin | todo |
+| T21 | Photo capture and markup | O/M | T12, T20 | `expo-camera` straight from the card, caption sheet after the shutter, `expo-image-picker` library picker, JPEG conversion per D38 with `expo-image-manipulator` (orientation baked, EXIF/GPS stripped, first frame of HEIC/MPO), thumbnail, Skia markup stored as a separate stroke-list blob, link to device/punch/end; upload queue badge; native modules → dev build | todo |
+| T22 | Connection end editor and cross-floor jump | O/M | T20 | Both ends stacked, status/note per end, riser label check display, "Jump to" pushes the other level's plan with the pin lit (or list view if plan not cached); From/To text editable (D32) | todo |
+| T23 | Long-press additions and field additions | O/M | T17, T20 | Long-press menu: add device (library type picker; free-typed model → library draft per D55), note, photo, ink; `origin=field_addition`, "+" mark, device ID assigned per T13 | todo |
+| T24 | Plan ink layers (D53) | O/M | T16, T12 | Skia stroke capture with Pencil pressure; one stroke-list blob per (sheet, user); others' layers rendered read-only; own layer saved debounced as a blob replace (new sha, `ink_layer.updated_at` op); never conflicts; stroke format documented in `packages/core/docs/strokes.md` | todo |
+| T25 | Sync & uploads screen and status bar | S/M | T11, T12 | Phase 3 §12 screen: connection, last sync seq, pending ops, photos waiting, cached levels with download, storage, install/app version (EAS build id), re-sign-in, export local log; "Pause on cellular" | todo |
+| T26 | Needs review screen | O/M | T15 | Phase 3 §6: tabs by kind, A/B panel with who/when/install, Choose A/B/Combine, pin conflicts on the plan, field groups; resolution clears badges on next pull | todo |
+
+## M3 — Seed import and export (7)
+
+| # | Task | Model/Effort | Deps | Definition of done | Status |
+|---|---|---|---|---|---|
+| T27 | Workbook seed import (server job) | F/H | T02, T09 | PLAN §7.5 for all tabs incl. cable-end pairing proposals, `part_source` parsing, Photo Log thumbnails (`seed_thumbnail_only`), Change Log → historical ops, counters, D50 rename ruling recorded, out-of-list values → review items; results delivered as ops; pytest on `fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx`: 210 devices, 107 ends, 215 punch, 85 parts, 76 photos, 375 historical ops | todo |
+| T28 | Import column-mapping UI | S/M | T27, T18 | Setup → Sources → Seed import: `expo-document-picker` file picker, pre-matched column mapping, checks summary, job progress, "open Needs review"; floor-workbook variant | todo |
+| T29 | Excel export (XlsxWriter) | F/H | T27 | PLAN §7.6 in full; export job writes to R2 and an `export` row; **TP-4**: pytest imports the master, exports, diffs every data tab, Summary values, widths, freeze panes, Table names, validation ranges, chart count/anchors with openpyxl — empty except D50 spelling and no Change Log tab; diff script committed as `server/tests/xlsx_diff.py` | todo |
+| T30 | Excel open test (TP-5, D72) | O/M | T29 | Checklist in `docs/test/tp5.md` executed in Excel Online and Excel for Windows with screenshots: no repair prompt, dropdowns work, wrap/row heights readable, charts render; Excel for Mac row left "pending — no Mac" until one is available; any fix applied in XlsxWriter and TP-4 re-run | todo |
+| T31 | Export screen and history | O/M | T29, T18 | Phase 3 §11.1: levels, tabs, pre-flight (lint count, open review, unsynced ops), "Sync first", job progress, history list with Open/Share (`expo-sharing`)/Save to Files and diff summary vs previous export | todo |
+| T59 | Floor PDF (WeasyPrint, D56/D66) | O/M | T29 | PLAN §7.7: cover with plan snapshot (status-coloured, category-shaped pins, ID labels, all ink layers flattened server-side from stroke JSON), dense findings table with thumbnails (3–4 items per page, modelled on `fixtures/Lake_Dallas_CTE…Punch_List.pdf` elements: number/title, status \| owner \| category, plan crop with pin, notes, photos), connections, punch list ordered (`sort_last`, #), missing parts, 2×3 photo appendix; header date only, no company name (R7); export job + `export` row; Floor PDF options in the Export screen (Phase 3 §11.2) | todo |
+| T32 | Synthetic scale run (TP-3) | O/M | T29, T12 | Generator for 2,000 devices / 10,000 photos / 1,500 ops; timed on the iPad: plan open < 3 s, list scroll smooth, thumbnail prefetch < 10 min on Wi-Fi, export < 5 min; results in `docs/perf/tp3.md`; any hot spot fixed or filed as a follow-up task | todo |
+
+## M4 — Rules, rulings, lint, dashboard, cable view (8)
+
+| # | Task | Model/Effort | Deps | Definition of done | Status |
+|---|---|---|---|---|---|
+| T33 | `packages/rules` engine core | F/H | T07 | Snapshot type, rule interface, proposal keying `(rule_id, subject, discriminator)` + `inputs_hash`, states incl. `superseded`, findings; debounced trigger after commit and after pull (wired in core); Accept/Edit/Reject emit ops with `rule_id`/`proposal_id`; vitest on idempotence | todo |
+| T34 | Rules R1–R5, E5–E9 | F/H | T33 | Every row of PLAN §6.1 implemented with the exact phrases from CLAUDE.md §3; R3c per D49 (Notes list, auto-close, reopen); R2f copy/derive; library generation hooks (R2c/d/e); unit tests per rule | todo |
+| T35 | Rule golden tests (TP-8) | F/H | T34, T27 | Load the seeded master into a snapshot (via the server export of ops into a Node store); the engine's proposals equal the master's rule-generated rows (R3c item per group, R3b/R4b pairs, R2f copied ends, E5 on the missing LVD) with a committed list of known differences; no extra proposals | todo |
+| T36 | Lint view and findings | O/M | T33, T19 | PLAN §6.3 checks as findings; screen per Phase 3 §9 with dismiss-with-reason, reappear on input change, "fix all via ruling" hand-off | todo |
+| T37 | Rulings: record, preview, apply, standing | O/H | T33, T08 | Phase 3 §8: filter builder (entity + field predicates), actions (set / rename phrase / append note / generate item), preview op table with untick, apply → `Ruling` ops with `ruling_id`; standing re-evaluation raises proposals; rename updates `vocab.canonical_of`; multi-select → "Apply as ruling…" | todo |
+| T38 | Dashboard and search | O/M | T19 | Four Summary tables + stacked bar charts (`victory-native`; native module → dev build) computed with the same queries the export uses; drill-down to filtered lists (D17); as-found counts; readiness; global FTS search grouped by entity; test: dashboard numbers == export Summary for the seeded master | todo |
+| T39 | Cable / riser view | O/M | T22 | Phase 3 §5: group by vertical/level/code, both ends, consistency checks (missing far end, code mismatch, status mismatch, To ≠ riser, unconfirmed endpoint, Not started on in-scope level), end editor in the side panel, riser crop display | todo |
+| T40 | Vocabulary and placeholder editors | S/M | T07 | Vocab lists per PLAN §2.2 editable with drafts; placeholder table (D26) editable from the endpoint picker; seed data for this project (CLAUDE.md §3, PLAN §7.5) | todo |
+
+## M5 — Setup pipeline and library (10)
+
+| # | Task | Model/Effort | Deps | Definition of done | Status |
+|---|---|---|---|---|---|
+| T41 | Project creation and levels | O/M | T18, T13 | Phase 3 §3.1: create project (server-side so numbering groups exist), parties, copy-from (vocabulary/library/rulings/placeholders; app library per D65), levels table with floor order, numbering group sharing, split level, in-scope, "Add range"; export title/disclaimer settings | todo |
+| T42 | BOM extraction (text + OCR) | F/H | T02 | PLAN §7.2 on `fixtures/BOM.pdf` (pp.1,2,4–6 text, p.3 OCR) and `fixtures/15090056-BOM.pdf` (format only); `draft_device` with `source_ref`, candidates for SR/LR, level alias, rack lines → one draft, accessories, excluded lines; pytest: counts per the Phase 1f report | todo |
+| T43 | Riser extraction with Claude API endpoints | F/H | T42 | PLAN §7.3: bands, device tags, bubbles by geometry, per-band crops to the Claude API with structured outputs (schema committed), rack output placeholders, sheet 002 OCR path; validation rules; conflicts (D28); **TP-9**: ≥ 50/54 device keys, the two known qty conflicts raised, low-confidence endpoints flagged; API key only from server `.env`; cost per run logged | todo |
+| T44 | Draft review screens (devices, cables) | O/H | T42, T43, T19 | Phase 3 §3.3: per-level table with confidence/source, right panel with candidates and source crops (served as PNGs by the server), Accept/Edit/Reject/Promote, bulk accept ≥ 0.9 (still recorded as reviewed), mismatch list, excluded lines; cables tab with endpoint pickers and **Confirm endpoint** (D6). *Fallback (K12):* must also work with hand-entered drafts if a floor arrives before T42/T43 | todo |
+| T45 | Plan sheets upload and grid auto-calibration | F/H | T16, T02 | PLAN §7.4 (server job): display + source sheets per level, text pass for bubbles/rooms/panel tags, per-grid-set affine fit with residual, manual 3-tap fallback on the iPad, prefix per set, Drawing Position text from a pin incl. "East of H"; test on the 06M composite: both grid sets auto, residual < 2 pt, tap → "C-9"-style label | todo |
+| T46 | Place devices from the unplaced list | O/H | T44, T45, T17 | Phase 3 §3.4: unplaced list per level or pool by type, drag/tap to place, confirm ID/tag/Drawing Position/Room, pooled decrement, "not on this sheet" flag, panel pre-placement proposals (dashed) from text tags, progress per level | todo |
+| T47 | Lock / unlock baseline | O/M | T46 | Phase 3 §3.5 table and dialog; lock sets `baseline_locked_at`, change-logging begins; unlock with typed reason, logged (D57); lint "locked with unreviewed drafts" | todo |
+| T48 | Device-type library editor (project scope) | O/M | T40, T23 | Phase 3 §10: types with aliases, ID scheme, default/optional cables, optional accessories (incl. NSPS power supply per D52), draft/accept/reject, "copy from"; accepting a type with default cables raises proposals for existing devices; free-typed models from T23 appear as drafts | todo |
+| T61 | App-level library manager (D65) | O/M | T48 | Library screen reachable from the Projects list; `library_type.project` nullable; create/edit/accept types without a project; project creation copies from the app library; "Promote to app library" on accepted project types (with `promoted_from`); tests: a type promoted from project A appears in new project B | todo |
+| T49 | Setup end-to-end on the fixtures | S/M | T41–T48, T61 | Script + checklist: new project → levels B2–06M + 07 → BOM + riser + 06M composite → extraction → review → place → lock 06M; recorded timings and defects; any defect becomes a task before M6 | todo |
+
+## M6 — Pilot (T03, T04, then 4)
+
+Run **T03 then T04** first (D69): Entra sign-in replaces the interim identity; interim users are merged by name.
+
+| # | Task | Model/Effort | Deps | Definition of done | Status |
+|---|---|---|---|---|---|
+| T50 | Pilot preparation | S/M | T49, T30, T35, T04 | Current project seeded from the master; pilot level set up and locked; assignments; plans cached on each iPad; TestFlight build < 30 days old on every iPad; pilot checklist from Phase 4 §5 in `docs/pilot/checklist.md` | todo |
+| T51 | Real-iPad TP-1 and TP-2 | O/M | T50 | TP-1 executed on two real iPads per the script, TP-2 one full offline day; results and any defects recorded in `docs/pilot/`; defects fixed or filed | todo |
+| T52 | Pilot survey support and fixes | O/M | T51 | Fix list from the pilot floor; each fix has a test; re-export and re-send if a fix changes the workbook | todo |
+| T53 | Pilot report and go/no-go | S/L | T52 | `docs/pilot/report.md` with the Phase 4 §5 measures (Excel edits after export, review items, proposals accepted unedited, time per device, crashes) and the go/no-go decision appended to `DECISIONS.md` | todo |
+
+## M7 — Should items (6)
+
+| # | Task | Model/Effort | Deps | Definition of done | Status |
+|---|---|---|---|---|---|
+| T54 | Neuron ID scanning | O/M | T20 | `react-native-vision-camera` + a text-recognition frame-processor plugin (native → dev build), normalise, 12-hex filter, 3-frame agreement, O/0 B/8 flags, duplicate check, evidence crop saved with `neuron_method=scan`; falls back to typed entry | todo |
+| T55 | Re-run extraction and diff against baseline | F/H | T43, T47 | New `import_batch` on a revised set → drafts matched to baseline by `baseline_ref` + (level, model, panel_name); added/removed/moved/changed → review items; nothing applies unreviewed; sheet revision with pins carried over | todo |
+| T56 | Copy a typical floor | O/M | T47 | Duplicate a level's devices and cables to another level, renumber per ID scheme, library-generated cables regenerated, then adjust; test on 02 → 07 | todo |
+| T57 | Peer-to-peer preview spike | F/H | T11 | Evaluate local-network exchange of pending ops between iPads (MultipeerConnectivity bindings for React Native vs. a local Wi-Fi HTTP peer) as a read-only "pending from <user>" overlay; no number assignment, no conflict decisions off-server; written recommendation (build / drop) appended to `DECISIONS.md` | todo |
+| T58 | MSS import and merge | O/M | T27 | **Blocked until the MSS workbook is attached (A4).** `import_batch(kind=mss)`, match by ID/level, disagreements → `review_item(mss)` → Missed Survey "check" items (E12); prior MSS entries kept | blocked |
+| T62 | iPhone layout (D74) | O/M | T26, T53 | `supportsPhone: true`; compact layout: full-screen plan, device card as a bottom sheet, side lists as screens, dashboard stacked; same ops and sync; checked on one iPhone via TestFlight; no iPad regression | todo |
+
+## Counts
+
+| M | Tasks | F/H | O/M–H | S/L–M |
+|---|---|---|---|---|
+| M0 | 6 (T01, T02, T60, T05, T06; T03/T04 listed here, run in M6) | 0 | 4 | 2 |
+| M1 | 9 | 6 | 3 | 0 |
+| M2 | 11 | 1 | 7 | 3 |
+| M3 | 7 | 2 | 4 | 1 |
+| M4 | 8 | 3 | 4 | 1 |
+| M5 | 10 | 3 | 6 | 1 |
+| M6 | 4 (+ T03, T04) | 0 | 2 | 2 |
+| M7 | 6 | 2 | 4 | 0 |
+| **Total** | **62** | **17** | **34** | **11** |
+
+## Follow-ups (append here; promote to numbered tasks at milestone boundaries)
+
+- (none yet)
