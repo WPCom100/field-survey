@@ -112,3 +112,16 @@ def test_a_client_can_never_set_a_number(client, w):
     w.push(client, [forged], status=422)
     preset = w.create(w.ann, "punch_item", {"number": 99})
     w.push(client, [preset], status=422)
+
+
+def test_a_new_project_starts_numbering_over(client, w):
+    """D88 (approved): numbering is per project; a second project's groups start at 1."""
+    w.push(client, [w.create(w.ann, "punch_item") for _ in range(3)])
+
+    other = World(w.session)
+    p = other.create(other.ann, "punch_item")
+    e = other.create(other.ann, "cable_end")
+    got = numbers(other.push(client, [p]), "number") | numbers(
+        other.push(client, [e]), "display_id"
+    )
+    assert got == {p["entity_id"]: 1, e["entity_id"]: "C-01"}
