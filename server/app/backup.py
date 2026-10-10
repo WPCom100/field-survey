@@ -6,7 +6,7 @@ local state. A restart, a redeploy or a missed night just runs the job on the ne
 
     python -m app.backup dump        # take a dump now and upload it
     python -m app.backup copy        # run the bucket copy now
-    python -m app.backup lifecycle   # (re)apply the 90-day expiry rule on backups/pg/
+    python -m app.backup prune       # delete dumps past BACKUP_RETENTION_DAYS (keeps the newest)
     python -m app.backup list        # list dumps in R2
     python -m app.backup fetch KEY   # download one dump to stdout (for restores, docs/ops.md §3)
 """
@@ -30,7 +30,6 @@ log = logging.getLogger("backup")
 
 DUMP_PREFIX = "backups/pg/"
 COPY_MARKER_PREFIX = "backups/copy-markers/"
-LIFECYCLE_RULE_ID = "expire-pg-dumps"
 
 
 def _event(event: str, **fields) -> None:
@@ -87,31 +86,20 @@ def dump(s3=None, now: dt.datetime | None = None) -> str:
     return key
 
 
-def apply_lifecycle(s3=None) -> None:
-    """Expire objects under backups/pg/ after `backup_retention_days`, keeping any other rules."""
+def prune(s3=None, now: dt.datetime | None = None) -> list[str]:
+    """Delete dumps older than `backup_retention_days` (by the timestamp in the key), always
+    keeping the newest one. Done in code because the R2 token is Object Read & Write only and
+    cannot manage bucket lifecycle rules."""
     s3 = s3 or storage.client()
-    try:
-        rules = s3.get_bucket_lifecycle_configuration(Bucket=settings.s3_bucket)["Rules"]
-    except ClientError as e:
-        if e.response["Error"]["Code"] not in (
-            "NoSuchLifecycleConfiguration",
-            "NoSuchBucketLifecycle",
-        ):
-            raise
-        rules = []
-    rules = [r for r in rules if r.get("ID") != LIFECYCLE_RULE_ID]
-    rules.append(
-        {
-            "ID": LIFECYCLE_RULE_ID,
-            "Status": "Enabled",
-            "Filter": {"Prefix": DUMP_PREFIX},
-            "Expiration": {"Days": settings.backup_retention_days},
-        }
-    )
-    s3.put_bucket_lifecycle_configuration(
-        Bucket=settings.s3_bucket, LifecycleConfiguration={"Rules": rules}
-    )
-    _event("backup_lifecycle", prefix=DUMP_PREFIX, days=settings.backup_retention_days)
+    now = now or dt.datetime.now(dt.UTC)
+    cutoff = dump_key(now - dt.timedelta(days=settings.backup_retention_days))
+    keys = sorted(_keys(s3, DUMP_PREFIX))
+    old = [k for k in keys[:-1] if k < cutoff]
+    for key in old:
+        s3.delete_object(Bucket=settings.s3_bucket, Key=key)
+    if old:
+        _event("backup_prune", deleted=len(old), oldest_kept=keys[len(old)])
+    return old
 
 
 def rclone_env() -> dict[str, str]:
@@ -189,7 +177,7 @@ def due(s3, now: dt.datetime) -> list[str]:
     if now.hour < settings.backup_hour_utc:
         return jobs
     if not dump_done_today(s3, now):
-        jobs.append("dump")
+        jobs += ["dump", "prune"]
     if (
         settings.backup_copy_bucket
         and now.isoweekday() >= settings.backup_copy_weekday
@@ -199,17 +187,26 @@ def due(s3, now: dt.datetime) -> list[str]:
     return jobs
 
 
+JOBS = {"dump": dump, "prune": prune, "copy": copy}
+_idle_on: dt.date | None = None  # a day already found to have nothing left due
+
+
 def tick(s3=None, now: dt.datetime | None = None) -> list[str]:
-    """Run whatever is due. A failure is logged and retried on a later tick (never crashes)."""
-    if not settings.backup_enabled:
-        return []
+    """Run whatever is due. A failure is logged and retried on a later tick (never crashes).
+    Once a day has nothing left due, R2 is not asked again until the next day."""
+    global _idle_on
     now = now or dt.datetime.now(dt.UTC)
+    if not settings.backup_enabled or _idle_on == now.date():
+        return []
     ran: list[str] = []
     try:
         s3 = s3 or storage.client()
-        for job in due(s3, now):
-            (dump if job == "dump" else copy)(s3, now)
+        jobs = due(s3, now)
+        for job in jobs:
+            JOBS[job](s3, now)
             ran.append(job)
+        if not jobs and now.hour >= settings.backup_hour_utc:
+            _idle_on = now.date()
     except Exception as e:  # the worker must keep running (CLAUDE.md §5)
         _event("backup_failed", error=repr(e), ran=ran)
     return ran
@@ -222,8 +219,8 @@ def main(argv: list[str]) -> None:
             print(dump())
         case ["copy"]:
             copy()
-        case ["lifecycle"]:
-            apply_lifecycle()
+        case ["prune"]:
+            prune()
         case ["list"]:
             for key in sorted(_keys(storage.client(), DUMP_PREFIX)):
                 print(key)

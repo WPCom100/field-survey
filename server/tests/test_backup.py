@@ -11,16 +11,17 @@ from app.config import settings
 
 
 class FakeS3:
-    def __init__(self, keys=(), lifecycle=None):
+    def __init__(self, keys=()):
         self.objects = {k: b"" for k in keys}
-        self.lifecycle = lifecycle
+        self.lists = 0
 
     def get_paginator(self, _name):
-        objects = self.objects
+        fake = self
 
         class P:
             def paginate(self, Bucket, Prefix):
-                yield {"Contents": [{"Key": k} for k in objects if k.startswith(Prefix)]}
+                fake.lists += 1
+                yield {"Contents": [{"Key": k} for k in fake.objects if k.startswith(Prefix)]}
 
         return P()
 
@@ -35,13 +36,8 @@ class FakeS3:
         with open(path, "rb") as f:
             self.objects[Key] = f.read()
 
-    def get_bucket_lifecycle_configuration(self, Bucket):
-        if self.lifecycle is None:
-            raise ClientError({"Error": {"Code": "NoSuchLifecycleConfiguration"}}, "Get")
-        return {"Rules": self.lifecycle}
-
-    def put_bucket_lifecycle_configuration(self, Bucket, LifecycleConfiguration):
-        self.lifecycle = LifecycleConfiguration["Rules"]
+    def delete_object(self, Bucket, Key):
+        del self.objects[Key]
 
 
 @pytest.fixture
@@ -51,6 +47,7 @@ def cfg(monkeypatch):
     monkeypatch.setattr(settings, "backup_copy_weekday", 7)
     monkeypatch.setattr(settings, "backup_copy_bucket", "survey-copy")
     monkeypatch.setattr(settings, "backup_retention_days", 90)
+    monkeypatch.setattr(backup, "_idle_on", None)
     return settings
 
 
@@ -78,7 +75,7 @@ def test_nothing_due_before_the_hour(cfg):
 
 
 def test_dump_and_copy_due_on_sunday(cfg):
-    assert backup.due(FakeS3(), SUN) == ["dump", "copy"]
+    assert backup.due(FakeS3(), SUN) == ["dump", "prune", "copy"]
 
 
 def test_done_today_and_this_week_is_not_due(cfg):
@@ -92,14 +89,15 @@ def test_done_today_and_this_week_is_not_due(cfg):
     # yesterday's dump does not count for today
     assert backup.due(FakeS3(["backups/pg/survey-2026-10-10T080100Z.dump"]), SUN) == [
         "dump",
+        "prune",
         "copy",
     ]
 
 
 def test_copy_only_on_the_weekday_and_only_when_configured(cfg, monkeypatch):
-    assert backup.due(FakeS3(), SUN - dt.timedelta(days=1)) == ["dump"]
+    assert backup.due(FakeS3(), SUN - dt.timedelta(days=1)) == ["dump", "prune"]
     monkeypatch.setattr(settings, "backup_copy_bucket", "")
-    assert backup.due(FakeS3(), SUN) == ["dump"]
+    assert backup.due(FakeS3(), SUN) == ["dump", "prune"]
     assert backup.copy(FakeS3(), SUN) is False
 
 
@@ -117,12 +115,15 @@ def test_tick_runs_dump_then_copy_and_is_idempotent(cfg, monkeypatch):
 
     monkeypatch.setattr(backup.subprocess, "run", fake_run)
     s3 = FakeS3()
-    assert backup.tick(s3, SUN) == ["dump", "copy"]
+    assert backup.tick(s3, SUN) == ["dump", "prune", "copy"]
     assert s3.objects["backups/pg/survey-2026-10-11T093000Z.dump"] == b"PGDMP"
     assert "backups/copy-markers/2026-W41" in s3.objects
     assert [c[0] for c in calls] == ["pg_dump", "rclone"]
     assert calls[1][1:4] == ["copy", f"src:{settings.s3_bucket}", "dst:survey-copy"]
     assert backup.tick(s3, SUN + dt.timedelta(minutes=1)) == []
+    lists = s3.lists
+    assert backup.tick(s3, SUN + dt.timedelta(minutes=2)) == []
+    assert s3.lists == lists  # idle for the rest of the day: R2 is not asked again
 
 
 def test_tick_survives_a_failing_dump(cfg, monkeypatch):
@@ -138,17 +139,17 @@ def test_tick_disabled(monkeypatch):
     assert backup.tick(FakeS3(), SUN) == []
 
 
-def test_lifecycle_keeps_other_rules_and_replaces_its_own(cfg):
-    other = {"ID": "other", "Status": "Enabled", "Filter": {"Prefix": "x/"}}
-    stale = {"ID": backup.LIFECYCLE_RULE_ID, "Expiration": {"Days": 7}}
-    s3 = FakeS3(lifecycle=[other, stale])
-    backup.apply_lifecycle(s3)
-    assert s3.lifecycle[0] == other
-    assert s3.lifecycle[1]["Expiration"] == {"Days": 90}
-    assert s3.lifecycle[1]["Filter"] == {"Prefix": "backups/pg/"}
-    fresh = FakeS3()
-    backup.apply_lifecycle(fresh)
-    assert len(fresh.lifecycle) == 1
+def test_prune_drops_dumps_past_retention_but_keeps_the_newest(cfg):
+    keep = [
+        "backups/pg/survey-2026-07-14T080000Z.dump",  # 89 days before SUN
+        "backups/pg/survey-2026-10-10T080000Z.dump",
+    ]
+    old = ["backups/pg/survey-2026-07-01T080000Z.dump", "backups/pg/survey-2026-07-12T080000Z.dump"]
+    s3 = FakeS3(old + keep + ["blobs/aa/photo"])
+    assert backup.prune(s3, SUN) == old
+    assert sorted(s3.objects) == [*keep, "blobs/aa/photo"]
+    lone = FakeS3(["backups/pg/survey-2025-01-01T080000Z.dump"])
+    assert backup.prune(lone, SUN) == []  # never deletes the only dump left
 
 
 def test_rclone_copy_remote_defaults_to_main_credentials(cfg, monkeypatch):
