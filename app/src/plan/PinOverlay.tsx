@@ -40,7 +40,12 @@ export const PinOverlay = memo(function PinOverlay({ matrix, pins, selectedId, s
     const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, width, height));
     const m = matrix.value;
     if (m && showPins && pins.length > 0) {
-      drawPins(canvas, pins, layoutPins(pins, m, width, height), fonts, { labels, photos, selectedId });
+      // An exception on the UI thread ends a release build: degrade to an empty pin layer.
+      try {
+        drawPins(canvas, pins, layoutPins(pins, m, width, height), fonts, { labels, photos, selectedId });
+      } catch (e) {
+        console.error(`[plan] pin layer failed: ${String(e)}`);
+      }
     }
     return recorder.finishRecordingAsPicture();
   }, [pins, selectedId, showPins, labels, photos, width, height, fonts]);

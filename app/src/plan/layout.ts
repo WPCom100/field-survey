@@ -8,6 +8,8 @@
  * Clustering is greedy in a fixed pin order over view-space distances, so it depends on zoom
  * only, never on panning: a pin joins the first cluster whose seed is within `clusterPx`
  * screen points. At or above `offZoom` (view points per sheet point) pins never cluster.
+ *
+ * Worklet rule: no default parameters (see `layoutPins`); `worklets.test.ts` checks it.
  */
 
 import { apply, scaleOf, type Affine } from './viewport';
@@ -52,9 +54,12 @@ export function layoutPins(
   m: Affine,
   width: number,
   height: number,
-  opts: LayoutOptions = LAYOUT_DEFAULTS,
+  options?: LayoutOptions,
 ): PinLayout {
   'worklet';
+  // No default parameter: the worklet transform reads captured values inside the body, so a
+  // default like `= LAYOUT_DEFAULTS` is a ReferenceError on the UI thread (crashed build 5).
+  const opts = options ?? LAYOUT_DEFAULTS;
   const zoom = scaleOf(m);
   const r = zoom < opts.offZoom ? opts.clusterPx : 0;
   const n = pins.length;
