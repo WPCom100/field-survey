@@ -148,12 +148,12 @@ Monitoring: an external uptime monitor pings `https://survey.wpcom.cloud/health`
 
 ## 5. iOS builds and TestFlight (T06b, D59, D70)
 
-All on the PC in `app/`, in **your own terminal** (EAS asks for the Apple ID password and 2FA code interactively). Needs the Apple Developer Program membership **active** (developer.apple.com → Account → Membership shows a Team ID). Nothing here needs a Mac.
+All on the PC in `app/`, in **your own terminal** (EAS asks for the Apple ID password and 2FA code interactively). Needs the Apple Developer Program membership **active** (developer.apple.com → Account → Membership shows a Team ID). Nothing here needs a Mac. **Always run `eas` from `app/`**: from the repo root it writes a stray `eas.json`/`app.json` there and fails with "The `expo` package was not found". Apple team `H2CLZXHCH8`; commands that need it non-interactively take `--apple-team-id H2CLZXHCH8` (e.g. `eas device:list`).
 
 ### 5.1 Once per project
 
 1. `eas login` (the Expo account), then `eas init` → writes `extra.eas.projectId` and `owner` into `app.json`; commit that.
-2. **App Store Connect API key.** appstoreconnect.apple.com → Users and Access → Integrations → App Store Connect API → Team Keys → **+**, name `EAS`, access **Admin** → download the `.p8` (once only; keep it in the password manager, never in the repo) and note the Key ID and Issuer ID. Then `eas credentials` → iOS → production → App Store Connect: Manage your API Key → set up a new key with those three values.
+2. **App Store Connect API key.** (Done in T06b the easy way: the first `eas submit` offered to generate the key and stored it in EAS.) Manual route: appstoreconnect.apple.com → Users and Access → Integrations → App Store Connect API → Team Keys → **+**, name `EAS`, access **Admin** → download the `.p8` (once only; keep it in the password manager, never in the repo) and note the Key ID and Issuer ID. Then `eas credentials` → iOS → production → App Store Connect: Manage your API Key → set up a new key with those three values.
 3. **Devices.** `eas device:create` → "Website" → open the link/QR on each team iPad in Safari → install the profile (Settings → General → VPN & Device Management). Every new iPad needs this **and** a new development build (the build's profile lists the devices).
 4. **App record.** App Store Connect → Apps → **+** New App: iOS, name `Field Survey`, language English (U.S.), bundle ID `productions.luminarytechnology.fieldsurvey` (EAS registers the bundle ID on the first build; if it is not in the list yet, do 5.2 first), SKU `field-survey`, Full Access. Copy the Apple ID (numeric) of the app into `eas.json` → `submit.production.ios.ascAppId`.
 5. **Team.** Users and Access → **+** for each team member (role Developer is enough), then TestFlight → Internal Testing → **+** group `LTP team` → add them; "Automatically distribute" on.
@@ -164,7 +164,7 @@ All on the PC in `app/`, in **your own terminal** (EAS asks for the Apple ID pas
 eas build --profile development --platform ios
 ```
 
-Install from the QR/link on the build page. First launch on iPadOS 17: Settings → Privacy & Security → **Developer Mode** on → restart. Daily work: `npx expo start --dev-client` on the PC, iPad on the same Wi-Fi, open the project from the dev client (allow Node.js through Windows Firewall on private networks if the iPad cannot connect).
+Install from the QR/link on the build page in Safari. The **Developer Mode** toggle only appears after a development-signed app is installed *and launched once* (iPadOS blocks it): then Settings → Privacy & Security → bottom of the list → **Developer Mode** on → restart → Turn On. Daily work: `npx expo start --dev-client` on the PC, iPad on the same Wi-Fi, open the project from the dev client (allow Node.js through Windows Firewall on private networks if the iPad cannot connect).
 
 ### 5.3 TestFlight build (at least every 60 days, D59)
 
@@ -179,3 +179,5 @@ The build number auto-increments in EAS (`appVersionSource: remote`). Export com
 
 | Date | Profile | EAS build id | Build no. | Notes |
 |---|---|---|---|---|
+| 2026-10-10 | development | `19e26a75-0635-4624-acbe-f062b37e5291` | 1 | internal (ad hoc), SDK 57, commit `0e188fc`; installed on Landry's iPad (UDID `00008122-001070500251801C`), Developer Mode on; `npx expo start --dev-client --lan` bundled 1268 modules, IdentityGate shown |
+| 2026-10-10 | production | `833be746-0079-4511-a0d6-ca0281475c0a` | 2 | store; `eas submit --latest` uploaded to ASC app `6821263690`; TestFlight internal group `LTP team` (auto-distribute), Zach invited |

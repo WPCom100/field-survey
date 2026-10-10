@@ -5,5 +5,5 @@
     "preview": { "distribution": "internal" },
     "production": { "autoIncrement": true }
   },
-  "submit": { "production": {} }
+  "submit": { "production": { "ios": { "ascAppId": "6821263690" } } }
 }

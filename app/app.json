@@ -10,14 +10,23 @@
     "ios": {
       "bundleIdentifier": "productions.luminarytechnology.fieldsurvey",
       "supportsTablet": true,
+      "isTabletOnly": true,
       "infoPlist": {
-        "UIDeviceFamily": [2],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router"
+    ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "01613384-c07a-4547-894f-2cc92ea38dac"
+      }
+    },
+    "owner": "wpcom"
   }
 }
