@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     s3_bucket: str = "survey"
     s3_access_key: str = ""
     s3_secret_key: str = ""
+    s3_region: str = "auto"
     worker_concurrency: int = 1
 
     @property

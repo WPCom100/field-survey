@@ -14,3 +14,6 @@ __pycache__/
 .env.*
 !.env.example
 .DS_Store
+
+# SSH keys never committed
+sshkey_*

@@ -1,0 +1,24 @@
+# Production override for the Droplet (D67 option A). Use with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# (docs/ops.md sets COMPOSE_FILE in .env so plain `docker compose` picks both up.)
+# Differences from dev: no MinIO (R2 from .env), Postgres not published, restarts, log caps.
+x-prod: &prod
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  api:
+    <<: *prod
+    depends_on: !reset [postgres]
+  worker:
+    <<: *prod
+    depends_on: !reset [postgres]
+  postgres:
+    <<: *prod
+    ports: !reset []
+  caddy:
+    <<: *prod
+  minio:
+    profiles: [dev-only]
