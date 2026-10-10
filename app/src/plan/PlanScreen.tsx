@@ -44,6 +44,7 @@ import {
 } from './filters';
 import { LAYOUT_DEFAULTS, hitTest, layoutPins, type RenderPin } from './layout';
 import { PinOverlay } from './PinOverlay';
+import { pdfNativeTag, useUiViewport } from './uiViewport';
 import { DEVICE_CATEGORIES, pinStyleFor, statusRank } from './pins';
 import {
   focusRect,
@@ -109,6 +110,7 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
   const matrix = useSharedValue<Affine | null>(null);
   const vpRef = useRef<PdfViewport | null>(null);
   const pdfRef = useRef<PdfRef>(null);
+  const { attach: attachUi, setFromJs } = useUiViewport(matrix);
   const listRef = useRef<FlatList<PlanDevice>>(null);
 
   // --- data and stored prefs
@@ -182,14 +184,15 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
     (vp: PdfViewport) => {
       const first = vpRef.current === null;
       vpRef.current = vp;
-      matrix.value = sheetToView(vp);
+      setFromJs(sheetToView(vp));
+      attachUi(pdfNativeTag(pdfRef.current));
       // The first viewport is "ready" (loadComplete re-fires much later, T16); open at fit.
       if (first) {
         console.log(`[plan] first viewport, zoom ${scaleOf(sheetToView(vp)).toFixed(3)}`);
         focusSheetRect(sheetRect(vp), false);
       }
     },
-    [matrix, focusSheetRect],
+    [setFromJs, attachUi, focusSheetRect],
   );
 
   const reveal = useCallback(

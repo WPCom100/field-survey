@@ -150,3 +150,30 @@ gained the `setNativeFocus` command, D101); see `TASKS.md` T17 for the build id.
 Run: Landry's iPad Air, dev build `a5f5c323` with JS from Metro (debug bundle, so RAM is higher than a release build would be), 2026-10-10, after the D102 driver fix. Also confirmed: pins on their drawing at Fit/×2/×4 when still, D64 shapes/colours/glyphs, "+" and camera marks, clusters at fit and cluster tap zooms in, pin ↔ row highlight both ways, filters (Status, Owner incl. the EC/ETC rule, Open punch = 16) and layers, prefs kept per level.
 
 **Reading against §4:** the TP-6 rule (RAM ≥ 600 MB at ×4 after the cycles reopens the decision) is **not** triggered: 512 MB after the cycles, 530 MB at ×4. The 620 MB transient peak during the stress cycles is a watch item: re-measure on a release (TestFlight) build when a Perf Monitor reading is possible, and on a real level sheet when T45 delivers one. UI-thread drawing (D95 step 1) did **not** remove the pinch trail; D95's native step is task T64.
+
+## 6. T64 run (dev client) — to do on the iPad
+
+T64 (D106) moves the viewport handling onto the UI thread: the patch's KVO emit runs a Reanimated
+worklet that writes the overlay matrix, and the pin picture is redrawn before PDFKit's frame is
+committed (no JS-thread hop, no wait for the next frame). JS only, so the **T17 dev build
+`a5f5c323`** runs it over Metro; no new build.
+
+1. Pull `main`, `cd app && npx expo start --dev-client`, open **Demo plan (06M composite)**. Metro's
+   log shows `[plan] viewport handled on the UI thread (view N)`. Without that line the old path is
+   still drawing, so stop and report it.
+2. **Pinch** slowly and quickly over the electrical room cluster and over a lone pin, both ways:
+   do the pins stay on their drawing **while** the fingers move? Pins keep their size throughout.
+3. **Pan** fast with one finger, and fling: same question.
+4. Regression: Fit, a row tap (pin centred), a pin tap (row highlighted), clusters split at ×2.
+5. UI fps while pinching with pins on (Perf Monitor), against T17's 60.
+
+| Check | Expected | Result |
+|---|---|---|
+| UI-thread log line | present | |
+| Pins glued during pinch | yes | |
+| Pins glued during pan / fling | yes | |
+| Pin size constant during pinch | yes | |
+| Fit, row tap, pin tap, clusters | unchanged | |
+| UI fps pinching (pins on) | ≥ 50 | |
+
+"Still trails" → the native step in D106 (layer transform from the KVO turn; new dev build).

@@ -22,8 +22,9 @@ type Props = {
 /**
  * The Skia layer over the PDF (D95). The picture is a derived value of the viewport matrix, so
  * on pan/zoom it is re-recorded on the UI thread without a React render; React only re-creates
- * the worklet when pins, selection or layers change. Takes no touches: pinch, pan and tap
- * belong to PDFKit underneath.
+ * the worklet when pins, selection or layers change. The matrix is written inside PDFKit's own
+ * scroll callback (`useUiViewport`, T64), so this mapper runs in the same run-loop turn. Takes no
+ * touches: pinch, pan and tap belong to PDFKit underneath.
  */
 export const PinOverlay = memo(function PinOverlay({ matrix, pins, selectedId, showPins, labels, photos, width, height }: Props) {
   const fonts = useMemo<PinFonts>(

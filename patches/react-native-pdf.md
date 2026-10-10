@@ -24,6 +24,13 @@ It also reports taps in view points, not page points.
 `app/src/plan/viewport.ts` turns the affine into sheet↔view maps (sheet = CropBox top-left origin,
 y down) and the Skia matrix.
 
+**The overlay depends on the emit being synchronous and on the main thread (T64, D106).**
+`app/src/plan/uiViewport.ts` registers a Reanimated worklet for the native view's `onChange`;
+Reanimated runs it inside `notifyOnChangeWithMessage` only when the event is emitted on the main
+queue, which is what keeps the pins in PDFKit's run-loop turn. The worklet parses the raw
+`viewport|…` string itself (`parseViewportMessage` in `viewport.ts`), so a change to the message
+format must change `index.js` **and** `viewport.ts` (the worklet test pins the `%f` format).
+
 ## Upgrading the package
 
 1. `pnpm patch react-native-pdf@<new>` → re-apply the four changes (the hunks are small; search for

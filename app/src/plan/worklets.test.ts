@@ -23,7 +23,7 @@ const FILES = ['layout.ts', 'pins.ts', 'viewport.ts', 'drawPins.ts'];
 
 type Worklet = { name: string; file: string; code: string; closure: string[] };
 
-function compiledWorklets(file: string): Worklet[] {
+function compiledWorklets(file: string, nameRe = /^\(function (\w+?)_\w+Ts\d+\(/): Worklet[] {
   const filename = join(__dirname, file);
   const out = transformSync(readFileSync(filename, 'utf8'), {
     filename,
@@ -35,7 +35,7 @@ function compiledWorklets(file: string): Worklet[] {
   const found: Worklet[] = [];
   for (const m of out!.code!.matchAll(/code:\s*"((?:[^"\\]|\\.)*)"/g)) {
     const code = JSON.parse(`"${m[1]}"`) as string;
-    const name = /^\(function (\w+?)_\w+Ts\d+\(/.exec(code)?.[1];
+    const name = nameRe.exec(code)?.[1];
     if (!name) continue;
     const closure = /const\s*\{?\[?([^\]=]*)\]?\}?\s*=\s*this\.__closure/.exec(code)?.[1];
     found.push({ name, file, code, closure: closure ? closure.split(',').map((s) => s.trim()).filter(Boolean) : [] });
@@ -43,7 +43,7 @@ function compiledWorklets(file: string): Worklet[] {
   return found;
 }
 
-const worklets = FILES.flatMap(compiledWorklets);
+const worklets = FILES.flatMap((f) => compiledWorklets(f));
 const byName = new Map(worklets.map((w) => [w.name, w]));
 const exportsOf: Record<string, unknown> = { ...viewportModule, ...pinsModule, ...layoutModule };
 
@@ -64,7 +64,7 @@ const vp = (s: number): PdfViewport => ({ a: s, b: 0, c: 0, d: -s, tx: 0, ty: s 
 
 describe('plan worklets on the UI runtime', () => {
   it('the plugin compiles every worklet the overlay uses', () => {
-    for (const n of ['layoutPins', 'hitTest', 'pinShape', 'regularPolygon', 'apply', 'scaleOf', 'drawPins', 'drawPin', 'shapeAt', 'centredText']) {
+    for (const n of ['layoutPins', 'hitTest', 'pinShape', 'regularPolygon', 'apply', 'scaleOf', 'drawPins', 'drawPin', 'shapeAt', 'centredText', 'compose', 'sheetToPage', 'sheetToView', 'parseViewportMessage']) {
       expect(byName.has(n), n).toBe(true);
     }
   });
@@ -92,5 +92,40 @@ describe('plan worklets on the UI runtime', () => {
     for (const cat of [...pinsModule.DEVICE_CATEGORIES, 'Unknown']) {
       expect(ui<typeof pinsModule.pinShape>('pinShape')(cat, 26)).toEqual(pinsModule.pinShape(cat, 26));
     }
+  });
+
+  it('the viewport event handler (T64) parses the patch message and drives the matrix on the UI thread', () => {
+    // As RNPDFPdfView.mm formats it: %f for the numbers, %lu for the page.
+    const v = vp(0.37);
+    const f = (x: number) => x.toFixed(6);
+    const message = ['viewport', ...[v.a, v.b, v.c, v.d, v.tx, v.ty, CROP.x, CROP.y, CROP.width, CROP.height].map(f), '1'].join('|');
+    const parse = ui<typeof viewportModule.parseViewportMessage>('parseViewportMessage');
+    expect(parse(message)).toEqual(viewportModule.parseViewportMessage(message));
+    expect(parse(message)).toEqual({ ...v, cropBox: { x: 0, y: 0, width: 4235.48, height: 3604.72 } });
+    expect(parse('pageSingleTap|1|10.000000|20.000000|30.000000|40.000000')).toBeNull();
+    expect(parse('viewport|1|0|0|-1|0|nan|0|0|10|10|1')).toBeNull();
+
+    // The two inline worklets of uiViewport.ts, as the UI runtime runs them.
+    const inline = compiledWorklets('uiViewport.ts', /^\(function (uiViewportTs\d+)\(/);
+    const code = (n: string) => (0, eval)(inline.find((w) => w.name === n)!.code) as (arg: unknown) => void;
+    const uiDriven = { value: false };
+    const matrix: { value: unknown } = { value: null };
+    const handler = code('uiViewportTs1');
+    const fromJs = code('uiViewportTs2');
+    expect(inline.find((w) => w.name === 'uiViewportTs1')!.closure).toEqual(['parseViewportMessage', 'uiDriven', 'matrix', 'sheetToView']);
+    const handlerThis = { __closure: [parse, uiDriven, matrix, ui('sheetToView')] };
+    const fromJsThis = { __closure: [uiDriven, matrix] };
+
+    fromJs.call(fromJsThis, { a: 9 }); // before the UI handler is live, the JS copy seeds the matrix
+    expect(matrix.value).toEqual({ a: 9 });
+    handler.call(handlerThis, { message: 'pageSingleTap|1|1|1|1|1' });
+    expect(matrix.value).toEqual({ a: 9 });
+    handler.call(handlerThis, { message });
+    expect(uiDriven.value).toBe(true);
+    const m = matrix.value as viewportModule.Affine;
+    const expected = sheetToView(parse(message)!);
+    for (const k of ['a', 'b', 'c', 'd', 'tx', 'ty'] as const) expect(m[k]).toBeCloseTo(expected[k], 9);
+    fromJs.call(fromJsThis, { a: 1 }); // a later (stale) JS copy is ignored
+    expect(matrix.value).toBe(m);
   });
 });

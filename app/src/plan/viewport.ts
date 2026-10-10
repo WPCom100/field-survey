@@ -31,6 +31,7 @@ export function apply(m: Affine, p: Point): Point {
 
 /** `compose(outer, inner)` maps p ↦ outer(inner(p)). */
 export function compose(outer: Affine, inner: Affine): Affine {
+  'worklet';
   return {
     a: outer.a * inner.a + outer.c * inner.b,
     b: outer.b * inner.a + outer.d * inner.b,
@@ -62,6 +63,7 @@ export function scaleOf(m: Affine): number {
 
 /** sheet → page: flip y inside the CropBox. */
 export function sheetToPage(vp: PdfViewport): Affine {
+  'worklet';
   const { x, y, height } = vp.cropBox;
   return { a: 1, b: 0, c: 0, d: -1, tx: x, ty: y + height };
 }
@@ -72,7 +74,35 @@ export function pageToSheet(vp: PdfViewport, p: Point): Point {
 
 /** sheet → view: the matrix the Skia overlay draws under. */
 export function sheetToView(vp: PdfViewport): Affine {
+  'worklet';
   return compose(vp, sheetToPage(vp));
+}
+
+/**
+ * The patch's raw `onChange` message `viewport|a|b|c|d|tx|ty|cx|cy|cw|ch|page` (as `index.js` of
+ * the patched package parses it), or null for any other message. Runs on the UI thread in the
+ * viewport event handler (T64), before the event reaches JS.
+ */
+export function parseViewportMessage(message: string): PdfViewport | null {
+  'worklet';
+  const f = message.split('|');
+  if (f.length !== 12 || f[0] !== 'viewport') return null;
+  const n: number[] = [];
+  for (let i = 1; i < 12; i++) {
+    const v = Number(f[i]);
+    if (!Number.isFinite(v)) return null;
+    n.push(v);
+  }
+  return {
+    a: n[0]!,
+    b: n[1]!,
+    c: n[2]!,
+    d: n[3]!,
+    tx: n[4]!,
+    ty: n[5]!,
+    cropBox: { x: n[6]!, y: n[7]!, width: n[8]!, height: n[9]! },
+    page: n[10]!,
+  };
 }
 
 export function viewToSheet(vp: PdfViewport): Affine {
