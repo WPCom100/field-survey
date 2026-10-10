@@ -57,6 +57,16 @@ difference Δ in points — the mapping is "proven" when Δ ≈ 0 at every zoom.
 
 Metro logs (React Native DevTools, `j` in Metro) show nothing extra for the spike; the HUD is the record.
 
+**TestFlight variant (no computer):** the same spike ships in the TestFlight build (production
+profile, JS bundled, PDF in the ipa; the home screen link is still there). Steps 1–2 become
+"install from TestFlight → open the app → TP-6 plan viewer spike →" (the cached-copy note no longer
+applies: the PDF is local). There is no dev menu, so skip step 3: **UI fps and RAM cannot be read**
+and those rows stay blank until a dev-client run. The HUD's **JS fps (min)** stands in for the
+overlay's frame rate — the "min" ignores the first 3 s and never resets, so read it right after the
+pan/zoom pass and again after the zoom cycles. Load/first-viewport, Δ, hit, ink and the crash check
+are measured the same way. Installing TestFlight replaces the dev client on the iPad (same bundle
+id); reinstall the dev build from its EAS page when back at the PC.
+
 ## 3. Results (iPad Air, fill in)
 
 | Measure | Threshold | ×1 (fit) | ×2 | ×4 | Notes |

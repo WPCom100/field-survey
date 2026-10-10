@@ -98,6 +98,30 @@ export function PlanSpike() {
   const [tap, setTap] = useState<TapInfo | null>(null);
   const [cycles, setCycles] = useState(0);
   const [cycling, setCycling] = useState(false);
+  const [jsFps, setJsFps] = useState<{ now: number; min: number }>({ now: 0, min: 0 });
+
+  // JS-thread frame rate (requestAnimationFrame), for builds without the Perf Monitor
+  // (TestFlight). The UI-thread rate and RAM still need the dev client's Perf Monitor.
+  useEffect(() => {
+    let frames = 0;
+    let last = now();
+    let raf = 0;
+    const started = last;
+    const tick = () => {
+      frames += 1;
+      const t = now();
+      if (t - last >= 1000) {
+        const fps = Math.round((frames * 1000) / (t - last));
+        // ignore the first 3 s (mount, PDF load)
+        setJsFps((s) => ({ now: fps, min: t - started < 3000 ? 0 : s.min === 0 ? fps : Math.min(s.min, fps) }));
+        frames = 0;
+        last = t;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // Only the sheet size matters for pin placement; the first viewport fixes it.
   const sheetW = viewport?.cropBox.width ?? 0;
@@ -263,8 +287,8 @@ export function PlanSpike() {
           {pageSize ? `${Math.round(pageSize.width)}×${Math.round(pageSize.height)} pt` : '…'}
         </Text>
         <Text style={styles.hudLine}>
-          zoom ×{zoom.toFixed(3)} (prop {scaleProp}) · viewport events {viewportEvents.current} · pins {pinCount} ·
-          strokes {strokeCount} ({pointCount} pts)
+          zoom ×{zoom.toFixed(3)} (prop {scaleProp}) · JS fps {jsFps.now} (min {jsFps.min || '…'}) · viewport events{' '}
+          {viewportEvents.current} · pins {pinCount} · strokes {strokeCount} ({pointCount} pts)
         </Text>
         <Text style={styles.hudLine}>
           {tap
