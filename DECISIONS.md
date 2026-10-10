@@ -80,6 +80,7 @@ Append-only. New decisions take the next D-number; assumptions the next A-number
 | D72 | TP-5 (Excel open test) runs in Excel Online and Excel for Windows; Excel for Mac is checked whenever a Mac is available (teammate or later purchase) and is a known gap until then | No Mac on the team | Proposed |
 | D73 | GitHub Actions runs server tests (Python) and client package tests (Node) on every push; EAS Build is triggered manually, not from CI | Phase 4 rework | Proposed |
 | D74 | **iPad-only MVP.** The Expo app ships `supportsTablet` only; an iPhone layout (full-screen plan, card as a bottom sheet, lists as screens) is an M7 task (T62); the office/Mac need is met by installing the iPad app on Apple-silicon Macs via TestFlight, and a browser (Expo web) build stays a Could | 22:06 answer | Approved |
+| D75 | **Node 24 everywhere.** `.nvmrc`, GitHub Actions and CLAUDE.md §6 move from Node 22 to Node 24 so local (v24) and CI match; Expo SDK 57 supports it | 2026-10-09 follow-up | Approved |
 
 ## Assumptions
 

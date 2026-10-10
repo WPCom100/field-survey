@@ -99,7 +99,7 @@ uv run alembic upgrade head
 uv run pytest                      # unit + API + export round-trip (needs fixtures/)
 uv run uvicorn app.main:app --reload
 
-# client (Windows PC; Node 22 LTS, pnpm, Docker Desktop, EAS CLI logged in)
+# client (Windows PC; Node 24 LTS, pnpm, Docker Desktop, EAS CLI logged in)
 pnpm install
 pnpm -r test                        # vitest in packages/core and packages/rules (Node + better-sqlite3)
 pnpm --filter app typecheck         # tsc --noEmit
@@ -109,7 +109,7 @@ eas build --profile development --platform ios   # only when a native module cha
 eas submit --platform ios                        # TestFlight (D59)
 ```
 
-Workstation: Windows 11, Claude Code (native Windows), Git, Node 22, pnpm, Docker Desktop, `uv`, EAS CLI (`npm i -g eas-cli`), the Expo development build installed on each team iPad. No WSL required; if a tool misbehaves on Windows, WSL 2 is the fallback, not a Mac.
+Workstation: Windows 11, Claude Code (native Windows), Git, Node 24, pnpm, Docker Desktop, `uv`, EAS CLI (`npm i -g eas-cli`), the Expo development build installed on each team iPad. No WSL required; if a tool misbehaves on Windows, WSL 2 is the fallback, not a Mac.
 
 Golden tests read `fixtures/`; if a fixture is missing the test is skipped with a clear message, never silently passed.
 
