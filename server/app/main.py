@@ -4,11 +4,13 @@ from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.api import ops
 from app.auth import SessionDep, current_user, require_token, upsert_user
 from app.config import settings
 from app.models import User
 
 app = FastAPI(title="Field Survey")
+app.include_router(ops.router)
 
 
 @app.get("/health")

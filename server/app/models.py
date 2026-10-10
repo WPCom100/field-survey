@@ -39,7 +39,10 @@ def fk(target: str, use_alter: bool = False) -> ForeignKey:
 
 def one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
     quoted = ", ".join("'" + v.replace("'", "''") + "'" for v in values)
-    return CheckConstraint(f"{column} IN ({quoted})", name=column)
+    # `info` lets the apply loop validate op values against the same list (T09).
+    return CheckConstraint(
+        f"{column} IN ({quoted})", name=column, info={"column": column, "values": values}
+    )
 
 
 class Id:
