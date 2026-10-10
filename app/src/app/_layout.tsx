@@ -1,5 +1,11 @@
 import { Stack } from 'expo-router';
 
+import { IdentityGate } from '../identity/IdentityGate';
+
 export default function RootLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <IdentityGate>
+      <Stack screenOptions={{ headerShown: false }} />
+    </IdentityGate>
+  );
 }
