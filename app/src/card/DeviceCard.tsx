@@ -3,8 +3,8 @@
  * Sections scroll and collapse; every tap commits one op (D45, no Save button) through
  * `actions.ts`. Plain taps are `Field survey` (D96); `[⋯]` delete / restore / move pin ask for
  * a reason (`Correction`). Camera / Library and a thumbnail tap hand over to the photo flow
- * (T21). Neuron ID scan (T54), the end editor (T22), rule drafts (T33) and quick actions (T34)
- * are shown with their buttons disabled until those land.
+ * (T21); a connection row opens the end editor (T22). Neuron ID scan (T54), rule drafts (T33)
+ * and quick actions (T34) are shown with their buttons disabled until those land.
  * Render it with `key={deviceId}`: a card instance belongs to one device (its note commits on leave).
  */
 
@@ -57,6 +57,8 @@ export type DeviceCardProps = {
   onPhoto?: (source: 'camera' | 'library') => void;
   /** Open one of its photos (caption, link, markup). */
   onOpenPhoto?: (photoId: string) => void;
+  /** Open a connection end in the end editor (T22). */
+  onOpenEnd?: (endId: string) => void;
 };
 
 type Pending = { kind: 'delete' | 'restore' | 'move'; reason: string } | null;
@@ -278,7 +280,7 @@ export function DeviceCard(props: DeviceCardProps) {
         <Section title={`Connections (${card.connections.length})`} marks="">
           {card.connections.length === 0 ? <Text style={styles.muted}>None on this device.</Text> : null}
           {card.connections.map((c) => (
-            <View key={c.id} style={styles.item}>
+            <Pressable key={c.id} style={styles.item} onPress={() => props.onOpenEnd?.(c.id)} disabled={!props.onOpenEnd}>
               <View style={styles.itemLine}>
                 <Swatch {...pinStyleFor(c.status ?? 'Not started')} />
                 <Text style={styles.itemId}>{c.label}</Text>
@@ -295,8 +297,9 @@ export function DeviceCard(props: DeviceCardProps) {
                     <Text style={styles.jumpText}>{c.jump.label} ▸</Text>
                   </Pressable>
                 ) : null}
+                {props.onOpenEnd ? <Text style={styles.chev}>›</Text> : null}
               </View>
-            </View>
+            </Pressable>
           ))}
         </Section>
 
@@ -653,6 +656,7 @@ const styles = StyleSheet.create({
   draft: { borderWidth: 1, borderStyle: 'dashed', borderColor: '#6a1b9a', borderRadius: 6, padding: 6 },
   jump: { paddingHorizontal: 6, paddingVertical: 2 },
   jumpText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
+  chev: { fontSize: 20, color: '#999', paddingLeft: 4 },
   btn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0', backgroundColor: '#fff' },
   btnText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
   btnDanger: { borderColor: '#b71c1c' },

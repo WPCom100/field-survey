@@ -7,7 +7,7 @@ import { getBlobFiles } from '../blobs/queue';
 import { ExpoSqliteDriver } from '../db/expo-sqlite-driver';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamNames } from '../identity/useTeamNames';
-import { ensureDemoCardExtras, ensureDemoLevel } from '../plan/demo';
+import { DEMO_SHEET_ID, ensureDemoCardExtras, ensureDemoJumpExtras, ensureDemoLevel } from '../plan/demo';
 import { PlanScreen } from '../plan/PlanScreen';
 
 // Private golden fixture, served by Metro in development and bundled by EAS otherwise.
@@ -33,7 +33,10 @@ function openDemo(dense: number) {
       .then((driver) => Store.open(driver))
       .then(async (store) => {
         const levelId = await ensureDemoLevel(store, log, dense);
-        if (!dense) await ensureDemoCardExtras(store, log);
+        if (!dense) {
+          await ensureDemoCardExtras(store, log);
+          await ensureDemoJumpExtras(store, log);
+        }
         // Photos on the demo: bytes in the same sandbox, bookkept in the demo database by a queue
         // that has no server and is never started, so nothing taken here is uploaded.
         const blobs = new BlobQueue(store, null, getBlobFiles(), { userId: () => null });
@@ -65,7 +68,8 @@ export default function DemoPlanRoute() {
   const user = useCurrentUser();
   const names = useTeamNames(state?.store ?? null);
 
-  const { pins } = useLocalSearchParams<{ pins?: string }>();
+  // `level` / `device`: a jump from the end editor (T22) to the demo's level 07 and back.
+  const { pins, level, device } = useLocalSearchParams<{ pins?: string; level?: string; device?: string }>();
   const dense = Math.min(Math.max(Number(pins) || 0, 0), 1000);
 
   useEffect(() => {
@@ -82,8 +86,11 @@ export default function DemoPlanRoute() {
   return (
     <PlanScreen
       store={state.store}
-      levelId={state.levelId}
-      resolveSheetUri={() => SHEET.uri}
+      levelId={level || state.levelId}
+      // Only the 06M composite ships with the app; level 07's sheet is "not downloaded" on purpose.
+      resolveSheetUri={(sheet) => (sheet.id === DEMO_SHEET_ID ? SHEET.uri : null)}
+      initialDeviceId={device}
+      onOpenLevel={dense ? undefined : (other, deviceId) => router.push({ pathname: '/demo-plan', params: { level: other, device: deviceId } })}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       status={dense ? `Demo data, ${dense} pins — not synced` : 'Demo data — not synced'}
       bench

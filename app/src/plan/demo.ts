@@ -13,7 +13,8 @@ import { DEVICE_CATEGORIES } from './pins';
 
 export const DEMO_LEVEL_ID = '0190a5f0-0000-7000-8000-00000000d06e';
 const PROJECT = '0190a5f0-0000-7000-8000-00000000d000';
-const SHEET = '0190a5f0-0000-7000-8000-00000000d5ee';
+export const DEMO_SHEET_ID = '0190a5f0-0000-7000-8000-00000000d5ee';
+const SHEET = DEMO_SHEET_ID;
 /** Numbering groups are server rows (no create op); the level only needs to point at one. */
 const GROUP = '0190a5f0-0000-7000-8000-00000000d6a0';
 const USER = '0190a5f0-0000-7000-8000-00000000d0e5';
@@ -252,4 +253,54 @@ export async function ensureDemoCardExtras(store: Store, log: (msg: string) => v
   log(`card samples: ${ops.length} ops`);
   await store.applyRemoteMany(ops);
   await store.setState(CARD_SEEDED_KEY, true);
+}
+
+/** The demo's second level (T22): 07, whose sheet is "not downloaded" on purpose. */
+export const DEMO_LEVEL_07_ID = '0190a5f0-0000-7000-8000-00000000d070';
+const SHEET_07 = '0190a5f0-0000-7000-8000-00000000d57e';
+const JUMP_SEEDED_KEY = 'demo_jump_seeded';
+
+/**
+ * End-editor samples (T22), seeded once and only from the demo route: riser labels on 06M-01's DMX
+ * run (matches its To) and Unison run (differs), and a second level `07` with three devices and a
+ * display sheet whose bytes are never on the iPad, joined to 06M-01 by an `N` cable — so "Jump to"
+ * opens another level and that level shows "plan not downloaded" with the list and card working.
+ */
+export async function ensureDemoJumpExtras(store: Store, log: (msg: string) => void = () => {}): Promise<void> {
+  if (await store.getState<boolean>(JUMP_SEEDED_KEY)) return;
+  const panel = (await store.list<{ id: string }>('device', { where: 'level_id = ? AND display_id = ?', params: [DEMO_LEVEL_ID, '06M-01'] }))[0]?.id;
+  if (!panel) return;
+  const last = await store.db.query<{ n: number | null }>('SELECT max(server_seq) AS n FROM op');
+  let seq = last[0]?.n ?? 0;
+  const ts = '2026-10-10T13:00:00.000Z';
+  const ops: Op[] = [];
+  const base = () => ({ op_id: uuidv7(), project_id: PROJECT, user_id: USER, install_id: INSTALL, client_ts: ts, server_seq: ++seq, server_ts: ts, change_type: 'Master edit' as const, reason: 'Demo level (T22)', state: 'applied' as const });
+  const create = (entity_kind: Op['entity_kind'], payload: Record<string, unknown>, entity_id = uuidv7()) => {
+    ops.push({ ...base(), entity_kind, entity_id, kind: 'create', payload });
+    return entity_id;
+  };
+  // riser labels on the T20 cables of 06M-01
+  const cables = await store.db.query<{ id: string; cable: string }>(
+    `SELECT c.id, c.cable FROM cable c JOIN cable_end e ON e.cable_id = c.id WHERE e.device_id = ? AND e.side = 'A'`,
+    [panel],
+  );
+  const riser: Record<string, string> = { X: 'DMX TO 06M-03', U: 'UNISON TO 06M STATIONS' };
+  for (const c of cables) {
+    if (riser[c.cable]) ops.push({ ...base(), entity_kind: 'cable', entity_id: c.id, kind: 'set', field: 'riser_to_label', now: riser[c.cable] });
+  }
+  // level 07
+  create('level', { project_id: PROJECT, level: '07', floor_order: 8, numbering_group_id: GROUP, in_scope: true, state: 'baseline_locked', display_sheet_id: SHEET_07 }, DEMO_LEVEL_07_ID);
+  create('sheet', { level_id: DEMO_LEVEL_07_ID, kind: 'display', page: 1, title: 'Level 07 – Lighting Composite', blob: 'f'.repeat(64), width_pt: DEMO_SHEET_SIZE.width, height_pt: DEMO_SHEET_SIZE.height }, SHEET_07);
+  const rack = create('device', { level_id: DEMO_LEVEL_07_ID, display_id: '07-01', category: 'Equipment rack', device: 'Equipment rack', room_location: 'XX07-1E05 Elec Rm', status: 'Installed, untested', pin: { sheet: SHEET_07, x: 1200, y: 900 } });
+  create('device', { level_id: DEMO_LEVEL_07_ID, display_id: '07-02', category: 'Relay panel', device: 'CT07LCPA', room_location: 'XX07-1E05 Elec Rm', status: 'Issue', pin: { sheet: SHEET_07, x: 1300, y: 900 } });
+  create('device', { level_id: DEMO_LEVEL_07_ID, display_id: '07-S1', category: 'Station', device: 'PI1002', room_location: 'XX07-210', pin: { sheet: SHEET_07, x: 2000, y: 1500 } });
+  const cable = uuidv7();
+  const endA = uuidv7();
+  const endB = uuidv7();
+  create('cable', { project_id: PROJECT, cable: 'N', qty: 1, origin: 'riser', end_a_id: endA, end_b_id: endB, riser_to_label: 'NETWORK TO LEVEL 07 RACK', vertical: 'V1' }, cable);
+  create('cable_end', { cable_id: cable, side: 'A', endpoint_kind: 'device', device_id: panel, level_id: DEMO_LEVEL_ID, display_id: 'C-11', to_text: 'Network to Level 07 rack', status: 'Installed, untested', status_source: 'surveyed' }, endA);
+  create('cable_end', { cable_id: cable, side: 'B', endpoint_kind: 'device', device_id: rack, level_id: DEMO_LEVEL_07_ID, display_id: 'C-01', from_text: 'Network from Level 06M 06M-01' }, endB);
+  log(`jump samples: ${ops.length} ops`);
+  await store.applyRemoteMany(ops);
+  await store.setState(JUMP_SEEDED_KEY, true);
 }

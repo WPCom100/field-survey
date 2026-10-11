@@ -12,6 +12,10 @@
  * - Selecting a device (pin or row) opens its card in the side panel (T20, Phase 3 §4.3); × goes
  *   back to the lists. An edit on the card reloads the plan, so the pin follows the status at once.
  *   "Move pin" puts the plan in a mode where the next tap places the pin.
+ * - A connection (card row or Conns tab row) opens the end editor in the same panel (T22, Phase 3
+ *   §4.5); "Jump to" a far end on another level opens that level (`onOpenLevel`), where a sheet that
+ *   is not downloaded leaves the list and the card usable ("plan not downloaded").
+ * - The photo flow (T21) is a full-screen modal over all of it.
  */
 
 import { Editor, type BlobQueue, type Store } from '@field-survey/core';
@@ -32,6 +36,7 @@ import { useSharedValue } from 'react-native-reanimated';
 
 import { movePin } from '../card/actions';
 import { DeviceCard } from '../card/DeviceCard';
+import { EndEditor } from '../ends/EndEditor';
 import type { JumpTarget } from '../card/model';
 import { NOT_WIRED } from '../card/proposals';
 import { PhotoFlow, type PhotoRequest } from '../photo/PhotoFlow';
@@ -162,6 +167,11 @@ export function PlanScreen(props: PlanScreenProps) {
   const [moveError, setMoveError] = useState<string | null>(null);
   /** The photo flow (camera, library or an existing photo) over the whole screen. */
   const [photoReq, setPhotoReq] = useState<PhotoRequest | null>(null);
+  /** The end editor in the side panel, opened from the card or from the Conns tab. */
+  const [endView, setEndView] = useState<{ endId: string; from: 'card' | 'list' } | null>(null);
+  /** "Download plan" for a sheet that is not on this iPad: null, busy, or the failure. */
+  const [sheetFetch, setSheetFetch] = useState<'busy' | string | null>(null);
+  const [sheetTick, setSheetTick] = useState(0);
   const [menu, setMenu] = useState<Menu>(null);
   const [tab, setTab] = useState<Tab>('devices');
   const [lists, setLists] = useState<LevelLists | null>(null);
@@ -282,7 +292,20 @@ export function PlanScreen(props: PlanScreenProps) {
   const arrivalPin = useRef<Point | null>(null);
   arrivalPin.current = initialDeviceId ? (deviceById.get(initialDeviceId)?.pin ?? null) : null;
 
-  const sheetUri = plan?.sheet ? resolveSheetUri(plan.sheet) : null;
+  // `sheetTick` re-reads the cache after "Download plan".
+  const sheetUri = useMemo(() => (plan?.sheet ? resolveSheetUri(plan.sheet) : null), [plan, resolveSheetUri, sheetTick]);
+  const downloadSheet = useCallback(() => {
+    const blob = plan?.sheet?.blob;
+    if (!blob || !props.blobs) return;
+    setSheetFetch('busy');
+    props.blobs.ensureLocal(blob, 'sheet').then(
+      (path) => {
+        setSheetFetch(path ? null : 'Not downloaded: no connection to the server (or the sheet is not uploaded yet).');
+        setSheetTick((n) => n + 1);
+      },
+      (e: unknown) => setSheetFetch(`Not downloaded: ${String(e)}`),
+    );
+  }, [plan, props.blobs]);
 
   // --- viewport, fit and focus
   const focusSheetRect = useCallback((r: Rect, animated: boolean) => {
@@ -329,6 +352,7 @@ export function PlanScreen(props: PlanScreenProps) {
     (id: string | null, from: 'plan' | 'list') => {
       setSelectedId(id);
       setCardOpen(!!id);
+      setEndView(null);
       if (!id) return;
       if (from === 'plan') {
         const index = firstRowOf.get(id);
@@ -369,6 +393,7 @@ export function PlanScreen(props: PlanScreenProps) {
       if (!hit) {
         setSelectedId(null);
         setCardOpen(false);
+        setEndView(null);
       } else if (hit.kind === 'pin') {
         select(renderPins[hit.index]!.id, 'plan');
       } else {
@@ -469,7 +494,17 @@ export function PlanScreen(props: PlanScreenProps) {
           ) : !plan.sheet ? (
             <Centered text={`Level ${plan.level.code} has no display sheet yet (setup, T45).`} />
           ) : !sheetUri ? (
-            <Centered text="The plan sheet is not downloaded to this iPad yet. It downloads with the next sync on Wi-Fi." />
+            <View style={styles.centered}>
+              <Text style={styles.centeredText}>
+                Plan not downloaded — {plan.level.code}'s sheet is not on this iPad yet. Use the list on the right; the sheet downloads with the next sync on Wi-Fi.
+              </Text>
+              {props.blobs && plan.sheet.blob ? (
+                <Pressable style={styles.tool} onPress={downloadSheet} disabled={sheetFetch === 'busy'}>
+                  <Text style={styles.toolText}>{sheetFetch === 'busy' ? 'Downloading…' : '⤓ Download plan now'}</Text>
+                </Pressable>
+              ) : null}
+              {sheetFetch && sheetFetch !== 'busy' ? <Text style={styles.centeredText}>{sheetFetch}</Text> : null}
+            </View>
           ) : (
             <>
               <Pdf
@@ -531,7 +566,34 @@ export function PlanScreen(props: PlanScreenProps) {
 
         {/* side lists */}
         <View style={styles.side}>
-          {cardOpen && selectedId ? (
+          {endView ? (
+            <EndEditor
+              key={endView.endId}
+              store={store}
+              editor={editor}
+              endId={endView.endId}
+              reloadKey={`${String(reloadKey)}|${edits}`}
+              names={props.names ?? NO_NAMES}
+              backLabel={endView.from === 'card' && selectedId ? (deviceById.get(selectedId)?.label ?? 'Device') : 'Connections'}
+              onBack={() => {
+                if (endView.from === 'list') setCardOpen(false);
+                setEndView(null);
+              }}
+              onEdited={onEdited}
+              onJump={onJump}
+              canOpenLevels={!!onOpenLevel}
+              onPhoto={
+                props.blobs && plan
+                  ? (t) =>
+                      setPhotoReq({
+                        kind: 'camera',
+                        title: t.title,
+                        target: { projectId: plan.level.projectId, levelId: t.levelId ?? levelId, deviceId: t.deviceId, cableEndId: t.endId },
+                      })
+                  : undefined
+              }
+            />
+          ) : cardOpen && selectedId ? (
             <DeviceCard
               key={selectedId}
               store={store}
@@ -562,10 +624,11 @@ export function PlanScreen(props: PlanScreenProps) {
                   : undefined
               }
               onOpenPhoto={props.blobs ? (photoId) => setPhotoReq({ kind: 'open', photoId, title: deviceById.get(selectedId)?.label ?? 'Photo' }) : undefined}
+              onOpenEnd={(endId) => setEndView({ endId, from: 'card' })}
             />
           ) : null}
           {/* The lists stay mounted under an open card, so their scroll position survives. */}
-          <View style={[styles.lists, cardOpen && selectedId ? styles.hidden : null]}>
+          <View style={[styles.lists, endView || (cardOpen && selectedId) ? styles.hidden : null]}>
           <View style={styles.tabs}>
             {TABS.map((t) => {
               const n = t === 'devices' ? visible.length : rowsByTab[t].length;
@@ -604,7 +667,13 @@ export function PlanScreen(props: PlanScreenProps) {
                 <ListRowView
                   row={item}
                   selected={!!item.deviceId && item.deviceId === selectedId}
-                  onPress={() => item.deviceId && select(item.deviceId === selectedId ? null : item.deviceId, 'list')}
+                  onPress={() => {
+                    if (item.tab === 'connections') {
+                      // a connection opens its end editor; its device's pin is lit behind it
+                      if (item.deviceId) select(item.deviceId, 'list');
+                      setEndView({ endId: item.id, from: 'list' });
+                    } else if (item.deviceId) select(item.deviceId === selectedId ? null : item.deviceId, 'list');
+                  }}
                 />
               ) : (
                 <DeviceRow
