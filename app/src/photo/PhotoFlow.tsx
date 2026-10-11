@@ -2,7 +2,10 @@
  * Photo capture and markup (T21, Phase 3 §4.4) as one full-screen modal over the plan:
  *
  * - **camera**: opens straight away (`expo-camera`); the shutter leads to the caption sheet, so a
- *   photo is two taps (shutter, Save). "Library" switches to the system picker (`expo-image-picker`).
+ *   photo is two taps (shutter, Save). "Library" closes this modal and asks the plan to open the
+ *   system picker (`pickFromLibrary`): iOS cannot present the picker over a full-screen RN modal
+ *   (it waited forever, iPad run of T21), so the picker runs with no modal up and the sheet opens
+ *   afterwards on the picked image (`kind: 'picked'`).
  * - **edit**: the image with Skia markup on the left, caption fields on the right — Subject,
  *   What it shows (with phrase chips), the link (device only, or one of its punch items or
  *   connection ends), Location (from the device) — and the markup tools.
@@ -40,6 +43,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -62,7 +66,8 @@ import {
 } from './model';
 
 export type PhotoRequest =
-  | { kind: 'camera' | 'library'; target: PhotoTarget; title: string }
+  | { kind: 'camera'; target: PhotoTarget; title: string }
+  | { kind: 'picked'; uri: string; target: PhotoTarget; title: string }
   | { kind: 'open'; photoId: string; title: string };
 
 export type PhotoEnv = {
@@ -83,19 +88,60 @@ type Stage =
   | { kind: 'edit-existing'; photo: ExistingPhoto }
   | { kind: 'error'; text: string };
 
-export function PhotoFlow({ request, env, onClose }: { request: PhotoRequest | null; env: PhotoEnv; onClose: (saved: boolean, photoId?: string) => void }) {
+/**
+ * The system photo picker, opened while no modal is up (see above). Resolves to the picked image's
+ * URI, or null when the surveyor cancels.
+ */
+export async function pickFromLibrary(): Promise<string | null> {
+  const r = await launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, exif: false, allowsMultipleSelection: false });
+  return r.canceled || !r.assets[0] ? null : r.assets[0].uri;
+}
+
+export function PhotoFlow(props: {
+  request: PhotoRequest | null;
+  env: PhotoEnv;
+  onClose: (saved: boolean, photoId?: string) => void;
+  /** The camera's Library button: close this modal, then the plan opens the picker for the same target. */
+  onLibrary: (target: PhotoTarget, title: string) => void;
+  /** iOS finished dismissing the modal (the moment another view controller may be presented). */
+  onDismissed?: () => void;
+}) {
+  const { request, env, onClose } = props;
   return (
-    <Modal visible={!!request} animationType="slide" presentationStyle="fullScreen" supportedOrientations={[...ORIENTATIONS]} onRequestClose={() => onClose(false)}>
-      {request ? <Flow key={request.kind === 'open' ? request.photoId : `${request.kind}-${request.title}`} request={request} env={env} onClose={onClose} /> : null}
+    <Modal
+      visible={!!request}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      supportedOrientations={[...ORIENTATIONS]}
+      onRequestClose={() => onClose(false)}
+      onDismiss={props.onDismissed}>
+      {request ? (
+        <Flow
+          key={request.kind === 'open' ? request.photoId : `${request.kind}-${request.title}`}
+          request={request}
+          env={env}
+          onClose={onClose}
+          onLibrary={props.onLibrary}
+        />
+      ) : null}
     </Modal>
   );
 }
 
-function Flow({ request, env, onClose }: { request: PhotoRequest; env: PhotoEnv; onClose: (saved: boolean, photoId?: string) => void }) {
+function Flow({
+  request,
+  env,
+  onClose,
+  onLibrary,
+}: {
+  request: PhotoRequest;
+  env: PhotoEnv;
+  onClose: (saved: boolean, photoId?: string) => void;
+  onLibrary: (target: PhotoTarget, title: string) => void;
+}) {
   const [stage, setStage] = useState<Stage>(
-    request.kind === 'camera' ? { kind: 'camera' } : { kind: 'busy', text: request.kind === 'library' ? 'Opening the library…' : 'Opening the photo…' },
+    request.kind === 'camera' ? { kind: 'camera' } : { kind: 'busy', text: request.kind === 'picked' ? 'Converting to JPEG…' : 'Opening the photo…' },
   );
-  const cameFromCamera = useRef(request.kind === 'camera');
 
   const prepare = useCallback(async (uri: string) => {
     setStage({ kind: 'busy', text: 'Converting to JPEG…' });
@@ -108,23 +154,8 @@ function Flow({ request, env, onClose }: { request: PhotoRequest; env: PhotoEnv;
     }
   }, []);
 
-  const pickFromLibrary = useCallback(async () => {
-    setStage({ kind: 'busy', text: 'Opening the library…' });
-    try {
-      const r = await launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, exif: false, allowsMultipleSelection: false });
-      if (r.canceled || !r.assets[0]) {
-        if (cameFromCamera.current) setStage({ kind: 'camera' });
-        else onClose(false);
-        return;
-      }
-      await prepare(r.assets[0].uri);
-    } catch (e) {
-      setStage({ kind: 'error', text: `The library could not be opened: ${String((e as Error)?.message ?? e)}` });
-    }
-  }, [prepare, onClose]);
-
   useEffect(() => {
-    if (request.kind === 'library') void pickFromLibrary();
+    if (request.kind === 'picked') void prepare(request.uri);
     if (request.kind === 'open') {
       loadPhoto(env.store, request.photoId).then(
         (photo) => setStage(photo ? { kind: 'edit-existing', photo } : { kind: 'error', text: 'This photo is not on this iPad.' }),
@@ -136,7 +167,14 @@ function Flow({ request, env, onClose }: { request: PhotoRequest; env: PhotoEnv;
 
   switch (stage.kind) {
     case 'camera':
-      return <CameraStage title={request.title} onShot={prepare} onLibrary={pickFromLibrary} onCancel={() => onClose(false)} />;
+      return (
+        <CameraStage
+          title={request.title}
+          onShot={prepare}
+          onLibrary={() => request.kind === 'camera' && onLibrary(request.target, request.title)}
+          onCancel={() => onClose(false)}
+        />
+      );
     case 'busy':
       return (
         <View style={styles.center}>
@@ -273,6 +311,10 @@ function PhotoEditor(props: {
 
   const deviceId = existing ? existing.deviceId : (target?.deviceId ?? null);
   const readOnly = !env.editor;
+  // The caption panel has a fixed width from the window, so the image area can never push it off
+  // the screen (iPad run of T21: "the sidebar is off the screen after taking the image").
+  const win = useWindowDimensions();
+  const panelWidth = Math.round(Math.min(420, Math.max(300, win.width * 0.32)));
 
   // caption defaults, link choices and chips
   useEffect(() => {
@@ -398,7 +440,13 @@ function PhotoEditor(props: {
   const lineWidth = list ? Math.max(list.width, list.height) / 250 : 4;
 
   return (
-    <View style={styles.editor}>
+    <View
+      style={styles.editor}
+      onLayout={(e) =>
+        console.log(
+          `[blobs] photo sheet ${Math.round(e.nativeEvent.layout.width)}×${Math.round(e.nativeEvent.layout.height)}, window ${Math.round(win.width)}×${Math.round(win.height)}, panel ${panelWidth}`,
+        )
+      }>
       <View style={[styles.head, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => props.onDone(false)} hitSlop={8} disabled={saving}>
           <Text style={styles.headLink}>◀ {existing ? 'Close' : 'Cancel'}</Text>
@@ -435,7 +483,7 @@ function PhotoEditor(props: {
             </View>
           )}
         </View>
-        <ScrollView style={styles.panel} contentContainerStyle={styles.panelBody} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+        <ScrollView style={[styles.panel, { width: panelWidth }]} contentContainerStyle={styles.panelBody} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {fields ? (
             <>
@@ -554,16 +602,16 @@ const styles = StyleSheet.create({
   shutter: { width: 78, height: 78, borderRadius: 39, backgroundColor: '#fff', borderWidth: 6, borderColor: 'rgba(255,255,255,0.45)', alignItems: 'center', justifyContent: 'center' },
   shutterBusy: { opacity: 0.6 },
   camLib: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.45)' },
-  editor: { flex: 1, backgroundColor: '#f4f5f7' },
+  editor: { flex: 1, width: '100%', backgroundColor: '#f4f5f7' },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingBottom: 10, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
   headLink: { fontSize: 17, color: '#1565c0', fontWeight: '600' },
   headTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700' },
   saveBtn: { minWidth: 70, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: '#1565c0' },
   saveBusy: { opacity: 0.6 },
   saveText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  body: { flex: 1, flexDirection: 'row' },
-  imageArea: { flex: 68, backgroundColor: '#1d1f22' },
-  panel: { flex: 32, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
+  body: { flex: 1, flexDirection: 'row', overflow: 'hidden' },
+  imageArea: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: '#1d1f22' },
+  panel: { flexGrow: 0, flexShrink: 0, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
   panelBody: { padding: 14, gap: 8, paddingBottom: 40 },
   label: { fontSize: 13, fontWeight: '700', color: '#333', marginTop: 6 },
   input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 7, fontSize: 15, backgroundColor: '#fff' },

@@ -1,8 +1,9 @@
 /**
  * Draw mode over the plan (T24): takes the touches PDFKit would otherwise get, turns them into
- * strokes in **sheet coordinates** (D92) with Pencil pressure, and shows the stroke being drawn.
- * Committed strokes are drawn by the overlay's ink picture (`PinOverlay`), so this layer only ever
- * draws one stroke. "Pan" lets the touches through to PDFKit again without leaving draw mode.
+ * strokes in **sheet coordinates** (D92) with Apple Pencil pressure (gesture-handler's stylus data,
+ * D116), and shows the stroke being drawn. Committed strokes are drawn by the overlay's ink picture
+ * (`PinOverlay`), so this layer only ever draws one stroke. "Pan" lets the touches through to
+ * PDFKit again without leaving draw mode.
  */
 
 import {
@@ -18,11 +19,12 @@ import {
 } from '@field-survey/core';
 import { Canvas, Group, Picture, Skia } from '@shopify/react-native-skia';
 import { useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, type GestureResponderEvent } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { touchPressure } from '../photo/MarkupCanvas';
 import { apply, scaleOf, sheetToView, toSkiaMatrix, viewToSheet, type PdfViewport } from '../plan/viewport';
 import { recordStroke } from './render';
+import { useDrawGesture, type DrawPoint } from './useDrawGesture';
 
 export type InkTool = 'pen' | 'highlighter' | 'text' | 'erase' | 'pan';
 
@@ -47,10 +49,13 @@ export function InkCapture({ viewport, tool, color, widthPx, mine, onChange, onT
   const [live, setLive] = useState<{ stroke: Stroke; vp: PdfViewport } | null>(null);
   const pts = useRef<StrokePoint[]>([]);
   const start = useRef<{ vp: PdfViewport; zoom: number } | null>(null);
+  /** The list as this layer last changed it, so a fast eraser sees its own previous erase. */
+  const latest = useRef<StrokeList | null>(mine);
+  latest.current = mine;
 
-  const toSheet = (e: GestureResponderEvent, vp: PdfViewport): StrokePoint => {
-    const p = apply(viewToSheet(vp), { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY });
-    return { x: p.x, y: p.y, p: touchPressure(e) };
+  const toSheet = (d: DrawPoint, vp: PdfViewport): StrokePoint => {
+    const p = apply(viewToSheet(vp), { x: d.x, y: d.y });
+    return { x: p.x, y: p.y, p: d.p };
   };
   const build = (zoom: number): Stroke | null => {
     if (tool !== 'pen' && tool !== 'highlighter') return null;
@@ -66,45 +71,42 @@ export function InkCapture({ viewport, tool, color, widthPx, mine, onChange, onT
     });
   };
   const erase = (p: StrokePoint, zoom: number) => {
-    if (!mine) return;
-    const hit = strokeAt(mine, p.x, p.y, 14 / zoom);
-    if (hit) onChange(withoutStroke(mine, hit.id));
+    const list = latest.current;
+    if (!list) return;
+    const hit = strokeAt(list, p.x, p.y, 14 / zoom);
+    if (!hit) return;
+    const next = withoutStroke(list, hit.id);
+    latest.current = next;
+    console.log(`[plan] ink: erased a ${hit.tool} stroke (${next.strokes.length} left)`);
+    onChange(next);
   };
 
-  const picture = useMemo(() => (live ? recordStroke(live.stroke, surfaceOf(live.vp)) : null), [live]);
-  const matrix = useMemo(() => (live ? Skia.Matrix(toSkiaMatrix(sheetToView(live.vp))) : null), [live]);
-
-  if (tool === 'pan') return null;
-  return (
-    <View
-      style={StyleSheet.absoluteFill}
-      onStartShouldSetResponder={() => true}
-      onMoveShouldSetResponder={() => true}
-      onResponderTerminationRequest={() => false}
-      onResponderGrant={(e) => {
+  const gesture = useDrawGesture(
+    {
+      onStart: (d) => {
         const vp = viewport();
         if (!vp) return;
         const zoom = scaleOf(sheetToView(vp));
         start.current = { vp, zoom };
-        const p = toSheet(e, vp);
+        const p = toSheet(d, vp);
         pts.current = [p];
         if (tool === 'erase') erase(p, zoom);
         else {
           const s = build(zoom);
           if (s) setLive({ stroke: s, vp });
         }
-      }}
-      onResponderMove={(e) => {
+      },
+      onMove: (d) => {
         const st = start.current;
         if (!st) return;
-        const p = toSheet(e, st.vp);
+        const p = toSheet(d, st.vp);
         if (tool === 'erase') return erase(p, st.zoom);
         if (tool === 'text') return;
         pts.current.push(p);
         const s = build(st.zoom);
         if (s) setLive({ stroke: s, vp: st.vp });
-      }}
-      onResponderRelease={() => {
+      },
+      onEnd: () => {
         const st = start.current;
         start.current = null;
         setLive(null);
@@ -113,22 +115,36 @@ export function InkCapture({ viewport, tool, color, widthPx, mine, onChange, onT
           if (pts.current[0]) onTextAt(pts.current[0], 14 / st.zoom);
         } else if (tool === 'pen' || tool === 'highlighter') {
           const s = build(st.zoom);
-          if (s) onChange(withStroke(mine ?? emptyStrokeList('sheet', st.vp.cropBox.width, st.vp.cropBox.height), s));
+          if (s) {
+            const list = latest.current ?? emptyStrokeList('sheet', st.vp.cropBox.width, st.vp.cropBox.height);
+            const ps = pts.current.map((q) => q.p);
+            console.log(`[plan] ink: ${tool} stroke, ${ps.length} points, pressure ${Math.min(...ps).toFixed(2)}–${Math.max(...ps).toFixed(2)}`);
+            onChange(withStroke(list, s));
+          }
         }
         pts.current = [];
-      }}
-      onResponderTerminate={() => {
-        start.current = null;
-        pts.current = [];
-        setLive(null);
-      }}>
-      {picture && matrix ? (
-        <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Group matrix={matrix}>
-            <Picture picture={picture} />
-          </Group>
-        </Canvas>
-      ) : null}
-    </View>
+      },
+    },
+    tool !== 'pan',
+  );
+
+  const picture = useMemo(() => (live ? recordStroke(live.stroke, surfaceOf(live.vp)) : null), [live]);
+  const matrix = useMemo(() => (live ? Skia.Matrix(toSkiaMatrix(sheetToView(live.vp))) : null), [live]);
+
+  if (tool === 'pan') return null;
+  return (
+    <GestureHandlerRootView style={StyleSheet.absoluteFill}>
+      <GestureDetector gesture={gesture}>
+        <View style={StyleSheet.absoluteFill} collapsable={false}>
+          {picture && matrix ? (
+            <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Group matrix={matrix}>
+                <Picture picture={picture} />
+              </Group>
+            </Canvas>
+          ) : null}
+        </View>
+      </GestureDetector>
+    </GestureHandlerRootView>
   );
 }

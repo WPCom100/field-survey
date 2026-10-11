@@ -24,7 +24,7 @@ index 43fea3bfc16a3b0c526ec96d993d2120cbb2ef0b..0375eceb1b0729f30eb7e3ba9c648dc0
  
   export default codegenNativeComponent<NativeProps>('RNPDFPdfView');
 diff --git a/index.d.ts b/index.d.ts
-index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..b23a670685c48766a3ffff3d0938ede6f0f238fe 100644
+index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..2a762d1de5d9484f8e48001c5593a848797916a2 100644
 --- a/index.d.ts
 +++ b/index.d.ts
 @@ -31,6 +31,17 @@ export type PdfError = Error & {
@@ -69,7 +69,7 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..b23a670685c48766a3ffff3d0938ede6
  
  declare const Pdf: React.ForwardRefExoticComponent<PdfProps & React.RefAttributes<PdfRef>>
 diff --git a/index.js b/index.js
-index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..42f0cdb82717e3c776e54c8c40d4802c4e00d6db 100644
+index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..881e5b79b8c1991d2aa09f6e9012867fbb789706 100644
 --- a/index.js
 +++ b/index.js
 @@ -69,6 +69,7 @@ export default class Pdf extends Component {
@@ -95,7 +95,7 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..42f0cdb82717e3c776e54c8c40d4802c
      _onChange = (event) => {
          // Handle direct events for text selection/highlight
          if (event.nativeEvent.type) {
-@@ -412,6 +421,25 @@ export default class Pdf extends Component {
+@@ -412,6 +421,28 @@ export default class Pdf extends Component {
                  return;
              }
  
@@ -112,6 +112,9 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..42f0cdb82717e3c776e54c8c40d4802c
 +                this.props.onPageSingleTap && this.props.onPageSingleTap(
 +                    Number(message[1]), Number(message[2]), Number(message[3]), Number(message[4]), Number(message[5]));
 +                return;
++            } else if (message[0] === 'gestures') {
++                console.log(`[plan] pdf: disabled ${message[1]} PDFKit selection gesture(s): ${message.slice(2).join('|')}`);
++                return;
 +            } else if (message[0] === 'pageLongPress') {
 +                this.props.onPageLongPress && this.props.onPageLongPress(
 +                    Number(message[1]), Number(message[2]), Number(message[3]), Number(message[4]), Number(message[5]));
@@ -122,12 +125,14 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..42f0cdb82717e3c776e54c8c40d4802c
                  message[4] = message.splice(4).join('|');
              }
 diff --git a/ios/RNPDFPdf/RNPDFPdfView.mm b/ios/RNPDFPdf/RNPDFPdfView.mm
-index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc88b8bfe6 100644
+index 1bc263bb95c584c950583d42485059b8bf34168b..74e50b66572cdbaac7633487b23cb9cc2f7065a2 100644
 --- a/ios/RNPDFPdf/RNPDFPdfView.mm
 +++ b/ios/RNPDFPdf/RNPDFPdfView.mm
-@@ -75,8 +75,13 @@ const float MIN_SCALE = 1.0f;
+@@ -74,9 +74,15 @@ const float MIN_SCALE = 1.0f;
+     UITapGestureRecognizer *_singleTapRecognizer;
      UIPinchGestureRecognizer *_pinchRecognizer;
      UILongPressGestureRecognizer *_longPressRecognizer;
++    BOOL _reportedSelectionGestures;
      UITapGestureRecognizer *_doubleTapEmptyRecognizer;
 +    // field-survey patch: viewport reporting (see patches/react-native-pdf.md)
 +    UIScrollView *_observedScrollView;
@@ -139,7 +144,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
  #ifdef RCT_NEW_ARCH_ENABLED
  
  using namespace facebook::react;
-@@ -190,6 +195,7 @@ using namespace facebook::react;
+@@ -190,6 +196,7 @@ using namespace facebook::react;
  {
      [super prepareForRecycle];
  
@@ -147,7 +152,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
      [_pdfView removeFromSuperview];
      _pdfDocument = Nil;
      _pdfView = Nil;
-@@ -234,6 +240,45 @@ using namespace facebook::react;
+@@ -234,6 +241,45 @@ using namespace facebook::react;
      [self didSetProps:[NSArray arrayWithObject:@"page"]];
  }
  
@@ -193,7 +198,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
  #endif
  
  - (instancetype)initWithBridge:(RCTBridge *)bridge
-@@ -476,6 +521,9 @@ using namespace facebook::react;
+@@ -476,6 +522,9 @@ using namespace facebook::react;
                      _pdfView.maxScaleFactor = _fixScaleFactor*_maxScale;
                  }
              }
@@ -203,16 +208,17 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
  
          }
  
-@@ -567,6 +615,8 @@ using namespace facebook::react;
+@@ -567,6 +616,9 @@ using namespace facebook::react;
          _pdfView.backgroundColor = [UIColor clearColor];
          [_pdfView layoutDocumentView];
          [self setNeedsDisplay];
 +        [self attachScrollObserver];
++        [self disableTextSelectionGestures];
 +        [self emitViewport];
      }
  }
  
-@@ -600,6 +650,7 @@ using namespace facebook::react;
+@@ -600,6 +652,7 @@ using namespace facebook::react;
  
  - (void)dealloc{
  
@@ -220,7 +226,15 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
      _pdfDocument = Nil;
      _pdfView = Nil;
  
-@@ -741,6 +792,77 @@ using namespace facebook::react;
+@@ -734,6 +787,7 @@ using namespace facebook::react;
+ 
+ - (void)onScaleChanged:(NSNotification *)noti
+ {
++    [self disableTextSelectionGestures];
+ 
+     if (_initialed && _fixScaleFactor>0) {
+         if (_scale != _pdfView.scaleFactor/_fixScaleFactor) {
+@@ -741,6 +795,116 @@ using namespace facebook::react;
              [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"scaleChanged|%f", _scale]]];
          }
      }
@@ -228,6 +242,45 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
 +}
 +
 +#pragma mark viewport reporting (field-survey patch)
++
++/**
++ *  field-survey patch (T23 fix): PDFKit's own long press starts a text selection (with the
++ *  loupe and edit menu) and wins over our long press. The app never selects text, so every
++ *  long-press / loupe / text-interaction recognizer inside the PDFView is disabled. PDFKit adds
++ *  page views lazily, so this runs after load, on zoom and on each long press; it is cheap.
++ *  The first time it disables anything it reports what, as `gestures|n|names`.
++ */
++- (void)disableTextSelectionGestures
++{
++    NSMutableArray<NSString *> *names = [NSMutableArray array];
++    [self disableTextSelectionGesturesIn:_pdfView depth:0 names:names];
++    if (names.count > 0 && !_reportedSelectionGestures) {
++        _reportedSelectionGestures = YES;
++        [self notifyOnChangeWithMessage:
++         [NSString stringWithFormat:@"gestures|%lu|%@", (unsigned long)names.count, [names componentsJoinedByString:@","]]];
++    }
++}
++
++- (void)disableTextSelectionGesturesIn:(UIView *)view depth:(int)depth names:(NSMutableArray<NSString *> *)names
++{
++    if (!view || depth > 12) return;
++    for (UIGestureRecognizer *g in view.gestureRecognizers) {
++        if (g == _longPressRecognizer || g == _singleTapRecognizer || g == _doubleTapRecognizer ||
++            g == _doubleTapEmptyRecognizer || g == _pinchRecognizer || !g.enabled) continue;
++        NSString *cls = NSStringFromClass([g class]);
++        BOOL selection = [g isKindOfClass:[UILongPressGestureRecognizer class]] ||
++            [cls containsString:@"Loupe"] || [cls containsString:@"TextSelection"] ||
++            [cls containsString:@"TapAndAHalf"] || [cls containsString:@"TextInteraction"] ||
++            [cls containsString:@"HighlightTap"];
++        if (selection) {
++            g.enabled = NO;
++            [names addObject:cls];
++        }
++    }
++    for (UIView *sub in view.subviews) {
++        [self disableTextSelectionGesturesIn:sub depth:depth + 1 names:names];
++    }
++}
 +
 +/**
 + *  Observe the inner UIScrollView of the PDFView so JS learns every pan/zoom,
@@ -298,7 +351,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
  }
  
  #pragma mark gesture process
-@@ -839,8 +961,10 @@ using namespace facebook::react;
+@@ -839,8 +1003,10 @@ using namespace facebook::react;
      PDFPage *pdfPage = [_pdfView pageForPoint:point nearest:NO];
      if (pdfPage) {
          unsigned long page = [_pdfDocument indexForPage:pdfPage];
@@ -310,7 +363,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
      }
  
      //[self setNeedsDisplay];
-@@ -860,12 +984,21 @@ using namespace facebook::react;
+@@ -860,12 +1026,25 @@ using namespace facebook::react;
  }
  
  /**
@@ -323,6 +376,10 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
 -
 +    // field-survey patch: `pageLongPress|page|x|y|pageX|pageY` like pageSingleTap (T23 add-here menu)
 +    if (sender.state != UIGestureRecognizerStateBegan) return;
++    [self disableTextSelectionGestures];
++    dispatch_async(dispatch_get_main_queue(), ^{
++        [self->_pdfView clearSelection];
++    });
 +    CGPoint point = [sender locationInView:self];
 +    PDFPage *pdfPage = [_pdfView pageForPoint:point nearest:NO];
 +    if (pdfPage) {
@@ -334,3 +391,12 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc
  }
  
  /**
+@@ -915,6 +1094,8 @@ using namespace facebook::react;
+ 
+     [self addGestureRecognizer:longPressRecognizer];
+     _longPressRecognizer = longPressRecognizer;
++    // field-survey patch (T23 fix): the lift after a long press is not also a tap
++    [singleTapRecognizer requireGestureRecognizerToFail:longPressRecognizer];
+ 
+     // Override the _pdfView double tap gesture recognizer so that it doesn't confilict with custom double tap
+     UITapGestureRecognizer *doubleTapEmptyRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self

@@ -62,7 +62,8 @@ import { recordStrokes } from '../ink/render';
 import { useInkLayers } from '../ink/useInkLayers';
 import type { JumpTarget } from '../card/model';
 import { NOT_WIRED } from '../card/proposals';
-import { PhotoFlow, type PhotoRequest } from '../photo/PhotoFlow';
+import type { PhotoTarget } from '../photo/model';
+import { PhotoFlow, pickFromLibrary, type PhotoRequest } from '../photo/PhotoFlow';
 
 import { loadLevelPlan, type LevelPlan, type PlanDevice, type PlanSheet } from './data';
 import { PIN_PX } from './drawPins';
@@ -213,6 +214,9 @@ export function PlanScreen(props: PlanScreenProps) {
   const [noteText, setNoteText] = useState('');
   /** "Photo here" away from a pin: the camera mark added to the ink layer once the photo is saved. */
   const photoMark = useRef<{ at: Point; size: number } | null>(null);
+  /** The library picker waiting for the photo modal to finish closing (iOS presents one at a time). */
+  const afterDismiss = useRef<(() => void) | null>(null);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
   const [tab, setTab] = useState<Tab>('devices');
   const [lists, setLists] = useState<LevelLists | null>(null);
@@ -252,6 +256,31 @@ export function PlanScreen(props: PlanScreenProps) {
     [store, projectId, userId],
   );
   const onEdited = useCallback(() => setEdits((n) => n + 1), []);
+
+  /** System photo picker (T21 fix): opened with no modal up, then the photo sheet on the pick. */
+  const openLibrary = useCallback((target: PhotoTarget, title: string) => {
+    setLibraryError(null);
+    pickFromLibrary().then(
+      (uri) => uri && setPhotoReq({ kind: 'picked', uri, target, title }),
+      (e: unknown) => setLibraryError(`The photo library could not be opened: ${String((e as Error)?.message ?? e)}`),
+    );
+  }, []);
+  /** From the camera's Library button: close the camera, then open the picker once it is gone. */
+  const switchToLibrary = useCallback(
+    (target: PhotoTarget, title: string) => {
+      let done = false;
+      const go = () => {
+        if (done) return;
+        done = true;
+        afterDismiss.current = null;
+        openLibrary(target, title);
+      };
+      afterDismiss.current = go;
+      setTimeout(go, 1200); // in case onDismiss never comes
+      setPhotoReq(null);
+    },
+    [openLibrary],
+  );
 
   // --- plan ink (T24): all layers of the display sheet, the user's own editable
   const ink = useInkLayers({
@@ -720,7 +749,12 @@ export function PlanScreen(props: PlanScreenProps) {
                   }}
                   onColor={setInkColor}
                   onWidth={setInkWidth}
-                  onUndo={() => ink.mine && ink.setMine(withoutLast(ink.mine))}
+                  onUndo={() => {
+                    if (!ink.mine?.strokes.length) return;
+                    const gone = ink.mine.strokes[ink.mine.strokes.length - 1]!;
+                    console.log(`[plan] ink: undo removed a ${gone.tool} stroke (${ink.mine.strokes.length - 1} left)`);
+                    ink.setMine(withoutLast(ink.mine));
+                  }}
                   onNoteText={setNoteText}
                   onPlaceNote={placeNote}
                   onDone={stopDrawing}
@@ -766,6 +800,14 @@ export function PlanScreen(props: PlanScreenProps) {
                   }}
                   onClose={() => setPress(null)}
                 />
+              ) : null}
+              {libraryError ? (
+                <View style={styles.moveBanner}>
+                  <Text style={styles.moveText}>{libraryError}</Text>
+                  <Pressable onPress={() => setLibraryError(null)} hitSlop={8}>
+                    <Text style={styles.moveCancel}>OK</Text>
+                  </Pressable>
+                </View>
               ) : null}
               {moving ? (
                 <View style={styles.moveBanner}>
@@ -870,12 +912,12 @@ export function PlanScreen(props: PlanScreenProps) {
               }}
               onPhoto={
                 props.blobs && plan
-                  ? (source) =>
-                      setPhotoReq({
-                        kind: source,
-                        title: deviceById.get(selectedId)?.label ?? 'Device',
-                        target: { projectId: plan.level.projectId, levelId, deviceId: selectedId },
-                      })
+                  ? (source) => {
+                      const title = deviceById.get(selectedId)?.label ?? 'Device';
+                      const target = { projectId: plan.level.projectId, levelId, deviceId: selectedId };
+                      if (source === 'library') openLibrary(target, title);
+                      else setPhotoReq({ kind: 'camera', title, target });
+                    }
                   : undefined
               }
               onOpenPhoto={props.blobs ? (photoId) => setPhotoReq({ kind: 'open', photoId, title: deviceById.get(selectedId)?.label ?? 'Photo' }) : undefined}
@@ -996,6 +1038,8 @@ export function PlanScreen(props: PlanScreenProps) {
         <PhotoFlow
           request={photoReq}
           env={{ store, editor, queue: props.blobs }}
+          onLibrary={switchToLibrary}
+          onDismissed={() => afterDismiss.current?.()}
           onClose={(saved, photoId) => {
             setPhotoReq(null);
             const mark = photoMark.current;

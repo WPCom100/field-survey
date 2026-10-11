@@ -85,3 +85,14 @@ describe('plan ink layers (T24, D53)', () => {
     expect(back.strokes[3]!.ref).toEqual({ kind: 'photo', id: 'p1' });
   });
 });
+
+describe('Pencil pressure from gesture-handler (T24 fix, D116)', () => {
+  it('uses stylus pressure when the Pencil gives one, else the finger default', async () => {
+    const { pressureOf } = await import('./pressure');
+    expect(pressureOf({ pressure: 0.12 })).toBe(0.12);
+    expect(pressureOf({ pressure: 1.7 })).toBe(1);
+    expect(pressureOf({ pressure: 0 })).toBe(0.5);
+    expect(pressureOf(undefined)).toBe(0.5);
+    expect(pressureOf({ pressure: Number.NaN })).toBe(0.5);
+  });
+});
