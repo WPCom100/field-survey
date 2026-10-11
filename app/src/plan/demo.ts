@@ -38,7 +38,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-export function demoOps(): Op[] {
+export function demoOps(dense = 0): Op[] {
   const ops: Op[] = [];
   let seq = 0;
   const ts = '2026-10-10T12:00:00.000Z';
@@ -125,6 +125,25 @@ export function demoOps(): Op[] {
     return id;
   };
 
+  if (dense > 0) {
+    // A busy floor: 60 % of the pins in 14 tight rooms, 20 % along corridors, the rest scattered.
+    const rooms = Array.from({ length: 14 }, () => ({ x: W * (0.06 + 0.88 * rand()), y: H * (0.06 + 0.88 * rand()) }));
+    for (let i = 0; i < dense; i++) {
+      const k = i % 5;
+      const category = k === 3 ? 'Station' : k === 4 && i % 10 === 4 ? 'Sensor' : DEVICE_CATEGORIES[i % 6]!;
+      if (k < 3) {
+        const r = rooms[i % rooms.length]!;
+        device(category, r.x + (rand() - 0.5) * 150, r.y + (rand() - 0.5) * 150);
+      } else if (k === 3) {
+        device(category, W * (0.05 + 0.9 * (i / dense)), H * (0.2 + 0.6 * ((i * 7) % 5) / 5) + (rand() - 0.5) * 24);
+      } else {
+        device(category, W * (0.04 + 0.92 * rand()), H * (0.04 + 0.92 * rand()));
+      }
+    }
+    device('Touchscreen', null, null);
+    return ops;
+  }
+
   // Spread over the sheet, cycling the eight categories.
   for (let i = 0; i < 36; i++) {
     device(DEVICE_CATEGORIES[i % DEVICE_CATEGORIES.length]!, W * (0.06 + 0.88 * rand()), H * (0.06 + 0.88 * rand()));
@@ -147,9 +166,13 @@ export function demoOps(): Op[] {
 }
 
 /** Seed the demo level once per demo database; returns its level id. */
-export async function ensureDemoLevel(store: Store, log: (msg: string) => void = () => {}): Promise<string> {
+export async function ensureDemoLevel(
+  store: Store,
+  log: (msg: string) => void = () => {},
+  dense = 0,
+): Promise<string> {
   if (!(await store.getState<boolean>(SEEDED_KEY))) {
-    const ops = demoOps();
+    const ops = demoOps(dense);
     log(`seeding ${ops.length} ops`);
     await store.applyRemoteMany(ops);
     await store.setState(SEEDED_KEY, true);

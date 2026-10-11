@@ -1,5 +1,5 @@
 import { Store } from '@field-survey/core';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Text, View } from 'react-native';
 
@@ -15,19 +15,24 @@ const SHEET = Image.resolveAssetSource(require('../../../fixtures/Level_06M_-_Li
 const DEMO_DB = 'demo-plan-2.db';
 const STALE = ['demo-plan.db', 'probe-like.db', 'probe-fts.db', 'probe-c.db', 'probe-d.db', 'probe-e.db', 'probe-f.db', 'probe-g.db'];
 
-/** Opened once: a separate database that no sync engine ever sees (never the app store). */
-let demo: Promise<{ store: Store; levelId: string }> | null = null;
-function openDemo() {
+/** The dense variant (`/demo-plan?pins=500`): 500 devices on the same sheet, in its own database. */
+const DENSE_DB = 'demo-plan-500.db';
+
+/** Opened once per variant: a separate database that no sync engine ever sees (never the app store). */
+const demos = new Map<number, Promise<{ store: Store; levelId: string }>>();
+function openDemo(dense: number) {
+  let demo = demos.get(dense) ?? null;
   if (!demo) {
     const log = (m: string) => console.log(`[plan] demo: ${m}`);
     demo = Promise.all(STALE.map(ExpoSqliteDriver.remove))
-      .then(() => ExpoSqliteDriver.open(DEMO_DB))
+      .then(() => ExpoSqliteDriver.open(dense ? DENSE_DB : DEMO_DB))
       .then((driver) => Store.open(driver))
-      .then(async (store) => ({ store, levelId: await ensureDemoLevel(store, log) }))
+      .then(async (store) => ({ store, levelId: await ensureDemoLevel(store, log, dense) }))
       .catch((e) => {
-        demo = null;
+        demos.delete(dense);
         throw e;
       });
+    demos.set(dense, demo);
   }
   return demo;
 }
@@ -40,9 +45,12 @@ export default function DemoPlanRoute() {
   const [state, setState] = useState<{ store: Store; levelId: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const { pins } = useLocalSearchParams<{ pins?: string }>();
+  const dense = Math.min(Math.max(Number(pins) || 0, 0), 1000);
+
   useEffect(() => {
-    openDemo().then(setState, (e: unknown) => setError(String(e)));
-  }, []);
+    openDemo(dense).then(setState, (e: unknown) => setError(String(e)));
+  }, [dense]);
 
   if (!state) {
     return (
@@ -57,7 +65,7 @@ export default function DemoPlanRoute() {
       levelId={state.levelId}
       resolveSheetUri={() => SHEET.uri}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-      status="Demo data — not synced"
+      status={dense ? `Demo data, ${dense} pins — not synced` : 'Demo data — not synced'}
       bench
     />
   );

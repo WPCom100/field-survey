@@ -75,6 +75,9 @@ export default function ProjectHomeScreen() {
         <Link href="/demo-plan" style={styles.demo}>
           Demo plan (06M composite) →
         </Link>
+        <Link href={{ pathname: '/demo-plan', params: { pins: '500' } }} style={styles.demo}>
+          500 pins →
+        </Link>
         <Text style={styles.user}>{user.name}</Text>
       </View>
 

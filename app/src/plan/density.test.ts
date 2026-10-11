@@ -3,7 +3,7 @@ import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
 import { loadLevelPlan } from './data';
-import { DEMO_LEVEL_ID, DEMO_SHEET_SIZE, ensureDemoLevel } from './demo';
+import { DEMO_LEVEL_ID, DEMO_SHEET_SIZE, demoOps, ensureDemoLevel } from './demo';
 import { EMPTY_FILTER, matchesFilter } from './filters';
 import { hitTest, layoutPins, LAYOUT_DEFAULTS, type RenderPin } from './layout';
 import { loadLevelLists, rowMatches, searchIds } from './lists';
@@ -168,5 +168,20 @@ describe(`${N} devices in the side lists`, () => {
     console.log(`[density] ${plan.devices.length} devices / ${lists.punch.length} punch / ${lists.parts.length} parts / ${lists.connections.length} conns — load ${loadMs.toFixed(0)} ms, filter+search ${filterMs.toFixed(0)} ms`);
     expect(loadMs).toBeLessThan(1500);
     expect(filterMs).toBeLessThan(500);
+  });
+});
+
+describe('the 500-pin demo level', () => {
+  it('seeds 500 placed devices plus one unplaced, with punch items and parts', async () => {
+    const store = await Store.open(new BetterSqliteDriver(), { installId: 'i', search: 'like' });
+    await ensureDemoLevel(store, () => {}, 500);
+    const plan = (await loadLevelPlan(store, DEMO_LEVEL_ID))!;
+    expect(plan.devices).toHaveLength(501);
+    expect(plan.devices.filter((d) => d.pin)).toHaveLength(500);
+    expect(new Set(plan.devices.map((d) => d.label)).size).toBe(501);
+    const lists = await loadLevelLists(store, plan.level.projectId, DEMO_LEVEL_ID, plan.level.code, plan.devices);
+    expect(lists.punch.length).toBeGreaterThan(100);
+    expect(lists.parts.length).toBeGreaterThan(100);
+    expect(demoOps(0).length).toBeLessThan(demoOps(500).length); // the normal demo is unchanged in kind
   });
 });
