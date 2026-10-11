@@ -22,7 +22,6 @@ import {
   serializeStrokeList,
   uuidv7,
   withStroke,
-  withoutLast,
   type BlobQueue,
   type Editor,
   type Store,
@@ -50,6 +49,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBlobFiles } from '../blobs/queue';
 import { prepareText, readCachedText, register } from '../blobs/store-bytes';
 import { INK_COLORS } from '../ink/geometry';
+import { popUndo, pushUndo } from '../ink/history';
 import { discardPhoto, preparePhoto, type PreparedPhoto } from './capture';
 import { MarkupCanvas, type MarkupTool } from './MarkupCanvas';
 import {
@@ -301,6 +301,23 @@ function PhotoEditor(props: {
   /** Markup needs the image the strokes are measured on; a cached thumbnail alone is view-only. */
   const [markupNote, setMarkupNote] = useState<string | null>(null);
   const [list, setList] = useState<StrokeList | null>(prepared ? emptyStrokeList('image', prepared.width, prepared.height) : null);
+  /** ↶ Undo steps back through every markup change, erases included. */
+  const listRef = useRef(list);
+  listRef.current = list;
+  const [past, setPast] = useState<(StrokeList | null)[]>([]);
+  const change = useCallback((next: StrokeList) => {
+    if (next === listRef.current) return;
+    const before = listRef.current;
+    listRef.current = next;
+    setPast((p) => pushUndo(p, before));
+    setList(next);
+  }, []);
+  const undo = () => {
+    const step = popUndo(past, list);
+    if (!step) return;
+    setPast(step.stack);
+    setList(step.list);
+  };
   const original = useRef<string | null>(null);
   const [tool, setTool] = useState<MarkupTool>('pen');
   const [color, setColor] = useState<string>(INK_COLORS[0]);
@@ -429,7 +446,7 @@ function PhotoEditor(props: {
   const placeText = () => {
     if (!list || !textAt || !textValue.trim()) return;
     const size = Math.max(list.width, list.height) / 30;
-    setList(withStroke(list, makeStroke({ id: uuidv7(), tool: 'text', color, width: size, points: [textAt], text: textValue, at: new Date().toISOString() })));
+    change(withStroke(list, makeStroke({ id: uuidv7(), tool: 'text', color, width: size, points: [textAt], text: textValue, at: new Date().toISOString() })));
     setTextAt(null);
     setTextValue('');
   };
@@ -468,7 +485,7 @@ function PhotoEditor(props: {
             <MarkupCanvas
               imageUri={imageUri}
               list={list}
-              onChange={setList}
+              onChange={change}
               tool={tool}
               color={color}
               lineWidth={lineWidth}
@@ -552,7 +569,7 @@ function PhotoEditor(props: {
                 ).map(([k, label]) => (
                   <LinkChip key={k} label={label} on={tool === k} onPress={() => (setTool(k), setTextAt(null))} />
                 ))}
-                <LinkChip label="↶ Undo" on={false} disabled={!list.strokes.length} onPress={() => setList(withoutLast(list))} />
+                <LinkChip label="↶ Undo" on={false} disabled={!past.length} onPress={undo} />
               </View>
               <View style={styles.rowWrap}>
                 {INK_COLORS.map((c) => (

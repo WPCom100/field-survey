@@ -96,3 +96,25 @@ describe('Pencil pressure from gesture-handler (T24 fix, D116)', () => {
     expect(pressureOf({ pressure: Number.NaN })).toBe(0.5);
   });
 });
+
+describe('undo history (T24-6 fix)', () => {
+  it('steps back through strokes, notes and erases, and back to an empty layer', async () => {
+    const { pushUndo, popUndo } = await import('./history');
+    const at = '2026-10-11T10:00:00.000Z';
+    const empty = emptyStrokeList('sheet', 100, 100);
+    const a = withStroke(empty, makeStroke({ id: 'pen', tool: 'pen', color: '#111111', width: 2, points: [{ x: 1, y: 1, p: 0.5 }], at }));
+    const b = withStroke(a, makeStroke({ id: 'note', tool: 'text', color: '#111111', width: 9, points: [{ x: 5, y: 5, p: 1 }], text: 'hi', at }));
+    const c = { ...b, strokes: b.strokes.filter((s) => s.id !== 'note') }; // the note erased
+    let stack = pushUndo([], null);
+    stack = pushUndo(stack, a);
+    stack = pushUndo(stack, b);
+    let step = popUndo(stack, c)!; // undo the erase: the note is back
+    expect(step.list!.strokes.map((s) => s.id)).toEqual(['pen', 'note']);
+    step = popUndo(step.stack, step.list)!; // undo the note
+    expect(step.list!.strokes.map((s) => s.id)).toEqual(['pen']);
+    step = popUndo(step.stack, step.list)!; // undo the first stroke: empty, same surface
+    expect(step.list).toMatchObject({ strokes: [], width: 100, height: 100 });
+    expect(popUndo(step.stack, step.list)).toBeNull();
+    expect(pushUndo(Array(100).fill(null), a, 100)).toHaveLength(100);
+  });
+});

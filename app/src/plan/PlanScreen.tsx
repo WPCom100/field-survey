@@ -31,7 +31,6 @@ import {
   makeStroke,
   uuidv7,
   withStroke,
-  withoutLast,
   type BlobQueue,
   type Store,
   type StrokeList,
@@ -737,7 +736,7 @@ export function PlanScreen(props: PlanScreenProps) {
                   tool={inkTool}
                   color={inkColor}
                   width={inkWidth}
-                  canUndo={!!ink.mine?.strokes.length}
+                  canUndo={ink.canUndo}
                   save={ink.save}
                   error={ink.error}
                   missing={ink.missing}
@@ -750,10 +749,8 @@ export function PlanScreen(props: PlanScreenProps) {
                   onColor={setInkColor}
                   onWidth={setInkWidth}
                   onUndo={() => {
-                    if (!ink.mine?.strokes.length) return;
-                    const gone = ink.mine.strokes[ink.mine.strokes.length - 1]!;
-                    console.log(`[plan] ink: undo removed a ${gone.tool} stroke (${ink.mine.strokes.length - 1} left)`);
-                    ink.setMine(withoutLast(ink.mine));
+                    console.log(`[plan] ink: undo (${ink.mine?.strokes.length ?? 0} strokes before)`);
+                    ink.undo();
                   }}
                   onNoteText={setNoteText}
                   onPlaceNote={placeNote}

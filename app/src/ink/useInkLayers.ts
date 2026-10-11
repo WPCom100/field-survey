@@ -2,6 +2,7 @@ import { parseStrokeList, serializeStrokeList, type BlobQueue, type Editor, type
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { prepareText, readCachedText, register } from '../blobs/store-bytes';
+import { popUndo, pushUndo } from './history';
 import { loadInkLayers, ownLayer, saveInkLayer } from './model';
 
 /** Quiet time after the last stroke before the layer is written (a blob + one op group). */
@@ -18,8 +19,11 @@ export type InkLayers = {
   missing: number;
   save: InkSaveState;
   error: string | null;
-  /** Replace the user's layer (a stroke added, erased, undone); saved after a quiet second. */
+  /** Replace the user's layer (a stroke added or erased); undoable, saved after a quiet second. */
   setMine: (list: StrokeList) => void;
+  /** Step back one change of this drawing session (a stroke, note, highlight or erase). */
+  undo: () => void;
+  canUndo: boolean;
   /** Write now (leaving draw mode). */
   flush: () => Promise<void>;
 };
@@ -48,6 +52,10 @@ export function useInkLayers(opts: {
   const dirty = useRef<StrokeList | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chain = useRef<Promise<void>>(Promise.resolve());
+  /** The user's layer as shown, and the lists before each change (↶ Undo). */
+  const mineRef = useRef<StrokeList | null>(null);
+  const history = useRef<(StrokeList | null)[]>([]);
+  const [undoDepth, setUndoDepth] = useState(0);
 
   // --- load every layer of the sheet
   useEffect(() => {
@@ -79,7 +87,10 @@ export function useInkLayers(opts: {
       setMissing(gone);
       if (!dirty.current) {
         layerId.current = own?.id ?? null;
+        mineRef.current = ownList;
         setMineState(ownList);
+        history.current = []; // a layer that came from elsewhere starts a new undo history
+        setUndoDepth(0);
       }
     })().catch((e: unknown) => active && setError(String(e)));
     return () => {
@@ -116,8 +127,10 @@ export function useInkLayers(opts: {
     return chain.current;
   }, [write]);
 
-  const setMine = useCallback(
+  /** Show and schedule the save of a new version of the user's layer. */
+  const show = useCallback(
     (list: StrokeList) => {
+      mineRef.current = list;
       setMineState(list);
       dirty.current = list;
       setSave('pending');
@@ -127,10 +140,28 @@ export function useInkLayers(opts: {
     [flush],
   );
 
+  const setMine = useCallback(
+    (list: StrokeList) => {
+      if (list === mineRef.current) return;
+      history.current = pushUndo(history.current, mineRef.current);
+      setUndoDepth(history.current.length);
+      show(list);
+    },
+    [show],
+  );
+
+  const undo = useCallback(() => {
+    const step = popUndo(history.current, mineRef.current);
+    if (!step) return;
+    history.current = step.stack;
+    setUndoDepth(step.stack.length);
+    if (step.list) show(step.list);
+  }, [show]);
+
   // leaving the plan writes what is pending
   const flushRef = useRef(flush);
   flushRef.current = flush;
   useEffect(() => () => void flushRef.current(), []);
 
-  return { others, mine, missing, save, error, setMine, flush };
+  return { others, mine, missing, save, error, setMine, undo, canUndo: undoDepth > 0, flush };
 }
