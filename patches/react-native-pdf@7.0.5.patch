@@ -24,7 +24,7 @@ index 43fea3bfc16a3b0c526ec96d993d2120cbb2ef0b..0375eceb1b0729f30eb7e3ba9c648dc0
  
   export default codegenNativeComponent<NativeProps>('RNPDFPdfView');
 diff --git a/index.d.ts b/index.d.ts
-index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..3de3b7f6e7021fe69fd45e3d1d7e5f3e3b3011ea 100644
+index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..b23a670685c48766a3ffff3d0938ede6f0f238fe 100644
 --- a/index.d.ts
 +++ b/index.d.ts
 @@ -31,6 +31,17 @@ export type PdfError = Error & {
@@ -45,13 +45,15 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..3de3b7f6e7021fe69fd45e3d1d7e5f3e
  export type TextSelectionChangeEvent = {
    nativeEvent:
      | {
-@@ -79,14 +90,19 @@ export interface PdfProps {
+@@ -79,14 +90,21 @@ export interface PdfProps {
      onLoadComplete?: (numberOfPages: number, path: string, size: {height: number, width: number}, tableContents?: TableContent[]) => void,
      onPageChanged?: (page: number, numberOfPages: number) => void,
      onError?: (error: PdfError) => void,
 -    onPageSingleTap?: (page: number, x: number, y: number) => void,
 +    /** field-survey patch: on iOS `pageX`/`pageY` are the tap in PDF user space (PDFKit's own mapping); NaN elsewhere */
 +    onPageSingleTap?: (page: number, x: number, y: number, pageX: number, pageY: number) => void,
++    /** field-survey patch, iOS only: a long press (0.3 s), in view points and PDF user space */
++    onPageLongPress?: (page: number, x: number, y: number, pageX: number, pageY: number) => void,
      onScaleChanged?: (scale: number) => void,
 +    /** field-survey patch, iOS only */
 +    onViewportChanged?: (viewport: PdfViewport) => void,
@@ -67,10 +69,18 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..3de3b7f6e7021fe69fd45e3d1d7e5f3e
  
  declare const Pdf: React.ForwardRefExoticComponent<PdfProps & React.RefAttributes<PdfRef>>
 diff --git a/index.js b/index.js
-index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..f286b32590fc051c4bb5f27f9b63dfbd5b4fea9f 100644
+index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..42f0cdb82717e3c776e54c8c40d4802c4e00d6db 100644
 --- a/index.js
 +++ b/index.js
-@@ -388,6 +388,14 @@ export default class Pdf extends Component {
+@@ -69,6 +69,7 @@ export default class Pdf extends Component {
+         onPageChanged: PropTypes.func,
+         onError: PropTypes.func,
+         onPageSingleTap: PropTypes.func,
++        onPageLongPress: PropTypes.func,
+         onScaleChanged: PropTypes.func,
+         onPressLink: PropTypes.func,
+         enableTextSelection: PropTypes.bool,
+@@ -388,6 +389,14 @@ export default class Pdf extends Component {
          
      }
  
@@ -85,7 +95,7 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..f286b32590fc051c4bb5f27f9b63dfbd
      _onChange = (event) => {
          // Handle direct events for text selection/highlight
          if (event.nativeEvent.type) {
-@@ -412,6 +420,21 @@ export default class Pdf extends Component {
+@@ -412,6 +421,25 @@ export default class Pdf extends Component {
                  return;
              }
  
@@ -102,13 +112,17 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..f286b32590fc051c4bb5f27f9b63dfbd
 +                this.props.onPageSingleTap && this.props.onPageSingleTap(
 +                    Number(message[1]), Number(message[2]), Number(message[3]), Number(message[4]), Number(message[5]));
 +                return;
++            } else if (message[0] === 'pageLongPress') {
++                this.props.onPageLongPress && this.props.onPageLongPress(
++                    Number(message[1]), Number(message[2]), Number(message[3]), Number(message[4]), Number(message[5]));
++                return;
 +            }
 +
              if (message.length > 5) {
                  message[4] = message.splice(4).join('|');
              }
 diff --git a/ios/RNPDFPdf/RNPDFPdfView.mm b/ios/RNPDFPdf/RNPDFPdfView.mm
-index 1bc263bb95c584c950583d42485059b8bf34168b..7ad57cb1f659adf51a6120f88f3fd99130c05564 100644
+index 1bc263bb95c584c950583d42485059b8bf34168b..91331e6dc95aed2a3498f28558e7bedc88b8bfe6 100644
 --- a/ios/RNPDFPdf/RNPDFPdfView.mm
 +++ b/ios/RNPDFPdf/RNPDFPdfView.mm
 @@ -75,8 +75,13 @@ const float MIN_SCALE = 1.0f;
@@ -296,3 +310,27 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..7ad57cb1f659adf51a6120f88f3fd991
      }
  
      //[self setNeedsDisplay];
+@@ -860,12 +984,21 @@ using namespace facebook::react;
+ }
+ 
+ /**
+- *  Do nothing on long Press
++ *  Long press: report where, once, when it is recognised
+  *
+  *
+  */
+ - (void)handleLongPress:(UILongPressGestureRecognizer *)sender{
+-
++    // field-survey patch: `pageLongPress|page|x|y|pageX|pageY` like pageSingleTap (T23 add-here menu)
++    if (sender.state != UIGestureRecognizerStateBegan) return;
++    CGPoint point = [sender locationInView:self];
++    PDFPage *pdfPage = [_pdfView pageForPoint:point nearest:NO];
++    if (pdfPage) {
++        unsigned long page = [_pdfDocument indexForPage:pdfPage];
++        CGPoint pagePoint = [_pdfView convertPoint:[self convertPoint:point toView:_pdfView] toPage:pdfPage];
++        [self notifyOnChangeWithMessage:
++         [[NSString alloc] initWithString:[NSString stringWithFormat:@"pageLongPress|%lu|%f|%f|%f|%f", page+1, point.x, point.y, pagePoint.x, pagePoint.y]]];
++    }
+ }
+ 
+ /**

@@ -49,6 +49,8 @@ export type PhotoTarget = {
   /** Preselected link (a photo taken from a punch item or a connection end). */
   punchItemId?: string | null;
   cableEndId?: string | null;
+  /** Location text when there is no device to take it from ("Photo here" on the plan, T23). */
+  location?: string | null;
 };
 
 export type PhotoFields = {
@@ -87,7 +89,7 @@ export async function newPhotoFields(store: Store, t: PhotoTarget): Promise<Phot
   return {
     subject: null,
     whatItShows: null,
-    location: d ? str(d.room_location) : null,
+    location: d ? str(d.room_location) : str(t.location),
     punchItemId: t.punchItemId ?? null,
     cableEndId: t.cableEndId ?? null,
   };

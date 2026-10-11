@@ -304,3 +304,29 @@ export async function ensureDemoJumpExtras(store: Store, log: (msg: string) => v
   await store.applyRemoteMany(ops);
   await store.setState(JUMP_SEEDED_KEY, true);
 }
+
+const LIBRARY_SEEDED_KEY = 'demo_library_seeded';
+
+/**
+ * A small device-type library on the demo (T23) so "+ Device" has types to pick: two project
+ * types (a station and a sensor, both `level_tag`) and one app-library type (`project_id` null, D65).
+ * Models are the master's own (CLAUDE.md §3 phrases).
+ */
+export async function ensureDemoLibrary(store: Store, log: (msg: string) => void = () => {}): Promise<void> {
+  if (await store.getState<boolean>(LIBRARY_SEEDED_KEY)) return;
+  const last = await store.db.query<{ n: number | null }>('SELECT max(server_seq) AS n FROM op');
+  let seq = last[0]?.n ?? 0;
+  const ts = '2026-10-10T13:30:00.000Z';
+  const ops: Op[] = [
+    { model: 'PI1002', category: 'Station', id_scheme: 'level_tag', project_id: PROJECT },
+    { model: 'UHCI-WM', category: 'Sensor', id_scheme: 'level_tag', project_id: PROJECT },
+    { model: 'P-NSPS-D', category: 'NSPS', id_scheme: 'level_number', project_id: null },
+  ].map((payload) => ({
+    op_id: uuidv7(), project_id: PROJECT, user_id: USER, install_id: INSTALL, client_ts: ts, server_seq: ++seq, server_ts: ts,
+    entity_kind: 'library_type', entity_id: uuidv7(), kind: 'create', payload: { ...payload, state: 'accepted' },
+    change_type: 'Master edit', reason: 'Demo level (T23)', state: 'applied',
+  }));
+  log(`library samples: ${ops.length} ops`);
+  await store.applyRemoteMany(ops);
+  await store.setState(LIBRARY_SEEDED_KEY, true);
+}

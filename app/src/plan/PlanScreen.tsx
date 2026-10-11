@@ -16,6 +16,9 @@
  *   §4.5); "Jump to" a far end on another level opens that level (`onOpenLevel`), where a sheet that
  *   is not downloaded leaves the list and the card usable ("plan not downloaded").
  * - The photo flow (T21) is a full-screen modal over all of it.
+ * - Long-press on the sheet (T23, Phase 3 §4.6) opens the add-here menu: + Device (field
+ *   addition, form in the side panel, a grey "+" pin marks the spot), + Note here, + Photo here,
+ *   ✎ Markup. The single tap PDFKit reports when that finger lifts is ignored.
  */
 
 import { Editor, type BlobQueue, type Store } from '@field-survey/core';
@@ -37,6 +40,7 @@ import { useSharedValue } from 'react-native-reanimated';
 import { movePin } from '../card/actions';
 import { DeviceCard } from '../card/DeviceCard';
 import { EndEditor } from '../ends/EndEditor';
+import { AddDevicePanel } from '../additions/AddDevicePanel';
 import type { JumpTarget } from '../card/model';
 import { NOT_WIRED } from '../card/proposals';
 import { PhotoFlow, type PhotoRequest } from '../photo/PhotoFlow';
@@ -102,6 +106,10 @@ const REVEAL_ZOOM = LAYOUT_DEFAULTS.offZoom * 1.25; // 2.5: neighbours a couple 
  */
 const MAX_SCALE = 32;
 const ROW_H = 52;
+/** The tap PDFKit reports when a long-pressing finger lifts comes within this (ms). */
+const LONG_PRESS_TAP_GUARD_MS = 900;
+/** The placeholder pin of a device being added (never a real id). */
+const NEW_PIN_ID = '__adding__';
 
 type Menu = 'category' | 'status' | 'owner' | 'layers' | null;
 
@@ -172,6 +180,11 @@ export function PlanScreen(props: PlanScreenProps) {
   /** "Download plan" for a sheet that is not on this iPad: null, busy, or the failure. */
   const [sheetFetch, setSheetFetch] = useState<'busy' | string | null>(null);
   const [sheetTick, setSheetTick] = useState(0);
+  /** The long-press menu: where (view points for the menu, sheet points for what is added). */
+  const [press, setPress] = useState<{ view: Point; sheet: Point; deviceId: string | null } | null>(null);
+  const lastLongPress = useRef(0);
+  /** "+ Device": the form in the side panel and the grey pin at the spot. */
+  const [adding, setAdding] = useState<{ at: Point; category: string | null } | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
   const [tab, setTab] = useState<Tab>('devices');
   const [lists, setLists] = useState<LevelLists | null>(null);
@@ -276,7 +289,27 @@ export function PlanScreen(props: PlanScreenProps) {
     return m;
   }, [tabData]);
   const placed = useMemo(() => visible.filter((d) => d.pin), [visible]);
-  const renderPins = useMemo(() => placed.map(toRenderPin), [placed]);
+  const renderPins = useMemo(() => {
+    const pins = placed.map(toRenderPin);
+    if (adding) {
+      const st = pinStyleFor(null);
+      pins.push({
+        id: NEW_PIN_ID,
+        x: adding.at.x,
+        y: adding.at.y,
+        category: adding.category,
+        fill: st.fill,
+        hollow: false,
+        glyph: '+',
+        label: `${plan?.level.code ?? ''}-?`,
+        plus: true,
+        isNew: true,
+        photos: 0,
+        rank: 99,
+      });
+    }
+    return pins;
+  }, [placed, adding, plan]);
   const categories = useMemo(() => {
     const extra = new Set((plan?.devices ?? []).map((d) => d.category).filter((c): c is string => !!c));
     return [...DEVICE_CATEGORIES, ...[...extra].filter((c) => !(DEVICE_CATEGORIES as readonly string[]).includes(c)).sort()];
@@ -353,6 +386,7 @@ export function PlanScreen(props: PlanScreenProps) {
       setSelectedId(id);
       setCardOpen(!!id);
       setEndView(null);
+      setAdding(null);
       if (!id) return;
       if (from === 'plan') {
         const index = firstRowOf.get(id);
@@ -369,6 +403,8 @@ export function PlanScreen(props: PlanScreenProps) {
     (_page: number, x: number, y: number) => {
       const vp = vpRef.current;
       setMenu(null);
+      if (Date.now() - lastLongPress.current < LONG_PRESS_TAP_GUARD_MS) return; // the long press's own lift
+      if (press) return setPress(null);
       if (vp && moving && editor && plan?.sheet) {
         const at = apply(viewToSheet(vp), { x, y });
         const whole = sheetRect(vp);
@@ -391,17 +427,57 @@ export function PlanScreen(props: PlanScreenProps) {
       const layout = layoutPins(renderPins, sheetToView(vp), size.width, size.height);
       const hit = hitTest(layout, x, y, HIT_PX);
       if (!hit) {
+        if (adding) return; // the form stays open; Cancel closes it
         setSelectedId(null);
         setCardOpen(false);
         setEndView(null);
       } else if (hit.kind === 'pin') {
+        if (renderPins[hit.index]!.id === NEW_PIN_ID) return;
         select(renderPins[hit.index]!.id, 'plan');
       } else {
         const points = hit.members.map((i) => renderPins[i]!);
         focusSheetRect(focusRect(points, size, REVEAL_ZOOM), true);
       }
     },
-    [renderPins, size, prefs.layers.pins, select, focusSheetRect, moving, editor, plan, onEdited],
+    [renderPins, size, prefs.layers.pins, select, focusSheetRect, moving, editor, plan, onEdited, press, adding],
+  );
+
+  /** Long-press on the sheet: the add-here menu at that spot (T23). */
+  const onPageLongPress = useCallback(
+    (_page: number, x: number, y: number) => {
+      const vp = vpRef.current;
+      if (!vp || moving || !plan?.sheet) return;
+      const at = apply(viewToSheet(vp), { x, y });
+      const whole = sheetRect(vp);
+      if (at.x < 0 || at.y < 0 || at.x > whole.width || at.y > whole.height) return;
+      lastLongPress.current = Date.now();
+      setMenu(null);
+      let deviceId: string | null = null;
+      if (prefs.layers.pins) {
+        const hit = hitTest(layoutPins(renderPins, sheetToView(vp), size.width, size.height), x, y, HIT_PX);
+        if (hit?.kind === 'pin' && renderPins[hit.index]!.id !== NEW_PIN_ID) deviceId = renderPins[hit.index]!.id;
+      }
+      setPress({ view: { x, y }, sheet: at, deviceId });
+    },
+    [moving, plan, prefs.layers.pins, renderPins, size],
+  );
+
+  /** The nearest pinned device to a sheet point, for the Location of a "Photo here". */
+  const nearestDevice = useCallback(
+    (p: Point): PlanDevice | null => {
+      let best: PlanDevice | null = null;
+      let bestD = Infinity;
+      for (const d of plan?.devices ?? []) {
+        if (!d.pin) continue;
+        const dist = Math.hypot(d.pin.x - p.x, d.pin.y - p.y);
+        if (dist < bestD) {
+          bestD = dist;
+          best = d;
+        }
+      }
+      return best;
+    },
+    [plan],
   );
 
   /** A connection's far end: on this level select it; on another, open that level's plan. */
@@ -520,6 +596,7 @@ export function PlanScreen(props: PlanScreenProps) {
                 enableTextSelection={false}
                 onViewportChanged={onViewportChanged}
                 onPageSingleTap={onPageSingleTap}
+                onPageLongPress={onPageLongPress}
                 onLoadComplete={(pages, _path, sz) => console.log(`[plan] pdf loaded: ${pages} page(s), ${Math.round(sz.width)}×${Math.round(sz.height)}`)}
                 onError={(e) => setError(`The sheet could not be opened: ${String((e as Error)?.message ?? e)}`)}
               />
@@ -533,6 +610,38 @@ export function PlanScreen(props: PlanScreenProps) {
                   photos={prefs.layers.photos}
                   width={size.width}
                   height={size.height}
+                />
+              ) : null}
+              {press ? (
+                <PressMenu
+                  at={press.view}
+                  size={size}
+                  deviceLabel={press.deviceId ? (deviceById.get(press.deviceId)?.label ?? null) : null}
+                  canEdit={!!editor}
+                  canPhoto={!!props.blobs}
+                  onDevice={() => {
+                    setPress(null);
+                    setSelectedId(null);
+                    setCardOpen(false);
+                    setEndView(null);
+                    setAdding({ at: press.sheet, category: null });
+                  }}
+                  onPhoto={() => {
+                    setPress(null);
+                    if (!plan) return;
+                    const near = press.deviceId ? null : nearestDevice(press.sheet);
+                    setPhotoReq({
+                      kind: 'camera',
+                      title: press.deviceId ? (deviceById.get(press.deviceId)?.label ?? 'Device') : `Level ${plan.level.code}`,
+                      target: {
+                        projectId: plan.level.projectId,
+                        levelId,
+                        deviceId: press.deviceId,
+                        location: near ? [`Near ${near.label}`, near.room].filter(Boolean).join(', ') : null,
+                      },
+                    });
+                  }}
+                  onClose={() => setPress(null)}
                 />
               ) : null}
               {moving ? (
@@ -566,7 +675,25 @@ export function PlanScreen(props: PlanScreenProps) {
 
         {/* side lists */}
         <View style={styles.side}>
-          {endView ? (
+          {adding && editor && plan?.sheet ? (
+            <AddDevicePanel
+              store={store}
+              editor={editor}
+              projectId={plan.level.projectId}
+              levelId={levelId}
+              levelCode={plan.level.code}
+              sheetId={plan.sheet.id}
+              at={adding.at}
+              onCategory={(category) => setAdding((a) => (a ? { ...a, category } : a))}
+              onCancel={() => setAdding(null)}
+              onAdded={(deviceId) => {
+                setAdding(null);
+                onEdited();
+                setSelectedId(deviceId);
+                setCardOpen(true);
+              }}
+            />
+          ) : endView ? (
             <EndEditor
               key={endView.endId}
               store={store}
@@ -628,7 +755,7 @@ export function PlanScreen(props: PlanScreenProps) {
             />
           ) : null}
           {/* The lists stay mounted under an open card, so their scroll position survives. */}
-          <View style={[styles.lists, endView || (cardOpen && selectedId) ? styles.hidden : null]}>
+          <View style={[styles.lists, adding || endView || (cardOpen && selectedId) ? styles.hidden : null]}>
           <View style={styles.tabs}>
             {TABS.map((t) => {
               const n = t === 'devices' ? visible.length : rowsByTab[t].length;
@@ -752,6 +879,45 @@ export function PlanScreen(props: PlanScreenProps) {
 }
 
 // ------------------------------------------------------------------ pieces
+
+const MENU_W = 250;
+const MENU_H = 230;
+
+/** The long-press menu (Phase 3 §4.6), next to the finger, kept inside the plan area. */
+function PressMenu(props: {
+  at: Point;
+  size: { width: number; height: number };
+  deviceLabel: string | null;
+  canEdit: boolean;
+  canPhoto: boolean;
+  onDevice: () => void;
+  onPhoto: () => void;
+  onClose: () => void;
+}) {
+  const left = Math.max(8, Math.min(props.at.x + 12, props.size.width - MENU_W - 8));
+  const top = Math.max(8, Math.min(props.at.y - 20, props.size.height - MENU_H - 8));
+  return (
+    <>
+      <View style={[styles.pressDot, { left: props.at.x - 7, top: props.at.y - 7 }]} pointerEvents="none" />
+      <View style={[styles.pressMenu, { left, top, width: MENU_W }]}>
+        <PressItem label="+ Device (field addition)" disabled={!props.canEdit} onPress={props.onDevice} />
+        <PressItem label="+ Note here" disabled note="with plan ink (T24)" onPress={() => {}} />
+        <PressItem label={props.deviceLabel ? `+ Photo of ${props.deviceLabel}` : '+ Photo here'} disabled={!props.canEdit || !props.canPhoto} onPress={props.onPhoto} />
+        <PressItem label="✎ Markup (ink)" disabled note="with plan ink (T24)" onPress={() => {}} />
+        <PressItem label="Cancel" onPress={props.onClose} />
+      </View>
+    </>
+  );
+}
+
+function PressItem({ label, onPress, disabled, note }: { label: string; onPress: () => void; disabled?: boolean; note?: string }) {
+  return (
+    <Pressable style={styles.pressItem} onPress={disabled ? undefined : onPress}>
+      <Text style={[styles.pressText, disabled && styles.disabled]}>{label}</Text>
+      {note ? <Text style={styles.menuNoteInline}>{note}</Text> : null}
+    </Pressable>
+  );
+}
 
 function Centered({ text, spinner }: { text?: string; spinner?: boolean }) {
   return (
@@ -942,5 +1108,18 @@ const styles = StyleSheet.create({
   menuNoteInline: { fontSize: 11, color: '#888' },
   disabled: { color: '#aaa' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
+  pressDot: { position: 'absolute', width: 14, height: 14, borderRadius: 7, borderWidth: 3, borderColor: '#00bcd4', backgroundColor: 'rgba(255,255,255,0.8)' },
+  pressMenu: {
+    position: 'absolute',
+    paddingVertical: 4,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  pressItem: { paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#eceef1' },
+  pressText: { fontSize: 16, color: '#1565c0', fontWeight: '600' },
   centeredText: { color: '#fff', fontSize: 16, textAlign: 'center' },
 });

@@ -7,7 +7,7 @@ import { getBlobFiles } from '../blobs/queue';
 import { ExpoSqliteDriver } from '../db/expo-sqlite-driver';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamNames } from '../identity/useTeamNames';
-import { DEMO_SHEET_ID, ensureDemoCardExtras, ensureDemoJumpExtras, ensureDemoLevel } from '../plan/demo';
+import { DEMO_SHEET_ID, ensureDemoCardExtras, ensureDemoJumpExtras, ensureDemoLevel, ensureDemoLibrary } from '../plan/demo';
 import { PlanScreen } from '../plan/PlanScreen';
 
 // Private golden fixture, served by Metro in development and bundled by EAS otherwise.
@@ -36,6 +36,7 @@ function openDemo(dense: number) {
         if (!dense) {
           await ensureDemoCardExtras(store, log);
           await ensureDemoJumpExtras(store, log);
+          await ensureDemoLibrary(store, log);
         }
         // Photos on the demo: bytes in the same sandbox, bookkept in the demo database by a queue
         // that has no server and is never started, so nothing taken here is uploaded.
