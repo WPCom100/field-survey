@@ -75,8 +75,9 @@ def next_number(
 
 # ------------------------------------------------------------------ device IDs (D93)
 
-# Categories whose default scheme is `level_tag` (the drawing tag letter: master S / D).
-TAG_CATEGORIES = frozenset({"Station", "Sensor"})
+# Categories whose default scheme is `level_tag`, with their ID letter (stations S, sensors D).
+TAG_PREFIX = {"Station": "S", "Sensor": "D"}
+TAG_CATEGORIES = frozenset(TAG_PREFIX)
 
 
 def device_scheme(session: Session, payload: dict, head_value) -> str:
@@ -98,11 +99,14 @@ def level_code(session: Session, level_id: uuid.UUID, head_value) -> str | None:
     return level.level if level is not None else head_value(level_id, "level")
 
 
-def used_device_numbers(session: Session, project_id: uuid.UUID, code: str) -> set[int]:
-    """Every `<code>-<nn>` ever used in the project: any device `display_id` in the op log
+def used_device_numbers(
+    session: Session, project_id: uuid.UUID, code: str, prefix: str = ""
+) -> set[int]:
+    """Every `<code>-<prefix><n>` ever used in the project (prefix `S`/`D` for stations and
+    sensors, empty for the numbered devices): any device `display_id` in the op log
     (creates, sets, assigns — deleted, renamed, reviewed or superseded included) plus the
     device table (rows that never came through an op). Once used, a number is retired."""
-    pattern = re.compile(rf"^{re.escape(code)}-(\d+)$")
+    pattern = re.compile(rf"^{re.escape(code)}-{re.escape(prefix)}(\d+)$")
     values: list = list(
         session.scalars(
             select(Op.payload["display_id"].astext).where(
@@ -127,14 +131,15 @@ def used_device_numbers(session: Session, project_id: uuid.UUID, code: str) -> s
 
 
 def next_device_id(
-    session: Session, project_id: uuid.UUID, level_id: uuid.UUID, head_value
+    session: Session, project_id: uuid.UUID, level_id: uuid.UUID, head_value, prefix: str = ""
 ) -> str | None:
     """`<code>-<nn>` = highest number ever used on that level code + 1, two digits (then as
-    many as needed). Per level code, not per numbering group: 06 and 06M count separately.
+    many as needed); with a prefix (D118: stations `S`, sensors `D`) `<code>-S<n>`, no padding,
+    counted per prefix. Per level code, not per numbering group: 06 and 06M count separately.
     Called inside the push, which holds the project lock, so two pushes never race. None when
     the level is unknown."""
     code = level_code(session, level_id, head_value)
     if not code:
         return None
-    n = max(used_device_numbers(session, project_id, code), default=0) + 1
-    return f"{code}-{n:02d}"
+    n = max(used_device_numbers(session, project_id, code, prefix), default=0) + 1
+    return f"{code}-{prefix}{n}" if prefix else f"{code}-{n:02d}"

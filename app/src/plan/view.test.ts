@@ -220,3 +220,14 @@ describe('Unsurveyed (D110)', () => {
     expect(statusKey('Unsurveyed')).toBe(NO_STATUS);
   });
 });
+
+describe('pin labels show the device type (Landry, iPad retest)', () => {
+  it('prefers Type, then Device, then category, and shortens long names', async () => {
+    const { pinLabel } = await import('./data');
+    expect(pinLabel({ type: 'Echo relay panel', device: 'CT06LCPA', category: 'Relay panel' })).toBe('Echo relay panel');
+    expect(pinLabel({ type: null, device: 'P-NSPS-D', category: 'NSPS' })).toBe('P-NSPS-D');
+    expect(pinLabel({ type: null, device: null, category: 'Station' })).toBe('Station');
+    expect(pinLabel({ type: ' ', device: null, category: null })).toBe('Device');
+    expect(pinLabel({ type: 'Paradigm architectural control processor', device: null, category: null })).toBe('Paradigm architectura…');
+  });
+});

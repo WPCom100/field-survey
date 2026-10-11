@@ -136,7 +136,7 @@ Model and effort per task are in `TASKS.md` (D61). Do not switch tasks mid-sessi
 - A cable is **one** record with two ends; per-floor rows are generated. Never store a cable twice.
 - From/To are generated **once** from templates and then stored and editable (D32); the export writes the stored text verbatim.
 - Conflicts are per **field**, detected by comparing `base_op_id` with the field head; same user on two iPads never conflicts (D37). First-arrived value is official with an "in review" badge; nothing is overwritten.
-- `NEW` records have no display number until the server assigns one. Never show or store a provisional number. Device IDs of the `level_number` scheme are server-assigned too (D93): the iPad shows `<level>-?` + `NEW` until the `assign` op arrives; only station/sensor tags are typed on the iPad.
+- `NEW` records have no display number until the server assigns one. Never show or store a provisional number. Device IDs are server-assigned too (D93, D118 — stations `<level>-S<n>` and sensors `<level>-D<n>` included): the iPad shows `<level>-?` + `NEW` until the `assign` op arrives and never asks for a tag. Pin labels on the plan show the device type, not the ID (D119).
 - Export needs a connection and an empty outbox (D94): *Start* stays disabled until "Synced"; nothing is ever exported from the local store.
 - Pins and ink are stored in **sheet coordinates** (CropBox top-left origin, y down, PDF points — `app/src/plan/viewport.ts`), never in view or raw PDF user space; the overlay follows the viewer's native transform and is never hidden during a pinch (D95).
 - Placeholder endpoints are a project vocabulary (D26), not an enum.

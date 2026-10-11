@@ -64,7 +64,7 @@ import { NOT_WIRED } from '../card/proposals';
 import type { PhotoTarget } from '../photo/model';
 import { PhotoFlow, pickFromLibrary, type PhotoRequest } from '../photo/PhotoFlow';
 
-import { loadLevelPlan, type LevelPlan, type PlanDevice, type PlanSheet } from './data';
+import { loadLevelPlan, pinLabel, type LevelPlan, type PlanDevice, type PlanSheet } from './data';
 import { PIN_PX } from './drawPins';
 import {
   DEFAULT_LAYERS,
@@ -171,7 +171,7 @@ function toRenderPin(d: PlanDevice): RenderPin {
     fill: st.fill,
     hollow: st.hollow,
     glyph: st.glyph,
-    label: d.label,
+    label: pinLabel(d),
     plus: d.fieldAddition,
     isNew: d.isNew,
     photos: d.photos,
@@ -372,7 +372,7 @@ export function PlanScreen(props: PlanScreenProps) {
         fill: st.fill,
         hollow: false,
         glyph: '+',
-        label: `${plan?.level.code ?? ''}-?`,
+        label: adding.category ?? 'New device',
         plus: true,
         isNew: true,
         photos: 0,
@@ -1072,7 +1072,7 @@ export function PlanScreen(props: PlanScreenProps) {
               {menu === 'layers' ? (
                 <>
                   <MenuItem label="Pins" on={prefs.layers.pins} onPress={() => setLayer('pins')} />
-                  <MenuItem label="Labels" on={prefs.layers.labels} onPress={() => setLayer('labels')} />
+                  <MenuItem label="Labels (device type)" on={prefs.layers.labels} onPress={() => setLayer('labels')} />
                   <MenuItem label="Photos (camera mark)" on={prefs.layers.photos} onPress={() => setLayer('photos')} />
                   <MenuItem label="Ink (all users)" on={prefs.layers.ink} onPress={() => setLayer('ink')} />
                   <MenuItem label="Boundaries" on={false} disabled note="No boundary data for this sheet yet" onPress={() => {}} />

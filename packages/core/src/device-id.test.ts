@@ -111,9 +111,6 @@ describe('deviceIdFor', () => {
     });
     const dup = await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Station', tag: '1' });
     expect(dup).toMatchObject({ display_id: '06M-S1', taken_by: [expect.any(String)] });
-    await expect(deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Station' })).rejects.toThrow(
-      /drawing tag/,
-    );
   });
 
   it('the library type’s scheme wins over the category default', async () => {
@@ -135,29 +132,13 @@ describe('deviceIdFor', () => {
     ).toMatchObject({ scheme: 'level_tag', display_id: '06-T2' });
   });
 
-  it('Editor refuses a level_tag device without its tag at the tap, so the server never 422s the push (T63 → T23)', async () => {
-    const pending = async () => (await store.db.query<{ n: number }>('SELECT count(*) AS n FROM outbox'))[0]!.n;
-    const before = await pending();
-    await expect(editor.create('device', { level_id: L06M, category: 'Station' }, CTX)).rejects.toThrow(/needs its drawing tag/);
-    await expect(editor.create('device', { level_id: L06M, category: 'Sensor', display_id: '  ' }, CTX)).rejects.toThrow(/drawing tag/);
-    const tagType = (await editor.create('library_type', { project_id: PROJECT, model: 'TS-T', category: 'Touchscreen', id_scheme: 'level_tag' }, CTX)).id;
-    await expect(editor.create('device', { level_id: L06M, category: 'Touchscreen', library_type_id: tagType }, CTX)).rejects.toThrow(/drawing tag/);
-    expect(await pending()).toBe(before + 1); // only the library type went to the outbox
-    // level_number devices may leave the ID to the server, also via a type in the same group
-    const numType = (await editor.create('library_type', { project_id: PROJECT, model: 'UHCI-N', category: 'Sensor', id_scheme: 'level_number' }, CTX)).id;
-    await expect(editor.create('device', { level_id: L06M, category: 'Sensor', library_type_id: numType }, CTX)).resolves.toBeTruthy();
-    await expect(editor.create('device', { level_id: L06M, category: 'NSPS' }, CTX)).resolves.toBeTruthy();
-    const ops = await editor.group(CTX, async (g) => {
-      const t = await g.create('library_type', { project_id: PROJECT, model: 'New tag type', category: 'EBDK', id_scheme: 'level_tag' });
-      await g.create('device', { level_id: L06M, category: 'EBDK', library_type_id: t.id, display_id: '06M-E1' });
-    });
-    expect(ops).toHaveLength(2);
-    await expect(
-      editor.group(CTX, async (g) => {
-        const t = await g.create('library_type', { project_id: PROJECT, model: 'Other tag type', category: 'EBDK', id_scheme: 'level_tag' });
-        await g.create('device', { level_id: L06M, category: 'EBDK', library_type_id: t.id });
-      }),
-    ).rejects.toThrow(/drawing tag/);
+  it('without a tag every device is left to the server, stations and sensors too (D118)', async () => {
+    for (const category of ['Station', 'Sensor']) {
+      expect(await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category })).toEqual({ scheme: 'level_tag', pending: true });
+      expect(await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category, tag: '  ' })).toEqual({ scheme: 'level_tag', pending: true });
+    }
+    // and the Editor creates them without an ID (no guard any more)
+    await expect(editor.create('device', { level_id: L06M, category: 'Station' }, CTX)).resolves.toBeTruthy();
   });
 
   it('refuses an unknown level', async () => {

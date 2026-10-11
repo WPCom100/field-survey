@@ -5,9 +5,10 @@
  *   server** (D93). The iPad creates the device without `display_id`, shows `<level>-?` with the
  *   `NEW` badge (`displayNumber('device', row, level)`), and the ID arrives as an `assign` op
  *   within one sync. Two iPads adding devices offline on one level therefore never share an ID.
- * - `level_tag` (stations, sensors): `<level>-S<n>` / `<level>-D<n>` from the drawing tag the
- *   surveyor enters or confirms (`S15`, `15`, `s 15` → `S15`; no zero padding: `01-S9`). The
- *   server refuses a `level_tag` create without its tag (422).
+ * - `level_tag` (stations, sensors): `<level>-S<n>` / `<level>-D<n>`. Since D118 the server
+ *   numbers these too (next free per letter) when the create carries no ID, so the app never asks
+ *   for a tag; a tag that is given (seed import, setup placement) is still validated and kept
+ *   (`S15`, `15`, `s 15` → `S15`; no zero padding: `01-S9`).
  *
  * The scheme comes from the device's library type; without one, `Station` and `Sensor` are
  * `level_tag` and every other category `level_number`. A duplicate tag is reported
@@ -78,7 +79,7 @@ export interface DeviceIdRequest {
   category?: string | null;
   /** The device's library type; its `id_scheme` wins over the category default. */
   libraryTypeId?: string | null;
-  /** `level_tag`: the drawing tag entered/confirmed by the surveyor (required). */
+  /** `level_tag`: a drawing tag to keep (optional since D118: none → the server numbers it). */
   tag?: string | null;
   /** The device being (re)tagged, left out of `taken_by`. */
   deviceId?: string | null;
@@ -93,9 +94,9 @@ export interface TaggedDeviceId {
   taken_by: string[];
 }
 
-/** `level_number`: create without `display_id`; the server assigns it (D93). */
+/** Create without `display_id`; the server assigns it (D93, D118 for stations and sensors). */
 export interface PendingDeviceId {
-  scheme: 'level_number';
+  scheme: IdScheme;
   pending: true;
 }
 
@@ -128,8 +129,7 @@ export async function deviceIdFor(store: Store, req: DeviceIdRequest): Promise<D
     const type = await store.get<{ id_scheme: IdScheme | null }>('library_type', req.libraryTypeId);
     if (type?.id_scheme) scheme = type.id_scheme;
   }
-  if (scheme === 'level_number') return { scheme, pending: true };
-  if (!req.tag || !req.tag.trim()) throw new DeviceIdError('Enter the drawing tag (e.g. S15)');
+  if (scheme === 'level_number' || !req.tag || !req.tag.trim()) return { scheme, pending: true };
   const display_id = tagDeviceId(level.level, req.category, req.tag);
   const taken_by = (await projectDeviceIds(store, req.projectId))
     .filter((u) => u.id !== req.deviceId && u.display_id === display_id)

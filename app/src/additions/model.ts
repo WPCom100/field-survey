@@ -5,9 +5,9 @@
  * - **Type:** picked from the device-type library (this project's types and the app library, D65;
  *   rejected types left out), or a model typed freely, which becomes a **draft** library type of
  *   this project (D55) — unless it matches an existing type's model or alias, which is used instead.
- * - **ID (D93):** `level_number` types are created without an ID and show `<level>-?` + `NEW` until
- *   the server's `assign` arrives; `level_tag` types (stations, sensors) need the drawing tag typed
- *   here (`S15` → `06M-S15`), a duplicate is a warning, not a refusal (D76).
+ * - **ID (D93, D118):** every field addition is created without an ID and shows `<level>-?` + `NEW`
+ *   until the server's `assign` arrives (`06M-07`, or `06M-S16` / `06M-D3` for stations and
+ *   sensors). A tag can still be passed (setup placement), and is then kept.
  * - **Record:** `origin = field_addition`, `found_on_site = true`, the pin in sheet coordinates,
  *   status empty (Unsurveyed); the draft type and the device are one group (`Field survey`, D96).
  */
@@ -74,7 +74,7 @@ export type FieldDeviceInput = {
   libraryTypeId?: string | null;
   /** …or a model typed freely (becomes a draft type unless it matches one). */
   typedModel?: string | null;
-  /** `level_tag` types: the drawing tag (`S15`, `15`). */
+  /** A drawing tag to keep (`S15`); normally left out — the server numbers the device (D118). */
   tag?: string | null;
   room?: string | null;
 };

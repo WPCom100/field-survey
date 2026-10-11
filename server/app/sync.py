@@ -35,7 +35,7 @@ from app.db import Base
 from app.ids import uuid7
 from app.materialise import materialise
 from app.models import FieldHead, Level, Op, Project, ReviewItem, User
-from app.numbering import NUMBERED, device_scheme, next_device_id, next_number
+from app.numbering import NUMBERED, TAG_PREFIX, device_scheme, next_device_id, next_number
 
 log = logging.getLogger("sync")
 
@@ -689,23 +689,21 @@ class Push:
         self.set_head(create.entity_id, field, op.op_id)
 
     def assign_device(self, create: Op) -> None:
-        """D93: a `level_number` device created without `display_id` gets `<level>-<nn>` (highest
-        ever used on that level code + 1) as an `assign` op; a `level_tag` device must arrive with
-        its tag (422 otherwise). A create carrying an ID (tag, import, copied floor) keeps it."""
+        """D93/D118: a device created without `display_id` gets its ID from the server as an
+        `assign` op: `<level>-<nn>` (highest ever used on that level code + 1), or for stations and
+        sensors (`level_tag`) `<level>-S<n>` / `<level>-D<n>` counted the same way per letter. A
+        create carrying an ID (seed import, copied floor, an older app's typed tag) keeps it."""
         payload = create.payload or {}
         if self.head_value(create.entity_id, "display_id") is not None:
             return  # carries its ID, or a replayed create: never renumber
+        prefix = ""
         if device_scheme(self.session, payload, self.head_value) == "level_tag":
-            raise PushError(
-                422,
-                {
-                    "op_id": str(create.op_id),
-                    "error": "a level_tag device needs its display_id (the drawing tag)",
-                },
-            )
+            prefix = TAG_PREFIX.get(payload.get("category"), "")
         level_id = payload.get("level_id")
         display_id = (
-            next_device_id(self.session, self.project_id, uuid.UUID(str(level_id)), self.head_value)
+            next_device_id(
+                self.session, self.project_id, uuid.UUID(str(level_id)), self.head_value, prefix
+            )
             if level_id
             else None
         )

@@ -226,7 +226,10 @@ def test_replay_never_renumbers_a_device(client, w):
     assert len(w.session.scalars(select(Op).where(Op.kind == "assign")).all()) == 2
 
 
-def test_tagged_devices_keep_their_tag_and_must_carry_one(client, w):
+def test_stations_and_sensors_are_numbered_by_the_server_per_letter(client, w):
+    """D118: a station/sensor created without an ID gets `<level>-S<n>` / `<level>-D<n>` (highest
+    ever used for that letter on the level code + 1, no padding); one that carries its ID (seed
+    import, an older app's typed tag) keeps it."""
     station = w.create(
         w.ann,
         "device",
@@ -235,11 +238,19 @@ def test_tagged_devices_keep_their_tag_and_must_carry_one(client, w):
     res = w.push(client, [station])
     assert outcomes(res) == ["applied"] and res["server_ops"] == []
 
-    untagged = new_device(w, w.ann, w.l06m, category="Sensor")
-    before = w.op_count()
-    r = w.push(client, [new_device(w, w.ann, w.l06m), untagged], since=1, status=422)
-    assert "level_tag" in r["detail"]["error"] and r["detail"]["op_id"] == untagged["op_id"]
-    assert w.op_count() == before  # the whole push is refused
+    panel = new_device(w, w.ann, w.l06m)
+    sensor = new_device(w, w.ann, w.l06m, category="Sensor")
+    s2 = new_device(w, w.bob, w.l06m, category="Station")
+    s3 = new_device(w, w.bob, w.l06m, category="Station")
+    other = new_device(w, w.bob, w.l07, category="Station")
+    got = ids(w.push(client, [panel, sensor, s2, s3, other], since=1))
+    assert [got[o["entity_id"]] for o in (panel, sensor, s2, s3, other)] == [
+        "06M-01",
+        "06M-D1",
+        "06M-S16",
+        "06M-S17",
+        "07-S1",
+    ]
 
 
 def test_the_library_type_scheme_wins_over_the_category(client, w):
@@ -257,10 +268,11 @@ def test_the_library_type_scheme_wins_over_the_category(client, w):
     assert ids(w.push(client, [sensor_numbered], since=2)) == {
         sensor_numbered["entity_id"]: "06M-01"
     }
+    # a tag-scheme type on a category with no ID letter is simply numbered
     panel_tagged = new_device(
         w, w.ann, w.l06m, category="Relay panel", library_type_id=tag_type["entity_id"]
     )
-    w.push(client, [panel_tagged], since=4, status=422)
+    assert ids(w.push(client, [panel_tagged], since=4)) == {panel_tagged["entity_id"]: "06M-02"}
 
 
 def test_a_level_created_by_an_op_gives_its_code_from_the_log(client, w):

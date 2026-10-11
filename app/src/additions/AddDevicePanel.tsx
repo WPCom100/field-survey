@@ -1,17 +1,17 @@
 /**
  * "+ Device (field addition)" from the plan's long-press menu (T23, Phase 3 §4.6), in the side
- * panel: category → type from the library (or a model typed freely → draft type, D55) → the
- * drawing tag for stations/sensors (D93: other IDs come from the server) → Add. The new device's
+ * panel: category → type from the library (or a model typed freely → draft type, D55) → Add.
+ * Every ID comes from the server (D93, D118): the device shows `<level>-?` + NEW until then. The new device's
  * card opens after Add. The pin goes where the surveyor long-pressed (shown as a grey "+" pin).
  */
 
-import { OpError, deviceIdFor, tagDeviceId, type Editor, type Store } from '@field-survey/core';
+import { OpError, type Editor, type Store } from '@field-survey/core';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { chipStyles } from '../plan/chips';
 import { DEVICE_CATEGORIES } from '../plan/pins';
-import { addFieldDevice, libraryChoices, matchModel, schemeFor, type LibraryChoice } from './model';
+import { addFieldDevice, libraryChoices, matchModel, type LibraryChoice } from './model';
 
 export type AddDeviceProps = {
   store: Store;
@@ -33,9 +33,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
   const [all, setAll] = useState<LibraryChoice[] | null>(null);
   const [typeId, setTypeId] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
-  const [tag, setTag] = useState('');
   const [room, setRoom] = useState('');
-  const [takenBy, setTakenBy] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,31 +46,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
   const typedMatch = !picked && typed.trim() ? matchModel(all ?? [], typed) : null;
   const effective = picked ?? typedMatch;
   const effectiveCategory = effective?.category ?? category;
-  const scheme = schemeFor(effective, effectiveCategory);
-
-  let tagPreview: string | null = null;
-  let tagError: string | null = null;
-  if (scheme === 'level_tag' && tag.trim()) {
-    try {
-      tagPreview = tagDeviceId(levelCode, effectiveCategory, tag);
-    } catch (e) {
-      tagError = (e as Error).message;
-    }
-  }
-
-  useEffect(() => {
-    if (!tagPreview) return setTakenBy([]);
-    let active = true;
-    deviceIdFor(store, { projectId, levelId, category: effectiveCategory, libraryTypeId: effective?.id ?? null, tag }).then(
-      (p) => active && setTakenBy(p.pending ? [] : p.taken_by),
-      () => active && setTakenBy([]),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, projectId, levelId, effectiveCategory, effective?.id, tag, tagPreview]);
-
-  const ready = !!effectiveCategory && (!!picked || !!typed.trim()) && (scheme === 'level_number' || !!tagPreview);
+  const ready = !!effectiveCategory && (!!picked || !!typed.trim());
 
   const add = async () => {
     if (!ready || !effectiveCategory) return;
@@ -87,7 +61,6 @@ export function AddDevicePanel(props: AddDeviceProps) {
         category: effectiveCategory,
         libraryTypeId: picked?.id ?? null,
         typedModel: picked ? null : typed,
-        tag: scheme === 'level_tag' ? tag : null,
         room,
       });
       props.onAdded(r.deviceId);
@@ -170,28 +143,11 @@ export function AddDevicePanel(props: AddDeviceProps) {
         ) : null}
 
         <Text style={styles.label}>ID</Text>
-        {scheme === 'level_tag' ? (
-          <>
-            <TextInput
-              style={styles.input}
-              value={tag}
-              onChangeText={setTag}
-              placeholder={`Drawing tag, e.g. ${effectiveCategory === 'Sensor' ? 'D3' : 'S15'}`}
-              placeholderTextColor="#888"
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-            {tagPreview ? <Text style={styles.idPreview}>{tagPreview}</Text> : null}
-            {tagError ? <Text style={styles.error}>{tagError}</Text> : null}
-            {takenBy.length ? <Text style={styles.warn}>⚠ {tagPreview} is already used in this project; you can still add it (it will be flagged).</Text> : null}
-          </>
-        ) : (
-          <View style={styles.rowWrap}>
-            <Text style={styles.idPreview}>{levelCode}-?</Text>
-            <Text style={[chipStyles.badge]}>NEW</Text>
-            <Text style={styles.muted}>numbered by the server at the next sync (D93)</Text>
-          </View>
-        )}
+        <View style={styles.rowWrap}>
+          <Text style={styles.idPreview}>{levelCode}-?</Text>
+          <Text style={[chipStyles.badge]}>NEW</Text>
+          <Text style={styles.muted}>numbered by the server at the next sync</Text>
+        </View>
 
         <Text style={styles.label}>Room / Location (optional)</Text>
         <TextInput style={styles.input} value={room} onChangeText={setRoom} placeholder="e.g. XX06M-1E05 Elec Rm" placeholderTextColor="#888" />

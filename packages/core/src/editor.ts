@@ -20,7 +20,6 @@ import {
   type EntityKind,
   type EntitySpec,
 } from './schema/entities';
-import { defaultIdScheme } from './device-id';
 import { resolveReview, type ResolveChoice, type ResolveOptions, type ResolveResult } from './review';
 import type { Store } from './store';
 import { CHANGE_TYPE, type ChangeType } from './vocab';
@@ -120,7 +119,6 @@ export class EditBatch {
       full[name] = value;
     }
     if (await this.row(kind, id)) throw new OpError(`${kind} ${id} already exists`);
-    if (kind === 'device') await this.checkDeviceId(full);
     const op = this.op({ entity_kind: kind, entity_id: id, kind: 'create', payload: full });
     const row: Row = { ...full };
     if (spec.role === 'record') Object.assign(row, { deleted_at: null, deleted_by_id: null, delete_reason: null });
@@ -291,24 +289,6 @@ export class EditBatch {
   }
 
   // ------------------------------------------------------------------ internals
-
-  /**
-   * A `level_tag` device (stations, sensors, or a library type saying so) must carry its tag as
-   * `display_id`: the server refuses the create otherwise (422, T63), which would hold every later
-   * op of this iPad in the outbox. Refused here, at the tap. `level_number` devices may leave it out
-   * (the server assigns it, D93). The scheme is read as `deviceIdFor` reads it.
-   */
-  private async checkDeviceId(payload: Row): Promise<void> {
-    if (typeof payload.display_id === 'string' && payload.display_id.trim()) return;
-    let scheme = defaultIdScheme(typeof payload.category === 'string' ? payload.category : null);
-    if (typeof payload.library_type_id === 'string' && payload.library_type_id) {
-      const type = await this.row('library_type', payload.library_type_id);
-      if (typeof type?.id_scheme === 'string') scheme = type.id_scheme as typeof scheme;
-    }
-    if (scheme === 'level_tag') {
-      throw new OpError(`A ${typeof payload.category === 'string' ? payload.category : 'device'} needs its drawing tag (e.g. S15) as its ID`);
-    }
-  }
 
   private specFor(kind: string, what: string): EntitySpec {
     if (!isOpTarget(kind)) throw new OpError(`${what}: bad entity kind ${kind}`);

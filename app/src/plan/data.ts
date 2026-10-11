@@ -30,6 +30,8 @@ export type PlanDevice = Filterable & {
   label: string;
   isNew: boolean;
   device: string | null;
+  /** The master's Type column ("Echo relay panel"), when the device has one. */
+  type: string | null;
   room: string | null;
   /** On this level's display sheet, in sheet coordinates; null when unplaced or elsewhere. */
   pin: { x: number; y: number } | null;
@@ -47,6 +49,18 @@ type Row = Record<string, unknown>;
 
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+const PIN_LABEL_MAX = 22;
+
+/**
+ * What a pin's label says on the plan (Landry, iPad retest: "when looking around the drawing I want
+ * to know what kind of device each pin is, not its ID"): the Type, else the Device (model), else
+ * the category; long names are cut with an ellipsis. IDs stay in the lists and on the card.
+ */
+export function pinLabel(d: { type: string | null; device: string | null; category: string | null }): string {
+  const s = (d.type ?? d.device ?? d.category ?? '').trim() || 'Device';
+  return s.length > PIN_LABEL_MAX ? `${s.slice(0, PIN_LABEL_MAX - 1).trimEnd()}…` : s;
+}
 
 /** Natural order of device IDs: `06M-02` < `06M-10` < `06M-S1` < `06M-S12`; `-?` last. */
 export function compareLabels(a: string, b: string): number {
@@ -137,6 +151,7 @@ export async function loadLevelPlan(
       category: str(r.category),
       status: str(r.status),
       device: str(r.device),
+      type: str(r.type),
       room: str(r.room_location),
       pin: at,
       pinElsewhere: elsewhere,
