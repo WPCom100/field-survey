@@ -86,7 +86,9 @@ Ops arrive in `server_seq` order with their server `state`.
 
 `collided_pending` lists local pending ops on the same field (or any pending op on the record
 for an incoming delete/restore, and pending deletes for an incoming set): the sync engine marks
-those ops "will be reviewed" (`docs/sync.md`).
+those ops "will be reviewed" (`docs/sync.md`). Ink layers and the photo blob fields
+(`image_blob`, `thumb_blob`, `markup_blob`) never collide: the server applies the last write
+there (PLAN §3.3), so nothing would be reviewed (T24).
 
 Materialising `review_item.state = resolved`/`dismissed` (local or pulled) settles the ops the
 item held: `resolution.rejected_op_ids` → `rejected`, `superseded_op_ids` → `superseded`, only

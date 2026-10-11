@@ -83,7 +83,7 @@ type Stage =
   | { kind: 'edit-existing'; photo: ExistingPhoto }
   | { kind: 'error'; text: string };
 
-export function PhotoFlow({ request, env, onClose }: { request: PhotoRequest | null; env: PhotoEnv; onClose: (saved: boolean) => void }) {
+export function PhotoFlow({ request, env, onClose }: { request: PhotoRequest | null; env: PhotoEnv; onClose: (saved: boolean, photoId?: string) => void }) {
   return (
     <Modal visible={!!request} animationType="slide" presentationStyle="fullScreen" supportedOrientations={[...ORIENTATIONS]} onRequestClose={() => onClose(false)}>
       {request ? <Flow key={request.kind === 'open' ? request.photoId : `${request.kind}-${request.title}`} request={request} env={env} onClose={onClose} /> : null}
@@ -91,7 +91,7 @@ export function PhotoFlow({ request, env, onClose }: { request: PhotoRequest | n
   );
 }
 
-function Flow({ request, env, onClose }: { request: PhotoRequest; env: PhotoEnv; onClose: (saved: boolean) => void }) {
+function Flow({ request, env, onClose }: { request: PhotoRequest; env: PhotoEnv; onClose: (saved: boolean, photoId?: string) => void }) {
   const [stage, setStage] = useState<Stage>(
     request.kind === 'camera' ? { kind: 'camera' } : { kind: 'busy', text: request.kind === 'library' ? 'Opening the library…' : 'Opening the photo…' },
   );
@@ -162,9 +162,9 @@ function Flow({ request, env, onClose }: { request: PhotoRequest; env: PhotoEnv;
           target={request.kind === 'open' ? null : request.target}
           prepared={stage.kind === 'edit-new' ? stage.prepared : null}
           existing={stage.kind === 'edit-existing' ? stage.photo : null}
-          onDone={(saved) => {
+          onDone={(saved, photoId) => {
             if (!saved && stage.kind === 'edit-new') discardPhoto(stage.prepared);
-            onClose(saved);
+            onClose(saved, photoId);
           }}
         />
       );
@@ -251,7 +251,7 @@ function PhotoEditor(props: {
   target: PhotoTarget | null;
   prepared: PreparedPhoto | null;
   existing: ExistingPhoto | null;
-  onDone: (saved: boolean) => void;
+  onDone: (saved: boolean, photoId?: string) => void;
 }) {
   const { env, prepared, existing, target } = props;
   const insets = useSafeAreaInsets();
@@ -363,7 +363,7 @@ function PhotoEditor(props: {
         // bytes first (thumbnail is sent first by the queue), then the record
         await register(env.queue, prepared.image);
         await register(env.queue, prepared.thumb);
-        await createPhoto(env.editor, {
+        const made = await createPhoto(env.editor, {
           target,
           fields,
           image: prepared.image,
@@ -371,10 +371,12 @@ function PhotoEditor(props: {
           markupSha,
           takenAt: new Date().toISOString(),
         });
+        props.onDone(true, made.id);
+        return;
       } else if (existing) {
         await updatePhoto(env.editor, existing.id, fields, markupSha);
       }
-      props.onDone(true);
+      props.onDone(true, existing?.id);
     } catch (e) {
       console.warn('[store] photo not saved', e);
       setError(`Not saved: ${String((e as Error)?.message ?? e)}`);

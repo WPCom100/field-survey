@@ -224,6 +224,26 @@ describe('applyRemote', () => {
     expect((await store.applyRemote({ ...create, server_seq: 41, state: 'applied' })).outcome).toBe('duplicate');
   });
 
+  it('ink layers and photo blobs never mark a pending local op for review (last write wins, T24)', async () => {
+    const layer = uuidv7();
+    await store.apply(op({ entity_kind: 'ink_layer', entity_id: layer, kind: 'create', payload: { id: layer, sheet_id: uuidv7(), user_id: LANDRY, drawing_blob: 'a'.repeat(64) } }));
+    const heads = await store.fieldHeads(layer);
+    const mine = op({ entity_kind: 'ink_layer', entity_id: layer, kind: 'set', field: 'drawing_blob', was: 'a'.repeat(64), now: 'b'.repeat(64), base_op_id: heads.drawing_blob });
+    await store.apply(mine);
+    const other = remote({ entity_kind: 'ink_layer', entity_id: layer, kind: 'set', field: 'drawing_blob', was: 'a'.repeat(64), now: 'c'.repeat(64), base_op_id: heads.drawing_blob }, 20);
+    expect(await store.applyRemote(other)).toEqual({ outcome: 'applied', collided_pending: [] });
+    const photo = uuidv7();
+    await store.apply(op({ entity_kind: 'photo', entity_id: photo, kind: 'create', payload: { id: photo, level_id: LEVEL, markup_blob: null, subject: 'x' } }));
+    const ph = await store.fieldHeads(photo);
+    await store.apply(op({ entity_kind: 'photo', entity_id: photo, kind: 'set', field: 'markup_blob', was: null, now: 'd'.repeat(64), base_op_id: ph.markup_blob }));
+    await store.apply(op({ entity_kind: 'photo', entity_id: photo, kind: 'set', field: 'subject', was: 'x', now: 'y', base_op_id: ph.subject }));
+    const markup = remote({ entity_kind: 'photo', entity_id: photo, kind: 'set', field: 'markup_blob', was: null, now: 'e'.repeat(64), base_op_id: ph.markup_blob }, 21);
+    expect((await store.applyRemote(markup)).collided_pending).toEqual([]);
+    // a caption is ordinary survey text: that still collides
+    const subject = remote({ entity_kind: 'photo', entity_id: photo, kind: 'set', field: 'subject', was: 'x', now: 'z', base_op_id: ph.subject }, 22);
+    expect((await store.applyRemote(subject)).collided_pending).toHaveLength(1);
+  });
+
   it('records our op put in review without changing the official (first-arrived) value', async () => {
     const id = await newDevice();
     const heads = await store.fieldHeads(id);

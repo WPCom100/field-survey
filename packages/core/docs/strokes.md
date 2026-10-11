@@ -61,3 +61,14 @@ A reader drops a malformed stroke (counted in `skipped`) rather than refusing th
 `serializeStrokeList` writes keys in the order above with no whitespace, so an unchanged list
 produces the same bytes and the same SHA-256 (no second upload). Expected sizes: a photo markup of a
 few strokes is 1–5 KB; a busy sheet layer a few hundred KB.
+
+## Plan ink layers (T24, D53)
+
+| Rule | |
+|---|---|
+| One layer per (sheet, user) | `ink_layer` {`sheet_id`, `user_id`, `drawing_blob`, `updated_at`}; `space: sheet`, `width`/`height` = the display sheet's CropBox. The owner writes it; the app draws every other user's layer read-only (alpha 0.8) under the pins, gated by Layers ▸ Ink. |
+| Saving | Debounced 1.5 s after the last change, and at once on Done / leaving the plan: serialise → new blob (new SHA-256, `kind: ink`) queued for upload → the first save `create`s the layer, later ones `set` `drawing_blob` + `updated_at` as one group (`Field survey` / "Plan ink"). Old blobs are never edited. |
+| Never conflicts | The server applies `ink_layer` last-write-wins (PLAN §3.3) and the client never marks an ink op "will be reviewed". If one person's two iPads both create a layer for a sheet offline, both rows are kept and drawn; the newest is the one that person edits. |
+| Sizes | Line widths are picked on screen (thin 1.5 / medium 3 / thick 6 view points; highlighter 4×) and stored in sheet points at the zoom the stroke starts at, so ink keeps its size relative to the drawing. A text note is 14 view points; a "Photo here" camera mark is 26 view points (T23, `marker` with the photo's id). |
+| Editing | Undo removes the user's last stroke; the eraser removes the user's stroke under the finger (within 14 view points). Nobody erases another user's ink. |
+| Download | Layers of assigned levels are prefetched with the sheets (`BlobQueue.prefetch`); a missing one is fetched on demand when the plan opens, and the draw bar says how many are not downloaded yet. |

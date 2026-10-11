@@ -51,7 +51,10 @@ export async function prepareBytes(bytes: Uint8Array, kind: BlobKind, mime: stri
   const path = files.pathFor(sha256, kind);
   const dest = files.file(path);
   const created = !dest.exists;
-  if (created) dest.write(bytes);
+  if (created) {
+    dest.create();
+    dest.write(bytes);
+  }
   return { sha256, kind, path, size: bytes.length, mime, created };
 }
 

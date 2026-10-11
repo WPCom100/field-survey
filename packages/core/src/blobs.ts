@@ -660,7 +660,8 @@ export class BlobQueue {
   // ----------------------------------------------------------------- downloads
 
   /**
-   * Queue the thumbnails, photo markup and display sheets of the user's assigned levels that are not cached.
+   * Queue the display sheets, plan ink layers, photo thumbnails and photo markup of the user's assigned
+   * levels that are not cached.
    * A download finished earlier whose file was since evicted is queued again.
    */
   async prefetch(): Promise<void> {
@@ -684,6 +685,16 @@ export class BlobQueue {
        SELECT DISTINCT p.thumb_blob, 'download', 'thumb', ${DOWNLOAD_PRIORITY.thumb}, 'queued', 0, ?
        FROM photo p JOIN assignment a ON a.level_id = p.level_id AND a.user_id = ? AND a.deleted_at IS NULL
        WHERE p.deleted_at IS NULL AND p.thumb_blob IS NOT NULL AND ${notCached('p.thumb_blob')}
+       ${upsert}`,
+      [now, user],
+    );
+    // Plan ink layers (stroke lists, T24, D53): every user's layer on the assigned levels' sheets.
+    await this.db.exec(
+      `INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
+       SELECT DISTINCT i.drawing_blob, 'download', 'ink', ${DOWNLOAD_PRIORITY.ink}, 'queued', 0, ?
+       FROM ink_layer i JOIN sheet s ON s.id = i.sheet_id AND s.deleted_at IS NULL
+       JOIN assignment a ON a.level_id = s.level_id AND a.user_id = ? AND a.deleted_at IS NULL
+       WHERE i.deleted_at IS NULL AND i.drawing_blob IS NOT NULL AND ${notCached('i.drawing_blob')}
        ${upsert}`,
       [now, user],
     );

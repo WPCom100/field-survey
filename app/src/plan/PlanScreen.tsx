@@ -19,9 +19,24 @@
  * - Long-press on the sheet (T23, Phase 3 §4.6) opens the add-here menu: + Device (field
  *   addition, form in the side panel, a grey "+" pin marks the spot), + Note here, + Photo here,
  *   ✎ Markup. The single tap PDFKit reports when that finger lifts is ignored.
+ * - Plan ink (T24, D53): every user's layer drawn under the pins (Layers ▸ Ink); "✎ Ink" (or
+ *   Markup / Note here) enters draw mode, where touches draw into the user's own layer — pen
+ *   with Pencil pressure, highlighter, text note, eraser (own strokes only), undo — and "✋ Pan"
+ *   hands touches back to PDFKit. The layer is saved a second after the last stroke and on Done.
  */
 
-import { Editor, type BlobQueue, type Store } from '@field-survey/core';
+import {
+  Editor,
+  emptyStrokeList,
+  makeStroke,
+  uuidv7,
+  withStroke,
+  withoutLast,
+  type BlobQueue,
+  type Store,
+  type StrokeList,
+  type StrokePoint,
+} from '@field-survey/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -41,6 +56,10 @@ import { movePin } from '../card/actions';
 import { DeviceCard } from '../card/DeviceCard';
 import { EndEditor } from '../ends/EndEditor';
 import { AddDevicePanel } from '../additions/AddDevicePanel';
+import { INK_COLORS } from '../ink/geometry';
+import { InkCapture, type InkTool } from '../ink/InkCapture';
+import { recordStrokes } from '../ink/render';
+import { useInkLayers } from '../ink/useInkLayers';
 import type { JumpTarget } from '../card/model';
 import { NOT_WIRED } from '../card/proposals';
 import { PhotoFlow, type PhotoRequest } from '../photo/PhotoFlow';
@@ -185,6 +204,15 @@ export function PlanScreen(props: PlanScreenProps) {
   const lastLongPress = useRef(0);
   /** "+ Device": the form in the side panel and the grey pin at the spot. */
   const [adding, setAdding] = useState<{ at: Point; category: string | null } | null>(null);
+  /** Draw mode (T24) and its tool settings; `noteAt` = a text note waiting for its words. */
+  const [drawing, setDrawing] = useState(false);
+  const [inkTool, setInkTool] = useState<InkTool>('pen');
+  const [inkColor, setInkColor] = useState<string>(INK_COLORS[0]);
+  const [inkWidth, setInkWidth] = useState(3);
+  const [noteAt, setNoteAt] = useState<{ at: StrokePoint; size: number } | null>(null);
+  const [noteText, setNoteText] = useState('');
+  /** "Photo here" away from a pin: the camera mark added to the ink layer once the photo is saved. */
+  const photoMark = useRef<{ at: Point; size: number } | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
   const [tab, setTab] = useState<Tab>('devices');
   const [lists, setLists] = useState<LevelLists | null>(null);
@@ -224,6 +252,17 @@ export function PlanScreen(props: PlanScreenProps) {
     [store, projectId, userId],
   );
   const onEdited = useCallback(() => setEdits((n) => n + 1), []);
+
+  // --- plan ink (T24): all layers of the display sheet, the user's own editable
+  const ink = useInkLayers({
+    store,
+    editor,
+    sheetId: plan?.sheet?.id ?? null,
+    userId: userId ?? null,
+    queue: props.blobs ?? null,
+    reloadKey,
+  });
+  const canInk = !!editor && !!props.blobs && !!plan?.sheet;
 
   // Search: FTS over device / punch / part text plus a text match on connections; debounced.
   useEffect(() => {
@@ -515,6 +554,43 @@ export function PlanScreen(props: PlanScreenProps) {
     setSize({ width, height });
   };
 
+  /** Every layer as one picture in sheet coordinates (others a little faded), drawn by the overlay. */
+  const inkPicture = useMemo(() => {
+    if (!prefs.layers.ink) return null;
+    const lists: { list: StrokeList; alpha: number }[] = ink.others.map((o) => ({ list: o.list, alpha: 0.8 }));
+    if (ink.mine) lists.push({ list: ink.mine, alpha: 1 });
+    if (!lists.some((l) => l.list.strokes.length)) return null;
+    const crop = vpRef.current?.cropBox;
+    return recordStrokes(lists, { width: crop?.width ?? plan?.sheet?.widthPt ?? 20000, height: crop?.height ?? plan?.sheet?.heightPt ?? 20000 });
+  }, [prefs.layers.ink, ink.others, ink.mine, plan]);
+
+  const zoomNow = () => (vpRef.current ? scaleOf(sheetToView(vpRef.current)) : 1);
+  const emptyInk = (): StrokeList | null => {
+    const crop = vpRef.current?.cropBox;
+    return crop ? emptyStrokeList('sheet', crop.width, crop.height) : null;
+  };
+  const startDrawing = (tool: InkTool) => {
+    if (!canInk) return;
+    if (!prefs.layers.ink) setLayer('ink');
+    setMenu(null);
+    setPress(null);
+    setInkTool(tool);
+    setDrawing(true);
+  };
+  const stopDrawing = () => {
+    setDrawing(false);
+    setNoteAt(null);
+    setNoteText('');
+    void ink.flush();
+  };
+  const placeNote = () => {
+    const base = ink.mine ?? emptyInk();
+    if (!noteAt || !noteText.trim() || !base) return;
+    ink.setMine(withStroke(base, makeStroke({ id: uuidv7(), tool: 'text', color: inkColor, width: noteAt.size, points: [noteAt.at], text: noteText, at: new Date().toISOString() })));
+    setNoteAt(null);
+    setNoteText('');
+  };
+
   const filtering = isFiltering(prefs.filter);
   const unplaced = visible.length - placed.length;
 
@@ -603,6 +679,7 @@ export function PlanScreen(props: PlanScreenProps) {
               {size.width > 0 ? (
                 <PinOverlay
                   matrix={matrix}
+                  ink={inkPicture}
                   pins={renderPins}
                   selectedId={selectedId}
                   showPins={prefs.layers.pins}
@@ -612,6 +689,43 @@ export function PlanScreen(props: PlanScreenProps) {
                   height={size.height}
                 />
               ) : null}
+              {drawing ? (
+                <InkCapture
+                  viewport={() => vpRef.current}
+                  tool={inkTool}
+                  color={inkColor}
+                  widthPx={inkWidth}
+                  mine={ink.mine}
+                  onChange={ink.setMine}
+                  onTextAt={(at, size) => {
+                    setNoteAt({ at, size });
+                    setNoteText('');
+                  }}
+                />
+              ) : null}
+              {drawing ? (
+                <InkBar
+                  tool={inkTool}
+                  color={inkColor}
+                  width={inkWidth}
+                  canUndo={!!ink.mine?.strokes.length}
+                  save={ink.save}
+                  error={ink.error}
+                  missing={ink.missing}
+                  noteAt={!!noteAt}
+                  noteText={noteText}
+                  onTool={(t) => {
+                    setInkTool(t);
+                    if (t !== 'text') setNoteAt(null);
+                  }}
+                  onColor={setInkColor}
+                  onWidth={setInkWidth}
+                  onUndo={() => ink.mine && ink.setMine(withoutLast(ink.mine))}
+                  onNoteText={setNoteText}
+                  onPlaceNote={placeNote}
+                  onDone={stopDrawing}
+                />
+              ) : null}
               {press ? (
                 <PressMenu
                   at={press.view}
@@ -619,6 +733,14 @@ export function PlanScreen(props: PlanScreenProps) {
                   deviceLabel={press.deviceId ? (deviceById.get(press.deviceId)?.label ?? null) : null}
                   canEdit={!!editor}
                   canPhoto={!!props.blobs}
+                  canInk={canInk}
+                  onNote={() => {
+                    const at = press.sheet;
+                    startDrawing('text');
+                    setNoteAt({ at: { x: at.x, y: at.y, p: 1 }, size: 14 / zoomNow() });
+                    setNoteText('');
+                  }}
+                  onInk={() => startDrawing('pen')}
                   onDevice={() => {
                     setPress(null);
                     setSelectedId(null);
@@ -630,6 +752,7 @@ export function PlanScreen(props: PlanScreenProps) {
                     setPress(null);
                     if (!plan) return;
                     const near = press.deviceId ? null : nearestDevice(press.sheet);
+                    photoMark.current = press.deviceId || !canInk ? null : { at: press.sheet, size: 26 / zoomNow() };
                     setPhotoReq({
                       kind: 'camera',
                       title: press.deviceId ? (deviceById.get(press.deviceId)?.label ?? 'Device') : `Level ${plan.level.code}`,
@@ -660,6 +783,11 @@ export function PlanScreen(props: PlanScreenProps) {
                 </View>
               ) : null}
               <View style={styles.planTools}>
+                {canInk && !drawing ? (
+                  <Pressable style={styles.tool} onPress={() => startDrawing('pen')}>
+                    <Text style={styles.toolText}>✎ Ink</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable style={styles.tool} onPress={fit}>
                   <Text style={styles.toolText}>⌖ Fit</Text>
                 </Pressable>
@@ -868,8 +996,17 @@ export function PlanScreen(props: PlanScreenProps) {
         <PhotoFlow
           request={photoReq}
           env={{ store, editor, queue: props.blobs }}
-          onClose={(saved) => {
+          onClose={(saved, photoId) => {
             setPhotoReq(null);
+            const mark = photoMark.current;
+            photoMark.current = null;
+            if (saved && photoId && mark) {
+              // "Photo here": a camera mark at the spot in the user's ink layer (D114 (6))
+              const base = ink.mine ?? emptyInk();
+              if (base) {
+                ink.setMine(withStroke(base, makeStroke({ id: uuidv7(), tool: 'marker', color: '#37474f', width: mark.size, points: [{ ...mark.at, p: 1 }], ref: { kind: 'photo', id: photoId }, at: new Date().toISOString() })));
+              }
+            }
             if (saved) onEdited();
           }}
         />
@@ -890,8 +1027,11 @@ function PressMenu(props: {
   deviceLabel: string | null;
   canEdit: boolean;
   canPhoto: boolean;
+  canInk: boolean;
   onDevice: () => void;
+  onNote: () => void;
   onPhoto: () => void;
+  onInk: () => void;
   onClose: () => void;
 }) {
   const left = Math.max(8, Math.min(props.at.x + 12, props.size.width - MENU_W - 8));
@@ -901,12 +1041,103 @@ function PressMenu(props: {
       <View style={[styles.pressDot, { left: props.at.x - 7, top: props.at.y - 7 }]} pointerEvents="none" />
       <View style={[styles.pressMenu, { left, top, width: MENU_W }]}>
         <PressItem label="+ Device (field addition)" disabled={!props.canEdit} onPress={props.onDevice} />
-        <PressItem label="+ Note here" disabled note="with plan ink (T24)" onPress={() => {}} />
+        <PressItem label="+ Note here" disabled={!props.canInk} onPress={props.onNote} />
         <PressItem label={props.deviceLabel ? `+ Photo of ${props.deviceLabel}` : '+ Photo here'} disabled={!props.canEdit || !props.canPhoto} onPress={props.onPhoto} />
-        <PressItem label="✎ Markup (ink)" disabled note="with plan ink (T24)" onPress={() => {}} />
+        <PressItem label="✎ Markup (ink)" disabled={!props.canInk} onPress={props.onInk} />
         <PressItem label="Cancel" onPress={props.onClose} />
       </View>
     </>
+  );
+}
+
+const INK_TOOLS: [InkTool, string][] = [
+  ['pen', '✎ Pen'],
+  ['highlighter', '▬ Highlight'],
+  ['text', 'T Note'],
+  ['erase', '⌫ Erase'],
+  ['pan', '✋ Pan'],
+];
+const INK_WIDTHS: [number, string][] = [
+  [1.5, 'thin'],
+  [3, 'medium'],
+  [6, 'thick'],
+];
+
+/** Draw-mode toolbar along the top of the plan (T24). */
+function InkBar(props: {
+  tool: InkTool;
+  color: string;
+  width: number;
+  canUndo: boolean;
+  save: string;
+  error: string | null;
+  missing: number;
+  noteAt: boolean;
+  noteText: string;
+  onTool: (t: InkTool) => void;
+  onColor: (c: string) => void;
+  onWidth: (w: number) => void;
+  onUndo: () => void;
+  onNoteText: (t: string) => void;
+  onPlaceNote: () => void;
+  onDone: () => void;
+}) {
+  const saveText = props.save === 'saving' ? 'Saving…' : props.save === 'pending' ? 'Unsaved…' : props.save === 'saved' ? 'Saved' : props.save === 'error' ? 'Not saved' : '';
+  return (
+    <View style={styles.inkBar}>
+      <View style={styles.inkRow}>
+        {INK_TOOLS.map(([t, label]) => (
+          <Pressable key={t} onPress={() => props.onTool(t)} style={[styles.inkBtn, props.tool === t && styles.inkBtnOn]}>
+            <Text style={[styles.inkBtnText, props.tool === t && styles.inkBtnTextOn]}>{label}</Text>
+          </Pressable>
+        ))}
+        <View style={styles.inkSep} />
+        {INK_COLORS.map((c) => (
+          <Pressable key={c} onPress={() => props.onColor(c)} style={[styles.inkSwatch, { backgroundColor: c }, props.color === c && styles.inkSwatchOn]} accessibilityLabel={`Colour ${c}`} />
+        ))}
+        <View style={styles.inkSep} />
+        {INK_WIDTHS.map(([w, label]) => (
+          <Pressable key={label} onPress={() => props.onWidth(w)} style={[styles.inkBtn, props.width === w && styles.inkBtnOn]}>
+            <Text style={[styles.inkBtnText, props.width === w && styles.inkBtnTextOn]}>{label}</Text>
+          </Pressable>
+        ))}
+        <Pressable onPress={props.onUndo} disabled={!props.canUndo} style={[styles.inkBtn, !props.canUndo && styles.inkBtnOff]}>
+          <Text style={styles.inkBtnText}>↶ Undo</Text>
+        </Pressable>
+        <View style={styles.spacer} />
+        {saveText ? <Text style={[styles.inkNote, props.save === 'error' && styles.inkErr]}>{saveText}</Text> : null}
+        <Pressable onPress={props.onDone} style={[styles.inkBtn, styles.inkDone]}>
+          <Text style={[styles.inkBtnText, styles.inkBtnTextOn]}>Done</Text>
+        </Pressable>
+      </View>
+      {props.tool === 'text' ? (
+        props.noteAt ? (
+          <View style={styles.inkRow}>
+            <TextInput
+              style={styles.inkInput}
+              value={props.noteText}
+              onChangeText={props.onNoteText}
+              placeholder="Note text"
+              placeholderTextColor="#888"
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={props.onPlaceNote}
+            />
+            <Pressable onPress={props.onPlaceNote} disabled={!props.noteText.trim()} style={[styles.inkBtn, styles.inkDone, !props.noteText.trim() && styles.inkBtnOff]}>
+              <Text style={[styles.inkBtnText, styles.inkBtnTextOn]}>Place</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Text style={styles.inkNote}>Tap the plan where the note goes.</Text>
+        )
+      ) : props.tool === 'pan' ? (
+        <Text style={styles.inkNote}>Pan and zoom the plan; pick a tool to draw again.</Text>
+      ) : props.tool === 'erase' ? (
+        <Text style={styles.inkNote}>Touch your strokes to erase them (other people's ink is theirs).</Text>
+      ) : null}
+      {props.error ? <Text style={[styles.inkNote, styles.inkErr]}>{props.error}</Text> : null}
+      {props.missing ? <Text style={styles.inkNote}>{props.missing} ink layer{props.missing === 1 ? '' : 's'} not downloaded yet.</Text> : null}
+    </View>
   );
 }
 
@@ -1119,6 +1350,20 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
   },
+  inkBar: { position: 'absolute', top: 8, left: 8, right: 8, padding: 8, gap: 6, borderRadius: 10, backgroundColor: 'rgba(20,22,26,0.88)' },
+  inkRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  inkBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 6, borderWidth: 1, borderColor: '#555' },
+  inkBtnOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
+  inkBtnOff: { opacity: 0.4 },
+  inkBtnText: { color: '#ddd', fontSize: 13, fontWeight: '600' },
+  inkBtnTextOn: { color: '#fff' },
+  inkDone: { backgroundColor: '#2e7d32', borderColor: '#2e7d32' },
+  inkSep: { width: 1, height: 24, backgroundColor: '#555', marginHorizontal: 2 },
+  inkSwatch: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: '#888' },
+  inkSwatchOn: { borderWidth: 3, borderColor: '#00bcd4' },
+  inkNote: { color: '#ccc', fontSize: 12 },
+  inkErr: { color: '#ff8a80' },
+  inkInput: { flex: 1, minWidth: 200, paddingHorizontal: 8, paddingVertical: 6, fontSize: 15, borderRadius: 6, backgroundColor: '#fff' },
   pressItem: { paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#eceef1' },
   pressText: { fontSize: 16, color: '#1565c0', fontWeight: '600' },
   centeredText: { color: '#fff', fontSize: 16, textAlign: 'center' },

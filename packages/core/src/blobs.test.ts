@@ -337,7 +337,7 @@ describe('uploads', () => {
 });
 
 describe('downloads', () => {
-  it('prefetches thumbnails, markup and display sheets of assigned levels only, never full-size images', async () => {
+  it('prefetches thumbnails, markup, ink and display sheets of assigned levels only, never full-size images', async () => {
     const { store } = await openStore();
     await seedLevels(store);
     await assign(store, L1, ANN);
@@ -355,17 +355,26 @@ describe('downloads', () => {
     await addPhoto(store, L2, { thumb: tOther });
     const gone = await addPhoto(store, L1, { thumb: tDeleted });
     await store.applyRemote(remote('photo', gone, 'delete', { reason: 'dup' }));
+    const displaySheet = uuidv7();
+    const otherSheet = uuidv7();
+    const ink = server.seed(bytes(700, 9), 'application/json');
+    const inkOther = server.seed(bytes(700, 10), 'application/json');
     await store.applyRemoteMany([
-      remote('sheet', uuidv7(), 'create', { payload: { level_id: L1, kind: 'display', blob: sheet } }),
+      remote('sheet', displaySheet, 'create', { payload: { level_id: L1, kind: 'display', blob: sheet } }),
       remote('sheet', uuidv7(), 'create', { payload: { level_id: L1, kind: 'source', blob: srcSheet } }),
+      remote('sheet', otherSheet, 'create', { payload: { level_id: L2, kind: 'display', blob: null } }),
+      remote('ink_layer', uuidv7(), 'create', { payload: { sheet_id: displaySheet, user_id: BOB, drawing_blob: ink } }),
+      remote('ink_layer', uuidv7(), 'create', { payload: { sheet_id: otherSheet, user_id: BOB, drawing_blob: inkOther } }),
     ]);
 
     const q = queue(store);
     const report = await q.run();
-    expect(report).toMatchObject({ outcome: 'ran', downloaded: 4 });
+    expect(report).toMatchObject({ outcome: 'ran', downloaded: 5 });
     const downloads = server.calls.filter((c) => c.startsWith('download')).map((c) => c.slice(9));
     expect(downloads[0]).toBe(sheet.slice(0, 8)); // the plan first
-    expect(new Set(downloads)).toEqual(new Set([sheet, t1, t2, m1].map((s) => s.slice(0, 8)))); // markup too (T21)
+    // markup (T21) and the ink layers on assigned levels' sheets (T24), not L2's
+    expect(new Set(downloads)).toEqual(new Set([sheet, t1, t2, m1, ink].map((s) => s.slice(0, 8))));
+    expect(await blobRow(store, ink)).toMatchObject({ kind: 'ink' });
     expect(await blobRow(store, m1)).toMatchObject({ kind: 'markup' });
     const path = await q.localPath(t1);
     expect(path).toBe(files.pathFor(t1, 'thumb'));

@@ -32,6 +32,10 @@ import {
 import type { SqlDriver, SqlRow } from './sql-driver';
 import { CHANGE_TYPE, OP_KIND, OP_STATE } from './vocab';
 
+
+/** Ink layers and photo blobs never conflict (PLAN §3.3, D53): the server applies the last write. */
+const LAST_WRITE_WINS_ENTITIES = new Set(['ink_layer']);
+const LAST_WRITE_WINS_FIELDS = new Set(['photo.image_blob', 'photo.thumb_blob', 'photo.markup_blob']);
 export class StoreError extends Error {
   constructor(
     message: string,
@@ -250,6 +254,9 @@ export class Store {
 
   /** Local pending ops the incoming op will collide with on the server (PLAN §3.2 pull). */
   private async pendingCollisions(tx: SqlDriver, op: StoredOp): Promise<string[]> {
+    // Last write wins there (PLAN §3.3, the server's LAST_WRITE_WINS_*): never "will be reviewed".
+    if (LAST_WRITE_WINS_ENTITIES.has(op.entity_kind)) return [];
+    if (op.kind === 'set' && LAST_WRITE_WINS_FIELDS.has(`${op.entity_kind}.${op.field}`)) return [];
     let sql = `SELECT op_id FROM op WHERE entity_id = ? AND state = 'pending' AND server_seq IS NULL`;
     const params: SqlValue[] = [op.entity_id];
     if (op.kind === 'set' || op.kind === 'assign') {

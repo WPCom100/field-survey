@@ -19,7 +19,7 @@ import { sheetToView, type PdfViewport } from './viewport';
 import * as viewportModule from './viewport';
 
 const require = createRequire(import.meta.url);
-const FILES = ['layout.ts', 'pins.ts', 'viewport.ts', 'drawPins.ts'];
+const FILES = ['layout.ts', 'pins.ts', 'viewport.ts', 'drawPins.ts', 'drawInk.ts'];
 
 type Worklet = { name: string; file: string; code: string; closure: string[] };
 
@@ -64,7 +64,7 @@ const vp = (s: number): PdfViewport => ({ a: s, b: 0, c: 0, d: -s, tx: 0, ty: s 
 
 describe('plan worklets on the UI runtime', () => {
   it('the plugin compiles every worklet the overlay uses', () => {
-    for (const n of ['layoutPins', 'hitTest', 'pinShape', 'regularPolygon', 'apply', 'scaleOf', 'drawPins', 'drawPin', 'shapeAt', 'centredText', 'compose', 'sheetToPage', 'sheetToView', 'parseViewportMessage']) {
+    for (const n of ['layoutPins', 'hitTest', 'pinShape', 'regularPolygon', 'apply', 'scaleOf', 'drawPins', 'drawPin', 'shapeAt', 'centredText', 'compose', 'sheetToPage', 'sheetToView', 'parseViewportMessage', 'drawInkLayer', 'inkMatrix']) {
       expect(byName.has(n), n).toBe(true);
     }
   });
@@ -92,6 +92,27 @@ describe('plan worklets on the UI runtime', () => {
     for (const cat of [...pinsModule.DEVICE_CATEGORIES, 'Unknown']) {
       expect(ui<typeof pinsModule.pinShape>('pinShape')(cat, 26)).toEqual(pinsModule.pinShape(cat, 26));
     }
+  });
+
+  it('the ink layer (T24) is drawn under the sheet → view matrix from its code string', () => {
+    const calls: string[] = [];
+    let made: readonly number[] | null = null;
+    const fakeSkia = { Matrix: (m: readonly number[]) => ((made = m), { m }) };
+    const canvas = {
+      save: () => calls.push('save'),
+      concat: (x: { m: number[] }) => calls.push(`concat ${x.m.join(',')}`),
+      drawPicture: (p: string) => calls.push(`picture ${p}`),
+      restore: () => calls.push('restore'),
+    };
+    const w = byName.get('drawInkLayer')!;
+    expect(w.closure).toEqual(['Skia', 'inkMatrix']);
+    const fn = (0, eval)(w.code) as (c: unknown, p: unknown, m: unknown) => void;
+    const m = sheetToView(vp(0.25));
+    fn.apply({ __closure: [fakeSkia, ui('inkMatrix')] }, [canvas, 'INK', m]);
+    expect(made).toEqual([m.a, m.c, m.tx, m.b, m.d, m.ty, 0, 0, 1]);
+    expect(calls).toEqual(['save', `concat ${made!.join(',')}`, 'picture INK', 'restore']);
+    // a sheet point lands where the pins put it: (x, y) → (a·x + c·y + tx, b·x + d·y + ty)
+    expect(viewportModule.apply(m, { x: 100, y: 200 })).toEqual({ x: 25, y: 50 });
   });
 
   it('the viewport event handler (T64) parses the patch message and drives the matrix on the UI thread', () => {
