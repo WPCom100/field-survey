@@ -34,6 +34,7 @@ import {
   EMPTY_FILTER,
   NO_STATUS,
   OWNERS,
+  UNSURVEYED,
   STATUS_KEYS,
   isFiltering,
   matchesFilter,
@@ -509,7 +510,7 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
                 ? STATUS_KEYS.map((s) => (
                     <MenuItem
                       key={s}
-                      label={s === NO_STATUS ? 'No status yet' : s}
+                      label={s === NO_STATUS ? UNSURVEYED : s}
                       swatch={pinStyleFor(s === NO_STATUS ? null : s)}
                       on={prefs.filter.statuses.includes(s)}
                       onPress={() => setFilter((f) => ({ ...f, statuses: toggle<StatusKey>(f.statuses, s, STATUS_KEYS) }))}
@@ -635,7 +636,7 @@ function DeviceRow({ device, badges, selected, onPress }: { device: PlanDevice; 
           {!device.pin ? <Text style={styles.badgePlain}>{device.pinElsewhere ? 'other sheet' : 'not placed'}</Text> : null}
         </View>
         <Text style={styles.rowSub} numberOfLines={1}>
-          {[device.device ?? device.category, device.status ?? 'No status yet', device.room].filter(Boolean).join(' · ')}
+          {[device.device ?? device.category, device.status ?? UNSURVEYED, device.room].filter(Boolean).join(' · ')}
         </Text>
       </View>
       <View style={styles.rowRight}>
@@ -654,7 +655,7 @@ function Legend() {
       {LEGEND.map((s) => (
         <View key={s ?? 'none'} style={styles.legendItem}>
           <Swatch {...pinStyleFor(s)} />
-          <Text style={styles.legendText}>{s ?? 'No status'}</Text>
+          <Text style={styles.legendText}>{s ?? UNSURVEYED}</Text>
         </View>
       ))}
     </View>

@@ -19,6 +19,8 @@ export const OWNERS = vocab.OWNER;
 export type Owner = vocab.Owner;
 
 export const NO_STATUS = 'none' as const;
+/** What a device with no status is called everywhere (D110); the stored value stays empty. */
+export const UNSURVEYED = 'Unsurveyed';
 export type StatusKey = vocab.DeviceStatus | typeof NO_STATUS;
 export const STATUS_KEYS: readonly StatusKey[] = [...vocab.DEVICE_STATUS, NO_STATUS];
 

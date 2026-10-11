@@ -6,6 +6,8 @@ import { compareLabels, loadLevelPlan } from './data';
 import { DEMO_LEVEL_ID, DEMO_SHEET_SIZE, ensureDemoLevel } from './demo';
 import {
   DEFAULT_LAYERS,
+  NO_STATUS,
+  UNSURVEYED,
   EMPTY_FILTER,
   matchesFilter,
   ownerMatches,
@@ -208,5 +210,13 @@ describe('loadLevelPlan over the demo level', () => {
   it('orders IDs naturally', () => {
     const ids = ['06M-S12', '06M-?', '06M-10', '06M-S2', '06M-02', '06M-D1'];
     expect([...ids].sort(compareLabels)).toEqual(['06M-02', '06M-10', '06M-D1', '06M-S2', '06M-S12', '06M-?']);
+  });
+});
+
+describe('Unsurveyed (D110)', () => {
+  it('is the name of the empty status; the stored value stays empty', () => {
+    expect(UNSURVEYED).toBe('Unsurveyed');
+    expect(statusKey(null)).toBe(NO_STATUS);
+    expect(statusKey('Unsurveyed')).toBe(NO_STATUS);
   });
 });

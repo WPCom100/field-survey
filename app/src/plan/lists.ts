@@ -4,7 +4,7 @@
  * the plan filters (D99) applied to every tab. Reads only; no React or Expo imports.
  *
  * Filter semantics on the other tabs (D108): a row inherits its device's Category and Status
- * (a connection uses its own end status, `Not started` counting as "no status yet"); Owner is
+ * (a connection uses its own end status, `Not started` counting as Unsurveyed (D110)); Owner is
  * the item's own for punch and parts and the device's open owners for a connection; Open punch
  * is "this item is open" for punch and parts and "the device has an open punch item" for a
  * connection. Rows without a device match only when Category is not being filtered.
@@ -217,7 +217,7 @@ export async function loadLevelLists(
 export function rowMatches(row: ListRow, f: PlanFilter): boolean {
   if (f.categories.length && !f.categories.includes(row.category ?? '')) return false;
   if (f.statuses.length) {
-    // A connection's `Not started` is "no status yet"; statusKey maps anything unknown to it.
+    // A connection's `Not started` is Unsurveyed; statusKey maps anything unknown to it.
     const key = statusKey(row.tab === 'connections' ? row.endStatus : row.deviceStatus);
     if (!f.statuses.includes(key)) return false;
   }
