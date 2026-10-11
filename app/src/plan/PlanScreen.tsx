@@ -14,7 +14,7 @@
  *   "Move pin" puts the plan in a mode where the next tap places the pin.
  */
 
-import { Editor, type Store } from '@field-survey/core';
+import { Editor, type BlobQueue, type Store } from '@field-survey/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -34,6 +34,7 @@ import { movePin } from '../card/actions';
 import { DeviceCard } from '../card/DeviceCard';
 import type { JumpTarget } from '../card/model';
 import { NOT_WIRED } from '../card/proposals';
+import { PhotoFlow, type PhotoRequest } from '../photo/PhotoFlow';
 
 import { loadLevelPlan, type LevelPlan, type PlanDevice, type PlanSheet } from './data';
 import { PIN_PX } from './drawPins';
@@ -121,6 +122,8 @@ export type PlanScreenProps = {
   onOpenLevel?: (levelId: string, deviceId: string) => void;
   /** Device to select and open on arrival (a jump from another level). */
   initialDeviceId?: string;
+  /** Where captured photo bytes go (T21); without it the card cannot take photos. */
+  blobs?: Pick<BlobQueue, 'addLocal' | 'ensureLocal'> | null;
 };
 
 const NO_NAMES: ReadonlyMap<string, string> = new Map();
@@ -157,6 +160,8 @@ export function PlanScreen(props: PlanScreenProps) {
   /** Move-pin mode: the next tap on the plan places this device's pin (a Correction). */
   const [moving, setMoving] = useState<{ deviceId: string; reason: string } | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  /** The photo flow (camera, library or an existing photo) over the whole screen. */
+  const [photoReq, setPhotoReq] = useState<PhotoRequest | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
   const [tab, setTab] = useState<Tab>('devices');
   const [lists, setLists] = useState<LevelLists | null>(null);
@@ -546,6 +551,17 @@ export function PlanScreen(props: PlanScreenProps) {
                 setMoveError(null);
                 setMoving({ deviceId: selectedId, reason });
               }}
+              onPhoto={
+                props.blobs && plan
+                  ? (source) =>
+                      setPhotoReq({
+                        kind: source,
+                        title: deviceById.get(selectedId)?.label ?? 'Device',
+                        target: { projectId: plan.level.projectId, levelId, deviceId: selectedId },
+                      })
+                  : undefined
+              }
+              onOpenPhoto={props.blobs ? (photoId) => setPhotoReq({ kind: 'open', photoId, title: deviceById.get(selectedId)?.label ?? 'Photo' }) : undefined}
             />
           ) : null}
           {/* The lists stay mounted under an open card, so their scroll position survives. */}
@@ -652,6 +668,16 @@ export function PlanScreen(props: PlanScreenProps) {
           </>
         ) : null}
       </View>
+      {props.blobs ? (
+        <PhotoFlow
+          request={photoReq}
+          env={{ store, editor, queue: props.blobs }}
+          onClose={(saved) => {
+            setPhotoReq(null);
+            if (saved) onEdited();
+          }}
+        />
+      ) : null}
     </View>
   );
 }

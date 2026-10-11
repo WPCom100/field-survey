@@ -17,7 +17,24 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Field Survey uses the camera to photograph devices, panels and wiring during the survey.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Field Survey attaches photos from your library to survey records.",
+          "cameraPermission": "Field Survey uses the camera to photograph devices, panels and wiring during the survey.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

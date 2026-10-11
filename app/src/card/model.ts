@@ -86,8 +86,9 @@ export type CardPhoto = {
   label: string;
   thumb: string | null;
   image: string | null;
+  markup: string | null;
   subject: string | null;
-  /** The image bytes are still on this iPad only (`📷 waiting`). */
+  /** Some of its bytes (image, thumbnail, markup) are still on this iPad only (`📷 waiting`, as the queue counts). */
   waiting: boolean;
 };
 
@@ -300,7 +301,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
 
   // --- photos, and which images have not reached the server
   const photoRows = (await store.list<Row>('photo', { where: 'device_id = ?', params: [deviceId] })).sort(byNumber);
-  const images = photoRows.map((p) => str(p.image_blob)).filter((s): s is string => !!s);
+  const images = photoRows.flatMap((p) => [str(p.image_blob), str(p.thumb_blob), str(p.markup_blob)]).filter((s): s is string => !!s);
   const waitingShas = new Set<string>();
   if (images.length) {
     for (const r of await store.db.query<{ sha256: string }>(
@@ -316,8 +317,9 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
       label: displayNumber('photo', p),
       thumb: str(p.thumb_blob),
       image: str(p.image_blob),
+      markup: str(p.markup_blob),
       subject: str(p.subject) ?? str(p.what_it_shows),
-      waiting: !!str(p.image_blob) && waitingShas.has(String(p.image_blob)),
+      waiting: [p.image_blob, p.thumb_blob, p.markup_blob].some((b) => !!str(b) && waitingShas.has(String(b))),
     }),
   );
 

@@ -1,9 +1,10 @@
-import type { Store } from '@field-survey/core';
+import type { BlobQueue, Store } from '@field-survey/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
-import { getBlobFiles } from '../../blobs/queue';
+import { getBlobFiles, getBlobQueue } from '../../blobs/queue';
+import { describeBlobs, useBlobStatus } from '../../blobs/useBlobStatus';
 import { useCurrentUser } from '../../identity/IdentityGate';
 import { useTeamNames } from '../../identity/useTeamNames';
 import { openAppStore } from '../../db';
@@ -14,16 +15,20 @@ import { describeSync, useSyncStatus } from '../../sync/useSyncStatus';
 /**
  * Plan view of one level from the app store; the sheet and photo thumbnails come from the blob
  * cache (T12). `?device=` selects and opens that device's card on arrival (a cross-level jump).
+ * Photos taken here go to the app's blob queue (T21); the top bar shows "N photos waiting".
  */
 export default function LevelPlanRoute() {
   const { levelId, device } = useLocalSearchParams<{ levelId: string; device?: string }>();
   const user = useCurrentUser();
   const [store, setStore] = useState<Store | null>(null);
+  const [blobs, setBlobs] = useState<BlobQueue | null>(null);
   const sync = useSyncStatus();
+  const blobStatus = useBlobStatus();
   const names = useTeamNames(store);
 
   useEffect(() => {
     openAppStore().then(setStore, (e: unknown) => console.error('[plan] store', e));
+    getBlobQueue().then(setBlobs, (e: unknown) => console.error('[blobs] queue', e));
   }, []);
 
   const resolveSheetUri = useCallback((sheet: PlanSheet) => {
@@ -52,12 +57,13 @@ export default function LevelPlanRoute() {
       levelId={levelId}
       resolveSheetUri={resolveSheetUri}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-      status={describeSync(sync)}
+      status={[describeSync(sync), describeBlobs(blobStatus)].filter(Boolean).join(' · ')}
       reloadKey={sync.lastSyncAt}
       userId={user.id}
       names={names}
       resolveBlobUri={resolveBlobUri}
       initialDeviceId={device}
+      blobs={blobs}
       onOpenLevel={(other, deviceId) => router.push({ pathname: '/plan/[levelId]', params: { levelId: other, device: deviceId } })}
     />
   );

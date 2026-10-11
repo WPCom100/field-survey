@@ -337,7 +337,7 @@ describe('uploads', () => {
 });
 
 describe('downloads', () => {
-  it('prefetches thumbnails and display sheets of assigned levels only, never full-size images', async () => {
+  it('prefetches thumbnails, markup and display sheets of assigned levels only, never full-size images', async () => {
     const { store } = await openStore();
     await seedLevels(store);
     await assign(store, L1, ANN);
@@ -349,7 +349,8 @@ describe('downloads', () => {
     const tDeleted = server.seed(bytes(3000, 5));
     const sheet = server.seed(bytes(50_000, 6), 'application/pdf');
     const srcSheet = server.seed(bytes(40_000, 7), 'application/pdf');
-    await addPhoto(store, L1, { image: i1, thumb: t1 });
+    const m1 = server.seed(bytes(400, 8), 'application/json');
+    await addPhoto(store, L1, { image: i1, thumb: t1, markup: m1 });
     await addPhoto(store, L1, { thumb: t2 });
     await addPhoto(store, L2, { thumb: tOther });
     const gone = await addPhoto(store, L1, { thumb: tDeleted });
@@ -361,10 +362,11 @@ describe('downloads', () => {
 
     const q = queue(store);
     const report = await q.run();
-    expect(report).toMatchObject({ outcome: 'ran', downloaded: 3 });
+    expect(report).toMatchObject({ outcome: 'ran', downloaded: 4 });
     const downloads = server.calls.filter((c) => c.startsWith('download')).map((c) => c.slice(9));
     expect(downloads[0]).toBe(sheet.slice(0, 8)); // the plan first
-    expect(new Set(downloads)).toEqual(new Set([sheet, t1, t2].map((s) => s.slice(0, 8))));
+    expect(new Set(downloads)).toEqual(new Set([sheet, t1, t2, m1].map((s) => s.slice(0, 8)))); // markup too (T21)
+    expect(await blobRow(store, m1)).toMatchObject({ kind: 'markup' });
     const path = await q.localPath(t1);
     expect(path).toBe(files.pathFor(t1, 'thumb'));
     expect(new Uint8Array(await readFile(path!))).toEqual(bytes(3000, 1));

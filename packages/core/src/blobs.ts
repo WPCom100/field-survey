@@ -660,7 +660,7 @@ export class BlobQueue {
   // ----------------------------------------------------------------- downloads
 
   /**
-   * Queue the thumbnails and display sheets of the user's assigned levels that are not cached.
+   * Queue the thumbnails, photo markup and display sheets of the user's assigned levels that are not cached.
    * A download finished earlier whose file was since evicted is queued again.
    */
   async prefetch(): Promise<void> {
@@ -684,6 +684,15 @@ export class BlobQueue {
        SELECT DISTINCT p.thumb_blob, 'download', 'thumb', ${DOWNLOAD_PRIORITY.thumb}, 'queued', 0, ?
        FROM photo p JOIN assignment a ON a.level_id = p.level_id AND a.user_id = ? AND a.deleted_at IS NULL
        WHERE p.deleted_at IS NULL AND p.thumb_blob IS NOT NULL AND ${notCached('p.thumb_blob')}
+       ${upsert}`,
+      [now, user],
+    );
+    // Photo markup (stroke lists, T21): small, and needed to see a photo as marked up offline.
+    await this.db.exec(
+      `INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
+       SELECT DISTINCT p.markup_blob, 'download', 'markup', ${DOWNLOAD_PRIORITY.markup}, 'queued', 0, ?
+       FROM photo p JOIN assignment a ON a.level_id = p.level_id AND a.user_id = ? AND a.deleted_at IS NULL
+       WHERE p.deleted_at IS NULL AND p.markup_blob IS NOT NULL AND ${notCached('p.markup_blob')}
        ${upsert}`,
       [now, user],
     );

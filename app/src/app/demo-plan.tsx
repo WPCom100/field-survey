@@ -1,8 +1,9 @@
-import { Store } from '@field-survey/core';
+import { BlobQueue, Store } from '@field-survey/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Text, View } from 'react-native';
 
+import { getBlobFiles } from '../blobs/queue';
 import { ExpoSqliteDriver } from '../db/expo-sqlite-driver';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamNames } from '../identity/useTeamNames';
@@ -21,7 +22,8 @@ const STALE = ['demo-plan.db', 'probe-like.db', 'probe-fts.db', 'probe-c.db', 'p
 const DENSE_DB = 'demo-plan-500.db';
 
 /** Opened once per variant: a separate database that no sync engine ever sees (never the app store). */
-const demos = new Map<number, Promise<{ store: Store; levelId: string }>>();
+type Demo = { store: Store; levelId: string; blobs: BlobQueue };
+const demos = new Map<number, Promise<Demo>>();
 function openDemo(dense: number) {
   let demo = demos.get(dense) ?? null;
   if (!demo) {
@@ -32,7 +34,10 @@ function openDemo(dense: number) {
       .then(async (store) => {
         const levelId = await ensureDemoLevel(store, log, dense);
         if (!dense) await ensureDemoCardExtras(store, log);
-        return { store, levelId };
+        // Photos on the demo: bytes in the same sandbox, bookkept in the demo database by a queue
+        // that has no server and is never started, so nothing taken here is uploaded.
+        const blobs = new BlobQueue(store, null, getBlobFiles(), { userId: () => null });
+        return { store, levelId, blobs };
       })
       .catch((e) => {
         demos.delete(dense);
@@ -43,12 +48,18 @@ function openDemo(dense: number) {
   return demo;
 }
 
+function resolveDemoBlob(sha: string, kind: 'thumb' | 'image'): string | null {
+  const files = getBlobFiles();
+  const file = files.file(files.pathFor(sha, kind));
+  return file.exists ? file.uri : null;
+}
+
 /**
  * Demo level (T17): the 06M composite with seeded devices, for trying the plan view before setup
  * puts real sheets on the iPad, and the TP-6 bench that replaced the T16 spike.
  */
 export default function DemoPlanRoute() {
-  const [state, setState] = useState<{ store: Store; levelId: string } | null>(null);
+  const [state, setState] = useState<Demo | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Card edits on the demo land in its own database's outbox, which never syncs.
   const user = useCurrentUser();
@@ -76,6 +87,8 @@ export default function DemoPlanRoute() {
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       status={dense ? `Demo data, ${dense} pins — not synced` : 'Demo data — not synced'}
       bench
+      blobs={state.blobs}
+      resolveBlobUri={resolveDemoBlob}
       userId={user.id}
       names={names}
     />

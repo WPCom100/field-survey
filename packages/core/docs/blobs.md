@@ -27,7 +27,7 @@ iPad sandbox and the server's `/blobs` routes (`server/docs/blobs.md`). Decision
    SHA-256, size disagrees with the server; never retried, counted in `uploadsFailed`, the
    photo still counts as waiting); retry later with per-row backoff (4xx/5xx); or stop the pass
    (network, 401).
-3. **Prefetch**: queue downloads for the display sheets and photo thumbnails of levels the
+3. **Prefetch**: queue downloads for the display sheets, photo thumbnails and photo markup (T21) of levels the
    current user is assigned to (`assignment` link, not deleted) that are not cached. A
    finished download whose file was evicted is queued again.
 4. **Downloads**, four at a time in `DOWNLOAD_PRIORITY` order (sheet 0, thumb 1, …). A 404

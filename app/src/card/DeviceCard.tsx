@@ -2,8 +2,9 @@
  * Device card (T20, Phase 3 §4.3): the side panel beside the plan when a device is selected.
  * Sections scroll and collapse; every tap commits one op (D45, no Save button) through
  * `actions.ts`. Plain taps are `Field survey` (D96); `[⋯]` delete / restore / move pin ask for
- * a reason (`Correction`). Photos (T21), Neuron ID scan (T54), the end editor (T22), rule
- * drafts (T33) and quick actions (T34) are shown with their buttons disabled until those land.
+ * a reason (`Correction`). Camera / Library and a thumbnail tap hand over to the photo flow
+ * (T21). Neuron ID scan (T54), the end editor (T22), rule drafts (T33) and quick actions (T34)
+ * are shown with their buttons disabled until those land.
  * Render it with `key={deviceId}`: a card instance belongs to one device (its note commits on leave).
  */
 
@@ -52,6 +53,10 @@ export type DeviceCardProps = {
   onJump: (t: JumpTarget) => void;
   /** Start move-pin mode on the plan with this reason; the plan's next tap places the pin. */
   onStartMove: (reason: string) => void;
+  /** Take a photo of this device (T21); absent = no capture here. */
+  onPhoto?: (source: 'camera' | 'library') => void;
+  /** Open one of its photos (caption, link, markup). */
+  onOpenPhoto?: (photoId: string) => void;
 };
 
 type Pending = { kind: 'delete' | 'restore' | 'move'; reason: string } | null;
@@ -252,21 +257,21 @@ export function DeviceCard(props: DeviceCardProps) {
               {card.photos.map((p) => {
                 const uri = p.thumb ? props.resolveBlobUri(p.thumb, 'thumb') : null;
                 return (
-                  <View key={p.id} style={styles.photo}>
+                  <Pressable key={p.id} style={styles.photo} onPress={() => props.onOpenPhoto?.(p.id)} disabled={!props.onOpenPhoto}>
                     {uri ? <Image source={{ uri }} style={styles.photoImg} /> : <Text style={styles.photoNum}>📷</Text>}
                     <Text style={styles.photoLabel} numberOfLines={1}>
                       {p.label}
+                      {p.markup ? ' ✎' : ''}
                       {p.waiting ? ' ↑' : ''}
                     </Text>
-                  </View>
+                  </Pressable>
                 );
               })}
             </ScrollView>
           ) : null}
           <View style={styles.rowWrap}>
-            <SmallButton label="📷 Camera" disabled onPress={() => {}} />
-            <SmallButton label="🖼 Library" disabled onPress={() => {}} />
-            <Text style={styles.muted}>with T21</Text>
+            <SmallButton label="📷 Camera" disabled={readOnly || !props.onPhoto} onPress={() => props.onPhoto?.('camera')} />
+            <SmallButton label="🖼 Library" disabled={readOnly || !props.onPhoto} onPress={() => props.onPhoto?.('library')} />
           </View>
         </Section>
 
