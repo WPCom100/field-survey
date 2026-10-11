@@ -1,12 +1,14 @@
 /**
  * Plan view (T17, Phase 3 §4.2): the level's display sheet in PDFKit with the Skia pin layer on
- * top (left ~72 %), the device list beside it (right ~28 %, D105 narrows D44's 38 %; T19 grows it into four tabs).
+ * top (left ~72 %), the side lists beside it (right ~28 %, D105): Devices, Conns, Punch, Parts (T19).
  *
  * - Pins come from `device.pin` in sheet coordinates (D92), shaped by category and coloured by
  *   status (D64), clustered at low zoom; drawn on the UI thread from the viewport (D95).
  * - Tap a pin → select it and scroll its row into view; tap a cluster → zoom into it; tap a row →
  *   select it and bring its pin into view. Pinch/pan are PDFKit's; "Fit" shows the whole sheet.
- * - Filters (Category, Status, Owner, Open punch — D99) and layers persist per level on this iPad.
+ * - Filters (Category, Status, Owner, Open punch — D99) apply to all four tabs; search (FTS) and
+ *   "Show deleted" are session state. Filters and layers persist per level on this iPad.
+ * - A row in any tab highlights its device's pin; tapping a pin scrolls the open tab to its first row.
  */
 
 import type { Store } from '@field-survey/core';
@@ -18,6 +20,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import Pdf, { type PdfRef } from 'react-native-pdf';
@@ -43,6 +46,18 @@ import {
   type StatusKey,
 } from './filters';
 import { LAYOUT_DEFAULTS, hitTest, layoutPins, type RenderPin } from './layout';
+import {
+  NO_BADGES,
+  TABS,
+  TAB_LABEL,
+  loadLevelLists,
+  rowMatches,
+  searchIds,
+  type Badges,
+  type LevelLists,
+  type ListRow,
+  type Tab,
+} from './lists';
 import { PinOverlay } from './PinOverlay';
 import { pdfNativeTag, useUiViewport } from './uiViewport';
 import { DEVICE_CATEGORIES, pinStyleFor, statusRank } from './pins';
@@ -110,6 +125,11 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
   const [prefs, setPrefs] = useState<PlanPrefs>({ filter: EMPTY_FILTER, layers: DEFAULT_LAYERS });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
+  const [tab, setTab] = useState<Tab>('devices');
+  const [lists, setLists] = useState<LevelLists | null>(null);
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<Set<string> | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const insets = useSafeAreaInsets();
 
@@ -117,24 +137,44 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
   const vpRef = useRef<PdfViewport | null>(null);
   const pdfRef = useRef<PdfRef>(null);
   const { attach: attachUi, setFromJs } = useUiViewport(matrix);
-  const listRef = useRef<FlatList<PlanDevice>>(null);
+  const listRef = useRef<FlatList<PlanDevice | ListRow>>(null);
 
   // --- data and stored prefs
   useEffect(() => {
     let active = true;
-    loadLevelPlan(store, levelId).then(
-      (p) => {
-        if (!active) return;
-        console.log(`[plan] loaded ${p?.devices.length ?? 'no'} devices, sheet ${p?.sheet ? 'yes' : 'no'}`);
-        if (p) setPlan(p);
-        else setError('This level is not on this iPad.');
-      },
-      (e: unknown) => active && setError(String(e)),
-    );
+    (async () => {
+      const p = await loadLevelPlan(store, levelId, { includeDeleted: showDeleted });
+      if (!active) return;
+      console.log(`[plan] loaded ${p?.devices.length ?? 'no'} devices, sheet ${p?.sheet ? 'yes' : 'no'}`);
+      if (!p) return setError('This level is not on this iPad.');
+      const l = await loadLevelLists(store, p.level.projectId, levelId, p.level.code, p.devices, { includeDeleted: showDeleted });
+      if (!active) return;
+      setPlan(p);
+      setLists(l);
+    })().catch((e: unknown) => active && setError(String(e)));
     return () => {
       active = false;
     };
-  }, [store, levelId, reloadKey]);
+  }, [store, levelId, reloadKey, showDeleted]);
+
+  // Search: FTS over device / punch / part text plus a text match on connections; debounced.
+  useEffect(() => {
+    if (!query.trim()) {
+      setHits(null);
+      return;
+    }
+    let active = true;
+    const t = setTimeout(() => {
+      searchIds(store, levelId, query, lists?.connections ?? []).then(
+        (ids) => active && setHits(ids),
+        (e: unknown) => console.warn('[plan] search failed', e),
+      );
+    }, 200);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [store, levelId, query, lists]);
 
   useEffect(() => {
     let active = true;
@@ -158,19 +198,40 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
   const setLayer = (key: keyof PlanLayers) => updatePrefs((p) => ({ ...p, layers: { ...p.layers, [key]: !p.layers[key] } }));
 
   // --- what is shown
-  const visible = useMemo(() => (plan ? plan.devices.filter((d) => matchesFilter(d, prefs.filter)) : []), [plan, prefs.filter]);
+  const visible = useMemo(
+    () => (plan ? plan.devices.filter((d) => matchesFilter(d, prefs.filter) && (!hits || hits.has(d.id))) : []),
+    [plan, prefs.filter, hits],
+  );
+  const rowsByTab = useMemo(() => {
+    const keep = (rows: ListRow[]) => rows.filter((r) => rowMatches(r, prefs.filter) && (!hits || hits.has(r.id)));
+    return {
+      connections: keep(lists?.connections ?? []),
+      punch: keep(lists?.punch ?? []),
+      parts: keep(lists?.parts ?? []),
+    };
+  }, [lists, prefs.filter, hits]);
+  const tabData: (PlanDevice | ListRow)[] = tab === 'devices' ? visible : rowsByTab[tab];
+  /** First row of each device in the open tab: where a pin tap scrolls to. */
+  const firstRowOf = useMemo(() => {
+    const m = new Map<string, number>();
+    tabData.forEach((r, i) => {
+      const dev = 'tab' in r ? r.deviceId : r.id;
+      if (dev && !m.has(dev)) m.set(dev, i);
+    });
+    return m;
+  }, [tabData]);
   const placed = useMemo(() => visible.filter((d) => d.pin), [visible]);
   const renderPins = useMemo(() => placed.map(toRenderPin), [placed]);
-  const rowIndex = useMemo(() => new Map(visible.map((d, i) => [d.id, i])), [visible]);
   const categories = useMemo(() => {
     const extra = new Set((plan?.devices ?? []).map((d) => d.category).filter((c): c is string => !!c));
     return [...DEVICE_CATEGORIES, ...[...extra].filter((c) => !(DEVICE_CATEGORIES as readonly string[]).includes(c)).sort()];
   }, [plan]);
 
-  // A filtered-out device cannot stay selected.
+  const deviceById = useMemo(() => new Map((plan?.devices ?? []).map((d) => [d.id, d])), [plan]);
+  // A device that is gone (deleted away, level reloaded) cannot stay selected.
   useEffect(() => {
-    if (selectedId && !rowIndex.has(selectedId)) setSelectedId(null);
-  }, [rowIndex, selectedId]);
+    if (selectedId && plan && !deviceById.has(selectedId)) setSelectedId(null);
+  }, [deviceById, plan, selectedId]);
 
   const sheetUri = plan?.sheet ? resolveSheetUri(plan.sheet) : null;
 
@@ -218,14 +279,14 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
       setSelectedId(id);
       if (!id) return;
       if (from === 'plan') {
-        const index = rowIndex.get(id);
+        const index = firstRowOf.get(id);
         if (index !== undefined) listRef.current?.scrollToIndex({ index, viewPosition: 0.4, animated: true });
       } else {
-        const pin = visible[rowIndex.get(id) ?? -1]?.pin;
+        const pin = deviceById.get(id)?.pin;
         if (pin) reveal([pin], REVEAL_ZOOM);
       }
     },
-    [rowIndex, visible, reveal],
+    [firstRowOf, deviceById, reveal],
   );
 
   const onPageSingleTap = useCallback(
@@ -302,6 +363,17 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
             <Text style={styles.chipText}>Clear</Text>
           </Pressable>
         ) : null}
+        <TextInput
+          style={styles.search}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search"
+          placeholderTextColor="#888"
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          returnKeyType="search"
+        />
         <View style={styles.spacer} />
         <BarButton label="Layers" open={menu === 'layers'} onPress={() => setMenu(menu === 'layers' ? null : 'layers')} />
         {status ? <Text style={styles.status} numberOfLines={1}>{status}</Text> : null}
@@ -362,25 +434,64 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
           )}
         </View>
 
-        {/* side list */}
+        {/* side lists */}
         <View style={styles.side}>
+          <View style={styles.tabs}>
+            {TABS.map((t) => {
+              const n = t === 'devices' ? visible.length : rowsByTab[t].length;
+              return (
+                <Pressable key={t} style={[styles.tabBtn, tab === t && styles.tabBtnOn]} onPress={() => setTab(t)}>
+                  <Text style={[styles.tabText, tab === t && styles.tabTextOn]} numberOfLines={1}>
+                    {TAB_LABEL[t]} {n}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <View style={styles.sideHead}>
-            <Text style={styles.sideTitle}>
-              Devices {visible.length}
-              {plan && visible.length !== plan.devices.length ? ` of ${plan.devices.length}` : ''}
+            <Text style={styles.sideNote} numberOfLines={1}>
+              {filtering || hits ? 'Filtered' : 'All'} · {tabData.length}
+              {tab === 'devices' && plan ? ` of ${plan.devices.length}` : ''}
+              {tab === 'devices' && unplaced > 0 ? ` · ${unplaced} not on the plan` : ''}
             </Text>
-            {unplaced > 0 ? <Text style={styles.sideNote}>{unplaced} not on the plan</Text> : null}
+            <Pressable onPress={() => setShowDeleted((v) => !v)} hitSlop={8}>
+              <Text style={styles.sideNote}>{showDeleted ? '☑' : '☐'} Deleted</Text>
+            </Pressable>
           </View>
           <FlatList
             ref={listRef}
-            data={visible}
-            keyExtractor={(d) => d.id}
+            data={tabData}
+            extraData={selectedId}
+            keyExtractor={(r) => r.id}
             getItemLayout={(_d, index) => ({ length: ROW_H, offset: ROW_H * index, index })}
             onScrollToIndexFailed={() => {}}
-            renderItem={({ item }) => (
-              <DeviceRow device={item} selected={item.id === selectedId} onPress={() => select(item.id === selectedId ? null : item.id, 'list')} />
-            )}
-            ListEmptyComponent={plan ? <Text style={styles.empty}>{filtering ? 'No device matches the filters.' : 'No devices on this level.'}</Text> : null}
+            initialNumToRender={20}
+            windowSize={9}
+            maxToRenderPerBatch={20}
+            removeClippedSubviews
+            renderItem={({ item }) =>
+              'tab' in item ? (
+                <ListRowView
+                  row={item}
+                  selected={!!item.deviceId && item.deviceId === selectedId}
+                  onPress={() => item.deviceId && select(item.deviceId === selectedId ? null : item.deviceId, 'list')}
+                />
+              ) : (
+                <DeviceRow
+                  device={item}
+                  badges={lists?.deviceBadges.get(item.id) ?? NO_BADGES}
+                  selected={item.id === selectedId}
+                  onPress={() => select(item.id === selectedId ? null : item.id, 'list')}
+                />
+              )
+            }
+            ListEmptyComponent={
+              plan ? (
+                <Text style={styles.empty}>
+                  {filtering || hits ? 'Nothing matches the filters or search.' : `No ${TAB_LABEL[tab].toLowerCase()} on this level.`}
+                </Text>
+              ) : null
+            }
           />
           <Legend />
         </View>
@@ -481,15 +592,45 @@ function Swatch({ fill, hollow, glyph }: { fill: string; hollow: boolean; glyph:
   );
 }
 
-function DeviceRow({ device, selected, onPress }: { device: PlanDevice; selected: boolean; onPress: () => void }) {
+/** The record badges of Phase 3 §2.3 that a list row can carry. */
+function BadgeStrip({ b }: { b: Badges }) {
+  return (
+    <>
+      {b.isNew ? <Text style={styles.badge}>NEW</Text> : null}
+      {b.pending > 0 ? <Text style={styles.badgePlain}>↑{b.pending}</Text> : null}
+      {b.inReview ? <Text style={[styles.badge, styles.badgeReview]}>IN REVIEW</Text> : null}
+      {b.draft ? <Text style={[styles.badge, styles.badgeDraft]}>DRAFT</Text> : null}
+      {b.deleted ? <Text style={[styles.badge, styles.badgeDeleted]}>DELETED</Text> : null}
+    </>
+  );
+}
+
+function ListRowView({ row, selected, onPress }: { row: ListRow; selected: boolean; onPress: () => void }) {
+  const st = pinStyleFor(row.tab === 'connections' ? row.endStatus : row.deviceStatus);
+  return (
+    <Pressable style={[styles.row, selected && styles.rowSelected, row.badges.deleted && styles.rowDeleted]} onPress={onPress}>
+      {row.tab === 'connections' ? <Swatch {...st} /> : <Text style={styles.rowNum}>{row.label}</Text>}
+      <View style={styles.rowMain}>
+        <View style={styles.rowLine}>
+          {row.tab === 'connections' ? <Text style={styles.rowId}>{row.label}</Text> : null}
+          <BadgeStrip b={row.badges} />
+        </View>
+        <Text style={styles.rowTitle} numberOfLines={1}>{row.title}</Text>
+        <Text style={styles.rowSub} numberOfLines={1}>{row.sub}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function DeviceRow({ device, badges, selected, onPress }: { device: PlanDevice; badges: Badges; selected: boolean; onPress: () => void }) {
   const st = pinStyleFor(device.status);
   return (
-    <Pressable style={[styles.row, selected && styles.rowSelected]} onPress={onPress}>
+    <Pressable style={[styles.row, selected && styles.rowSelected, device.deleted && styles.rowDeleted]} onPress={onPress}>
       <Swatch {...st} />
       <View style={styles.rowMain}>
         <View style={styles.rowLine}>
           <Text style={styles.rowId}>{device.label}</Text>
-          {device.isNew ? <Text style={styles.badge}>NEW</Text> : null}
+          <BadgeStrip b={badges} />
           {device.fieldAddition ? <Text style={styles.badgePlain}>+</Text> : null}
           {!device.pin ? <Text style={styles.badgePlain}>{device.pinElsewhere ? 'other sheet' : 'not placed'}</Text> : null}
         </View>
@@ -548,7 +689,7 @@ const styles = StyleSheet.create({
   tool: { backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
   toolText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   side: { flex: 28, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  sideHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', padding: 12 },
+  sideHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
   sideTitle: { fontSize: 16, fontWeight: '600' },
   sideNote: { fontSize: 13, color: '#666' },
   empty: { padding: 16, color: '#666' },
@@ -561,6 +702,18 @@ const styles = StyleSheet.create({
   rowRight: { alignItems: 'flex-end', gap: 2 },
   rowCount: { fontSize: 12, color: '#444' },
   badge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#1565c0', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3, overflow: 'hidden' },
+  badgeReview: { backgroundColor: '#e65100' },
+  badgeDraft: { backgroundColor: '#6a1b9a' },
+  badgeDeleted: { backgroundColor: '#b71c1c' },
+  rowDeleted: { opacity: 0.55 },
+  rowNum: { width: 40, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  rowTitle: { fontSize: 13, color: '#222', marginTop: 1 },
+  search: { minWidth: 150, flexShrink: 1, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
+  tabs: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
+  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 3, borderColor: 'transparent' },
+  tabBtnOn: { borderColor: '#1565c0' },
+  tabText: { fontSize: 13, color: '#555', fontWeight: '600' },
+  tabTextOn: { color: '#1565c0' },
   badgePlain: { fontSize: 11, color: '#555', borderWidth: 1, borderColor: '#c9ccd1', paddingHorizontal: 4, borderRadius: 3 },
   swatch: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   swatchGlyph: { fontSize: 10, fontWeight: '700' },

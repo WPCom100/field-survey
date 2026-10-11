@@ -37,6 +37,8 @@ export type PlanDevice = Filterable & {
   pinElsewhere: boolean;
   fieldAddition: boolean;
   photos: number;
+  /** Soft-deleted; only loaded with `includeDeleted`, never pinned. */
+  deleted: boolean;
 };
 
 export type LevelPlan = { level: PlanLevel; sheet: PlanSheet | null; devices: PlanDevice[] };
@@ -64,7 +66,11 @@ function pinOn(pin: unknown, sheetId: string | null): { at: { x: number; y: numb
 }
 
 /** The level, its display sheet and its live devices, sorted by ID; null if the level is unknown. */
-export async function loadLevelPlan(store: Store, levelId: string): Promise<LevelPlan | null> {
+export async function loadLevelPlan(
+  store: Store,
+  levelId: string,
+  opts: { includeDeleted?: boolean } = {},
+): Promise<LevelPlan | null> {
   const lv = await store.get<Row>('level', levelId);
   if (!lv || lv.deleted_at) return null;
   const level: PlanLevel = {
@@ -89,7 +95,11 @@ export async function loadLevelPlan(store: Store, levelId: string): Promise<Leve
     }
   }
 
-  const rows = await store.list<Row>('device', { where: 'level_id = ?', params: [levelId] });
+  const rows = await store.list<Row>('device', {
+    where: 'level_id = ?',
+    params: [levelId],
+    includeDeleted: opts.includeDeleted,
+  });
 
   const photos = new Map<string, number>();
   for (const r of await store.db.query<{ device_id: string; n: number }>(
@@ -118,7 +128,8 @@ export async function loadLevelPlan(store: Store, levelId: string): Promise<Leve
 
   const devices = rows.map((r): PlanDevice => {
     const id = String(r.id);
-    const { at, elsewhere } = pinOn(r.pin, sheet?.id ?? null);
+    const deleted = !!r.deleted_at;
+    const { at, elsewhere } = deleted ? { at: null, elsewhere: false } : pinOn(r.pin, sheet?.id ?? null);
     return {
       id,
       label: displayNumber('device', r, level.code),
@@ -131,6 +142,7 @@ export async function loadLevelPlan(store: Store, levelId: string): Promise<Leve
       pinElsewhere: elsewhere,
       fieldAddition: r.origin === 'field_addition',
       photos: photos.get(id) ?? 0,
+      deleted,
       openPunch: openPunch.get(id) ?? 0,
       openOwners: owners.get(id) ?? [],
     };
