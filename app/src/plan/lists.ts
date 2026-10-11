@@ -15,6 +15,9 @@ import { displayNumber, isNew, type Store } from '@field-survey/core';
 import type { PlanDevice } from './data';
 import { ownerMatches, statusKey, type PlanFilter } from './filters';
 
+/** Cable codes (CLAUDE.md §3). A search term equal to one matches the cable type exactly. */
+export const CABLE_CODES: readonly string[] = ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V'];
+
 export type Tab = 'devices' | 'connections' | 'punch' | 'parts';
 export const TABS: readonly Tab[] = ['devices', 'connections', 'punch', 'parts'];
 export const TAB_LABEL: Record<Tab, string> = { devices: 'Devices', connections: 'Conns', punch: 'Punch', parts: 'Parts' };
@@ -41,6 +44,8 @@ export type ListRow = {
   deviceStatus: string | null;
   deviceOwners: readonly string[];
   deviceOpenPunch: number;
+  /** Cable code of a connection (`N`, `NG`, `0-10V`…); null for punch and parts. */
+  cable: string | null;
   /** Lower-cased text the in-memory search matches (connections are not in the FTS index). */
   text: string;
 };
@@ -145,6 +150,7 @@ export async function loadLevelLists(
         sub: [deviceLabel, str(e.status) ?? 'Not started'].filter(Boolean).join(' · '),
         ...inherited,
         badges: badgesOf(id, isNew('cable_end', e), !!e.deleted_at || !!cable?.deleted_at),
+        cable: str(cable?.cable),
         endStatus: str(e.status),
         open: true,
         owner: null,
@@ -166,6 +172,7 @@ export async function loadLevelLists(
         sub: [deviceLabel, str(p.type), str(p.owner), str(p.tracking_status) ?? 'Open'].filter(Boolean).join(' · '),
         ...inherited,
         badges: badgesOf(id, isNew('punch_item', p), !!p.deleted_at),
+        cable: null,
         endStatus: null,
         open: str(p.tracking_status) !== 'Closed',
         owner: str(p.owner),
@@ -185,6 +192,7 @@ export async function loadLevelLists(
         sub: [deviceLabel ?? str(m.device_location), str(m.owner), str(m.part_status) ?? 'Needed'].filter(Boolean).join(' · '),
         ...inherited,
         badges: badgesOf(id, isNew('missing_part', m), !!m.deleted_at),
+        cable: null,
         endStatus: null,
         open: str(m.part_status) !== 'Installed',
         owner: str(m.owner),
@@ -236,6 +244,10 @@ export async function searchIds(
   const hits = await store.search(q, { levelId, limit: 5000 });
   const ids = new Set(hits.map((h) => h.entity_id));
   const terms = q.toLowerCase().split(/\s+/);
-  for (const c of connections) if (terms.every((t) => c.text.includes(t))) ids.add(c.id);
+  // A term that is a cable code ("n", "ng", "0-10v") means that cable type, not the letter anywhere.
+  const isCode = (t: string) => CABLE_CODES.some((k) => k.toLowerCase() === t);
+  for (const c of connections) {
+    if (terms.every((t) => (isCode(t) ? c.cable?.toLowerCase() === t : c.text.includes(t)))) ids.add(c.id);
+  }
   return ids;
 }

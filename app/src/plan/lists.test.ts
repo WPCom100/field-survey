@@ -145,6 +145,24 @@ describe('side lists', () => {
     });
   }
 
+  it('searches connections by cable type, matching the code exactly', async () => {
+    const { store, plan, pid } = await demo();
+    for (const code of ['N', 'NG', '0-10V']) {
+      const cable = uuidv7();
+      await store.apply(op('cable', cable, 'create', pid, { project_id: pid, cable: code }));
+      await store.apply(op('cable_end', uuidv7(), 'create', pid, { cable_id: cable, side: 'A', level_id: DEMO_LEVEL_ID, device_id: plan.devices[0]!.id, to_text: 'Rack' }));
+    }
+    const { lists } = await load(store, pid);
+    const conns = async (q: string) => {
+      const ids = (await searchIds(store, DEMO_LEVEL_ID, q, lists.connections))!;
+      return lists.connections.filter((c) => ids.has(c.id)).map((c) => c.cable).sort();
+    };
+    expect(await conns('n')).toEqual(['N']);
+    expect(await conns('NG')).toEqual(['NG']);
+    expect(await conns('0-10v')).toEqual(['0-10V']);
+    expect(await conns('ng rack')).toEqual(['NG']);
+  });
+
   it('handles 2,000 rows per tab and search/filter over them quickly', async () => {
     const { store, plan, pid } = await demo();
     const devs = plan.devices;
