@@ -9,9 +9,12 @@
  * - Filters (Category, Status, Owner, Open punch — D99) apply to all four tabs; search (FTS) and
  *   "Show deleted" are session state. Filters and layers persist per level on this iPad.
  * - A row in any tab highlights its device's pin; tapping a pin scrolls the open tab to its first row.
+ * - Selecting a device (pin or row) opens its card in the side panel (T20, Phase 3 §4.3); × goes
+ *   back to the lists. An edit on the card reloads the plan, so the pin follows the status at once.
+ *   "Move pin" puts the plan in a mode where the next tap places the pin.
  */
 
-import type { Store } from '@field-survey/core';
+import { Editor, type Store } from '@field-survey/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -26,6 +29,11 @@ import {
 import Pdf, { type PdfRef } from 'react-native-pdf';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedValue } from 'react-native-reanimated';
+
+import { movePin } from '../card/actions';
+import { DeviceCard } from '../card/DeviceCard';
+import type { JumpTarget } from '../card/model';
+import { NOT_WIRED } from '../card/proposals';
 
 import { loadLevelPlan, type LevelPlan, type PlanDevice, type PlanSheet } from './data';
 import { PIN_PX } from './drawPins';
@@ -59,16 +67,19 @@ import {
   type ListRow,
   type Tab,
 } from './lists';
+import { BadgeStrip, Swatch, chipStyles } from './chips';
 import { PinOverlay } from './PinOverlay';
 import { pdfNativeTag, useUiViewport } from './uiViewport';
 import { DEVICE_CATEGORIES, pinStyleFor, statusRank } from './pins';
 import {
+  apply,
   focusRect,
   inView,
   scaleOf,
   sheetRect,
   sheetRectToPage,
   sheetToView,
+  viewToSheet,
   type Affine,
   type PdfViewport,
   type Point,
@@ -100,7 +111,20 @@ export type PlanScreenProps = {
   reloadKey?: unknown;
   /** Dev-only TP-6 bench controls (demo level). */
   bench?: boolean;
+  /** The user stamped on card edits; without one the card is read-only. */
+  userId?: string;
+  /** User id → name for the card's history. */
+  names?: ReadonlyMap<string, string>;
+  /** A `file://` URI for a cached blob (photo thumbnails), or null. */
+  resolveBlobUri?: (sha: string, kind: 'thumb' | 'image') => string | null;
+  /** Open another level's plan with this device selected (a connection's far end, T20/T22). */
+  onOpenLevel?: (levelId: string, deviceId: string) => void;
+  /** Device to select and open on arrival (a jump from another level). */
+  initialDeviceId?: string;
 };
+
+const NO_NAMES: ReadonlyMap<string, string> = new Map();
+const noBlob = () => null;
 
 function toRenderPin(d: PlanDevice): RenderPin {
   const st = pinStyleFor(d.status);
@@ -120,11 +144,19 @@ function toRenderPin(d: PlanDevice): RenderPin {
   };
 }
 
-export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, reloadKey, bench }: PlanScreenProps) {
+export function PlanScreen(props: PlanScreenProps) {
+  const { store, levelId, resolveSheetUri, onBack, status, reloadKey, bench, userId, initialDeviceId, onOpenLevel } = props;
   const [plan, setPlan] = useState<LevelPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<PlanPrefs>({ filter: EMPTY_FILTER, layers: DEFAULT_LAYERS });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialDeviceId ?? null);
+  /** The side panel shows the selected device's card instead of the lists. */
+  const [cardOpen, setCardOpen] = useState(!!initialDeviceId);
+  /** Bumped by every card edit: reloads the plan, the lists and the card. */
+  const [edits, setEdits] = useState(0);
+  /** Move-pin mode: the next tap on the plan places this device's pin (a Correction). */
+  const [moving, setMoving] = useState<{ deviceId: string; reason: string } | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
   const [tab, setTab] = useState<Tab>('devices');
   const [lists, setLists] = useState<LevelLists | null>(null);
@@ -156,7 +188,14 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
     return () => {
       active = false;
     };
-  }, [store, levelId, reloadKey, showDeleted]);
+  }, [store, levelId, reloadKey, showDeleted, edits]);
+
+  const projectId = plan?.level.projectId ?? null;
+  const editor = useMemo(
+    () => (projectId && userId ? new Editor(store, { projectId, userId }) : null),
+    [store, projectId, userId],
+  );
+  const onEdited = useCallback(() => setEdits((n) => n + 1), []);
 
   // Search: FTS over device / punch / part text plus a text match on connections; debounced.
   useEffect(() => {
@@ -229,10 +268,14 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
   }, [plan]);
 
   const deviceById = useMemo(() => new Map((plan?.devices ?? []).map((d) => [d.id, d])), [plan]);
-  // A device that is gone (deleted away, level reloaded) cannot stay selected.
+  // A device that is gone (deleted away, level reloaded) cannot stay selected, unless its card is
+  // open: the card then shows it deleted, with Restore.
   useEffect(() => {
-    if (selectedId && plan && !deviceById.has(selectedId)) setSelectedId(null);
-  }, [deviceById, plan, selectedId]);
+    if (selectedId && plan && !cardOpen && !deviceById.has(selectedId)) setSelectedId(null);
+  }, [deviceById, plan, selectedId, cardOpen]);
+  /** Where a jump from another level arrives: the first viewport focuses it instead of fitting. */
+  const arrivalPin = useRef<Point | null>(null);
+  arrivalPin.current = initialDeviceId ? (deviceById.get(initialDeviceId)?.pin ?? null) : null;
 
   const sheetUri = plan?.sheet ? resolveSheetUri(plan.sheet) : null;
 
@@ -254,13 +297,15 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
       vpRef.current = vp;
       setFromJs(sheetToView(vp));
       attachUi(pdfNativeTag(pdfRef.current));
-      // The first viewport is "ready" (loadComplete re-fires much later, T16); open at fit.
+      // The first viewport is "ready" (loadComplete re-fires much later, T16); open at fit, or on
+      // the device a jump from another level arrived for.
       if (first) {
         console.log(`[plan] first viewport, zoom ${scaleOf(sheetToView(vp)).toFixed(3)}`);
-        focusSheetRect(sheetRect(vp), false);
+        const arrival = arrivalPin.current;
+        focusSheetRect(arrival && size.width ? focusRect([arrival], size, REVEAL_ZOOM) : sheetRect(vp), false);
       }
     },
-    [setFromJs, attachUi, focusSheetRect],
+    [setFromJs, attachUi, focusSheetRect, size],
   );
 
   const reveal = useCallback(
@@ -278,6 +323,7 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
   const select = useCallback(
     (id: string | null, from: 'plan' | 'list') => {
       setSelectedId(id);
+      setCardOpen(!!id);
       if (!id) return;
       if (from === 'plan') {
         const index = firstRowOf.get(id);
@@ -294,11 +340,30 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
     (_page: number, x: number, y: number) => {
       const vp = vpRef.current;
       setMenu(null);
+      if (vp && moving && editor && plan?.sheet) {
+        const at = apply(viewToSheet(vp), { x, y });
+        const whole = sheetRect(vp);
+        if (at.x < 0 || at.y < 0 || at.x > whole.width || at.y > whole.height) {
+          setMoveError('That is off the sheet; tap on the drawing.');
+          return;
+        }
+        const { deviceId, reason } = moving;
+        movePin(editor, deviceId, { sheet: plan.sheet.id, x: at.x, y: at.y }, reason).then(
+          () => {
+            setMoving(null);
+            setMoveError(null);
+            onEdited();
+          },
+          (e: unknown) => setMoveError(`Not moved: ${String((e as Error)?.message ?? e)}`),
+        );
+        return;
+      }
       if (!vp || !prefs.layers.pins) return;
       const layout = layoutPins(renderPins, sheetToView(vp), size.width, size.height);
       const hit = hitTest(layout, x, y, HIT_PX);
       if (!hit) {
         setSelectedId(null);
+        setCardOpen(false);
       } else if (hit.kind === 'pin') {
         select(renderPins[hit.index]!.id, 'plan');
       } else {
@@ -306,7 +371,16 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
         focusSheetRect(focusRect(points, size, REVEAL_ZOOM), true);
       }
     },
-    [renderPins, size, prefs.layers.pins, select, focusSheetRect],
+    [renderPins, size, prefs.layers.pins, select, focusSheetRect, moving, editor, plan, onEdited],
+  );
+
+  /** A connection's far end: on this level select it; on another, open that level's plan. */
+  const onJump = useCallback(
+    (t: JumpTarget) => {
+      if (t.sameLevel) select(t.deviceId, 'list');
+      else onOpenLevel?.(t.levelId, t.deviceId);
+    },
+    [select, onOpenLevel],
   );
 
   // --- TP-6 bench: 100 zoom cycles between fit and ×4 around the sheet centre (dev only)
@@ -421,6 +495,21 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
                   height={size.height}
                 />
               ) : null}
+              {moving ? (
+                <View style={styles.moveBanner}>
+                  <Text style={styles.moveText}>
+                    Tap the new position of {deviceById.get(moving.deviceId)?.label ?? 'the device'}.{moveError ? ` ${moveError}` : ''}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setMoving(null);
+                      setMoveError(null);
+                    }}
+                    hitSlop={8}>
+                    <Text style={styles.moveCancel}>Cancel</Text>
+                  </Pressable>
+                </View>
+              ) : null}
               <View style={styles.planTools}>
                 <Pressable style={styles.tool} onPress={fit}>
                   <Text style={styles.toolText}>⌖ Fit</Text>
@@ -437,6 +526,30 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
 
         {/* side lists */}
         <View style={styles.side}>
+          {cardOpen && selectedId ? (
+            <DeviceCard
+              key={selectedId}
+              store={store}
+              editor={editor}
+              deviceId={selectedId}
+              badges={lists?.deviceBadges.get(selectedId) ?? NO_BADGES}
+              reloadKey={`${String(reloadKey)}|${edits}`}
+              names={props.names ?? NO_NAMES}
+              resolveBlobUri={props.resolveBlobUri ?? noBlob}
+              decider={NOT_WIRED}
+              canMovePin={!!deviceById.get(selectedId)?.pin}
+              canOpenLevels={!!onOpenLevel}
+              onEdited={onEdited}
+              onClose={() => setCardOpen(false)}
+              onJump={onJump}
+              onStartMove={(reason) => {
+                setMoveError(null);
+                setMoving({ deviceId: selectedId, reason });
+              }}
+            />
+          ) : null}
+          {/* The lists stay mounted under an open card, so their scroll position survives. */}
+          <View style={[styles.lists, cardOpen && selectedId ? styles.hidden : null]}>
           <View style={styles.tabs}>
             {TABS.map((t) => {
               const n = t === 'devices' ? visible.length : rowsByTab[t].length;
@@ -495,6 +608,7 @@ export function PlanScreen({ store, levelId, resolveSheetUri, onBack, status, re
             }
           />
           <Legend />
+          </View>
         </View>
 
         {menu ? (
@@ -585,27 +699,6 @@ function MenuItem(props: {
   );
 }
 
-function Swatch({ fill, hollow, glyph }: { fill: string; hollow: boolean; glyph: string }) {
-  return (
-    <View style={[styles.swatch, hollow ? { borderColor: fill, backgroundColor: '#fff' } : { backgroundColor: fill, borderColor: fill }]}>
-      <Text style={[styles.swatchGlyph, { color: hollow ? fill : '#fff' }]}>{glyph}</Text>
-    </View>
-  );
-}
-
-/** The record badges of Phase 3 §2.3 that a list row can carry. */
-function BadgeStrip({ b }: { b: Badges }) {
-  return (
-    <>
-      {b.isNew ? <Text style={styles.badge}>NEW</Text> : null}
-      {b.pending > 0 ? <Text style={styles.badgePlain}>↑{b.pending}</Text> : null}
-      {b.inReview ? <Text style={[styles.badge, styles.badgeReview]}>IN REVIEW</Text> : null}
-      {b.draft ? <Text style={[styles.badge, styles.badgeDraft]}>DRAFT</Text> : null}
-      {b.deleted ? <Text style={[styles.badge, styles.badgeDeleted]}>DELETED</Text> : null}
-    </>
-  );
-}
-
 function ListRowView({ row, selected, onPress }: { row: ListRow; selected: boolean; onPress: () => void }) {
   const st = pinStyleFor(row.tab === 'connections' ? row.endStatus : row.deviceStatus);
   return (
@@ -632,8 +725,8 @@ function DeviceRow({ device, badges, selected, onPress }: { device: PlanDevice; 
         <View style={styles.rowLine}>
           <Text style={styles.rowId}>{device.label}</Text>
           <BadgeStrip b={badges} />
-          {device.fieldAddition ? <Text style={styles.badgePlain}>+</Text> : null}
-          {!device.pin ? <Text style={styles.badgePlain}>{device.pinElsewhere ? 'other sheet' : 'not placed'}</Text> : null}
+          {device.fieldAddition ? <Text style={chipStyles.badgePlain}>+</Text> : null}
+          {!device.pin ? <Text style={chipStyles.badgePlain}>{device.pinElsewhere ? 'other sheet' : 'not placed'}</Text> : null}
         </View>
         <Text style={styles.rowSub} numberOfLines={1}>
           {[device.device ?? device.category, device.status ?? UNSURVEYED, device.room].filter(Boolean).join(' · ')}
@@ -689,6 +782,22 @@ const styles = StyleSheet.create({
   planTools: { position: 'absolute', right: 12, bottom: 12, gap: 8, alignItems: 'flex-end' },
   tool: { backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
   toolText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  lists: { flex: 1 },
+  hidden: { display: 'none' },
+  moveBanner: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,248,225,0.96)',
+  },
+  moveText: { flex: 1, fontSize: 15, color: '#333' },
+  moveCancel: { fontSize: 15, fontWeight: '700', color: '#1565c0' },
   side: { flex: 28, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
   sideHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
   sideTitle: { fontSize: 16, fontWeight: '600' },
@@ -702,10 +811,6 @@ const styles = StyleSheet.create({
   rowSub: { fontSize: 12, color: '#555', marginTop: 2 },
   rowRight: { alignItems: 'flex-end', gap: 2 },
   rowCount: { fontSize: 12, color: '#444' },
-  badge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#1565c0', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3, overflow: 'hidden' },
-  badgeReview: { backgroundColor: '#e65100' },
-  badgeDraft: { backgroundColor: '#6a1b9a' },
-  badgeDeleted: { backgroundColor: '#b71c1c' },
   rowDeleted: { opacity: 0.55 },
   rowNum: { width: 40, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
   rowTitle: { fontSize: 13, color: '#222', marginTop: 1 },
@@ -715,9 +820,6 @@ const styles = StyleSheet.create({
   tabBtnOn: { borderColor: '#1565c0' },
   tabText: { fontSize: 13, color: '#555', fontWeight: '600' },
   tabTextOn: { color: '#1565c0' },
-  badgePlain: { fontSize: 11, color: '#555', borderWidth: 1, borderColor: '#c9ccd1', paddingHorizontal: 4, borderRadius: 3 },
-  swatch: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  swatchGlyph: { fontSize: 10, fontWeight: '700' },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 10, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendText: { fontSize: 11, color: '#444' },

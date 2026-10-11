@@ -180,3 +180,76 @@ export async function ensureDemoLevel(
   }
   return DEMO_LEVEL_ID;
 }
+
+const CARD_SEEDED_KEY = 'demo_card_seeded';
+
+/**
+ * Device-card samples on the demo level (T20), seeded once and only from the demo route (the
+ * side-list tests count the base seed's connections): on 06M-01 two accessories (one short), a
+ * DMX cable to 06M-03, a 0-10V run to Fixtures, a Unison run the server has not numbered, two
+ * rule drafts and a finding — so every card section has something to show on the iPad.
+ */
+export async function ensureDemoCardExtras(store: Store, log: (msg: string) => void = () => {}): Promise<void> {
+  if (await store.getState<boolean>(CARD_SEEDED_KEY)) return;
+  const idOf = async (displayId: string) =>
+    (await store.list<{ id: string }>('device', { where: 'level_id = ? AND display_id = ?', params: [DEMO_LEVEL_ID, displayId] }))[0]?.id;
+  const panel = await idOf('06M-01');
+  const far = await idOf('06M-03');
+  if (!panel || !far) return; // the dense variant has other devices; nothing to add there
+  const last = await store.db.query<{ n: number | null }>('SELECT max(server_seq) AS n FROM op');
+  let seq = last[0]?.n ?? 0;
+  const ts = '2026-10-10T12:30:00.000Z';
+  const ops: Op[] = [];
+  const create = (entity_kind: Op['entity_kind'], payload: Record<string, unknown>, entity_id = uuidv7()) => {
+    ops.push({
+      op_id: uuidv7(), project_id: PROJECT, user_id: USER, install_id: INSTALL, client_ts: ts, server_seq: ++seq, server_ts: ts,
+      entity_kind, entity_id, kind: 'create', payload, change_type: 'Master edit', reason: 'Demo level (T20)', state: 'applied',
+    });
+    return entity_id;
+  };
+  const cable = (code: string, a: Record<string, unknown>, b: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
+    const id = uuidv7();
+    const endA = uuidv7();
+    const endB = uuidv7();
+    create('cable', { project_id: PROJECT, cable: code, qty: 1, origin: 'riser', end_a_id: endA, end_b_id: endB, ...extra }, id);
+    create('cable_end', { cable_id: id, side: 'A', level_id: DEMO_LEVEL_ID, ...a }, endA);
+    create('cable_end', { cable_id: id, side: 'B', ...b }, endB);
+  };
+
+  create('accessory', { device_id: panel, model: 'ERP-FT-LVD', expected_qty: 2, found_qty: 1 });
+  create('accessory', { device_id: panel, model: 'ERP-RTO', expected_qty: 1, found_qty: 1 });
+  const fixtures = create('placeholder', { project_id: PROJECT, label: 'Fixtures', kind: 'fixtures' });
+  const bus = create('placeholder', { project_id: PROJECT, label: 'Stations & Sensors', kind: 'station_bus' });
+  cable(
+    'X',
+    { endpoint_kind: 'device', device_id: panel, display_id: 'C-03', to_text: 'DMX to 06M-03', status: 'Issue', note: 'Run, not terminated; no term kit', status_source: 'surveyed' },
+    { endpoint_kind: 'device', device_id: far, level_id: DEMO_LEVEL_ID, display_id: 'C-04', from_text: 'DMX from 06M-01' },
+  );
+  cable(
+    '0-10V',
+    { endpoint_kind: 'device', device_id: panel, display_id: 'C-08', to_text: 'Fixtures', status: 'Issue', note: 'Not landed', status_source: 'surveyed' },
+    { endpoint_kind: 'placeholder', placeholder_id: fixtures },
+    { single_row: true },
+  );
+  cable(
+    'U',
+    { endpoint_kind: 'device', device_id: panel, to_text: 'Stations & Sensors', status: 'Not installed', note: 'Not run' },
+    { endpoint_kind: 'placeholder', placeholder_id: bus },
+  );
+  const subject = { entity: 'device', entity_id: panel };
+  create('proposal', {
+    project_id: PROJECT, rule_id: 'R3a', kind: 'punch', subject, discriminator: 'U run', inputs_hash: 'demo',
+    payload: { item: 'Run Unison to Stations & Sensors', type: 'Cable not run', owner: 'EC', tracking_status: 'Open', why: 'The U end is Not installed (R3a: one "Run …" item per unpulled wire).' },
+  });
+  create('proposal', {
+    project_id: PROJECT, rule_id: 'R4b', kind: 'part', subject, discriminator: 'X kit', inputs_hash: 'demo',
+    payload: { part: 'DMX termination kit - 06M-03 run', owner: 'EC', part_status: 'Needed', why: 'C-03 is Issue "no term kit" (R3b/R4b: one kit per run).' },
+  });
+  create('finding', {
+    project_id: PROJECT, level_id: DEMO_LEVEL_ID, lint_id: 'R1', subject,
+    message: 'Installed, untested with outstanding wiring → Issue (suggested)',
+  });
+  log(`card samples: ${ops.length} ops`);
+  await store.applyRemoteMany(ops);
+  await store.setState(CARD_SEEDED_KEY, true);
+}

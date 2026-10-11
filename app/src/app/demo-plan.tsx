@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Text, View } from 'react-native';
 
 import { ExpoSqliteDriver } from '../db/expo-sqlite-driver';
-import { ensureDemoLevel } from '../plan/demo';
+import { useCurrentUser } from '../identity/IdentityGate';
+import { useTeamNames } from '../identity/useTeamNames';
+import { ensureDemoCardExtras, ensureDemoLevel } from '../plan/demo';
 import { PlanScreen } from '../plan/PlanScreen';
 
 // Private golden fixture, served by Metro in development and bundled by EAS otherwise.
@@ -27,7 +29,11 @@ function openDemo(dense: number) {
     demo = Promise.all(STALE.map(ExpoSqliteDriver.remove))
       .then(() => ExpoSqliteDriver.open(dense ? DENSE_DB : DEMO_DB))
       .then((driver) => Store.open(driver))
-      .then(async (store) => ({ store, levelId: await ensureDemoLevel(store, log, dense) }))
+      .then(async (store) => {
+        const levelId = await ensureDemoLevel(store, log, dense);
+        if (!dense) await ensureDemoCardExtras(store, log);
+        return { store, levelId };
+      })
       .catch((e) => {
         demos.delete(dense);
         throw e;
@@ -44,6 +50,9 @@ function openDemo(dense: number) {
 export default function DemoPlanRoute() {
   const [state, setState] = useState<{ store: Store; levelId: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Card edits on the demo land in its own database's outbox, which never syncs.
+  const user = useCurrentUser();
+  const names = useTeamNames(state?.store ?? null);
 
   const { pins } = useLocalSearchParams<{ pins?: string }>();
   const dense = Math.min(Math.max(Number(pins) || 0, 0), 1000);
@@ -67,6 +76,8 @@ export default function DemoPlanRoute() {
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       status={dense ? `Demo data, ${dense} pins — not synced` : 'Demo data — not synced'}
       bench
+      userId={user.id}
+      names={names}
     />
   );
 }
