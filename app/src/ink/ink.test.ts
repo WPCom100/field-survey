@@ -118,3 +118,18 @@ describe('undo history (T24-6 fix)', () => {
     expect(pushUndo(Array(100).fill(null), a, 100)).toHaveLength(100);
   });
 });
+
+describe('camera marks open their photo (T23-10 fix)', () => {
+  it('finds the topmost photo mark near a sheet point in any layer', async () => {
+    const { photoMarkAt } = await import('./geometry');
+    const at = '2026-10-11T10:00:00.000Z';
+    const mark = (id: string, x: number) =>
+      makeStroke({ id: `m-${id}`, tool: 'marker', color: '#37474f', width: 130, points: [{ x, y: 500, p: 1 }], ref: { kind: 'photo', id }, at });
+    const mine = withStroke(emptyStrokeList('sheet', 4000, 3000), mark('p1', 1000));
+    const theirs = withStroke(withStroke(emptyStrokeList('sheet', 4000, 3000), mark('p2', 2000)), makeStroke({ id: 'pen', tool: 'pen', color: '#111111', width: 5, points: [{ x: 1000, y: 500, p: 0.5 }], at }));
+    expect(photoMarkAt([theirs, mine], 1040, 520, 10)).toBe('p1');
+    expect(photoMarkAt([theirs, mine], 2000, 560, 10)).toBe('p2');
+    expect(photoMarkAt([theirs, mine], 1500, 500, 10)).toBeNull(); // between them
+    expect(photoMarkAt([], 1000, 500, 10)).toBeNull();
+  });
+});

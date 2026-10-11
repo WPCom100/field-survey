@@ -55,7 +55,7 @@ import { movePin } from '../card/actions';
 import { DeviceCard } from '../card/DeviceCard';
 import { EndEditor } from '../ends/EndEditor';
 import { AddDevicePanel } from '../additions/AddDevicePanel';
-import { INK_COLORS } from '../ink/geometry';
+import { INK_COLORS, photoMarkAt } from '../ink/geometry';
 import { InkCapture, type InkTool } from '../ink/InkCapture';
 import { recordStrokes } from '../ink/render';
 import { useInkLayers } from '../ink/useInkLayers';
@@ -202,6 +202,10 @@ export function PlanScreen(props: PlanScreenProps) {
   /** The long-press menu: where (view points for the menu, sheet points for what is added). */
   const [press, setPress] = useState<{ view: Point; sheet: Point; deviceId: string | null } | null>(null);
   const lastLongPress = useRef(0);
+  /** The long-pressing finger is still down: the dot follows it and a viewport change is not a pan. */
+  const pressHolding = useRef(false);
+  const pressOpen = useRef(false);
+  pressOpen.current = !!press;
   /** "+ Device": the form in the side panel and the grey pin at the spot. */
   const [adding, setAdding] = useState<{ at: Point; category: string | null } | null>(null);
   /** Draw mode (T24) and its tool settings; `noteAt` = a text note waiting for its words. */
@@ -423,6 +427,8 @@ export function PlanScreen(props: PlanScreenProps) {
     (vp: PdfViewport) => {
       const first = vpRef.current === null;
       vpRef.current = vp;
+      // panning or zooming the plan closes the add-here menu (iPad retest X-5)
+      if (pressOpen.current && !pressHolding.current && Date.now() - lastLongPress.current > 300) setPress(null);
       setFromJs(sheetToView(vp));
       attachUi(pdfNativeTag(pdfRef.current));
       // The first viewport is "ready" (loadComplete re-fires much later, T16); open at fit, or on
@@ -490,6 +496,16 @@ export function PlanScreen(props: PlanScreenProps) {
         );
         return;
       }
+      if (vp && prefs.layers.ink && props.blobs && !adding) {
+        const at = apply(viewToSheet(vp), { x, y });
+        const pinned = prefs.layers.pins && hitTest(layoutPins(renderPins, sheetToView(vp), size.width, size.height), x, y, HIT_PX);
+        const lists = [...ink.others.map((o) => o.list), ...(ink.mine ? [ink.mine] : [])];
+        const photoId = pinned ? null : photoMarkAt(lists, at.x, at.y, HIT_PX / 2 / scaleOf(sheetToView(vp)));
+        if (photoId) {
+          setPhotoReq({ kind: 'open', photoId, title: `Level ${plan?.level.code ?? ''}` });
+          return;
+        }
+      }
       if (!vp || !prefs.layers.pins) return;
       const layout = layoutPins(renderPins, sheetToView(vp), size.width, size.height);
       const hit = hitTest(layout, x, y, HIT_PX);
@@ -506,27 +522,60 @@ export function PlanScreen(props: PlanScreenProps) {
         focusSheetRect(focusRect(points, size, REVEAL_ZOOM), true);
       }
     },
-    [renderPins, size, prefs.layers.pins, select, focusSheetRect, moving, editor, plan, onEdited, press, adding],
+    [renderPins, size, prefs.layers.pins, prefs.layers.ink, select, focusSheetRect, moving, editor, plan, onEdited, press, adding, ink.others, ink.mine, props.blobs],
   );
 
-  /** Long-press on the sheet: the add-here menu at that spot (T23). */
-  const onPageLongPress = useCallback(
-    (_page: number, x: number, y: number) => {
+  /** Where a long press is, as the menu needs it; null off the sheet. */
+  const pressAt = useCallback(
+    (x: number, y: number): { view: Point; sheet: Point; deviceId: string | null } | null => {
       const vp = vpRef.current;
-      if (!vp || moving || !plan?.sheet) return;
+      if (!vp) return null;
       const at = apply(viewToSheet(vp), { x, y });
       const whole = sheetRect(vp);
-      if (at.x < 0 || at.y < 0 || at.x > whole.width || at.y > whole.height) return;
-      lastLongPress.current = Date.now();
-      setMenu(null);
+      if (at.x < 0 || at.y < 0 || at.x > whole.width || at.y > whole.height) return null;
       let deviceId: string | null = null;
       if (prefs.layers.pins) {
         const hit = hitTest(layoutPins(renderPins, sheetToView(vp), size.width, size.height), x, y, HIT_PX);
         if (hit?.kind === 'pin' && renderPins[hit.index]!.id !== NEW_PIN_ID) deviceId = renderPins[hit.index]!.id;
       }
-      setPress({ view: { x, y }, sheet: at, deviceId });
+      return { view: { x, y }, sheet: at, deviceId };
     },
-    [moving, plan, prefs.layers.pins, renderPins, size],
+    [prefs.layers.pins, renderPins, size],
+  );
+
+  /**
+   * Long-press on the sheet (T23): the add-here menu shows at once, the dot follows the finger while
+   * it is still down (adjusting the spot), and lifting leaves it there (iPad retest X-4).
+   */
+  const onPageLongPress = useCallback(
+    (_page: number, x: number, y: number) => {
+      if (moving || !plan?.sheet) return;
+      const p = pressAt(x, y);
+      if (!p) return;
+      pressHolding.current = true;
+      lastLongPress.current = Date.now();
+      setMenu(null);
+      setPress(p);
+    },
+    [moving, plan, pressAt],
+  );
+  const onPageLongPressMove = useCallback(
+    (_page: number, x: number, y: number) => {
+      if (!pressHolding.current) return;
+      const p = pressAt(x, y);
+      if (p) setPress(p);
+    },
+    [pressAt],
+  );
+  const onPageLongPressEnd = useCallback(
+    (_page: number, x: number, y: number) => {
+      if (!pressHolding.current) return;
+      pressHolding.current = false;
+      lastLongPress.current = Date.now();
+      const p = pressAt(x, y);
+      if (p) setPress(p);
+    },
+    [pressAt],
   );
 
   /** The nearest pinned device to a sheet point, for the Location of a "Photo here". */
@@ -701,6 +750,8 @@ export function PlanScreen(props: PlanScreenProps) {
                 onViewportChanged={onViewportChanged}
                 onPageSingleTap={onPageSingleTap}
                 onPageLongPress={onPageLongPress}
+                onPageLongPressMove={onPageLongPressMove}
+                onPageLongPressEnd={onPageLongPressEnd}
                 onLoadComplete={(pages, _path, sz) => console.log(`[plan] pdf loaded: ${pages} page(s), ${Math.round(sz.width)}×${Math.round(sz.height)}`)}
                 onError={(e) => setError(`The sheet could not be opened: ${String((e as Error)?.message ?? e)}`)}
               />

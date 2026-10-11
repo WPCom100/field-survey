@@ -4,7 +4,7 @@
  * unit-tested in Node, and the server's flattening (T29/T59) follows the same rules.
  */
 
-import { pressureScale, unpackPoints, type Stroke } from '@field-survey/core';
+import { pressureScale, unpackPoints, type Stroke, type StrokeList } from '@field-survey/core';
 
 export type Segment = { x1: number; y1: number; x2: number; y2: number; width: number };
 
@@ -57,4 +57,20 @@ export const INK_COLORS = ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#111111'
 export function containTransform(space: { width: number; height: number }, view: { width: number; height: number }) {
   const scale = Math.min(view.width / Math.max(space.width, 1), view.height / Math.max(space.height, 1));
   return { scale, ox: (view.width - space.width * scale) / 2, oy: (view.height - space.height * scale) / 2 };
+}
+
+/**
+ * The photo of the camera mark ("Photo here", T23) under a sheet point, in any user's layer: the
+ * topmost `marker` within its own half-width plus `tolerance`, or null. A tap on it opens the photo.
+ */
+export function photoMarkAt(lists: readonly StrokeList[], x: number, y: number, tolerance: number): string | null {
+  for (let l = lists.length - 1; l >= 0; l--) {
+    const strokes = lists[l]!.strokes;
+    for (let k = strokes.length - 1; k >= 0; k--) {
+      const s = strokes[k]!;
+      if (s.tool !== 'marker' || !s.ref) continue;
+      if (Math.hypot(x - s.points[0]!, y - s.points[1]!) <= s.width / 2 + tolerance) return s.ref.id;
+    }
+  }
+  return null;
 }
