@@ -176,6 +176,8 @@ export const ENTITIES = {
       width_pt: r(),
       height_pt: r(),
       grid_sets: j(),
+      /** The plan text pass (T45, D147): rooms, tags, loose bubbles, source-sheet boundaries. */
+      features: j(),
       revision: t(),
     },
     [['level_id']],

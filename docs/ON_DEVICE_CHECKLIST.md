@@ -187,6 +187,29 @@ Make a conflict: both iPads in airplane mode, iPad 1 note "Cover plate loose", i
 
 ---
 
+## T45 — Plan sheets upload and grid calibration  ·  Needs: no new build (JS only); **the server rebuilt with T45** (`docker compose up -d --build` — the image gains pdfplumber and pypdf — and `alembic upgrade head` to 0005); the iPad's local database migrates to 0006 on first open
+
+**Why it matters:** this is how a level gets its floor plan: the composite goes up once, every iPad downloads it, pins and ink have a sheet to live on, and Drawing Position is read off the grid instead of typed. The 06M composite is the only real sheet we have; on the PC its three grids calibrate automatically — the iPad has to show the same.
+
+- [ ] **Upload the 06M composite.** Projects → Houston Methodist (or a throw-away project with a 06M level) → Setup → 3 Sources → Floor plans: the 06M row shows "—" and Choose…. Put `Level_06M_-_Lighting_Composite_vector.pdf` in Files, Choose…, pick it. The job line reads Queued → Reading the sheet… → "Done: 1 sheet, 3 grid sets (3 auto) — arrives with the next sync" (about 15 s). → saw:
+- [ ] **It arrives.** Within a sync or two the row shows the sheet's title, "(not downloaded yet)" until the blob queue fetches it (Sync screen: plans bytes grow), then the Grid column reads **auto ✓ 3 sets**. Open plan ▸ opens the level with the drawing. → saw:
+- [ ] **No magenta.** On the plan the source-sheet boundaries are drawn by the app as thin dashed magenta lines with the sheet names (Ef.106.5.A…) — not baked into the drawing: Layers ▸ Boundaries (source sheets) off makes every magenta line disappear; on brings them back. (In the demo level the toggle stays disabled: its PDF is the original.) → saw:
+- [ ] **Boundaries follow a pinch.** Pinch and pan: the dashed lines stay exactly on the drawing's sheet edges, same as pins and ink (D95), and stay 1–2 px wide at every zoom. → saw:
+- [ ] **Grid panel.** ⌗ Grid (bottom right) opens Grid calibration — 06M in the side panel: three sets — A–H / 13.5–5 (● auto · residual 0.2 pt), A.–F. / 15.–5. (● auto), R.–K. / 16.–13. (+22°) (● auto · rotated 22°) — each with a name and a Prefix field; the plan shows every grid bubble ringed in the set's colour (blue, green, orange) exactly over the printed bubbles, including the rotated wing's K.–R. and 13.–16. → saw:
+- [ ] **Test a point.** Test: tap a point → its Drawing Position, then tap between columns B and C and rows 9 and 8 of the Centennial grid: the panel reads **Grid B-C / 9-8**. Tap on the C line at row 9: **Grid C / 9**. Tap right of column H (still in the Centennial part): **Grid East of H / …**. Tap in the Walter Tower part: **Grid C.-D. / 7.-6.**-style with the dotted labels. Tap the title block: "Off every grid on this sheet". → saw:
+- [ ] **Prefix.** Set the Walter Tower set's Prefix to `WT`, Save: a test tap there now reads **WT Grid C.-D. / 7.-6.**; after a sync a second iPad shows the same prefix. → saw:
+- [ ] **Three-tap calibration.** Recalibrate: tap three bubbles → tap the A bubble at the top of the Centennial grid: the panel asks "Which bubble…? Printed there: A" with A pre-filled; Use. Tap H (pre-filled H), Use. Tap the 9 bubble at the left edge (pre-filled 9), Use. Finish is enabled; name it `Test` and Finish: a fourth set "Test" (● manual) appears, its bubbles drawn in purple, and a test tap between B and C still reads Grid B-C / 9-8 (the manual set and the auto set agree). Remove the Test set. → saw:
+- [ ] **A wrong label is refused.** Recalibrate again, tap any bubble and type `OF` as its label: "…is not a grid label." Tap three letter bubbles only and Finish: "Tap bubbles of both axes". Cancel. → saw:
+- [ ] **Drawing Position on + Device.** Long-press between B and C / 9 and 8 → + Device: the form's Drawing Position reads **Grid B-C / 9-8** and Room / Location the nearest room (e.g. `Elevator Lobby B (FSAE) XX06M-C003`), both editable. Add: the card shows that Drawing Position. → saw:
+- [ ] **Drawing Position follows a moved pin.** On that device, Move pin (reason) → tap between D and E: Drawing Position becomes Grid D-E / …. Type your own Drawing Position on another device, then move its pin: the typed text stays. → saw:
+- [ ] **Source sheets.** Floor plans → 06M → Source sheets → Add…: pick any multi-page PDF: "Done: N sheets, 0 grid sets"; the row lists `<name> p.1, p.2…`. (Opening source sheets on the plan is T78.) → saw:
+- [ ] **Same file twice.** Choose… the composite again for 06M: "Already uploaded — this exact file was imported for this level before". Replace… with a different PDF: the level now opens that one; the old pins show as "elsewhere" (T77 carries them over). → saw:
+- [ ] **Offline.** Airplane mode on, Choose…: a plain error line, nothing else affected; the Grid panel and Test still work from the local sheet data. → saw:
+
+Decision D147: `sheet.features` beside `grid_sets`; pypdf rewrites the display PDF with the boundary group off; three grid sets on 06M; manual calibration on the plan (⌗ Grid), Drawing Position / Room defaults follow the pin until typed over (see DECISIONS.md). Approve / change → answer:
+
+---
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

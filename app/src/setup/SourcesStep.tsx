@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useIdentity } from '../identity/IdentityGate';
+import { FloorPlans } from './FloorPlans';
 import { Btn, ChipPicker, Notice, Section } from './widgets';
 import {
   KIND_LABEL,
@@ -122,6 +123,7 @@ export function SourcesStep({ projectId }: { projectId: string }) {
 
   return (
     <>
+      <FloorPlans projectId={projectId} />
       <Section title="Seed import">
         <Text style={styles.hint}>
           Import a master workbook, or one floor's workbook, as the project's starting records. The server reads the file, so this needs a connection. Rows that do not fit the vocabulary go to Needs review; nothing is locked.

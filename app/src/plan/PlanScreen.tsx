@@ -34,12 +34,21 @@
 
 import {
   Editor,
+  drawingPosition,
   emptyStrokeList,
+  labelKind,
+  manualGridSet,
+  nearestRoom,
   resolutionReason,
   makeStroke,
+  roomText,
+  snapLabel,
   uuidv7,
   withStroke,
   type BlobQueue,
+  type EditContext,
+  type GridSet,
+  type GridTap,
   type ReviewItem,
   type Store,
   type StrokeList,
@@ -111,6 +120,8 @@ import {
 } from './lists';
 import { BadgeStrip, Swatch, chipStyles } from './chips';
 import { PinOverlay } from './PinOverlay';
+import { GridPanel, type GridPanelMode } from './GridPanel';
+import type { GridMark } from './drawLayers';
 import { pdfNativeTag, useUiViewport } from './uiViewport';
 import { DEVICE_CATEGORIES, pinStyleFor, statusRank } from './pins';
 import {
@@ -144,6 +155,8 @@ const LONG_PRESS_TAP_GUARD_MS = 900;
 const NEW_PIN_ID = '__adding__';
 /** Side B of a pin conflict (never a real id). */
 const REVIEW_B_PIN_ID = '__review_b__';
+/** Grid calibration edits on `sheet.grid_sets` (T45): project setup, not a survey finding. */
+const GRID_EDIT: EditContext = { change_type: 'Master edit', reason: 'Grid calibration' };
 
 type Menu = 'category' | 'status' | 'owner' | 'layers' | null;
 
@@ -233,6 +246,13 @@ export function PlanScreen(props: PlanScreenProps) {
   pressOpen.current = !!press;
   /** "+ Device": the form in the side panel and the grey pin at the spot. */
   const [adding, setAdding] = useState<{ at: Point; category: string | null } | null>(null);
+  /** The Grid panel (T45) in the side panel, with its test / three-tap calibration modes. */
+  const [gridOpen, setGridOpen] = useState(false);
+  const [gridMode, setGridMode] = useState<GridPanelMode>('idle');
+  const [gridTaps, setGridTaps] = useState<GridTap[]>([]);
+  const [gridPending, setGridPending] = useState<{ x: number; y: number; suggestion: string | null } | null>(null);
+  const [gridTest, setGridTest] = useState<{ text: string | null } | null>(null);
+  const [gridError, setGridError] = useState<string | null>(null);
   /** Draw mode (T24) and its tool settings; `noteAt` = a text note waiting for its words. */
   const [drawing, setDrawing] = useState(false);
   /** Draw-mode touches from the Pdf view (T69). */
@@ -560,6 +580,7 @@ export function PlanScreen(props: PlanScreenProps) {
       setCardOpen(!!id);
       setEndView(null);
       setAdding(null);
+      if (id) setGridOpen(false);
       if (!id) return;
       if (from === 'plan') {
         const index = firstRowOf.get(id);
@@ -578,6 +599,18 @@ export function PlanScreen(props: PlanScreenProps) {
       setMenu(null);
       if (Date.now() - lastLongPress.current < LONG_PRESS_TAP_GUARD_MS) return; // the long press's own lift
       if (press) return setPress(null);
+      // Grid panel (T45): a test tap reads its Drawing Position; a calibration tap waits for its label.
+      if (vp && gridOpen && gridMode !== 'idle' && plan?.sheet) {
+        const at = apply(viewToSheet(vp), { x, y });
+        if (gridMode === 'test') {
+          const text = drawingPosition(plan.sheet.gridSets, at);
+          console.log(`[plan] grid test at ${Math.round(at.x)},${Math.round(at.y)} → ${text ?? 'off every grid'}`);
+          setGridTest({ text });
+        } else if (!gridPending) {
+          setGridPending({ x: at.x, y: at.y, suggestion: snapLabel(plan.sheet.gridSets, plan.sheet.features, at) });
+        }
+        return;
+      }
       if (vp && moving && editor && plan?.sheet) {
         const at = apply(viewToSheet(vp), { x, y });
         const whole = sheetRect(vp);
@@ -586,7 +619,14 @@ export function PlanScreen(props: PlanScreenProps) {
           return;
         }
         const { deviceId, reason } = moving;
-        movePin(editor, deviceId, { sheet: plan.sheet.id, x: at.x, y: at.y }, reason).then(
+        // Drawing Position follows the pin unless someone typed their own (T45, PLAN §7.4)
+        const sets = plan.sheet.gridSets;
+        const dev = deviceById.get(deviceId);
+        const next = drawingPosition(sets, at);
+        const prior = dev?.pin ? drawingPosition(sets, dev.pin) : null;
+        const typed = !!dev?.drawingPosition && dev.drawingPosition !== prior;
+        const position = !typed && next !== null && next !== (dev?.drawingPosition ?? null) ? next : undefined;
+        movePin(editor, deviceId, { sheet: plan.sheet.id, x: at.x, y: at.y }, reason, position).then(
           () => {
             setMoving(null);
             setMoveError(null);
@@ -623,7 +663,7 @@ export function PlanScreen(props: PlanScreenProps) {
         focusSheetRect(focusRect(points, size, REVEAL_ZOOM), true);
       }
     },
-    [renderPins, size, prefs.layers.pins, prefs.layers.ink, select, focusSheetRect, moving, editor, plan, onEdited, press, adding, ink.others, ink.mine, props.blobs, pinConflict],
+    [renderPins, size, prefs.layers.pins, prefs.layers.ink, select, focusSheetRect, moving, editor, plan, onEdited, press, adding, ink.others, ink.mine, props.blobs, pinConflict, gridOpen, gridMode, gridPending, deviceById],
   );
 
   /** Where a long press is, as the menu needs it; null off the sheet. */
@@ -756,6 +796,41 @@ export function PlanScreen(props: PlanScreenProps) {
     const crop = vpRef.current?.cropBox;
     return recordStrokes(lists, { width: crop?.width ?? plan?.sheet?.widthPt ?? 20000, height: crop?.height ?? plan?.sheet?.heightPt ?? 20000 });
   }, [prefs.layers.ink, ink.others, ink.mine, plan]);
+
+  /** Grid bubbles of every set, plus the calibration taps as a new set, while the Grid panel is open (T45). */
+  const gridMarks = useMemo<GridMark[]>(() => {
+    const sets = plan?.sheet?.gridSets ?? [];
+    const marks: GridMark[] = sets.flatMap((gs, i) => (gs.bubbles ?? []).map((b) => ({ label: b.label, axis: b.axis, x: b.x, y: b.y, set: i })));
+    for (const t of gridTaps) marks.push({ label: t.label, axis: labelKind(t.label) === 'alpha' ? 'col' : 'row', x: t.x, y: t.y, set: sets.length });
+    if (gridPending) marks.push({ label: '?', axis: 'col', x: gridPending.x, y: gridPending.y, set: sets.length });
+    return marks;
+  }, [plan, gridTaps, gridPending]);
+  /** Save the sheet's grid sets as one op (project setup, not a survey finding). */
+  const saveGridSets = useCallback(
+    (sets: GridSet[]) => {
+      if (!editor || !plan?.sheet) return;
+      setGridError(null);
+      editor.setField('sheet', plan.sheet.id, 'grid_sets', sets, GRID_EDIT).then(
+        () => {
+          console.log(`[plan] grid sets saved: ${sets.map((s) => `${s.name} (${s.mode})`).join('; ') || 'none'}`);
+          setGridMode('idle');
+          setGridTaps([]);
+          setGridPending(null);
+          onEdited();
+        },
+        (e: unknown) => setGridError(`Not saved: ${String((e as Error)?.message ?? e)}`),
+      );
+    },
+    [editor, plan, onEdited],
+  );
+  const closeGrid = () => {
+    setGridOpen(false);
+    setGridMode('idle');
+    setGridTaps([]);
+    setGridPending(null);
+    setGridTest(null);
+    setGridError(null);
+  };
 
   const zoomNow = () => (vpRef.current ? scaleOf(sheetToView(vpRef.current)) : 1);
   const emptyInk = (): StrokeList | null => {
@@ -900,6 +975,12 @@ export function PlanScreen(props: PlanScreenProps) {
                   photos={prefs.layers.photos}
                   width={size.width}
                   height={size.height}
+                  boundaries={
+                    prefs.layers.boundaries && plan.sheet.features.boundaries.length
+                      ? { lines: plan.sheet.features.boundaries, labels: plan.sheet.features.boundary_labels }
+                      : null
+                  }
+                  gridMarks={gridOpen ? gridMarks : null}
                 />
               ) : null}
               {drawing ? (
@@ -1035,6 +1116,19 @@ export function PlanScreen(props: PlanScreenProps) {
                     <Text style={styles.toolText}>✎ Ink</Text>
                   </Pressable>
                 ) : null}
+                {!drawing ? (
+                  <Pressable
+                    style={[styles.tool, gridOpen && styles.toolOn]}
+                    onPress={() => {
+                      if (gridOpen) return closeGrid();
+                      setGridOpen(true);
+                      setCardOpen(false);
+                      setEndView(null);
+                      setAdding(null);
+                    }}>
+                    <Text style={styles.toolText}>⌗ Grid</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable style={styles.tool} onPress={fit}>
                   <Text style={styles.toolText}>⌖ Fit</Text>
                 </Pressable>
@@ -1050,7 +1144,51 @@ export function PlanScreen(props: PlanScreenProps) {
 
         {/* side lists */}
         <View style={styles.side}>
-          {adding && editor && plan?.sheet ? (
+          {gridOpen && plan?.sheet ? (
+            <GridPanel
+              levelCode={plan.level.code}
+              sets={plan.sheet.gridSets}
+              canEdit={!!editor}
+              mode={gridMode}
+              testResult={gridTest}
+              taps={gridTaps}
+              pending={gridPending}
+              error={gridError}
+              onTest={() => {
+                setGridTest(null);
+                setGridMode((m) => (m === 'test' ? 'idle' : 'test'));
+              }}
+              onStartCalibrate={() => {
+                setGridMode('calibrate');
+                setGridTaps([]);
+                setGridPending(null);
+                setGridError(null);
+              }}
+              onCancelCalibrate={() => {
+                setGridMode('idle');
+                setGridTaps([]);
+                setGridPending(null);
+              }}
+              onLabelPending={(label) => {
+                if (!gridPending) return;
+                setGridTaps((t) => [...t, { x: gridPending.x, y: gridPending.y, label }]);
+                setGridPending(null);
+              }}
+              onDropPending={() => setGridPending(null)}
+              onUndoTap={() => setGridTaps((t) => t.slice(0, -1))}
+              onFinishCalibrate={(name, prefix) => {
+                try {
+                  const gs = manualGridSet(gridTaps, { ...(name ? { name } : {}), prefix });
+                  saveGridSets([...plan.sheet!.gridSets, gs]);
+                } catch (e) {
+                  setGridError(String((e as Error)?.message ?? e));
+                }
+              }}
+              onRename={(i, name, prefix) => saveGridSets(plan.sheet!.gridSets.map((s, j) => (j === i ? { ...s, name, prefix } : s)))}
+              onRemove={(i) => saveGridSets(plan.sheet!.gridSets.filter((_, j) => j !== i))}
+              onClose={closeGrid}
+            />
+          ) : adding && editor && plan?.sheet ? (
             <AddDevicePanel
               store={store}
               editor={editor}
@@ -1059,6 +1197,13 @@ export function PlanScreen(props: PlanScreenProps) {
               levelCode={plan.level.code}
               sheetId={plan.sheet.id}
               at={adding.at}
+              defaults={{
+                drawingPosition: drawingPosition(plan.sheet.gridSets, adding.at),
+                room: (() => {
+                  const r = nearestRoom(plan.sheet.features, adding.at);
+                  return r ? roomText(r) : null;
+                })(),
+              }}
               onCategory={(category) => setAdding((a) => (a ? { ...a, category } : a))}
               onCancel={() => setAdding(null)}
               onAdded={(deviceId) => {
@@ -1132,7 +1277,7 @@ export function PlanScreen(props: PlanScreenProps) {
             />
           ) : null}
           {/* The lists stay mounted under an open card, so their scroll position survives. */}
-          <View style={[styles.lists, adding || endView || (cardOpen && selectedId) ? styles.hidden : null]}>
+          <View style={[styles.lists, adding || endView || gridOpen || (cardOpen && selectedId) ? styles.hidden : null]}>
           <View style={styles.tabs}>
             {TABS.map((t) => {
               const n = t === 'devices' ? visible.length : rowsByTab[t].length;
@@ -1234,7 +1379,13 @@ export function PlanScreen(props: PlanScreenProps) {
                   <MenuItem label="Labels (device type)" on={prefs.layers.labels} onPress={() => setLayer('labels')} />
                   <MenuItem label="Photos (camera mark)" on={prefs.layers.photos} onPress={() => setLayer('photos')} />
                   <MenuItem label="Ink (all users)" on={prefs.layers.ink} onPress={() => setLayer('ink')} />
-                  <MenuItem label="Boundaries" on={false} disabled note="No boundary data for this sheet yet" onPress={() => {}} />
+                  <MenuItem
+                    label="Boundaries (source sheets)"
+                    on={prefs.layers.boundaries && !!plan?.sheet?.features.boundaries.length}
+                    disabled={!plan?.sheet?.features.boundaries.length}
+                    note={plan?.sheet?.features.boundaries.length ? undefined : 'No boundary data for this sheet'}
+                    onPress={() => setLayer('boundaries')}
+                  />
                 </>
               ) : null}
             </View>
@@ -1553,6 +1704,7 @@ const styles = StyleSheet.create({
   pdf: { flex: 1, backgroundColor: '#3a3d42' },
   planTools: { position: 'absolute', right: 12, bottom: 12, gap: 8, alignItems: 'flex-end' },
   tool: { backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
+  toolOn: { backgroundColor: '#1565c0' },
   toolText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   lists: { flex: 1 },
   hidden: { display: 'none' },

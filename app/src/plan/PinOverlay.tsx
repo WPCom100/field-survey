@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 
 import { drawInkLayer } from './drawInk';
+import { drawBoundaries, drawGridMarks, type BoundaryLabel, type BoundaryLine, type GridMark } from './drawLayers';
 import { drawPins, type PinFonts } from './drawPins';
 import { layoutPins, type RenderPin } from './layout';
 import type { Affine } from './viewport';
@@ -20,6 +21,10 @@ type Props = {
   height: number;
   /** All users' ink (T24) in sheet coordinates, drawn under the pins; null = ink layer off or empty. */
   ink: SkPicture | null;
+  /** Source-sheet boundaries (T45, D100) with their labels; null = layer off or none on this sheet. */
+  boundaries?: { lines: readonly BoundaryLine[]; labels: readonly BoundaryLabel[] } | null;
+  /** Grid bubbles of the calibration, shown while the Grid panel is open (T45); null = hidden. */
+  gridMarks?: readonly GridMark[] | null;
 };
 
 /**
@@ -29,7 +34,7 @@ type Props = {
  * scroll callback (`useUiViewport`, T64), so this mapper runs in the same run-loop turn. Takes no
  * touches: pinch, pan and tap belong to PDFKit underneath.
  */
-export const PinOverlay = memo(function PinOverlay({ matrix, pins, selectedId, showPins, labels, photos, width, height, ink }: Props) {
+export const PinOverlay = memo(function PinOverlay({ matrix, pins, selectedId, showPins, labels, photos, width, height, ink, boundaries, gridMarks }: Props) {
   const fonts = useMemo<PinFonts>(
     () => ({
       glyph: matchFont({ fontFamily: 'Helvetica', fontSize: 11, fontWeight: 'bold' }),
@@ -43,11 +48,25 @@ export const PinOverlay = memo(function PinOverlay({ matrix, pins, selectedId, s
     const recorder = Skia.PictureRecorder();
     const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, width, height));
     const m = matrix.value;
+    if (m && boundaries && boundaries.lines.length > 0) {
+      try {
+        drawBoundaries(canvas, boundaries.lines, boundaries.labels, m, fonts.label);
+      } catch (e) {
+        console.error(`[plan] boundary layer failed: ${String(e)}`);
+      }
+    }
     if (m && ink) {
       try {
         drawInkLayer(canvas, ink, m);
       } catch (e) {
         console.error(`[plan] ink layer failed: ${String(e)}`);
+      }
+    }
+    if (m && gridMarks && gridMarks.length > 0) {
+      try {
+        drawGridMarks(canvas, gridMarks, m, fonts.glyph);
+      } catch (e) {
+        console.error(`[plan] grid layer failed: ${String(e)}`);
       }
     }
     if (m && showPins && pins.length > 0) {
@@ -59,7 +78,7 @@ export const PinOverlay = memo(function PinOverlay({ matrix, pins, selectedId, s
       }
     }
     return recorder.finishRecordingAsPicture();
-  }, [pins, selectedId, showPins, labels, photos, width, height, fonts, ink]);
+  }, [pins, selectedId, showPins, labels, photos, width, height, fonts, ink, boundaries, gridMarks]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">

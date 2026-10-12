@@ -4,7 +4,15 @@
  * or Expo imports, so it is tested in Node over `BetterSqliteDriver`.
  */
 
-import { displayNumber, isNew, type Store } from '@field-survey/core';
+import {
+  displayNumber,
+  isNew,
+  parseGridSets,
+  parseSheetFeatures,
+  type GridSet,
+  type SheetFeatures,
+  type Store,
+} from '@field-survey/core';
 
 import type { Filterable } from './filters';
 
@@ -22,6 +30,10 @@ export type PlanSheet = {
   title: string | null;
   widthPt: number | null;
   heightPt: number | null;
+  /** Grid calibration (T45, D47): empty until the server's plans job or a manual calibration. */
+  gridSets: GridSet[];
+  /** The text pass (T45, D147): rooms, tags, loose bubbles, source-sheet boundaries. */
+  features: SheetFeatures;
 };
 
 export type PlanDevice = Filterable & {
@@ -33,6 +45,8 @@ export type PlanDevice = Filterable & {
   /** The master's Type column ("Echo relay panel"), when the device has one. */
   type: string | null;
   room: string | null;
+  /** The master's Drawing Position text ("Grid B-C / 9-8"); a default from the pin (T45). */
+  drawingPosition: string | null;
   /** On this level's display sheet, in sheet coordinates; null when unplaced or elsewhere. */
   pin: { x: number; y: number } | null;
   /** Pinned, but on another sheet than the display sheet. */
@@ -107,6 +121,8 @@ export async function loadLevelPlan(
         title: str(sh.title),
         widthPt: num(sh.width_pt),
         heightPt: num(sh.height_pt),
+        gridSets: parseGridSets(sh.grid_sets),
+        features: parseSheetFeatures(sh.features),
       };
     }
   }
@@ -164,6 +180,7 @@ export async function loadLevelPlan(
       device: str(r.device),
       type: str(r.type),
       room: str(r.room_location),
+      drawingPosition: str(r.drawing_position),
       pin: at,
       pinElsewhere: elsewhere,
       fieldAddition: r.origin === 'field_addition',

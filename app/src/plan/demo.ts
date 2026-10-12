@@ -9,6 +9,7 @@
 
 import { uuidv7, type Op, type Store } from '@field-survey/core';
 
+import demoGrid from './demo-grid.json';
 import { DEVICE_CATEGORIES } from './pins';
 
 export const DEMO_LEVEL_ID = '0190a5f0-0000-7000-8000-00000000d06e';
@@ -78,6 +79,11 @@ export function demoOps(dense = 0): Op[] {
     title: 'Level 06M – Lighting Composite',
     width_pt: DEMO_SHEET_SIZE.width,
     height_pt: DEMO_SHEET_SIZE.height,
+    // The server's text pass over the fixture (T45): three grid sets, rooms and tags, so the
+    // Grid panel and Drawing Position can be tried on the demo level; no boundaries (the demo
+    // shows the original PDF, whose magenta is still baked in).
+    grid_sets: demoGrid.grid_sets,
+    features: { rooms: demoGrid.rooms, tags: demoGrid.tags, bubbles: [], boundaries: [], boundary_labels: [] },
   });
 
   const rand = mulberry32(17);

@@ -68,11 +68,12 @@ describe('filters (D99)', () => {
     expect(toggle(['A', 'B'], 'A', ['A', 'B', 'C'])).toEqual(['B']);
   });
 
-  it('stored prefs are read defensively and boundaries stay off until T45 (D100)', () => {
+  it('stored prefs are read defensively; the boundaries layer is a plain flag since T45 (D100)', () => {
     expect(parsePrefs(null)).toEqual({ filter: EMPTY_FILTER, layers: DEFAULT_LAYERS });
+    expect(DEFAULT_LAYERS.boundaries).toBe(true);
     const p = parsePrefs({
       filter: { categories: ['Station', 7], statuses: ['Issue', 'Bogus'], owners: ['ETC/EC', 'EC'], openPunch: true },
-      layers: { labels: false, boundaries: true, photos: 'yes' },
+      layers: { labels: false, boundaries: false, photos: 'yes' },
     });
     expect(p.filter).toEqual({ categories: ['Station'], statuses: ['Issue'], owners: ['EC'], openPunch: true });
     expect(p.layers).toEqual({ ...DEFAULT_LAYERS, labels: false, boundaries: false });

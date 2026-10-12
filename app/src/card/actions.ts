@@ -104,7 +104,16 @@ export function movePin(
   deviceId: string,
   pin: { sheet: string; x: number; y: number },
   reason: string,
+  /** The Drawing Position the new pin reads as (T45), set in the same group when given. */
+  drawingPosition?: string | null,
 ): Promise<Op | null> {
   const round = (n: number) => Math.round(n * 10) / 10;
-  return editor.setField('device', deviceId, 'pin', { sheet: pin.sheet, x: round(pin.x), y: round(pin.y) }, correction(reason));
+  const at = { sheet: pin.sheet, x: round(pin.x), y: round(pin.y) };
+  if (drawingPosition === undefined) return editor.setField('device', deviceId, 'pin', at, correction(reason));
+  return editor
+    .group(correction(reason), async (g) => {
+      await g.setField('device', deviceId, 'pin', at);
+      await g.setField('device', deviceId, 'drawing_position', drawingPosition);
+    })
+    .then((ops) => ops[0] ?? null);
 }

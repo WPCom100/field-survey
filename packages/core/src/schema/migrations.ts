@@ -10,6 +10,7 @@ import { statements as m0002 } from './migrations/0002_blob_kind';
 import { statements as m0003 } from './migrations/0003_photo_link';
 import { statements as m0004 } from './migrations/0004_punch_device_text';
 import { statements as m0005 } from './migrations/0005_outbox_state';
+import { statements as m0006 } from './migrations/0006_sheet_features';
 
 export interface Migration {
   version: number;
@@ -23,6 +24,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 3, name: 'photo_link', statements: m0003 },
   { version: 4, name: 'punch_device_text', statements: m0004 },
   { version: 5, name: 'outbox_state', statements: m0005 },
+  { version: 6, name: 'sheet_features', statements: m0006 },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

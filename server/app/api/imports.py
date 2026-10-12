@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.auth import SessionDep, current_user, require_token
 from app.config import settings
-from app.jobs import runner
+from app.jobs import plans, runner
 from app.jobs.workbook import WorkbookError, inspect_workbook
 from app.models import ImportBatch, User
 from app.storage import ObjectStore, get_object_store
@@ -34,11 +34,36 @@ async def create_import(
     file: Annotated[UploadFile, File()],
     kind: Annotated[str, Form()] = "master_xlsx",
     mapping: Annotated[str | None, Form()] = None,
+    level_id: Annotated[uuid.UUID | None, Form()] = None,
+    sheet_kind: Annotated[str | None, Form()] = None,
 ) -> dict[str, Any]:
-    """Queue a seed import of the uploaded workbook. 202 with the batch; poll it by id."""
+    """Queue a seed import of the uploaded workbook — or, with `kind=plans`, a plan sheet PDF for
+    `level_id` as its `sheet_kind` (`display` | `source`, T45). 202 with the batch; poll it by
+    id."""
     data = await file.read()
     if len(data) > settings.blob_max_bytes:
         raise HTTPException(413, {"error": "too_large", "max": settings.blob_max_bytes})
+    if kind == plans.PLANS_KIND:
+        if level_id is None:
+            raise HTTPException(
+                422, {"error": "bad_request", "detail": "kind=plans needs level_id"}
+            )
+        try:
+            batch = plans.create_sheet_batch(
+                session,
+                store,
+                project_id=project_id,
+                level_id=level_id,
+                sheet_kind=sheet_kind or "display",
+                filename=file.filename or "sheet.pdf",
+                data=data,
+                user=user,
+            )
+        except runner.ImportError_ as e:
+            session.rollback()
+            status = 404 if "unknown" in str(e) else 422
+            raise HTTPException(status, str(e)) from e
+        return runner.batch_out(batch)
     overrides = None
     if mapping:
         try:

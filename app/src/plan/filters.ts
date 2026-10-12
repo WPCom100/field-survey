@@ -34,7 +34,7 @@ export type PlanFilter = {
 export type PlanLayers = {
   pins: boolean;
   labels: boolean;
-  /** Source-sheet boundaries: no data until T45 extracts them (D100); the toggle is disabled. */
+  /** Source-sheet boundaries from the sheet's text pass (T45, D100); the toggle is disabled on a sheet without any. */
   boundaries: boolean;
   /** Ink of all users; drawn once T24 stores stroke lists. */
   ink: boolean;
@@ -43,7 +43,7 @@ export type PlanLayers = {
 };
 
 export const EMPTY_FILTER: PlanFilter = { categories: [], statuses: [], owners: [], openPunch: false };
-export const DEFAULT_LAYERS: PlanLayers = { pins: true, labels: true, boundaries: false, ink: true, photos: true };
+export const DEFAULT_LAYERS: PlanLayers = { pins: true, labels: true, boundaries: true, ink: true, photos: true };
 
 /** What a filter needs to know about one device. */
 export type Filterable = {
@@ -116,7 +116,7 @@ export function parsePrefs(raw: unknown): PlanPrefs {
     layers: {
       pins: flag('pins'),
       labels: flag('labels'),
-      boundaries: false, // nothing to draw until T45 (D100)
+      boundaries: flag('boundaries'),
       ink: flag('ink'),
       photos: flag('photos'),
     },

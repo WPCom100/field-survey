@@ -131,6 +131,8 @@ class Sheet(Id, Synced, Base):
     width_pt: Mapped[float | None]
     height_pt: Mapped[float | None]
     grid_sets: Mapped[list[Any] | None]
+    # The text pass (T45, D147): rooms, tags, loose bubbles, source-sheet boundaries.
+    features: Mapped[dict[str, Any] | None]
     revision: Mapped[str | None]
 
 

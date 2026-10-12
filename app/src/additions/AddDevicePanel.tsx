@@ -21,6 +21,8 @@ export type AddDeviceProps = {
   levelCode: string;
   sheetId: string;
   at: { x: number; y: number };
+  /** Defaults from the sheet's grid calibration and text pass at `at` (T45): editable. */
+  defaults?: { drawingPosition: string | null; room: string | null };
   onCancel: () => void;
   /** Category picked so far: the plan draws the placeholder pin in its shape. */
   onCategory: (category: string | null) => void;
@@ -33,7 +35,8 @@ export function AddDevicePanel(props: AddDeviceProps) {
   const [all, setAll] = useState<LibraryChoice[] | null>(null);
   const [typeId, setTypeId] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
-  const [room, setRoom] = useState('');
+  const [room, setRoom] = useState(props.defaults?.room ?? '');
+  const [drawingPosition, setDrawingPosition] = useState(props.defaults?.drawingPosition ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +65,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
         libraryTypeId: picked?.id ?? null,
         typedModel: picked ? null : typed,
         room,
+        drawingPosition,
       });
       props.onAdded(r.deviceId);
     } catch (e) {
@@ -149,8 +153,13 @@ export function AddDevicePanel(props: AddDeviceProps) {
           <Text style={styles.muted}>numbered by the server at the next sync</Text>
         </View>
 
+        <Text style={styles.label}>Drawing Position (optional)</Text>
+        <TextInput style={styles.input} value={drawingPosition} onChangeText={setDrawingPosition} placeholder="e.g. Grid B-C / 9-8" placeholderTextColor="#888" autoCorrect={false} />
+        {props.defaults?.drawingPosition ? <Text style={styles.muted}>From the grid at the pin; edit if the drawing says otherwise.</Text> : null}
+
         <Text style={styles.label}>Room / Location (optional)</Text>
         <TextInput style={styles.input} value={room} onChangeText={setRoom} placeholder="e.g. XX06M-1E05 Elec Rm" placeholderTextColor="#888" />
+        {props.defaults?.room ? <Text style={styles.muted}>The room code printed nearest the pin.</Text> : null}
 
         <Pressable style={[styles.addBtn, (!ready || saving) && styles.addBusy]} onPress={add} disabled={!ready || saving}>
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.addText}>Add device</Text>}

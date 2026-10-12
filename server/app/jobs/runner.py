@@ -83,22 +83,26 @@ def create_batch(
     data: bytes,
     user: User | None,
     mapping: dict[str, dict[str, str]] | None = None,
+    mime: str = XLSX_MIME,
+    extra: dict[str, Any] | None = None,
 ) -> ImportBatch:
-    """Store the file and queue the job. Commits."""
-    if kind not in SEED_KINDS:
-        raise ImportError_(f"kind must be one of {', '.join(SEED_KINDS)}")
+    """Store the file and queue the job. Commits. `extra` goes into the file entry (the plans
+    job keeps `level_id` / `sheet_kind` there, T45)."""
+    if kind not in SEED_KINDS and kind != "plans":
+        raise ImportError_(f"kind must be one of {', '.join((*SEED_KINDS, 'plans'))}")
     if session.get(Project, project_id) is None:
         raise ImportError_(f"unknown project {project_id}")
     if not data:
         raise ImportError_("empty file")
     batch_id = uuid7()
     key = file_key(batch_id, filename or "workbook.xlsx")
-    store.put_file(key, io.BytesIO(data), XLSX_MIME)
+    store.put_file(key, io.BytesIO(data), mime)
     entry: dict[str, Any] = {
         "name": filename,
         "sha256": hashlib.sha256(data).hexdigest(),
         "size": len(data),
         "key": key,
+        **(extra or {}),
     }
     if mapping:
         entry["mapping"] = mapping  # column-mapping UI overrides (T28)
@@ -287,11 +291,18 @@ def _levels(session: Session, project_id: uuid.UUID, wb) -> dict[str, seed_impor
 # ------------------------------------------------------------- lifecycle
 
 SessionFactory = Callable[[], Session]
+Job = Callable[[Session, ObjectStore, ImportBatch], dict[str, Any]]
 
 
-def run_batch(session_factory: SessionFactory, store: ObjectStore, batch_id: uuid.UUID) -> str:
+def run_batch(
+    session_factory: SessionFactory,
+    store: ObjectStore,
+    batch_id: uuid.UUID,
+    job: Job = import_workbook,
+) -> str:
     """Run one batch to `done`, `skipped` or `failed`; returns the final state. The data
-    transaction and the batch-state updates are separate sessions so a failure is recorded."""
+    transaction and the batch-state updates are separate sessions so a failure is recorded.
+    `job` is the seed import by default; the plans job (`app.jobs.plans`) passes its own."""
     with session_factory() as s:
         batch = s.get(ImportBatch, batch_id)
         if batch is None:
@@ -307,7 +318,7 @@ def run_batch(session_factory: SessionFactory, store: ObjectStore, batch_id: uui
         with session_factory() as s:
             batch = s.get(ImportBatch, batch_id)
             assert batch is not None
-            stats = import_workbook(s, store, batch)
+            stats = job(s, store, batch)
             s.commit()
         state = "skipped" if "skipped" in stats else "done"
     except ImportError_ as e:
@@ -325,18 +336,24 @@ def run_batch(session_factory: SessionFactory, store: ObjectStore, batch_id: uui
     return state
 
 
-def run_queued(session_factory: SessionFactory, store: ObjectStore, limit: int = 1) -> list[str]:
-    """Worker tick: run up to `limit` queued seed imports, oldest first."""
+def run_queued(
+    session_factory: SessionFactory,
+    store: ObjectStore,
+    limit: int = 1,
+    kinds: tuple[str, ...] = SEED_KINDS,
+    job: Job = import_workbook,
+) -> list[str]:
+    """Worker tick: run up to `limit` queued batches of `kinds` with `job`, oldest first."""
     with session_factory() as s:
         ids = list(
             s.scalars(
                 select(ImportBatch.id)
-                .where(ImportBatch.job_state == "queued", ImportBatch.kind.in_(SEED_KINDS))
+                .where(ImportBatch.job_state == "queued", ImportBatch.kind.in_(kinds))
                 .order_by(ImportBatch.created_at)
                 .limit(limit)
             )
         )
-    return [run_batch(session_factory, store, i) for i in ids]
+    return [run_batch(session_factory, store, i, job) for i in ids]
 
 
 # ------------------------------------------------------------------- CLI

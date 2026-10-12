@@ -77,6 +77,8 @@ export type FieldDeviceInput = {
   /** A drawing tag to keep (`S15`); normally left out — the server numbers the device (D118). */
   tag?: string | null;
   room?: string | null;
+  /** The master's Drawing Position text, defaulted from the pin by the grid calibration (T45). */
+  drawingPosition?: string | null;
 };
 
 export type FieldDeviceResult = {
@@ -139,6 +141,7 @@ export async function addFieldDevice(editor: Editor, store: Store, input: FieldD
       category,
       device: model,
       room_location: str(input.room),
+      drawing_position: str(input.drawingPosition),
       pin: { sheet: input.sheetId, x: round(input.at.x), y: round(input.at.y) },
       origin: 'field_addition',
       found_on_site: true,
