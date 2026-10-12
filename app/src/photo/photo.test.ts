@@ -128,14 +128,19 @@ describe('photo capture model (T21)', () => {
     ]);
     expect(new Set([made.op.group_id, ...made.links.map((o) => o.group_id)]).size).toBe(1);
 
-    // the photo's device, the linked device and the linked end all show it, each naming the others
+    // the photo's device, the linked device and the linked end all show it; the strip does not
+    // list the other links under the thumbnail (D134), the caption sheet's picker does
     const own = (await loadDeviceCard(store, dev.id))!.photos.find((p) => p.id === made.id)!;
-    expect(own.links).toEqual([conn.label, other.label]);
+    expect(own).toBeDefined();
+    expect(own).not.toHaveProperty('links');
     const linked = (await loadDeviceCard(store, other.id))!.photos.find((p) => p.id === made.id)!;
-    expect(linked.links).toEqual([dev.label, conn.label]);
+    expect(linked).toMatchObject({ id: made.id, label: 'NEW' });
     const ends = (await loadCableEnds(store, conn.id))!;
     expect(ends.ends[0].photos.map((p) => p.id)).toContain(made.id);
-    expect(ends.ends[0].photos.find((p) => p.id === made.id)!.links).toEqual([dev.label, other.label]);
+    expect((await loadPhoto(store, made.id))!.fields.links).toEqual([
+      { kind: 'cable_end', id: conn.id },
+      { kind: 'device', id: other.id },
+    ]);
 
     // unlink the device, keep the end, change the caption: one group of set + link_remove
     const before = (await loadPhoto(store, made.id))!;

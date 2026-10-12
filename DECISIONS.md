@@ -191,7 +191,7 @@ The one part of this file kept current in place (rows are edited or removed as q
 | TP-6 stays pass on the T17 numbers; clustering up to ×2, reveal at ×2.5 | D103 (T17) | as built | DECISIONS D103 status | Proposed |
 | Pin overlay driven inside PDFKit's run-loop turn replaces D95's two native options | D106 (T64) | as built; the iPad agreed ("much more sticky") | DECISIONS D106 status | Proposed |
 | Plan max zoom ×32 of fit | D107 (T64) | as built | DECISIONS D107 status | Proposed |
-| Photo link picker: "nearby" = a pin within 144 sheet points (two inches of drawing); old single links read as links | D131 (T65) | as built | checklist Decision line, T65 | Proposed |
+| Photo link picker: "nearby" = a pin within 144 sheet points (two inches of drawing); old single links read as links (D131 (4)'s "🔗" line under thumbnails was removed by D134, T73) | D131 (T65) | as built | checklist Decision line, T65 | Proposed |
 | Draw mode: a second finger cancels the stroke; taps, double tap and long press are off while drawing | D132 (T69) | as built | checklist Decision line, T69 | Proposed |
 | Editing others' ink: 🎨 Recolour tool, erase beats recolour, offline writes merged after the pull | D133 (T72) | as built | checklist Decision line, T72 | Proposed |
 | `expo-document-picker` as the way to get a workbook onto the iPad (native module, new dev build) | D135 (T28) | as built | checklist Decision line, T28 | Proposed |

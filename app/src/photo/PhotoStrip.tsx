@@ -1,6 +1,7 @@
 /**
- * A row of photo thumbnails (T20 card, T65 end editor): number, ✎ markup, ↑ waiting, and the
- * photo's other links ("🔗 06M-05 · C-07", D128) so a photo shared by several records says so.
+ * A row of photo thumbnails (T20 card, T65 end editor): number, ✎ markup, ↑ waiting. A photo
+ * shared by several records shows on each of them; its links are seen and changed in the caption
+ * sheet's Linked picker, not listed under the thumbnail (D134).
  */
 
 import { Image, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
@@ -25,11 +26,6 @@ export function PhotoStrip(props: {
               {p.markup ? ' ✎' : ''}
               {p.waiting ? ' ↑' : ''}
             </Text>
-            {p.links.length ? (
-              <Text style={styles.photoLinks} numberOfLines={2}>
-                🔗 {p.links.join(' · ')}
-              </Text>
-            ) : null}
           </Pressable>
         );
       })}
@@ -43,5 +39,4 @@ const styles = StyleSheet.create({
   photoImg: { width: 64, height: 64, borderRadius: 4, backgroundColor: '#ddd' },
   photoNum: { width: 64, height: 64, borderRadius: 4, backgroundColor: '#e3e5e8', textAlign: 'center', lineHeight: 64, fontSize: 20 },
   photoLabel: { fontSize: 11, color: '#555' },
-  photoLinks: { fontSize: 10, color: '#1565c0', textAlign: 'center' },
 });

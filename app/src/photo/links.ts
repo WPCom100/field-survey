@@ -10,7 +10,7 @@
  *   the same sheet (nearest first) each with their ends, then the device's punch items, then any
  *   linked target not in that list (so it can still be unlinked).
  * - `photoStrip`: the photos of one device / connection end / punch item for a card or the end
- *   editor, each with its other links named ("🔗 06M-05 · C-07").
+ *   editor (their other links are not listed there, D134).
  */
 
 import { displayNumber, type Store } from '@field-survey/core';
@@ -149,7 +149,7 @@ export async function linkOptions(store: Store, deviceId: string | null, linked:
 
 /**
  * The photos of a device (taken from it or linked to it), a connection end or a punch item, by
- * number, each with its other links named and whether its bytes are still on this iPad only.
+ * number, each with whether its bytes are still on this iPad only.
  */
 export async function photoStrip(store: Store, target: LinkRef): Promise<CardPhoto[]> {
   const column = target.kind === 'device' ? 'device_id' : target.kind === 'cable_end' ? 'cable_end_id' : 'punch_item_id';
@@ -169,11 +169,6 @@ export async function photoStrip(store: Store, target: LinkRef): Promise<CardPho
   }
   const out: CardPhoto[] = [];
   for (const p of rows) {
-    const others = [
-      ...(str(p.device_id) ? [{ kind: 'device' as const, id: String(p.device_id) }] : []),
-      ...(await linksOf(store, p)),
-    ].filter((l) => !(l.kind === target.kind && l.id === target.id));
-    const labels = await shortLabels(store, others);
     out.push({
       id: String(p.id),
       label: displayNumber('photo', p),
@@ -182,7 +177,6 @@ export async function photoStrip(store: Store, target: LinkRef): Promise<CardPho
       markup: str(p.markup_blob),
       subject: str(p.subject) ?? str(p.what_it_shows),
       waiting: [p.image_blob, p.thumb_blob, p.markup_blob].some((b) => !!str(b) && waiting.has(String(b))),
-      links: others.map((l) => labels.get(keyOf(l))!).filter(Boolean),
     });
   }
   return out;

@@ -104,7 +104,7 @@ describe('connection end editor (T22)', () => {
 });
 
 describe('photos on the end editor (T65, D128)', () => {
-  it('shows a photo on the end it is linked to, not on the other end, naming its device', async () => {
+  it('shows a photo on the end it is linked to, not on the other end', async () => {
     const { store, editor, panel, end } = await setup();
     const dmx = end('C-03');
     const { id } = await editor.group({ change_type: 'Field survey', reason: 'Field survey' }, async (g) => {
@@ -113,7 +113,8 @@ describe('photos on the end editor (T65, D128)', () => {
     }).then((ops) => ({ id: ops[0]!.entity_id }));
     const view = (await loadCableEnds(store, dmx.id))!;
     const [mine, other] = view.ends;
-    expect(mine.photos).toMatchObject([{ id, label: 'NEW', links: [panel.label] }]);
+    expect(mine.photos).toMatchObject([{ id, label: 'NEW' }]);
+    expect(mine.photos[0]).not.toHaveProperty('links'); // no linked-items line (D134)
     expect(other?.photos ?? []).toEqual([]);
   });
 });

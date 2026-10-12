@@ -92,8 +92,6 @@ export type CardPhoto = {
   subject: string | null;
   /** Some of its bytes (image, thumbnail, markup) are still on this iPad only (`📷 waiting`, as the queue counts). */
   waiting: boolean;
-  /** D128: what else it is linked to, besides the record showing it (`06M-04`, `C-07`, `#12`). */
-  links: string[];
 };
 
 export type JumpTarget = { deviceId: string; levelId: string; label: string; sameLevel: boolean };

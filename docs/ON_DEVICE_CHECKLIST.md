@@ -44,7 +44,7 @@ Decision D135: `expo-document-picker` is added as a native module (see DECISIONS
 
 - [ ] **Photo from a connection is linked to it.** Open a device with connections → tap a connection → 📷 Photo, take a picture: in the caption sheet the connection's chip is already ticked (✓). Save; back in the end editor, the end shows "Photos (1)" with the thumbnail; the other end of the cable does not. → saw:
 - [ ] **Link several, nearest first.** Take a photo of a device that has other pins close to it on the plan: under Linked, its own connections come first, then the nearby devices (closest first) each followed by their connections, then its punch items. Tick two devices and one connection, Save. → saw:
-- [ ] **Shown everywhere it is linked.** Open each linked device's card and the linked connection: the photo is in each Photos strip, with a small blue "🔗 …" line naming the other links. → saw:
+- [ ] **Shown everywhere it is linked.** Open each linked device's card and the linked connection: the photo is in each Photos strip, showing only its number (and ✎ / ↑ marks) — no blue "🔗 …" line under it (D134, T73); its links show in the caption sheet's Linked picker. → saw:
 - [ ] **Unlink.** Open the photo again, untick one device, Save: it disappears from that device's card only; the others keep it. On a second iPad (or after a sync) the same. → saw:
 - [ ] **Imported multi-device photos.** On the Tower project, if a photo shows several devices in the master (`B1-01, B1-02`): note whether only the first device shows it (expected for data imported before T65; see TASKS follow-ups). → saw:
 
