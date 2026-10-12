@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     backup_copy_endpoint: str = ""
     backup_copy_access_key: str = ""
     backup_copy_secret_key: str = ""
+    # Weekly master export (D67, T29): ISO weekday (7 = Sunday), from BACKUP_HOUR_UTC, gated by
+    # BACKUP_ENABLED; one xlsx export per project by the `export` system user.
+    export_weekly_weekday: int = 7
 
     @property
     def team_names(self) -> list[str]:

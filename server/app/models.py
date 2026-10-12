@@ -249,6 +249,9 @@ class PunchItem(Id, Synced, Base):
     number: Mapped[int | None]
     device_id: Mapped[uuid.UUID | None] = mapped_column(fk("device.id"), index=True)
     cable_end_id: Mapped[uuid.UUID | None] = mapped_column(fk("cable_end.id"))
+    # The master's **Device** text, kept verbatim by the import and exported as stored (D136);
+    # generated from the linked device when empty.
+    device_text: Mapped[str | None]
     item: Mapped[str | None]
     type: Mapped[str | None]
     owner: Mapped[str | None]
@@ -575,3 +578,7 @@ class Export(Id, Base):
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(fk("app_user.id"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     diff_summary: Mapped[dict[str, Any] | None]
+    # Job lifecycle (T29, D137): queued → running → done | failed; `stats` holds the filename,
+    # row counts, timings or the error.
+    job_state: Mapped[str | None]
+    stats: Mapped[dict[str, Any] | None]

@@ -11,7 +11,7 @@ import time
 from app import backup
 from app.config import settings
 from app.db import SessionLocal
-from app.jobs import runner
+from app.jobs import exports, runner
 from app.storage import get_object_store
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -27,8 +27,10 @@ def main() -> None:
         if tick % HEARTBEAT_EVERY == 0:
             log.info(json.dumps({"event": "heartbeat", "concurrency": settings.worker_concurrency}))
             backup.tick()
+            exports.weekly_tick(SessionLocal, get_object_store())  # D67 weekly master export
         try:
             runner.run_queued(SessionLocal, get_object_store(), limit=settings.worker_concurrency)
+            exports.run_queued(SessionLocal, get_object_store(), limit=settings.worker_concurrency)
         except Exception as e:  # noqa: BLE001 - the loop must survive a bad database moment
             log.error(json.dumps({"event": "jobs_tick_failed", "error": repr(e)}))
         time.sleep(JOB_POLL_SECONDS)

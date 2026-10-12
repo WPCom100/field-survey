@@ -283,6 +283,8 @@ export const ENTITIES = {
       number: i({ serverAssigned: true }),
       device_id: t(),
       cable_end_id: t(),
+      // The master's Device text, kept verbatim by the import and exported as stored (D136).
+      device_text: t(),
       item: t(),
       type: enumCol(v.PUNCH_TYPE),
       owner: enumCol(v.OWNER),

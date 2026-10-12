@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app import auth
 from app.config import settings
 from app.main import app
+from app.storage import MemoryObjectStore, get_object_store
 
 TOKEN = "test-token"
 HDR = {"Authorization": f"Bearer {TOKEN}"}
@@ -74,3 +75,18 @@ def client(session, monkeypatch):
     app.dependency_overrides[auth.get_session] = lambda: session
     yield TestClient(app, raise_server_exceptions=False)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def store():
+    """An in-memory object store bound to the API (blobs, imports, exports)."""
+    s = MemoryObjectStore()
+    app.dependency_overrides[get_object_store] = lambda: s
+    yield s
+    app.dependency_overrides.pop(get_object_store, None)
+
+
+@pytest.fixture
+def factory(engine):
+    """A session factory for the job runners (each job opens its own sessions)."""
+    return lambda: Session(engine)

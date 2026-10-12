@@ -38,7 +38,9 @@ describe('migrations', () => {
     for (const spec of Object.values(ENTITIES)) {
       const info = await db.query<TableInfo>(`PRAGMA table_info(${spec.table})`);
       expect(info.length, spec.table).toBeGreaterThan(0);
-      expect(info.map((c) => c.name), spec.table).toEqual(Object.keys(spec.columns));
+      // Order-insensitive: a column added by a later `ALTER TABLE` (migration 0004) lands after the
+      // synced columns, while the registry lists it with the entity's own columns.
+      expect(info.map((c) => c.name).sort(), spec.table).toEqual(Object.keys(spec.columns).sort());
       for (const c of info) {
         const col = spec.columns[c.name]!;
         expect(c.notnull === 1, `${spec.table}.${c.name} notnull`).toBe(!!col.notNull);

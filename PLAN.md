@@ -72,7 +72,7 @@ Bold = master column (name kept verbatim for export). `*` = server-assigned.
 | `cable` | id, project, **Cable**, **Qty** (nullable), origin ∈ {riser, library, import, manual}, single_row, riser_ref{sheet, bbox}, riser_to_label, vertical (grouping key), end_a, end_b, endpoint_confirmed (D6), version, deleted_* | One physical cable (D2) |
 | `cable_end` | id, cable, side ∈ {A, B}, endpoint_kind ∈ {device, placeholder}, device, placeholder, level, **ID** (`C-nn`*, null until numbered), **From**, **To**, **Status**, **Note**, surveyed_by, surveyed_at, status_source ∈ {surveyed, copied, derived} | From/To generated once from templates then stored/editable (D32) |
 | `placeholder` | id, project, label, kind ∈ {fixtures, power, station_bus, level_not_in_scope, external, fixture_run, spare, unknown, custom}, level? | Project vocabulary (D26); seed list §7.5 |
-| `punch_item` | id, level, **#***, device, cable_end, **Item**, **Type**, **Owner**, **Tracking status**, **Date closed**, **Notes**, rule_id, proposal_id, sort_last, version, deleted_* | **Device**/**Photo** columns generated at export |
+| `punch_item` | id, level, **#***, device, cable_end, device_text (the **Device** column text, kept by the import, generated from the device when empty — D136), **Item**, **Type**, **Owner**, **Tracking status**, **Date closed**, **Notes**, rule_id, proposal_id, sort_last, version, deleted_* | **Photo** column generated at export; **Device** written from `device_text` |
 | `missing_part` | id, level, **#***, device, **Device / Location**, **Part**, **Part no.**, **Qty**, **Owner**, **Part status**, **Notes**, rule_id, proposal_id, version, deleted_* | **Source** generated at export from `part_source` |
 | `part_source` | missing_part, target_kind ∈ {punch, device, cable_end}, target_id | |
 | `photo_link` | photo, target_kind ∈ {device, cable_end, punch}, target_id (D128) | |
@@ -88,7 +88,7 @@ Bold = master column (name kept verbatim for export). `*` = server-assigned.
 | `draft_device` / `draft_cable` | per Phase 1f schema: level?, model/candidates[], category, qty, accessories[], source_ref{job, page, line|bbox}, level_basis, confidence, conflicts[], state ∈ {proposed, accepted, edited, rejected}, placed, not_on_sheet | |
 | `library_type` | id, project (**nullable: null = app-level library**), model, aliases[], category, id_scheme ∈ {level_number, level_tag}, default_cables[], optional_cables[], optional_accessories[], state ∈ {draft, accepted, rejected}, created_by, promoted_from | D43, D48, D65 |
 | `vocab` | id, project, list ∈ {device_note, punch_item, punch_note, part_note, connection_note, photo_caption, model_map, level_alias, category, type}, value, canonical_of | |
-| `export` | id, project, kind ∈ {xlsx, floor_pdf}, params, blob, created_by/at, diff_summary | Export history |
+| `export` | id, project, kind ∈ {xlsx, floor_pdf}, params{levels}, blob (SHA-256 of the file, stored as a blob), job_state, stats{filename, rows…}, created_by/at, diff_summary | Export history; a job row (D137) |
 
 ### 2.3 Numbering
 

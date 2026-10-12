@@ -896,6 +896,7 @@ class Builder:
                     "level_id": lv.level_id,
                     "number": number,
                     "device_id": dev.id if dev else None,
+                    "device_text": row.get("device"),  # verbatim, exported as stored (D136)
                     "item": item,
                     "type": self.enum(
                         vocab.PUNCH_TYPE,

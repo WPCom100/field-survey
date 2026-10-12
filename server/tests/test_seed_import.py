@@ -9,14 +9,12 @@ import openpyxl
 import pytest
 from conftest import HDR, SERVER_DIR
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
 from app import materialise, projects
 from app.auth import system_user, upsert_user
 from app.ids import uuid7
 from app.jobs import runner, seed_import
 from app.jobs.workbook import read_workbook
-from app.main import app
 from app.models import (
     Blob,
     Cable,
@@ -36,25 +34,11 @@ from app.models import (
     ReviewItem,
     Ruling,
 )
-from app.storage import MemoryObjectStore, get_object_store
 
 FIXTURE = SERVER_DIR.parent / "fixtures" / "Lighting_Control_Survey_Master_B2-06_4.xlsx"
 needs_fixture = pytest.mark.skipif(
     not FIXTURE.exists(), reason=f"golden fixture missing: {FIXTURE} (CLAUDE.md §6)"
 )
-
-
-@pytest.fixture
-def store():
-    s = MemoryObjectStore()
-    app.dependency_overrides[get_object_store] = lambda: s
-    yield s
-    app.dependency_overrides.pop(get_object_store, None)
-
-
-@pytest.fixture
-def factory(engine):
-    return lambda: Session(engine)
 
 
 def new_project(session, name="Tower") -> uuid.UUID:
@@ -369,6 +353,7 @@ def test_master_seed_import(session, store, factory, client):
     assert v.punch("B2", 3).device_id == v.device("B2-03").id
     assert v.punch("01", 18).device_id == v.device("01-S2").id
     assert v.punch("01", 12).device_id == v.device("01-08").id  # `UFMP4 - BH OBS RM 47` by room
+    assert v.punch("01", 12).device_text == "UFMP4 - BH OBS RM 47"  # kept verbatim (D136)
     assert v.punch("B1", 6).device_id == v.device("B1-02").id  # `EBDK (CTB1LCPB)`
     assert v.punch("06", 13).device_id == v.device("06-S2").id  # `PI1002 #2 � Corridor…`
     assert v.punch("03", 11).device_id == v.device("03-07").id  # `UFMP4 #2`

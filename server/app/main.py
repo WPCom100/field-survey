@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.api import blobs, imports, ops, projects
+from app.api import blobs, exports, imports, ops, projects
 from app.auth import SessionDep, current_user, is_system_user, require_token, upsert_user
 from app.config import settings
 from app.models import User
@@ -14,6 +14,7 @@ app.include_router(ops.router)
 app.include_router(blobs.router)
 app.include_router(imports.router)
 app.include_router(projects.router)
+app.include_router(exports.router)
 
 
 @app.get("/health")
