@@ -43,6 +43,18 @@ Decision D131 (how "nearby" is measured — two inches of drawing around the pho
 - [ ] **In scope taps.** Tap anywhere in the In scope cell (switch or the space around it) ten times: it flips every time; off shows "out of scope (far ends only)". → saw:
 - [ ] **Neuron ID Save.** On a device card, Neuron ID → Type…: Save and Cancel are on the same line as the field, visible above the keyboard; Return saves a valid ID. → saw:
 
+## T69 — Two-finger pan while drawing ink  ·  Needs: **new dev build** (native patch)
+
+**Why it matters:** marking up a big floor means moving around while drawing; leaving draw mode just to pan was slow.
+
+- [ ] **Draw with one finger and the Pencil.** On a level with a plan, ✎ Ink: a Pencil stroke draws with pressure (lighter = thinner); a finger stroke draws at medium width. There is no ✋ Pan button. → saw:
+- [ ] **Two fingers pan and zoom.** Still in Ink, put two fingers down and drag: the plan pans; pinch: it zooms. Your ink, everyone's ink and the pins stay glued to the drawing during the move. Nothing is drawn by the two fingers. → saw:
+- [ ] **Second finger cancels a stroke.** Start a stroke with one finger, then put a second finger down and pan: the half-drawn stroke disappears (not saved) and the plan pans. → saw:
+- [ ] **No taps while drawing.** In Ink, tap a pin: no card opens (a dot or nothing is drawn); double-tap: no zoom; long-press: no add-here menu. Tap Done: tapping a pin opens its card again, double-tap and long-press work again. → saw:
+- [ ] **Eraser and Note still work.** ⌫ Erase removes your stroke under the finger; T Note: tap the plan, type, Place. → saw:
+
+Decision D132 (a second finger cancels the stroke; taps, double tap and long press are off while drawing): approve / change →
+
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:

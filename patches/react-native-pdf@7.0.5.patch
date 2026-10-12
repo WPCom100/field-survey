@@ -1,8 +1,8 @@
 diff --git a/fabric/RNPDFPdfNativeComponent.js b/fabric/RNPDFPdfNativeComponent.js
-index 43fea3bfc16a3b0c526ec96d993d2120cbb2ef0b..0375eceb1b0729f30eb7e3ba9c648dc0d3c86bd8 100644
+index 43fea3bfc16a3b0c526ec96d993d2120cbb2ef0b..e13b776487670ffaed2889a166ca2cf5dc158790 100644
 --- a/fabric/RNPDFPdfNativeComponent.js
 +++ b/fabric/RNPDFPdfNativeComponent.js
-@@ -39,10 +39,19 @@
+@@ -39,10 +39,24 @@
      viewRef: React.ElementRef<ComponentType>,
      page: Int32,
    ) => void;
@@ -15,16 +15,21 @@ index 43fea3bfc16a3b0c526ec96d993d2120cbb2ef0b..0375eceb1b0729f30eb7e3ba9c648dc0
 +    height: Double,
 +    animated: boolean,
 +  ) => void;
++  // field-survey patch (T69): draw mode — one finger/Pencil draws, two fingers pan and zoom
++  +setNativeInkMode: (
++    viewRef: React.ElementRef<ComponentType>,
++    enabled: boolean,
++  ) => void;
  }
  
  export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
 -  supportedCommands: ['setNativePage'],
-+  supportedCommands: ['setNativePage', 'setNativeFocus'],
++  supportedCommands: ['setNativePage', 'setNativeFocus', 'setNativeInkMode'],
  });
  
   export default codegenNativeComponent<NativeProps>('RNPDFPdfView');
 diff --git a/index.d.ts b/index.d.ts
-index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..3191c204c0037f4d85a878c712a66cd29017b550 100644
+index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..b4fc57032b24861dec6362eab3a2d92075aa515f 100644
 --- a/index.d.ts
 +++ b/index.d.ts
 @@ -31,6 +31,17 @@ export type PdfError = Error & {
@@ -45,7 +50,7 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..3191c204c0037f4d85a878c712a66cd2
  export type TextSelectionChangeEvent = {
    nativeEvent:
      | {
-@@ -79,14 +90,24 @@ export interface PdfProps {
+@@ -79,14 +90,28 @@ export interface PdfProps {
      onLoadComplete?: (numberOfPages: number, path: string, size: {height: number, width: number}, tableContents?: TableContent[]) => void,
      onPageChanged?: (page: number, numberOfPages: number) => void,
      onError?: (error: PdfError) => void,
@@ -57,6 +62,8 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..3191c204c0037f4d85a878c712a66cd2
 +    /** field-survey patch, iOS only: the long-pressing finger moved / lifted (or was cancelled) */
 +    onPageLongPressMove?: (page: number, x: number, y: number, pageX: number, pageY: number) => void,
 +    onPageLongPressEnd?: (page: number, x: number, y: number, pageX: number, pageY: number) => void,
++    /** field-survey patch, iOS only: the raw `ink|…` message of draw mode (see setInkMode) */
++    onInkMessage?: (message: string) => void,
      onScaleChanged?: (scale: number) => void,
 +    /** field-survey patch, iOS only */
 +    onViewportChanged?: (viewport: PdfViewport) => void,
@@ -68,24 +75,27 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..3191c204c0037f4d85a878c712a66cd2
      setPage(pageNumber: number): void
 +    /** field-survey patch (iOS): zoom to and centre a rect of the current page, PDF user space (y up) */
 +    focusRect(x: number, y: number, width: number, height: number, animated?: boolean): void
++    /** field-survey patch (iOS): draw mode — one finger or the Pencil sends `ink|…`, two fingers pan and zoom */
++    setInkMode(enabled: boolean): void
  }
  
  declare const Pdf: React.ForwardRefExoticComponent<PdfProps & React.RefAttributes<PdfRef>>
 diff --git a/index.js b/index.js
-index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..41b9a6c3a33d5b8bebdad18f01bf8fd99dfc276a 100644
+index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..237292ea842e6de7cabc1408adeb5b478459f809 100644
 --- a/index.js
 +++ b/index.js
-@@ -69,6 +69,9 @@ export default class Pdf extends Component {
+@@ -69,6 +69,10 @@ export default class Pdf extends Component {
          onPageChanged: PropTypes.func,
          onError: PropTypes.func,
          onPageSingleTap: PropTypes.func,
 +        onPageLongPress: PropTypes.func,
 +        onPageLongPressMove: PropTypes.func,
 +        onPageLongPressEnd: PropTypes.func,
++        onInkMessage: PropTypes.func,
          onScaleChanged: PropTypes.func,
          onPressLink: PropTypes.func,
          enableTextSelection: PropTypes.bool,
-@@ -388,6 +391,14 @@ export default class Pdf extends Component {
+@@ -388,6 +392,21 @@ export default class Pdf extends Component {
          
      }
  
@@ -97,10 +107,17 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..41b9a6c3a33d5b8bebdad18f01bf8fd9
 +        }
 +    }
 +
++    // field-survey patch (T69, iOS, new architecture): draw mode on/off (see setNativeInkMode)
++    setInkMode(enabled) {
++        if (!!global?.nativeFabricUIManager && this._root) {
++            PdfViewCommands.setNativeInkMode(this._root, !!enabled);
++        }
++    }
++
      _onChange = (event) => {
          // Handle direct events for text selection/highlight
          if (event.nativeEvent.type) {
-@@ -412,6 +423,29 @@ export default class Pdf extends Component {
+@@ -412,6 +431,32 @@ export default class Pdf extends Component {
                  return;
              }
  
@@ -117,6 +134,9 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..41b9a6c3a33d5b8bebdad18f01bf8fd9
 +                this.props.onPageSingleTap && this.props.onPageSingleTap(
 +                    Number(message[1]), Number(message[2]), Number(message[3]), Number(message[4]), Number(message[5]));
 +                return;
++            } else if (message[0] === 'ink') {
++                this.props.onInkMessage && this.props.onInkMessage(event.nativeEvent.message);
++                return;
 +            } else if (message[0] === 'gestures') {
 +                console.log(`[plan] pdf: disabled ${message[1]} PDFKit selection gesture(s): ${message.slice(2).join('|')}`);
 +                return;
@@ -131,10 +151,92 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..41b9a6c3a33d5b8bebdad18f01bf8fd9
                  message[4] = message.splice(4).join('|');
              }
 diff --git a/ios/RNPDFPdf/RNPDFPdfView.mm b/ios/RNPDFPdf/RNPDFPdfView.mm
-index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a380273297 100644
+index 1bc263bb95c584c950583d42485059b8bf34168b..4f9d36f37a591799deff8b1b18ec1dca7fceadb4 100644
 --- a/ios/RNPDFPdf/RNPDFPdfView.mm
 +++ b/ios/RNPDFPdf/RNPDFPdfView.mm
-@@ -74,9 +74,15 @@ const float MIN_SCALE = 1.0f;
+@@ -61,6 +61,81 @@ const float MIN_SCALE = 1.0f;
+ >
+ @end
+ 
++#import <UIKit/UIGestureRecognizerSubclass.h>
++
++/**
++ *  field-survey patch (T69, D129): ink capture in draw mode. Follows ONE touch (a finger or the
++ *  Apple Pencil) and begins at once, so a stroke starts under the pen without a delay. A second
++ *  finger cancels it, so the two-finger pan (the scroll view's pan needs 2 touches in draw mode)
++ *  and PDFKit's pinch take over without leaving draw mode.
++ */
++@interface RNPDFInkGestureRecognizer : UIGestureRecognizer
++@property (nonatomic, weak) UITouch *trackedTouch;
++@property (nonatomic, strong) UIEvent *lastEvent;
++@end
++
++@implementation RNPDFInkGestureRecognizer
++
++- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
++{
++    [super touchesBegan:touches withEvent:event];
++    NSUInteger down = 0;
++    for (UITouch *t in event.allTouches) {
++        if (t.phase != UITouchPhaseEnded && t.phase != UITouchPhaseCancelled) down++;
++    }
++    if (self.trackedTouch == nil && self.state == UIGestureRecognizerStatePossible && down == 1) {
++        self.trackedTouch = touches.anyObject;
++        self.lastEvent = event;
++        self.state = UIGestureRecognizerStateBegan;
++        return;
++    }
++    // a second finger: hand the gesture to the scroll view (two-finger pan) and PDFKit's pinch
++    for (UITouch *t in touches) {
++        if (t != self.trackedTouch) [self ignoreTouch:t forEvent:event];
++    }
++    if (self.state == UIGestureRecognizerStateBegan || self.state == UIGestureRecognizerStateChanged) {
++        self.state = UIGestureRecognizerStateCancelled;
++    } else if (self.state == UIGestureRecognizerStatePossible) {
++        self.state = UIGestureRecognizerStateFailed;
++    }
++}
++
++- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
++{
++    [super touchesMoved:touches withEvent:event];
++    if (self.trackedTouch && [touches containsObject:self.trackedTouch] &&
++        (self.state == UIGestureRecognizerStateBegan || self.state == UIGestureRecognizerStateChanged)) {
++        self.lastEvent = event;
++        self.state = UIGestureRecognizerStateChanged;
++    }
++}
++
++- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
++{
++    [super touchesEnded:touches withEvent:event];
++    if (self.trackedTouch && [touches containsObject:self.trackedTouch]) {
++        self.lastEvent = event;
++        self.state = (self.state == UIGestureRecognizerStatePossible) ? UIGestureRecognizerStateFailed : UIGestureRecognizerStateEnded;
++    }
++}
++
++- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
++{
++    [super touchesCancelled:touches withEvent:event];
++    if (self.trackedTouch && [touches containsObject:self.trackedTouch]) {
++        self.state = (self.state == UIGestureRecognizerStatePossible) ? UIGestureRecognizerStateFailed : UIGestureRecognizerStateCancelled;
++    }
++}
++
++- (void)reset
++{
++    [super reset];
++    self.trackedTouch = nil;
++    self.lastEvent = nil;
++}
++
++@end
++
+ @implementation RNPDFPdfView
+ {
+     RCTBridge *_bridge;
+@@ -74,9 +149,19 @@ const float MIN_SCALE = 1.0f;
      UITapGestureRecognizer *_singleTapRecognizer;
      UIPinchGestureRecognizer *_pinchRecognizer;
      UILongPressGestureRecognizer *_longPressRecognizer;
@@ -143,6 +245,10 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
 +    // field-survey patch: viewport reporting (see patches/react-native-pdf.md)
 +    UIScrollView *_observedScrollView;
 +    NSString *_lastViewport;
++    // field-survey patch (T69): draw mode
++    RNPDFInkGestureRecognizer *_inkRecognizer;
++    BOOL _inkMode;
++    NSMutableArray<UIGestureRecognizer *> *_inkDisabled;
  }
  
 +static void *RNPDFViewportKVOContext = &RNPDFViewportKVOContext;
@@ -150,7 +256,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
  #ifdef RCT_NEW_ARCH_ENABLED
  
  using namespace facebook::react;
-@@ -190,6 +196,7 @@ using namespace facebook::react;
+@@ -190,6 +275,7 @@ using namespace facebook::react;
  {
      [super prepareForRecycle];
  
@@ -158,7 +264,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
      [_pdfView removeFromSuperview];
      _pdfDocument = Nil;
      _pdfView = Nil;
-@@ -234,6 +241,45 @@ using namespace facebook::react;
+@@ -234,8 +320,136 @@ using namespace facebook::react;
      [self didSetProps:[NSArray arrayWithObject:@"page"]];
  }
  
@@ -201,10 +307,101 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
 +    [self emitViewport];
 +}
 +
++/**
++ *  field-survey patch (T69, D129): draw mode on/off. On: one finger or the Pencil draws (`ink|…`
++ *  messages from the ink recognizer), two fingers pan (the scroll view's pan needs 2 touches) and
++ *  pinch; taps, double taps and the long press are off so they never fire under a stroke.
++ */
++- (void)setNativeInkMode:(BOOL)enabled
++{
++    [self applyInkMode:enabled];
++}
++
  #endif
  
++- (void)applyInkMode:(BOOL)enabled
++{
++    _inkMode = enabled;
++    _inkRecognizer.enabled = enabled;
++    [self attachScrollObserver];
++    _observedScrollView.panGestureRecognizer.minimumNumberOfTouches = enabled ? 2 : 1;
++    if (enabled) {
++        if (!_inkDisabled) _inkDisabled = [NSMutableArray array];
++        NSMutableArray<UIGestureRecognizer *> *taps = [NSMutableArray array];
++        if (_singleTapRecognizer) [taps addObject:_singleTapRecognizer];
++        if (_doubleTapRecognizer) [taps addObject:_doubleTapRecognizer];
++        if (_longPressRecognizer) [taps addObject:_longPressRecognizer];
++        [self collectTapRecognizersIn:_pdfView depth:0 into:taps];
++        for (UIGestureRecognizer *g in taps) {
++            if (g.enabled && ![_inkDisabled containsObject:g]) {
++                g.enabled = NO;
++                [_inkDisabled addObject:g];
++            }
++        }
++    } else {
++        for (UIGestureRecognizer *g in _inkDisabled) g.enabled = YES;
++        [_inkDisabled removeAllObjects];
++    }
++}
++
++/** PDFKit's own tap recognizers (double tap to zoom, link taps) inside the PDFView. */
++- (void)collectTapRecognizersIn:(UIView *)view depth:(int)depth into:(NSMutableArray<UIGestureRecognizer *> *)out
++{
++    if (!view || depth > 12) return;
++    for (UIGestureRecognizer *g in view.gestureRecognizers) {
++        if ([g isKindOfClass:[UITapGestureRecognizer class]]) [out addObject:g];
++    }
++    for (UIView *sub in view.subviews) [self collectTapRecognizersIn:sub depth:depth + 1 into:out];
++}
++
++/**
++ *  `ink|start|x|y|p`, `ink|move|x|y|p[|x|y|p…]` (coalesced Pencil samples), `ink|end`,
++ *  `ink|cancel` (a second finger came down: drop the stroke). x, y in this view's points (the
++ *  space of `viewport|…`); p = Pencil force 0–1, or -1 for a finger.
++ */
++- (void)handleInk:(RNPDFInkGestureRecognizer *)sender
++{
++    UITouch *touch = sender.trackedTouch;
++    NSString *message = nil;
++    switch (sender.state) {
++        case UIGestureRecognizerStateBegan:
++            if (!touch) return;
++            message = [NSString stringWithFormat:@"ink|start|%@", [self inkSample:touch]];
++            break;
++        case UIGestureRecognizerStateChanged: {
++            if (!touch) return;
++            NSArray<UITouch *> *samples = sender.lastEvent ? [sender.lastEvent coalescedTouchesForTouch:touch] : nil;
++            if (samples.count == 0) samples = @[touch];
++            NSMutableArray<NSString *> *parts = [NSMutableArray arrayWithCapacity:samples.count];
++            for (UITouch *t in samples) [parts addObject:[self inkSample:t]];
++            message = [NSString stringWithFormat:@"ink|move|%@", [parts componentsJoinedByString:@"|"]];
++            break;
++        }
++        case UIGestureRecognizerStateEnded:
++            message = @"ink|end";
++            break;
++        case UIGestureRecognizerStateCancelled:
++        case UIGestureRecognizerStateFailed:
++            message = @"ink|cancel";
++            break;
++        default:
++            return;
++    }
++    [self notifyOnChangeWithMessage:message];
++}
++
++- (NSString *)inkSample:(UITouch *)t
++{
++    CGPoint p = [t preciseLocationInView:self];
++    double force = -1;
++    if (t.type == UITouchTypePencil && t.maximumPossibleForce > 0) force = MIN(1.0, t.force / t.maximumPossibleForce);
++    return [NSString stringWithFormat:@"%f|%f|%f", p.x, p.y, force];
++}
++
  - (instancetype)initWithBridge:(RCTBridge *)bridge
-@@ -476,6 +522,9 @@ using namespace facebook::react;
+ {
+     self = [super init];
+@@ -476,6 +690,9 @@ using namespace facebook::react;
                      _pdfView.maxScaleFactor = _fixScaleFactor*_maxScale;
                  }
              }
@@ -214,17 +411,18 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
  
          }
  
-@@ -567,6 +616,9 @@ using namespace facebook::react;
+@@ -567,6 +784,10 @@ using namespace facebook::react;
          _pdfView.backgroundColor = [UIColor clearColor];
          [_pdfView layoutDocumentView];
          [self setNeedsDisplay];
 +        [self attachScrollObserver];
 +        [self disableTextSelectionGestures];
++        if (_inkMode) [self applyInkMode:YES];
 +        [self emitViewport];
      }
  }
  
-@@ -600,6 +652,7 @@ using namespace facebook::react;
+@@ -600,6 +821,7 @@ using namespace facebook::react;
  
  - (void)dealloc{
  
@@ -232,7 +430,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
      _pdfDocument = Nil;
      _pdfView = Nil;
  
-@@ -734,6 +787,7 @@ using namespace facebook::react;
+@@ -734,6 +956,7 @@ using namespace facebook::react;
  
  - (void)onScaleChanged:(NSNotification *)noti
  {
@@ -240,7 +438,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
  
      if (_initialed && _fixScaleFactor>0) {
          if (_scale != _pdfView.scaleFactor/_fixScaleFactor) {
-@@ -741,6 +795,116 @@ using namespace facebook::react;
+@@ -741,6 +964,117 @@ using namespace facebook::react;
              [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"scaleChanged|%f", _scale]]];
          }
      }
@@ -306,6 +504,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
 +    if (found) {
 +        [found addObserver:self forKeyPath:@"contentOffset" options:NSKeyValueObservingOptionNew context:RNPDFViewportKVOContext];
 +        _observedScrollView = found;
++        found.panGestureRecognizer.minimumNumberOfTouches = _inkMode ? 2 : 1;
 +    }
 +}
 +
@@ -357,7 +556,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
  }
  
  #pragma mark gesture process
-@@ -839,8 +1003,10 @@ using namespace facebook::react;
+@@ -839,8 +1173,10 @@ using namespace facebook::react;
      PDFPage *pdfPage = [_pdfView pageForPoint:point nearest:NO];
      if (pdfPage) {
          unsigned long page = [_pdfDocument indexForPage:pdfPage];
@@ -369,7 +568,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
      }
  
      //[self setNeedsDisplay];
-@@ -860,12 +1026,48 @@ using namespace facebook::react;
+@@ -860,12 +1196,48 @@ using namespace facebook::react;
  }
  
  /**
@@ -420,12 +619,21 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..f6abd5bcefcbb23d7a599a18302756a3
  }
  
  /**
-@@ -915,6 +1117,8 @@ using namespace facebook::react;
+@@ -915,6 +1287,17 @@ using namespace facebook::react;
  
      [self addGestureRecognizer:longPressRecognizer];
      _longPressRecognizer = longPressRecognizer;
 +    // field-survey patch (T23 fix): the lift after a long press is not also a tap
 +    [singleTapRecognizer requireGestureRecognizerToFail:longPressRecognizer];
++
++    // field-survey patch (T69): ink capture, off until draw mode
++    RNPDFInkGestureRecognizer *inkRecognizer = [[RNPDFInkGestureRecognizer alloc] initWithTarget:self
++                                                                                          action:@selector(handleInk:)];
++    inkRecognizer.delegate = self;
++    inkRecognizer.cancelsTouchesInView = YES;
++    inkRecognizer.enabled = _inkMode;
++    [self addGestureRecognizer:inkRecognizer];
++    _inkRecognizer = inkRecognizer;
  
      // Override the _pdfView double tap gesture recognizer so that it doesn't confilict with custom double tap
      UITapGestureRecognizer *doubleTapEmptyRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self

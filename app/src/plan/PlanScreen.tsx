@@ -20,9 +20,10 @@
  *   addition, form in the side panel, a grey "+" pin marks the spot), + Note here, + Photo here,
  *   ✎ Markup. The single tap PDFKit reports when that finger lifts is ignored.
  * - Plan ink (T24, D53): every user's layer drawn under the pins (Layers ▸ Ink); "✎ Ink" (or
- *   Markup / Note here) enters draw mode, where touches draw into the user's own layer — pen
- *   with Pencil pressure, highlighter, text note, eraser (own strokes only), undo — and "✋ Pan"
- *   hands touches back to PDFKit. The layer is saved a second after the last stroke and on Done.
+ *   Markup / Note here) enters draw mode, where one finger or the Pencil draws into the user's
+ *   own layer — pen with Pencil pressure, highlighter, text note, eraser (own strokes only), undo —
+ *   and two fingers pan and zoom the plan (T69, D129: the patched PDF view captures the single
+ *   touch, `ink/touches.ts`). The layer is saved a second after the last stroke and on Done.
  * - A pin-position conflict (T26, Phase 3 §6) opened from Needs review (`reviewItemId`) draws
  *   side A solid at the device and side B dashed, both kept out of clusters, with Choose A /
  *   Choose B under the plan. Devices with an open review item have an amber ring (§13).
@@ -63,6 +64,7 @@ import { EndEditor } from '../ends/EndEditor';
 import { AddDevicePanel } from '../additions/AddDevicePanel';
 import { INK_COLORS, photoMarkAt } from '../ink/geometry';
 import { InkCapture, type InkTool } from '../ink/InkCapture';
+import { createInkBus } from '../ink/touches';
 import { recordStrokes } from '../ink/render';
 import { loadPinConflict, type PinConflict } from '../review/model';
 import { useInkLayers } from '../ink/useInkLayers';
@@ -228,6 +230,8 @@ export function PlanScreen(props: PlanScreenProps) {
   const [adding, setAdding] = useState<{ at: Point; category: string | null } | null>(null);
   /** Draw mode (T24) and its tool settings; `noteAt` = a text note waiting for its words. */
   const [drawing, setDrawing] = useState(false);
+  /** Draw-mode touches from the Pdf view (T69). */
+  const inkBus = useMemo(createInkBus, []);
   const [inkTool, setInkTool] = useState<InkTool>('pen');
   const [inkColor, setInkColor] = useState<string>(INK_COLORS[0]);
   const [inkWidth, setInkWidth] = useState(3);
@@ -740,6 +744,20 @@ export function PlanScreen(props: PlanScreenProps) {
     const crop = vpRef.current?.cropBox;
     return crop ? emptyStrokeList('sheet', crop.width, crop.height) : null;
   };
+  /** Draw mode in the patched PDF view (T69): one finger / the Pencil draws, two fingers pan. */
+  const drawingRef = useRef(drawing);
+  drawingRef.current = drawing;
+  const setPdfInkMode = useCallback((on: boolean) => {
+    try {
+      pdfRef.current?.setInkMode(on);
+    } catch (e) {
+      console.warn('[plan] ink mode not set (dev build without T69?)', e);
+    }
+  }, []);
+  useEffect(() => {
+    setPdfInkMode(drawing);
+    console.log(`[plan] ink: draw mode ${drawing ? 'on (two fingers pan)' : 'off'}`);
+  }, [drawing, setPdfInkMode]);
   const startDrawing = (tool: InkTool) => {
     if (!canInk) return;
     if (!prefs.layers.ink) setLayer('ink');
@@ -846,7 +864,11 @@ export function PlanScreen(props: PlanScreenProps) {
                 onPageLongPress={onPageLongPress}
                 onPageLongPressMove={onPageLongPressMove}
                 onPageLongPressEnd={onPageLongPressEnd}
-                onLoadComplete={(pages, _path, sz) => console.log(`[plan] pdf loaded: ${pages} page(s), ${Math.round(sz.width)}×${Math.round(sz.height)}`)}
+                onInkMessage={inkBus.emit}
+                onLoadComplete={(pages, _path, sz) => {
+                  console.log(`[plan] pdf loaded: ${pages} page(s), ${Math.round(sz.width)}×${Math.round(sz.height)}`);
+                  if (drawingRef.current) setPdfInkMode(true);
+                }}
                 onError={(e) => setError(`The sheet could not be opened: ${String((e as Error)?.message ?? e)}`)}
               />
               {size.width > 0 ? (
@@ -864,6 +886,7 @@ export function PlanScreen(props: PlanScreenProps) {
               ) : null}
               {drawing ? (
                 <InkCapture
+                  touches={inkBus}
                   viewport={() => vpRef.current}
                   tool={inkTool}
                   color={inkColor}
@@ -1262,7 +1285,6 @@ const INK_TOOLS: [InkTool, string][] = [
   ['highlighter', '▬ Highlight'],
   ['text', 'T Note'],
   ['erase', '⌫ Erase'],
-  ['pan', '✋ Pan'],
 ];
 const INK_WIDTHS: [number, string][] = [
   [1.5, 'thin'],
@@ -1337,8 +1359,6 @@ function InkBar(props: {
         ) : (
           <Text style={styles.inkNote}>Tap the plan where the note goes.</Text>
         )
-      ) : props.tool === 'pan' ? (
-        <Text style={styles.inkNote}>Pan and zoom the plan; pick a tool to draw again.</Text>
       ) : props.tool === 'erase' ? (
         <Text style={styles.inkNote}>Touch your strokes to erase them (other people's ink is theirs).</Text>
       ) : null}

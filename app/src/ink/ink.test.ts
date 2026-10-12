@@ -1,4 +1,5 @@
 import {
+  DEFAULT_PRESSURE,
   Editor,
   Store,
   emptyStrokeList,
@@ -15,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { DEMO_LEVEL_ID, DEMO_SHEET_ID, DEMO_SHEET_SIZE, ensureDemoLevel } from '../plan/demo';
 import { loadLevelPlan } from '../plan/data';
 import { INK_CONTEXT, loadInkLayers, ownLayer, saveInkLayer } from './model';
+import { createInkBus, parseInkMessage } from './touches';
 
 const ANN = uuidv7();
 const BOB = uuidv7();
@@ -131,5 +133,35 @@ describe('camera marks open their photo (T23-10 fix)', () => {
     expect(photoMarkAt([theirs, mine], 2000, 560, 10)).toBe('p2');
     expect(photoMarkAt([theirs, mine], 1500, 500, 10)).toBeNull(); // between them
     expect(photoMarkAt([], 1000, 500, 10)).toBeNull();
+  });
+});
+
+describe('draw-mode touches from the PDF view (T69, D129)', () => {
+  it('parses start / move with coalesced samples / end / cancel; a finger draws at the default pressure', () => {
+    expect(parseInkMessage('ink|start|10.5|20|-1.000000')).toEqual({ phase: 'start', points: [{ x: 10.5, y: 20, p: DEFAULT_PRESSURE }] });
+    expect(parseInkMessage('ink|move|1|2|0.25|3|4|1.4')).toEqual({
+      phase: 'move',
+      points: [
+        { x: 1, y: 2, p: 0.25 },
+        { x: 3, y: 4, p: 1 },
+      ],
+    });
+    expect(parseInkMessage('ink|end')).toEqual({ phase: 'end', points: [] });
+    expect(parseInkMessage('ink|cancel')).toEqual({ phase: 'cancel', points: [] });
+    expect(parseInkMessage('ink|move')).toBeNull(); // a move needs a point
+    expect(parseInkMessage('viewport|1|0|0|1|0|0|0|0|10|10|1')).toBeNull();
+    expect(parseInkMessage('ink|wiggle|1|2|3')).toBeNull();
+  });
+
+  it('delivers parsed touches to every listener until it unsubscribes', () => {
+    const bus = createInkBus();
+    const seen: string[] = [];
+    const off = bus.listen((t) => seen.push(`${t.phase}:${t.points.length}`));
+    bus.emit('ink|start|1|1|-1');
+    bus.emit('pageSingleTap|1|2|3|4|5'); // not ink: ignored
+    bus.emit('ink|cancel');
+    off();
+    bus.emit('ink|end');
+    expect(seen).toEqual(['start:1', 'cancel:0']);
   });
 });
