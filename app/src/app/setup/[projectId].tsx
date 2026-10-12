@@ -7,6 +7,7 @@ import { useCurrentUser } from '../../identity/IdentityGate';
 import { SetupActions, SetupError, loadProjectSetup, type ProjectSetup, type SetupLevel } from '../../setup/model';
 import { Btn, ChipPicker, Field, Notice, Section, styles as w } from '../../setup/widgets';
 import { useSyncStatus } from '../../sync/useSyncStatus';
+import { syncDataKey } from '../../sync/dataKey';
 
 type Step = 'project' | 'levels';
 
@@ -19,6 +20,7 @@ export default function ProjectSetupScreen() {
   const { projectId, step: stepParam } = useLocalSearchParams<{ projectId: string; step?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
+  const dataKey = syncDataKey(sync);
   const [step, setStep] = useState<Step>(stepParam === 'project' ? 'project' : 'levels');
   const [setup, setSetup] = useState<ProjectSetup | null>(null);
   const [actions, setActions] = useState<SetupActions | null>(null);
@@ -38,7 +40,7 @@ export default function ProjectSetupScreen() {
     return () => {
       live = false;
     };
-  }, [projectId, user.id, reload, sync.lastSyncAt]);
+  }, [projectId, user.id, reload, dataKey]);
 
   /** Run an action; errors show inline, success reloads the table. */
   const run = useCallback(

@@ -12,7 +12,7 @@ server side in `server/docs/sync.md` (T09/T10). Decisions: D37, D81, D84, D85, D
 | `src/testing/fake-server.ts` | In-process server for tests: seq, duplicates, heads, review on conflict, review-item create op, assign numbers, fault injection. Test-only. |
 | `src/sync.test.ts`, `src/http-transport.test.ts` | 19 + 3 tests. |
 | `src/e2e/` | Twin-client harness (T14): two stores through this engine against the Docker server — TP-1, TP-7, TP-10, TP-11. See `docs/e2e.md`. |
-| `app/src/sync/` | `engine.ts` (the app's one engine), `SyncRunner.tsx` (start / foreground / 60 s), `useSyncStatus.ts` (status bar hook + `describeSync`). |
+| `app/src/sync/` | `engine.ts` (the app's one engine), `SyncRunner.tsx` (start / foreground / every 5 s, D130), `useSyncStatus.ts` (status bar hook + `describeSync`). |
 
 ## One cycle (`engine.sync()`)
 
@@ -35,7 +35,7 @@ For each project (local `project` rows ∪ projects with outbox entries, or the 
 
 Concurrent `sync()` calls share the running cycle. `requestSync()` (foreground, a tap on the
 status) clears the backoff and runs now. `start()` runs a cycle at once and then every
-`intervalMs` (60 s), waiting for the backoff when that is longer; `stop()` ends it.
+`intervalMs` (60 s by default; the app passes 5 s, D130), waiting for the backoff when that is longer; `stop()` ends it.
 
 ## "Will be reviewed" marks
 

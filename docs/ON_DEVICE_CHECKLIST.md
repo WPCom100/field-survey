@@ -9,14 +9,21 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 3. **Logs.** In the Metro terminal press `j` to open React Native DevTools; app logs appear there, not in the terminal.
 4. **Mark results as you go.** Tick `[x]` for pass. For a fail, leave it `[ ]` and write what you saw after "→ saw:". Then paste this file back to Claude.
 
-Pending round started: **2026-10-12**. Items: carried over from the 2026-10-11 round (archived in [on-device-log.md](on-device-log.md)): steps skipped there and the unanswered decisions. Most need **T71** (open a level without a plan sheet) or **T45** (plan sheets); each step says which. New tasks add their checks below.
+Pending round started: **2026-10-12**. Items: carried over from the 2026-10-11 round (archived in [on-device-log.md](on-device-log.md)): steps skipped there. Decisions D111–D115, D123 and D127 were answered on 2026-10-12 (D128–D130). Most need **T71** (open a level without a plan sheet) or **T45** (plan sheets); each step says which. New tasks add their checks below.
 
 ---
+
+## T67 — Sync every 5 seconds  ·  Needs: no new build (JS only)
+
+**Why it matters:** two people on one floor should see each other's changes within seconds, and the faster cycle must not make the plan or lists stutter.
+
+- [ ] **Changes arrive in about 5 seconds.** Two iPads (or the iPad plus a change made on the server) on the Houston Methodist Hospital project: change a device note on one; on the other, open the same device's card. The note updates within about 5–10 seconds without tapping Sync now. → saw:
+- [ ] **No flicker while idle.** Leave the Levels screen (and, once T71 lands, a level's lists) open for a minute with nobody editing. Nothing reloads, jumps or loses its scroll position every 5 seconds. → saw:
+- [ ] **Offline still backs off.** Airplane mode on: the status bar turns Offline and stays calm (no rapid flashing); airplane mode off: it reads Synced again within a few seconds. → saw:
 
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:
-- [ ] **Decision D127 is Proposed** (projects as ops, levels edited by ops, numbering group frozen once a level has records, app library always copied, seed CLI gone): approve or change.
 
 ## Carried over: T25 — Sync & uploads screen  ·  Needs: T71 (a real level that opens); downloads also need T45
 
@@ -38,18 +45,12 @@ Make a conflict: both iPads in airplane mode, iPad 1 note "Cover plate loose", i
 - [ ] **No Dismiss** on a sync conflict. → saw:
 - [ ] **Pin conflict on the plan.** Resolve on the plan ▸: A solid, B dashed with "B", never clustered; Choose B → confirm → item gone; pin at B on both after sync. (T45) → saw:
 - [ ] **Context link** opens the level with that device's card. → saw:
-- [ ] **Decision D123 is Proposed:** approve or change.
 
 ## Carried over: T20–T24 — field loop  ·  Needs: as noted per step
 
 - [ ] **T21 · Upload resume.** On a real level take several photos, force-quit while they upload, relaunch: uploads finish, nothing sent twice; Sync shows Photos waiting → 0. (T71) → saw:
 - [ ] **T23 · Real ID after sync.** On a real level with a plan, long-press → + Device, wait for a sync: `06M-?` becomes a real ID (`06M-49`, or `06M-S16` for a station). (T45) → saw:
 - [ ] **T24 · Two people's ink.** Two team names or iPads on a real level with a plan: each draws, both sync; each sees the other's ink faded and cannot erase it. (T45) → saw:
-- [ ] **Decision D111 is Proposed** (device card): approve or change.
-- [ ] **Decision D112 is Proposed** (photos): approve or change.
-- [ ] **Decision D113 is Proposed** (connection ends, editing the far end): approve or change.
-- [ ] **Decision D114 is Proposed** (field additions; IDs from the server per D118): approve or change.
-- [ ] **Decision D115 is Proposed** (plan ink): approve or change.
 
 ---
 

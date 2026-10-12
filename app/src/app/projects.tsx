@@ -9,6 +9,7 @@ import { fetchProjects, type ServerProject } from '../setup/api';
 import { Btn, Notice } from '../setup/widgets';
 import { getSyncEngine } from '../sync/engine';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { syncDataKey } from '../sync/dataKey';
 
 /**
  * Projects (Phase 3 §2.1 "Projects"): what is on this iPad plus what the server lists. A
@@ -18,6 +19,7 @@ import { useSyncStatus } from '../sync/useSyncStatus';
 export default function ProjectsScreen() {
   const identity = useIdentity();
   const sync = useSyncStatus();
+  const dataKey = syncDataKey(sync);
   const [local, setLocal] = useState<HomeProject[]>([]);
   const [remote, setRemote] = useState<ServerProject[] | null>(null);
   const [levels, setLevels] = useState<Map<string, number>>(new Map());
@@ -44,7 +46,7 @@ export default function ProjectsScreen() {
     return () => {
       live = false;
     };
-  }, [sync.lastSyncAt, sync.pendingOps]);
+  }, [dataKey, sync.pendingOps]);
 
   const refresh = useCallback(async () => {
     setBusy(true);

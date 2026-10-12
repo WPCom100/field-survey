@@ -9,6 +9,7 @@ import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamNames } from '../identity/useTeamNames';
 import { logTo } from '../log';
 import { kindLabel, loadReviewDetail, loadReviewList, shortStamp, type ReviewDetail, type ReviewList, type ReviewRow } from '../review/model';
+import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 
 const CHOICE_LABEL: Record<ResolveChoice['choice'], string> = { A: 'Choose A', B: 'Choose B', combine: 'Combine', value: 'Set value' };
@@ -24,6 +25,7 @@ export default function NeedsReviewScreen() {
   const params = useLocalSearchParams<{ item?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
+  const dataKey = syncDataKey(sync);
   const [store, setStore] = useState<Store | null>(null);
   const names = useTeamNames(store);
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export default function NeedsReviewScreen() {
     return () => {
       active = false;
     };
-  }, [store, projectId, kind, levelId, sort, tick, sync.lastSyncAt]);
+  }, [store, projectId, kind, levelId, sort, tick, dataKey]);
 
   useEffect(() => {
     if (!store || !selected) return setDetail(null);
@@ -75,7 +77,7 @@ export default function NeedsReviewScreen() {
     return () => {
       active = false;
     };
-  }, [store, selected, names, tick, sync.lastSyncAt]);
+  }, [store, selected, names, tick, dataKey]);
 
   const editor = useMemo(() => (store && projectId ? new Editor(store, { projectId, userId: user.id }) : null), [store, projectId, user.id]);
 

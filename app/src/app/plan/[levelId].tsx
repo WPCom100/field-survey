@@ -10,6 +10,7 @@ import { useTeamNames } from '../../identity/useTeamNames';
 import { openAppStore } from '../../db';
 import type { PlanSheet } from '../../plan/data';
 import { PlanScreen } from '../../plan/PlanScreen';
+import { syncDataKey } from '../../sync/dataKey';
 import { describeSync, useSyncStatus } from '../../sync/useSyncStatus';
 
 /**
@@ -59,7 +60,7 @@ export default function LevelPlanRoute() {
       resolveSheetUri={resolveSheetUri}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       status={[describeSync(sync), describeBlobs(blobStatus)].filter(Boolean).join(' · ')}
-      reloadKey={sync.lastSyncAt}
+      reloadKey={syncDataKey(sync)}
       userId={user.id}
       names={names}
       resolveBlobUri={resolveBlobUri}

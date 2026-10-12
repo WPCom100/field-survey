@@ -13,6 +13,7 @@ import {
 } from '../home/data';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { syncDataKey } from '../sync/dataKey';
 
 /** Sidebar targets (PLAN §5). Each lights up when its task lands; Levels is this screen. */
 const SIDEBAR = [
@@ -38,6 +39,7 @@ const CACHE_LABEL: Record<HomeLevel['cache'], string> = {
 export default function ProjectHomeScreen() {
   const user = useCurrentUser();
   const sync = useSyncStatus();
+  const dataKey = syncDataKey(sync);
   const { project: wanted } = useLocalSearchParams<{ project?: string }>();
   const [projects, setProjects] = useState<HomeProject[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -64,7 +66,7 @@ export default function ProjectHomeScreen() {
     return () => {
       live = false;
     };
-  }, [projectId, user.id, sync.lastSyncAt, sync.pendingOps]);
+  }, [projectId, user.id, dataKey, sync.pendingOps]);
 
   const rows = useMemo(() => (home ? filterLevels(home.levels, mineOnly) : []), [home, mineOnly]);
 
