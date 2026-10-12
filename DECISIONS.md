@@ -205,4 +205,4 @@ The one part of this file kept current in place (rows are edited or removed as q
 | iPad names and the EAS build id on the Sync and Needs review screens (`expo-application` / `expo-device`, new build) | T25 / T26 follow-ups | none yet | a D-number | Open |
 | The master's own spelling quirks (`12,13`, `01-S8 to 01-S12`, a Source parenthetical, a blank Qty on B1 C-05, 03-01's photo 2): fix the master or keep them as documented TP-4 differences | T29 follow-up | kept as documented differences | TASKS follow-up | Open |
 | Tower project backfills: photo links (imported before T65) and punch Device text (before T29) — a one-off SQL backfill or a fresh import into a new project | T65 / T29 follow-ups | none yet | TASKS follow-up | Open |
-| Where the TP-5 file is made: on the Droplet after the T29 deploy (`alembic upgrade head` 0003), or on the PC against the Docker server | T30 hand-off | Droplet after the deploy | before T30 starts | Open |
+| TP-5 manual run: open `docs/test/tp5/tp5_export.xlsx` (made on the PC from the TP-4 round trip, T30) in Excel Online and Excel for Windows and fill `docs/test/tp5.md` | T30 | — | `docs/test/tp5.md` | Open, waits on Landry |

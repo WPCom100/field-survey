@@ -108,4 +108,16 @@ Row heights are reported, not failed (≤ 3 % of rows differ). Run it by hand:
 uv run python tests/xlsx_diff.py ../fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx export.xlsx
 ```
 
-TP-5 (T30) opens the file in Excel Online and Excel for Windows.
+## TP-5: Excel opens it (T30)
+
+`docs/test/tp5.md` is the manual checklist (Excel Online, Excel for Windows, Excel for Mac when a
+Mac is available, D72) and records the file under test. `tests/tp5_precheck.py` is its automated
+part: it looks for the package mistakes that make Excel offer a repair (untyped or broken parts,
+table headers that differ from their cells, overlapping tables or merges, bad names, style
+indexes out of range, over-long strings or formulas, impossible row heights or widths, chart
+series on missing sheets). The TP-4 test runs it on every export; run it by hand on any file:
+
+```
+uv run python tests/tp5_precheck.py export.xlsx
+TP5_OUT=../docs/test/tp5/tp5_export.xlsx uv run pytest -q -k tp4   # remake the TP-5 file
+```

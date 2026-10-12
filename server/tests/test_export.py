@@ -4,12 +4,16 @@ job lifecycle, the weekly export, markup flattening and the empty-project workbo
 import hashlib
 import io
 import json
+import os
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import openpyxl
 import pytest
+import tp5_precheck
 import xlsx_diff
+import xlsxwriter
 from conftest import HDR
 from PIL import Image
 from sqlalchemy import select, update
@@ -95,6 +99,11 @@ def test_tp4_master_round_trip(session, store, factory, client, tmp_path):
 
     out = tmp_path / "export.xlsx"
     out.write_bytes(data)
+    # TP-5 (T30): `TP5_OUT=<path> uv run pytest -k tp4` keeps the file to open in Excel.
+    if os.environ.get("TP5_OUT"):
+        Path(os.environ["TP5_OUT"]).write_bytes(data)
+    # TP-5 pre-check (T30): nothing in the package that makes Excel offer a repair
+    assert tp5_precheck.check(out) == []
     result = xlsx_diff.diff(FIXTURE, out, allow=ALLOW)
     assert result.unexpected() == [], result.report()
     assert dict(result.documented()) == EXPECTED_DOCUMENTED, result.report()
@@ -105,6 +114,26 @@ def test_tp4_master_round_trip(session, store, factory, client, tmp_path):
     # the list route
     listed = client.get("/exports", params={"project_id": str(project_id)}, headers=HDR).json()
     assert [x["id"] for x in listed] == [got["id"]]
+
+
+def test_tp5_precheck_catches_repair_causes(tmp_path):
+    good = tmp_path / "good.xlsx"
+    wb = xlsxwriter.Workbook(good)
+    ws = wb.add_worksheet("Devices")
+    ws.add_table("A3:B5", {"name": "Devices", "columns": [{"header": "Level"}, {"header": "ID"}]})
+    wb.close()
+    assert tp5_precheck.check(good) == []
+
+    bad = tmp_path / "bad.xlsx"
+    wb = xlsxwriter.Workbook(bad)
+    ws = wb.add_worksheet("Devices")
+    ws.add_table("A3:B5", {"name": "Devices", "columns": [{"header": "Level"}, {"header": "ID"}]})
+    ws.write("B3", "ID ")  # header cell no longer equals the table column: Excel repairs this
+    ws.set_row(7, 500)  # taller than Excel allows
+    wb.close()
+    problems = tp5_precheck.check(bad)
+    assert any("header 'ID'" in x for x in problems), problems
+    assert any("height 500" in x for x in problems), problems
 
 
 @needs_fixture
