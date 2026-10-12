@@ -15,6 +15,21 @@ Pending round started: **2026-10-12**. Items: carried over from the 2026-10-11 r
 
 ---
 
+## T28 — Seed import from the iPad  ·  Needs: **new dev build** (adds `expo-document-picker`); the server must run this task's code (`POST /imports/preview`)
+
+**Why it matters:** this is how the Tower's master workbook becomes the project's records without retyping, and the mapping step is what lets a differently-headed floor workbook in.
+
+- [ ] **Open the step.** Projects → the Tower project → Setup → 3 Sources. "Seed import" shows Master workbook / Floor workbook buttons and Choose workbook…. → saw:
+- [ ] **Pick from Files.** Put `Lighting_Control_Survey_Master_B2-06_4.xlsx` in iCloud Drive or On My iPad; Choose workbook… opens Files, only .xlsx can be picked. After picking, "Reading the workbook…" then Checks and Column mapping appear. → saw:
+- [ ] **Pre-matched.** Checks list the floors, the rows per tab (Devices 210, Connections 107, …) and "Every column is matched."; the mapping pickers show the master's own headers. → saw:
+- [ ] **Change a mapping.** Set one Devices field to "not in this workbook" or another header: the field name turns amber, the Checks line counts it unmatched; Re-check with this mapping keeps your choice. → saw:
+- [ ] **Import and follow it.** Import master workbook: the Import card goes Queued → Importing… → Imported with review items, findings and unpaired ends; Open Needs review opens the list. Do this on a throw-away project: the Tower's devices appear after the next sync. → saw:
+- [ ] **Same file twice.** Pick the same file again and import: "Already imported — … nothing changed". → saw:
+- [ ] **Floor workbook.** Choose Floor workbook and pick one floor's workbook: "Floors in this file" names its floor(s) and the import completes the same way. Skip if none is at hand. → saw:
+- [ ] **Offline.** Airplane mode on, Choose workbook…: a plain error line (no crash), the rest of the app unaffected. → saw:
+
+Decision D135: `expo-document-picker` is added as a native module (see DECISIONS.md). Approve or ask for another way to get the file onto the iPad. → answer:
+
 ## T67 — Sync every 5 seconds  ·  Needs: no new build (JS only)
 
 **Why it matters:** two people on one floor should see each other's changes within seconds, and the faster cycle must not make the plan or lists stutter.

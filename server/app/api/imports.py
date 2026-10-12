@@ -16,6 +16,7 @@ from sqlalchemy import select
 from app.auth import SessionDep, current_user, require_token
 from app.config import settings
 from app.jobs import runner
+from app.jobs.workbook import WorkbookError, inspect_workbook
 from app.models import ImportBatch, User
 from app.storage import ObjectStore, get_object_store
 
@@ -62,6 +63,30 @@ async def create_import(
         status = 404 if "unknown project" in str(e) else 422
         raise HTTPException(status, str(e)) from e
     return runner.batch_out(batch)
+
+
+@router.post("/preview")
+async def preview_import(
+    file: Annotated[UploadFile, File()],
+    mapping: Annotated[str | None, Form()] = None,
+) -> dict[str, Any]:
+    """The column-mapping UI's first look (T28): headers, default matches and checks of the
+    workbook under an optional `mapping`. Reads only; nothing is stored or queued."""
+    data = await file.read()
+    if len(data) > settings.blob_max_bytes:
+        raise HTTPException(413, {"error": "too_large", "max": settings.blob_max_bytes})
+    overrides = None
+    if mapping:
+        try:
+            overrides = json.loads(mapping)
+        except ValueError as e:
+            raise HTTPException(422, {"error": "bad_mapping", "detail": str(e)}) from e
+        if not isinstance(overrides, dict):
+            raise HTTPException(422, {"error": "bad_mapping", "detail": "expected an object"})
+    try:
+        return inspect_workbook(data, file.filename, overrides)
+    except WorkbookError as e:
+        raise HTTPException(422, {"error": "bad_workbook", "detail": str(e)}) from e
 
 
 @router.get("/{batch_id}")

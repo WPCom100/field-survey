@@ -11,7 +11,7 @@ Decisions: D13, D25, D30, D32, D33, D40, D50, D51, D110, D124–D126.
 | `app/jobs/workbook.py` | Reads the `.xlsx`: every known tab by header name (row 3), the Summary floor table (Surveyed/Updated as ISO text), the Photo Log pictures straight from the drawing XML (openpyxl needs Pillow for pictures; we read `xl/drawings/*.xml` → `xl/media/*` ourselves). `ColumnMap` = `{tab: {field: header}}` overrides for the column-mapping UI (T28). |
 | `app/jobs/seed_import.py` | Rows → `Plan`: the ops, the Change Log as historical ops, the images, stats and checks. Device matching, cable-end pairing, `Source` parsing, the D50 rename ruling. No database. |
 | `app/jobs/runner.py` | `import_batch` lifecycle: `create_batch` (file → object store, row queued), `import_workbook` (one transaction), `run_batch` / `run_queued` (worker), CLI. |
-| `app/api/imports.py` | `POST /imports` (multipart), `GET /imports/{id}`, `GET /imports?project_id`. |
+| `app/api/imports.py` | `POST /imports` (multipart), `POST /imports/preview` (T28: headers, default matches and checks of an uploaded workbook under an optional `mapping`; stores nothing), `GET /imports/{id}`, `GET /imports?project_id`. |
 | `app/worker.py` | Polls queued batches every 5 s; backups and heartbeat once a minute. |
 | `app/sync.py` | `Push(trusted=True)` keeps carried display numbers and moves the counters (below). |
 | `tests/test_seed_import.py` | The master fixture end to end, a synthetic workbook for the edge cases, the routes, the trusted-push rules. |

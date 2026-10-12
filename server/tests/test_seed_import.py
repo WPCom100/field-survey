@@ -858,3 +858,38 @@ def test_single_row_far_end_is_never_numbered(session):
     }
     assert assigned == {a_id: "C-01"}
     assert session.get(NumberingGroup, w.group.id).counter_cable == 1
+
+
+def test_imports_preview(client, tmp_path):
+    """T28: the preview reads headers and matches, stores nothing; a mapping moves a match."""
+    path = tmp_path / "Floor_B2.xlsx"
+    write_workbook(path)
+    files = {"file": (path.name, path.read_bytes(), runner.XLSX_MIME)}
+    assert client.post("/imports/preview", files=files).status_code == 401
+    r = client.post("/imports/preview", files=files, headers=HDR)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    devices = next(t for t in body["tabs"] if t["tab"] == "Devices")
+    assert devices["found"] and devices["rows"] == 3 and "Room / Location" in devices["headers"]
+    assert {f["field"]: f["header"] for f in devices["fields"]}["status"] == "Status"
+    assert next(t for t in body["tabs"] if t["tab"] == "Change Log")["found"] is False
+    assert body["levels"]
+
+    mapped = client.post(
+        "/imports/preview",
+        data={"mapping": '{"Devices": {"status": "Notes"}}'},
+        files=files,
+        headers=HDR,
+    ).json()
+    d2 = next(t for t in mapped["tabs"] if t["tab"] == "Devices")
+    assert {f["field"]: f["header"] for f in d2["fields"]}["status"] == "Notes"
+    bad = client.post(
+        "/imports/preview", files={"file": ("x.xlsx", b"nope", runner.XLSX_MIME)}, headers=HDR
+    )
+    assert bad.status_code == 422
+    assert (
+        client.post(
+            "/imports/preview", data={"mapping": "[]"}, files=files, headers=HDR
+        ).status_code
+        == 422
+    )

@@ -140,7 +140,7 @@ export default function NewProjectScreen() {
             {i < 2 ? '  ●' : ''}
           </Text>
         ))}
-        <Text style={styles.hint}>Sources, review, placing and locking come after the project exists (T28, T44–T47).</Text>
+        <Text style={styles.hint}>Sources (the seed import), review, placing and locking come after the project exists.</Text>
       </View>
 
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>

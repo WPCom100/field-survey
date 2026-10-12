@@ -6,22 +6,23 @@ import { openAppStore } from '../../db';
 import { useCurrentUser } from '../../identity/IdentityGate';
 import { SetupActions, SetupError, loadProjectSetup, type ProjectSetup, type SetupLevel } from '../../setup/model';
 import { Btn, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
+import { SourcesStep } from '../../setup/SourcesStep';
 import { useSyncStatus } from '../../sync/useSyncStatus';
 import { syncDataKey } from '../../sync/dataKey';
 
-type Step = 'project' | 'levels';
+type Step = 'project' | 'levels' | 'sources';
 
 /**
  * Setup of an existing project (Phase 3 §3.1 steps 1–2): the project's fields and the levels
  * table. Every change is an op (`SetupActions`), so this works offline; the later steps
- * (Sources, Review drafts, Place devices, Lock baseline) light up with T28, T44, T46 and T47.
+ * (Review drafts, Place devices, Lock baseline) light up with T44, T46 and T47; Sources is the seed import (T28).
  */
 export default function ProjectSetupScreen() {
   const { projectId, step: stepParam } = useLocalSearchParams<{ projectId: string; step?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
   const dataKey = syncDataKey(sync);
-  const [step, setStep] = useState<Step>(stepParam === 'project' ? 'project' : 'levels');
+  const [step, setStep] = useState<Step>(stepParam === 'project' || stepParam === 'sources' ? stepParam : 'levels');
   const [setup, setSetup] = useState<ProjectSetup | null>(null);
   const [actions, setActions] = useState<SetupActions | null>(null);
   const [reload, setReload] = useState(0);
@@ -85,7 +86,10 @@ export default function ProjectSetupScreen() {
         <Pressable onPress={() => setStep('levels')} style={[styles.step, step === 'levels' && styles.stepOn]}>
           <Text style={styles.stepText}>2 Levels</Text>
         </Pressable>
-        {['3 Sources', '4 Review drafts', '5 Place devices', '6 Lock baseline'].map((s) => (
+        <Pressable onPress={() => setStep('sources')} style={[styles.step, step === 'sources' && styles.stepOn]}>
+          <Text style={styles.stepText}>3 Sources</Text>
+        </Pressable>
+        {['4 Review drafts', '5 Place devices', '6 Lock baseline'].map((s) => (
           <View key={s} style={styles.step}>
             <Text style={[styles.stepText, styles.stepDim]}>{s}</Text>
           </View>
@@ -99,7 +103,13 @@ export default function ProjectSetupScreen() {
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <Notice text={error} error />
         <Notice text={notice} />
-        {step === 'project' ? <ProjectStep setup={setup} run={run} /> : <LevelsStep setup={setup} run={run} toBottom={toBottom} />}
+        {step === 'project' ? (
+          <ProjectStep setup={setup} run={run} />
+        ) : step === 'sources' ? (
+          <SourcesStep projectId={projectId} />
+        ) : (
+          <LevelsStep setup={setup} run={run} toBottom={toBottom} />
+        )}
       </ScrollView>
     </View>
   );

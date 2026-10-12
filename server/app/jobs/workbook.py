@@ -261,6 +261,55 @@ def read_workbook(
     return Workbook(name=name, sha256=sha, levels=levels, rows=rows, images=images, checks=checks)
 
 
+def inspect_workbook(
+    data: bytes, name: str | None = None, mapping: ColumnMap | None = None
+) -> dict:
+    """What the column-mapping UI shows before an import (T28): per known tab the header row,
+    each field's default header and the header it matches under `mapping` (null: not found),
+    row counts, the floors found and the checks a person should read. Writes nothing."""
+    import io
+
+    wb = read_workbook(io.BytesIO(data), name, mapping)
+    book = openpyxl.load_workbook(io.BytesIO(data), data_only=True, read_only=False)
+    tabs = []
+    for tab, columns in TABS.items():
+        if tab not in book.sheetnames:
+            tabs.append({"tab": tab, "found": False, "headers": [], "fields": [], "rows": 0})
+            continue
+        ws = book[tab]
+        headers = [
+            h for c in range(1, ws.max_column + 1) if (h := as_text(ws.cell(HEADER_ROW, c).value))
+        ]
+        folded = {h.casefold(): h for h in headers}
+        override = (mapping or {}).get(tab, {})
+        fields = []
+        for fld, default in columns.items():
+            wanted = override.get(fld, default)
+            fields.append(
+                {
+                    "field": fld,
+                    "default": default,
+                    "header": folded.get(wanted.casefold()),
+                }
+            )
+        tabs.append(
+            {
+                "tab": tab,
+                "found": True,
+                "headers": headers,
+                "fields": fields,
+                "rows": len(wb.tab(tab)),
+            }
+        )
+    return {
+        "name": wb.name,
+        "tabs": tabs,
+        "levels": [lv.code for lv in wb.levels],
+        "images": len(wb.images),
+        "checks": wb.checks[:200],
+    }
+
+
 def _header_index(ws, tab: str, columns: dict[str, str], override: dict[str, str], checks):
     headers: dict[str, int] = {}
     for c in range(1, ws.max_column + 1):
