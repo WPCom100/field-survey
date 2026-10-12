@@ -33,6 +33,16 @@ Pending round started: **2026-10-12**. Items: carried over from the 2026-10-11 r
 
 Decision D131 (how "nearby" is measured — two inches of drawing around the photo's device pin — and old single links read as links): approve / change →
 
+## T66 — Setup and card form polish  ·  Needs: no new build (JS only)
+
+**Why it matters:** setting up a project with 20 floors should be quick typing, not fighting the keyboard; the In scope switch must register every tap.
+
+- [ ] **Add levels in a row.** Setup → 2 Levels (and + New project): tap Add level, type `07`, press Return: the level is added, the cursor stays in the field, the page scrolls so the field stays above the keyboard. Type `08`, Return, and so on. → saw:
+- [ ] **No extra text.** No description under the Levels header; on 1 Project no "each field saves when you leave it" note. → saw:
+- [ ] **Column help.** Under In scope, Numbering group (Shares numbering with on New project) and Split of there is one short grey line explaining each. → saw:
+- [ ] **In scope taps.** Tap anywhere in the In scope cell (switch or the space around it) ten times: it flips every time; off shows "out of scope (far ends only)". → saw:
+- [ ] **Neuron ID Save.** On a device card, Neuron ID → Type…: Save and Cancel are on the same line as the field, visible above the keyboard; Return saves a valid ID. → saw:
+
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:

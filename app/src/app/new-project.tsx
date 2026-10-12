@@ -1,13 +1,13 @@
 import { Link, router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { listProjects, type HomeProject } from '../home/data';
 import { useIdentity } from '../identity/IdentityGate';
 import { createProject, fetchProjects, type NewLevel, type NewProjectBody } from '../setup/api';
 import { DEFAULT_EXPORT_TITLE, SetupError, normLevelCode, parseLevelRange } from '../setup/model';
-import { Btn, Check, ChipPicker, Field, Notice, Section, styles as w } from '../setup/widgets';
+import { Btn, Check, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../setup/widgets';
 import { getSyncEngine } from '../sync/engine';
 
 type DraftLevel = { code: string; inScope: boolean; shareWith: string | null; splitOf: string | null };
@@ -35,6 +35,9 @@ export default function NewProjectScreen() {
   const [range, setRange] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+  /** Keep the Add level field in view above the keyboard (P-3); after the keyboard has animated in. */
+  const toBottom = () => setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 300);
 
   // Copy-from candidates: projects on this iPad plus whatever the server lists.
   useEffect(() => {
@@ -65,6 +68,7 @@ export default function NewProjectScreen() {
     if (levels.some((l) => l.code === code)) return setError(`Level ${code} is already in the list`);
     setLevels([...levels, { code, inScope: true, shareWith: null, splitOf: null }]);
     setNewCode('');
+    toBottom();
   };
 
   const addRange = () => {
@@ -139,7 +143,7 @@ export default function NewProjectScreen() {
         <Text style={styles.hint}>Sources, review, placing and locking come after the project exists (T28, T44–T47).</Text>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.main}>
+      <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <Section title="Project">
           <Field label="Name" value={name} onChange={setName} placeholder="Houston Methodist Centennial Tower" />
           <Field label="Site" value={site} onChange={setSite} placeholder="Houston, TX" />
@@ -169,13 +173,12 @@ export default function NewProjectScreen() {
         </Section>
 
         <Section title="Levels">
-          <Text style={styles.hint}>Floor order is the list order (lowest first). "Add range" adds far-end floors out of scope; toggle In scope later with one tap.</Text>
           <View style={styles.levelsHead}>
             <Text style={[styles.cN, w.label]}>#</Text>
             <Text style={[styles.cCode, w.label]}>Code</Text>
-            <Text style={[styles.cScope, w.label]}>In scope</Text>
-            <Text style={[styles.cPick, w.label]}>Shares numbering with</Text>
-            <Text style={[styles.cPick, w.label]}>Split of</Text>
+            <HeadCell style={styles.cScope} label="In scope" help={LEVEL_HELP.inScope} />
+            <HeadCell style={styles.cPick} label="Shares numbering with" help={LEVEL_HELP.numbering} />
+            <HeadCell style={styles.cPick} label="Split of" help={LEVEL_HELP.splitOf} />
             <Text style={[styles.cActions, w.label]}> </Text>
           </View>
           {levels.map((l, i) => (
@@ -183,7 +186,7 @@ export default function NewProjectScreen() {
               <Text style={styles.cN}>{i + 1}</Text>
               <Text style={[styles.cCode, styles.code]}>{l.code}</Text>
               <View style={styles.cScope}>
-                <Switch value={l.inScope} onValueChange={(v) => update(i, { inScope: v })} />
+                <ScopeSwitch value={l.inScope} onChange={(v) => update(i, { inScope: v })} />
               </View>
               <View style={styles.cPick}>
                 <ChipPicker value={l.shareWith} options={codes.filter((c) => c.id !== l.code)} onPick={(v) => update(i, { shareWith: v })} none="own group" />
@@ -201,12 +204,23 @@ export default function NewProjectScreen() {
           <View style={w.row}>
             <View style={{ width: 160 }}>
               <Text style={w.label}>Add level</Text>
-              <TextInput style={w.input} value={newCode} onChangeText={setNewCode} placeholder="06M" autoCapitalize="characters" autoCorrect={false} onSubmitEditing={addLevel} />
+              <TextInput
+                style={w.input}
+                value={newCode}
+                onChangeText={setNewCode}
+                placeholder="06M"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onFocus={toBottom}
+                onSubmitEditing={addLevel}
+                submitBehavior="submit"
+                returnKeyType="next"
+              />
             </View>
             <Btn title="+ Add level" onPress={addLevel} />
             <View style={{ width: 200 }}>
               <Text style={w.label}>Add range…</Text>
-              <TextInput style={w.input} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onSubmitEditing={addRange} />
+              <TextInput style={w.input} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onFocus={toBottom} onSubmitEditing={addRange} />
             </View>
             <Btn title="Add range" onPress={addRange} />
           </View>
@@ -234,7 +248,7 @@ const styles = StyleSheet.create({
   hint: { fontSize: 13, color: '#666' },
   main: { padding: 20, gap: 8 },
   flags: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  levelsHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
+  levelsHead: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
   cN: { width: 28, fontSize: 14, color: '#555' },
   cCode: { width: 70 },

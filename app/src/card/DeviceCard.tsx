@@ -451,6 +451,8 @@ function NeuronSection({ card, store, readOnly, run }: { card: Card; store: Stor
     };
   }, [store, d.projectId, d.id, check?.value, check?.error]);
 
+  const save = () => run((e) => saveNeuronId(e, d.id, typing ?? '')).then((ok) => ok && setTyping(null));
+
   return (
     <Section title="Neuron ID" marks={marks(card, 'neuron_id')}>
       <View style={styles.rowWrap}>
@@ -466,29 +468,28 @@ function NeuronSection({ card, store, readOnly, run }: { card: Card; store: Stor
         )
       ) : (
         <View>
-          <TextInput
-            style={[styles.input, styles.mono]}
-            value={typing}
-            onChangeText={setTyping}
-            placeholder="12 hex digits, e.g. 00A1B2C3D4E5"
-            placeholderTextColor="#888"
-            autoCapitalize="characters"
-            autoCorrect={false}
-            autoFocus
-            maxLength={20}
-          />
+          {/* Save and Cancel sit beside the field, so the keyboard never covers them (T20-9); Return saves. */}
+          <View style={styles.neuronRow}>
+            <TextInput
+              style={[styles.input, styles.mono, styles.flex]}
+              value={typing}
+              onChangeText={setTyping}
+              placeholder="12 hex digits, e.g. 00A1B2C3D4E5"
+              placeholderTextColor="#888"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoFocus
+              maxLength={20}
+              returnKeyType="done"
+              onSubmitEditing={() => check && !check.error && void save()}
+            />
+            <SmallButton label={dupes.length ? 'Save anyway' : 'Save'} disabled={!check || !!check.error} onPress={() => void save()} />
+            <SmallButton label="Cancel" onPress={() => setTyping(null)} />
+          </View>
           {check && typing ? (
             <Text style={check.error ? styles.error : styles.muted}>{check.error ?? `${check.value} ✓`}</Text>
           ) : null}
           {dupes.length ? <Text style={styles.finding}>⚠ Already on {dupes.map((x) => x.label).join(', ')} in this project.</Text> : null}
-          <View style={styles.rowWrap}>
-            <SmallButton
-              label={dupes.length ? 'Save anyway' : 'Save'}
-              disabled={!check || !!check.error}
-              onPress={() => run((e) => saveNeuronId(e, d.id, typing)).then((ok) => ok && setTyping(null))}
-            />
-            <SmallButton label="Cancel" onPress={() => setTyping(null)} />
-          </View>
         </View>
       )}
     </Section>
@@ -615,6 +616,7 @@ const styles = StyleSheet.create({
   statusBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
   statusText: { fontSize: 13, color: '#222' },
   input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 14, backgroundColor: '#fff' },
+  neuronRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   notes: { minHeight: 60, textAlignVertical: 'top' },
   mono: { fontVariant: ['tabular-nums'], letterSpacing: 1 },
   phrase: { maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, backgroundColor: '#eef2f7' },

@@ -1,7 +1,7 @@
 /** Small form pieces shared by the project setup screens (T41). Light theme only (app.json). */
 
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 export function Field({
   label,
@@ -112,6 +112,45 @@ export function ChipPicker({
   );
 }
 
+/**
+ * In scope as a switch with a large tap target (P-11: the bare Switch was hard to hit and missed
+ * taps). The whole cell toggles; the Switch only shows the state, so one tap is one toggle.
+ * Off reads "out of scope (far ends only)" (P-7).
+ */
+export function ScopeSwitch({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <Pressable
+      onPress={() => onChange(!value)}
+      hitSlop={8}
+      style={styles.scope}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel="In scope">
+      <View pointerEvents="none">
+        <Switch value={value} />
+      </View>
+      {value ? null : <Text style={styles.scopeOff}>out of scope (far ends only)</Text>}
+    </Pressable>
+  );
+}
+
+/** A table column header with a one-line explanation under it (P-7, P-11). */
+export function HeadCell({ label, help, style }: { label: string; help?: string; style?: object }) {
+  return (
+    <View style={[style, { gap: 2 }]}>
+      <Text style={styles.label}>{label}</Text>
+      {help ? <Text style={styles.help}>{help}</Text> : null}
+    </View>
+  );
+}
+
+/** What the levels-table columns mean, shown under their headers. */
+export const LEVEL_HELP = {
+  inScope: 'Off: not surveyed; the floor only holds far ends of cables from surveyed floors.',
+  numbering: 'Levels in one group share punch, part, photo and C- numbers (06 and 06M).',
+  splitOf: 'A part of another floor drawn on its own sheet (06M of 06); it is listed right after it.',
+} as const;
+
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
@@ -154,4 +193,7 @@ export const styles = StyleSheet.create({
   notice: { fontSize: 14, color: '#2e7d32', marginTop: 4 },
   noticeError: { color: '#c62828' },
   row: { flexDirection: 'row', gap: 12, alignItems: 'flex-end' },
+  scope: { minHeight: 44, minWidth: 80, justifyContent: 'center', gap: 2 },
+  scopeOff: { fontSize: 11, color: '#777' },
+  help: { fontSize: 11, color: '#777' },
 });

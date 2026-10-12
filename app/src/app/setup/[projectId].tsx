@@ -1,11 +1,11 @@
 import { Link, router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { openAppStore } from '../../db';
 import { useCurrentUser } from '../../identity/IdentityGate';
 import { SetupActions, SetupError, loadProjectSetup, type ProjectSetup, type SetupLevel } from '../../setup/model';
-import { Btn, ChipPicker, Field, Notice, Section, styles as w } from '../../setup/widgets';
+import { Btn, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
 import { useSyncStatus } from '../../sync/useSyncStatus';
 import { syncDataKey } from '../../sync/dataKey';
 
@@ -27,6 +27,9 @@ export default function ProjectSetupScreen() {
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const scroll = useRef<ScrollView>(null);
+  /** Keep the Add level field in view above the keyboard (P-3); after the keyboard has animated in. */
+  const toBottom = useCallback(() => setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 300), []);
 
   useEffect(() => {
     let live = true;
@@ -93,10 +96,10 @@ export default function ProjectSetupScreen() {
         </Pressable>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.main}>
+      <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <Notice text={error} error />
         <Notice text={notice} />
-        {step === 'project' ? <ProjectStep setup={setup} run={run} /> : <LevelsStep setup={setup} run={run} />}
+        {step === 'project' ? <ProjectStep setup={setup} run={run} /> : <LevelsStep setup={setup} run={run} toBottom={toBottom} />}
       </ScrollView>
     </View>
   );
@@ -131,28 +134,38 @@ function ProjectStep({ setup, run }: { setup: ProjectSetup; run: Run }) {
         multiline
       />
       {p.copiedFromId ? <Text style={styles.hint}>Vocabulary, library and rulings were copied from another project at creation.</Text> : null}
-      <Text style={styles.hint}>Each field saves when you leave it (one edit each, synced like any other).</Text>
     </Section>
   );
 }
 
-function LevelsStep({ setup, run }: { setup: ProjectSetup; run: Run }) {
+function LevelsStep({ setup, run, toBottom }: { setup: ProjectSetup; run: Run; toBottom: () => void }) {
   const [newCode, setNewCode] = useState('');
   const [newShare, setNewShare] = useState<string | null>(null);
   const [newSplit, setNewSplit] = useState<string | null>(null);
   const [range, setRange] = useState('');
   const options = setup.levels.map((l) => ({ id: l.id, label: l.code }));
+  /** Enter adds the level and keeps the keyboard up for the next one (P-3). */
+  const addLevel = () => {
+    if (!newCode.trim()) return;
+    void run(
+      async (a) => {
+        await a.addLevel({ code: newCode, shareWithLevelId: newShare, splitOfLevelId: newSplit });
+        setNewCode('');
+        setNewShare(null);
+        setNewSplit(null);
+        toBottom();
+      },
+      `Added level ${newCode.trim().toUpperCase()}`,
+    )();
+  };
   return (
     <Section title="Levels">
-      <Text style={styles.hint}>
-        Floor order from the bottom up. A level shares numbering with another (06 and 06M, D33) until it has records; "Add range" adds far-end floors out of scope.
-      </Text>
       <View style={styles.head}>
         <Text style={[styles.cN, w.label]}>#</Text>
         <Text style={[styles.cCode, w.label]}>Code</Text>
-        <Text style={[styles.cScope, w.label]}>In scope</Text>
-        <Text style={[styles.cGroup, w.label]}>Numbering group</Text>
-        <Text style={[styles.cPick, w.label]}>Split of</Text>
+        <HeadCell style={styles.cScope} label="In scope" help={LEVEL_HELP.inScope} />
+        <HeadCell style={styles.cGroup} label="Numbering group" help={`${LEVEL_HELP.numbering} Fixed once a level has records.`} />
+        <HeadCell style={styles.cPick} label="Split of" help={LEVEL_HELP.splitOf} />
         <Text style={[styles.cSheet, w.label]}>Display sheet</Text>
         <Text style={[styles.cActions, w.label]}> </Text>
       </View>
@@ -164,7 +177,18 @@ function LevelsStep({ setup, run }: { setup: ProjectSetup; run: Run }) {
       <View style={[w.row, { marginTop: 12, flexWrap: 'wrap' }]}>
         <View style={{ width: 120 }}>
           <Text style={w.label}>Add level</Text>
-          <TextInput style={w.input} value={newCode} onChangeText={setNewCode} placeholder="06M" autoCapitalize="characters" autoCorrect={false} />
+          <TextInput
+            style={w.input}
+            value={newCode}
+            onChangeText={setNewCode}
+            placeholder="06M"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            onFocus={toBottom}
+            onSubmitEditing={addLevel}
+            submitBehavior="submit"
+            returnKeyType="next"
+          />
         </View>
         <View style={{ gap: 4 }}>
           <Text style={w.label}>Shares numbering with</Text>
@@ -174,25 +198,12 @@ function LevelsStep({ setup, run }: { setup: ProjectSetup; run: Run }) {
           <Text style={w.label}>Split of</Text>
           <ChipPicker value={newSplit} options={options} onPick={setNewSplit} />
         </View>
-        <Btn
-          title="+ Add level"
-          onPress={() =>
-            void run(
-              async (a) => {
-                await a.addLevel({ code: newCode, shareWithLevelId: newShare, splitOfLevelId: newSplit });
-                setNewCode('');
-                setNewShare(null);
-                setNewSplit(null);
-              },
-              `Added level ${newCode.trim().toUpperCase()}`,
-            )()
-          }
-        />
+        <Btn title="+ Add level" onPress={addLevel} />
       </View>
       <View style={w.row}>
         <View style={{ width: 200 }}>
           <Text style={w.label}>Add range…</Text>
-          <TextInput style={w.input} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} />
+          <TextInput style={w.input} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onFocus={toBottom} />
         </View>
         <Btn
           title="Add range (out of scope)"
@@ -234,8 +245,7 @@ function LevelRow({
         {l.records ? <Text style={styles.small}>{l.records} records</Text> : null}
       </View>
       <View style={styles.cScope}>
-        <Switch value={l.inScope} onValueChange={(v) => void run((a) => a.setInScope(l.id, v))()} />
-        {!l.inScope ? <Text style={styles.small}>far end</Text> : null}
+        <ScopeSwitch value={l.inScope} onChange={(v) => void run((a) => a.setInScope(l.id, v))()} />
       </View>
       <View style={styles.cGroup}>
         <Text style={styles.groupText}>
@@ -283,14 +293,14 @@ const styles = StyleSheet.create({
   hint: { fontSize: 13, color: '#666' },
   main: { padding: 20, gap: 8 },
   empty: { fontSize: 15, color: '#666', padding: 20 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
+  head: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
   rowDim: { opacity: 0.6 },
   cN: { width: 28, fontSize: 14, color: '#555' },
   cCode: { width: 80 },
   code: { fontSize: 17, fontWeight: '600' },
   small: { fontSize: 11, color: '#777' },
-  cScope: { width: 80 },
+  cScope: { width: 110 },
   cGroup: { width: 230, gap: 4 },
   groupText: { fontSize: 14 },
   groupBtns: { flexDirection: 'row', gap: 6 },
