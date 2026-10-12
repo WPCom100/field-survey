@@ -5,6 +5,7 @@ import {
   type Identity,
   type TeamMember,
   addTeamMember,
+  clearIdentity,
   fetchTeam,
   loadIdentity,
   saveConnection,
@@ -14,6 +15,7 @@ import {
 type Signed = Identity & { user: TeamMember };
 
 const Ctx = createContext<Signed | null>(null);
+const SignOutCtx = createContext<(() => Promise<void>) | null>(null);
 
 /** The user stamped on every op (`Store.apply`, T07+). Only valid under <IdentityGate>. */
 export function useCurrentUser(): TeamMember {
@@ -25,6 +27,13 @@ export function useIdentity(): Signed {
   const i = useContext(Ctx);
   if (!i) throw new Error('useIdentity outside IdentityGate');
   return i;
+}
+
+/** Re-sign-in (T25): forgets the connection and returns to the connect screen. Edits are kept. */
+export function useSignOut(): () => Promise<void> {
+  const out = useContext(SignOutCtx);
+  if (!out) throw new Error('useSignOut outside IdentityGate');
+  return out;
 }
 
 /** First-launch flow: server + token, then pick a name. Renders children once a user is set. */
@@ -40,7 +49,15 @@ export function IdentityGate({ children }: { children: ReactNode }) {
   if (!identity.user) {
     return <Picker identity={identity} onDone={(user) => setIdentity({ ...identity, user })} />;
   }
-  return <Ctx.Provider value={identity as Signed}>{children}</Ctx.Provider>;
+  const signOut = async () => {
+    await clearIdentity();
+    setIdentity(null);
+  };
+  return (
+    <SignOutCtx.Provider value={signOut}>
+      <Ctx.Provider value={identity as Signed}>{children}</Ctx.Provider>
+    </SignOutCtx.Provider>
+  );
 }
 
 function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {

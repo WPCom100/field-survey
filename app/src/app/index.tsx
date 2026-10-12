@@ -66,11 +66,17 @@ export default function ProjectHomeScreen() {
     <View style={styles.root}>
       <View style={styles.sidebar}>
         <Text style={styles.brand}>Field Survey</Text>
-        {SIDEBAR.map((name) => (
-          <View key={name} style={[styles.navItem, name === 'Levels' && styles.navActive]}>
-            <Text style={[styles.navText, name !== 'Levels' && styles.navDim]}>{name}</Text>
-          </View>
-        ))}
+        {SIDEBAR.map((name) =>
+          name === 'Sync' ? (
+            <Link key={name} href="/sync" style={[styles.navItem, styles.navText]}>
+              Sync
+            </Link>
+          ) : (
+            <View key={name} style={[styles.navItem, name === 'Levels' && styles.navActive]}>
+              <Text style={[styles.navText, name !== 'Levels' && styles.navDim]}>{name}</Text>
+            </View>
+          ),
+        )}
         <View style={{ flex: 1 }} />
         <Link href="/demo-plan" style={styles.demo}>
           Demo plan (06M composite) →

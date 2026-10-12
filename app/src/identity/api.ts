@@ -50,3 +50,8 @@ export async function addTeamMember(identity: Identity, name: string): Promise<T
   if (!r.ok) throw new Error(`Server error ${r.status}`);
   return r.json();
 }
+
+/** Forget the server, token and user on this iPad (local data stays); the connect flow runs again. */
+export async function clearIdentity(): Promise<void> {
+  await Promise.all([SERVER_KEY, TOKEN_KEY, USER_KEY].map((k) => SecureStore.deleteItemAsync(k)));
+}

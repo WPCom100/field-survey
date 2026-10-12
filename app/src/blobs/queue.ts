@@ -1,15 +1,10 @@
 import { BlobQueue, type BlobLog } from '@field-survey/core';
 
 import { openAppStore } from '../db';
+import { logTo } from '../log';
 import { ExpoBlobFiles } from './expo-files';
 
-// Until the rotating file logger lands (T25), blob events go to the Metro console.
-const log: BlobLog = (level, event, data) => {
-  const line = `[blobs] ${event}${data ? ' ' + JSON.stringify(data) : ''}`;
-  if (level === 'error') console.error(line);
-  else if (level === 'warn') console.warn(line);
-  else console.log(line);
-};
+const log: BlobLog = (level, event, data) => logTo('sync', level, 'blobs.' + event, data);
 
 let files: ExpoBlobFiles | null = null;
 let queue: Promise<BlobQueue> | null = null;

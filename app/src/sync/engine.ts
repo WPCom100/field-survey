@@ -1,15 +1,9 @@
 import { SyncEngine, type SyncLog } from '@field-survey/core';
 
 import { openAppStore } from '../db';
+import { logTo } from '../log';
 
-// Until the rotating file logger lands (T25), sync events go to the Metro console under the
-// `sync` category the Sync screen will later export.
-const log: SyncLog = (level, event, data) => {
-  const line = `[sync] ${event}${data ? ' ' + JSON.stringify(data) : ''}`;
-  if (level === 'error') console.error(line);
-  else if (level === 'warn') console.warn(line);
-  else console.log(line);
-};
+const log: SyncLog = (level, event, data) => logTo('sync', level, event, data);
 
 let engine: Promise<SyncEngine> | null = null;
 
