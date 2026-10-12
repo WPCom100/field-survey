@@ -56,6 +56,8 @@ export const PLACEHOLDER_KIND = [
   'custom',
 ] as const;
 export const PART_SOURCE_TARGET = ['punch', 'device', 'cable_end'] as const;
+/** D128: what a photo can be linked to besides the device it was taken from. */
+export const PHOTO_LINK_TARGET = ['device', 'cable_end', 'punch'] as const;
 export const UPLOAD_STATE = ['local', 'partial', 'complete'] as const;
 export const OP_KIND = [
   'create',

@@ -21,6 +21,18 @@ Pending round started: **2026-10-12**. Items: carried over from the 2026-10-11 r
 - [ ] **No flicker while idle.** Leave the Levels screen (and, once T71 lands, a level's lists) open for a minute with nobody editing. Nothing reloads, jumps or loses its scroll position every 5 seconds. → saw:
 - [ ] **Offline still backs off.** Airplane mode on: the status bar turns Offline and stays calm (no rapid flashing); airplane mode off: it reads Synced again within a few seconds. → saw:
 
+## T65 — A photo linked to several devices and connection ends  ·  Needs: no new build (JS only); the server must be on migration 0002
+
+**Why it matters:** a photo often shows two panels or several cables side by side; it must show up on every one of them, and a photo taken from a connection must really be linked to that connection (the T21-5 fail).
+
+- [ ] **Photo from a connection is linked to it.** Open a device with connections → tap a connection → 📷 Photo, take a picture: in the caption sheet the connection's chip is already ticked (✓). Save; back in the end editor, the end shows "Photos (1)" with the thumbnail; the other end of the cable does not. → saw:
+- [ ] **Link several, nearest first.** Take a photo of a device that has other pins close to it on the plan: under Linked, its own connections come first, then the nearby devices (closest first) each followed by their connections, then its punch items. Tick two devices and one connection, Save. → saw:
+- [ ] **Shown everywhere it is linked.** Open each linked device's card and the linked connection: the photo is in each Photos strip, with a small blue "🔗 …" line naming the other links. → saw:
+- [ ] **Unlink.** Open the photo again, untick one device, Save: it disappears from that device's card only; the others keep it. On a second iPad (or after a sync) the same. → saw:
+- [ ] **Imported multi-device photos.** On the Tower project, if a photo shows several devices in the master (`B1-01, B1-02`): note whether only the first device shows it (expected for data imported before T65; see TASKS follow-ups). → saw:
+
+Decision D131 (how "nearby" is measured — two inches of drawing around the photo's device pin — and old single links read as links): approve / change →
+
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:

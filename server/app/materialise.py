@@ -53,7 +53,11 @@ from app.models import Op
 log = logging.getLogger("sync")
 
 TABLES = Base.metadata.tables
-LINK_OWNER = {"assignment": "level_id", "part_source": "missing_part_id"}
+LINK_OWNER = {
+    "assignment": "level_id",
+    "part_source": "missing_part_id",
+    "photo_link": "photo_id",
+}
 
 # ------------------------------------------------------------------- coercion
 

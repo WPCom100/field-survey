@@ -57,7 +57,11 @@ OP_TARGETS = frozenset(TABLES) - {"op", "field_head"}
 PROTECTED = frozenset({"id", "version", "head_seq", "deleted_at", "deleted_by_id", "delete_reason"})
 RECORDS = frozenset(t for t, tbl in TABLES.items() if "version" in tbl.c)
 # link table → owning column (the op's `entity_id`); key = the other primary-key columns
-LINK_OWNER = {"assignment": "level_id", "part_source": "missing_part_id"}
+LINK_OWNER = {
+    "assignment": "level_id",
+    "part_source": "missing_part_id",
+    "photo_link": "photo_id",
+}
 LINK_KEY = {
     t: [c.name for c in TABLES[t].primary_key if c.name != owner] for t, owner in LINK_OWNER.items()
 }

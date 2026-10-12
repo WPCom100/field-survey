@@ -7,7 +7,8 @@
 
 import { displayNumber, reviewFields, type Store } from '@field-survey/core';
 
-import type { JumpTarget } from '../card/model';
+import type { CardPhoto, JumpTarget } from '../card/model';
+import { photoStrip } from '../photo/links';
 
 /** Chips under an end's note until T40 brings the project's `connection_note` vocabulary (CLAUDE.md §3). */
 export const CONNECTION_PHRASES: readonly string[] = [
@@ -59,6 +60,8 @@ export type EndView = {
   pending: ReadonlySet<string>;
   /** Where "Jump to" goes: the endpoint device (same level → select, else open its level). */
   jump: JumpTarget | null;
+  /** Photos linked to this end (D128), with their other links named. */
+  photos: CardPhoto[];
 };
 
 export type RiserCheck =
@@ -165,6 +168,7 @@ async function endView(store: Store, e: Row, fromDeviceLevel: string | null): Pr
     inReview: new Set(Object.keys(await reviewFields(store, id))),
     pending: new Set(ops.filter((o) => o.state === 'pending' && o.field).map((o) => o.field!)),
     jump,
+    photos: await photoStrip(store, { kind: 'cable_end', id }),
   };
 }
 

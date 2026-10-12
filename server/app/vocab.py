@@ -49,6 +49,8 @@ PLACEHOLDER_KIND = (
     "custom",
 )
 PART_SOURCE_TARGET = ("punch", "device", "cable_end")
+# D128: what a photo can be linked to besides the device it was taken from
+PHOTO_LINK_TARGET = ("device", "cable_end", "punch")
 UPLOAD_STATE = ("local", "partial", "complete")
 OP_KIND = ("create", "set", "delete", "restore", "link_add", "link_remove", "assign")
 OP_STATE = ("pending", "applied", "review", "rejected", "superseded", "awaiting_approval")

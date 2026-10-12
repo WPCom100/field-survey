@@ -102,3 +102,18 @@ describe('connection end editor (T22)', () => {
     expect(p07.devices.map((d) => d.label)).toEqual(['07-01', '07-02', '07-S1']);
   });
 });
+
+describe('photos on the end editor (T65, D128)', () => {
+  it('shows a photo on the end it is linked to, not on the other end, naming its device', async () => {
+    const { store, editor, panel, end } = await setup();
+    const dmx = end('C-03');
+    const { id } = await editor.group({ change_type: 'Field survey', reason: 'Field survey' }, async (g) => {
+      const made = await g.create('photo', { level_id: DEMO_LEVEL_ID, device_id: panel.id, thumb_blob: '0'.repeat(64) });
+      await g.link('photo_link', made.id, { target_kind: 'cable_end', target_id: dmx.id });
+    }).then((ops) => ({ id: ops[0]!.entity_id }));
+    const view = (await loadCableEnds(store, dmx.id))!;
+    const [mine, other] = view.ends;
+    expect(mine.photos).toMatchObject([{ id, label: 'NEW', links: [panel.label] }]);
+    expect(other?.photos ?? []).toEqual([]);
+  });
+});

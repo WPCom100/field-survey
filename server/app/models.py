@@ -311,6 +311,21 @@ class Photo(Id, Synced, Base):
     seed_thumbnail_only: Mapped[bool] = mapped_column(default=False, server_default="false")
 
 
+class PhotoLink(Removable, Base):
+    """D128 (T65): a photo linked to further devices, connection ends and punch items.
+    Target is polymorphic (`target_kind`), so `target_id` has no foreign key."""
+
+    __tablename__ = "photo_link"
+    __table_args__ = (
+        one_of("target_kind", vocab.PHOTO_LINK_TARGET),
+        Index(None, "target_kind", "target_id"),
+    )
+
+    photo_id: Mapped[uuid.UUID] = mapped_column(fk("photo.id"), primary_key=True)
+    target_kind: Mapped[str] = mapped_column(primary_key=True)
+    target_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+
+
 class InkLayer(Id, Synced, Base):
     __tablename__ = "ink_layer"
     __table_args__ = (Index(None, "sheet_id", "user_id"),)

@@ -7,6 +7,7 @@
 import type { SqlDriver } from '../sql-driver';
 import { statements as m0001 } from './migrations/0001_initial';
 import { statements as m0002 } from './migrations/0002_blob_kind';
+import { statements as m0003 } from './migrations/0003_photo_link';
 
 export interface Migration {
   version: number;
@@ -17,6 +18,7 @@ export interface Migration {
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: 'initial', statements: m0001 },
   { version: 2, name: 'blob_kind', statements: m0002 },
+  { version: 3, name: 'photo_link', statements: m0003 },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

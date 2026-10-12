@@ -6,6 +6,8 @@
 
 import { displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
 
+import { photoStrip } from '../photo/links';
+
 /** Seed of the device-note chips until T40 puts the project's `vocab` lists on the iPad (CLAUDE.md §3). */
 export const STANDARD_PHRASES: readonly string[] = [
   'Not run',
@@ -90,6 +92,8 @@ export type CardPhoto = {
   subject: string | null;
   /** Some of its bytes (image, thumbnail, markup) are still on this iPad only (`📷 waiting`, as the queue counts). */
   waiting: boolean;
+  /** D128: what else it is linked to, besides the record showing it (`06M-04`, `C-07`, `#12`). */
+  links: string[];
 };
 
 export type JumpTarget = { deviceId: string; levelId: string; label: string; sameLevel: boolean };
@@ -299,29 +303,8 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     },
   );
 
-  // --- photos, and which images have not reached the server
-  const photoRows = (await store.list<Row>('photo', { where: 'device_id = ?', params: [deviceId] })).sort(byNumber);
-  const images = photoRows.flatMap((p) => [str(p.image_blob), str(p.thumb_blob), str(p.markup_blob)]).filter((s): s is string => !!s);
-  const waitingShas = new Set<string>();
-  if (images.length) {
-    for (const r of await store.db.query<{ sha256: string }>(
-      `SELECT sha256 FROM blob WHERE upload_state <> 'complete' AND sha256 IN (${inList(images)})`,
-      images,
-    )) {
-      waitingShas.add(r.sha256);
-    }
-  }
-  const photos = photoRows.map(
-    (p): CardPhoto => ({
-      id: String(p.id),
-      label: displayNumber('photo', p),
-      thumb: str(p.thumb_blob),
-      image: str(p.image_blob),
-      markup: str(p.markup_blob),
-      subject: str(p.subject) ?? str(p.what_it_shows),
-      waiting: [p.image_blob, p.thumb_blob, p.markup_blob].some((b) => !!str(b) && waitingShas.has(String(b))),
-    }),
-  );
+  // --- photos taken from it or linked to it (D128), and which have not reached the server
+  const photos = await photoStrip(store, { kind: 'device', id: deviceId });
 
   // --- connections: this device's ends, with the far end to jump to
   const ends = await store.list<Row>('cable_end', { where: 'device_id = ?', params: [deviceId] });

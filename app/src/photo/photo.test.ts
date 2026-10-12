@@ -6,7 +6,9 @@ import { loadDeviceCard } from '../card/model';
 import { arrowHead, containTransform, ellipseRect, penSegments } from '../ink/geometry';
 import { loadLevelPlan } from '../plan/data';
 import { DEMO_LEVEL_ID, ensureDemoCardExtras, ensureDemoLevel } from '../plan/demo';
-import { createPhoto, loadPhoto, newPhotoFields, photoLinks, thumbSize, toHex, updatePhoto } from './model';
+import { loadCableEnds } from '../ends/model';
+import { NEARBY_PT, linkOptions, photoStrip, toggleLink } from './links';
+import { createPhoto, loadPhoto, newPhotoFields, thumbSize, toHex, updatePhoto } from './model';
 
 const ME = uuidv7();
 const sha = (n: number) => n.toString(16).padStart(64, '0');
@@ -64,9 +66,8 @@ describe('photo capture model (T21)', () => {
       thumb_blob: sha(2),
       markup_blob: sha(3),
       taken_by_id: ME,
-      punch_item_id: null,
-      cable_end_id: null,
     });
+    expect(op.payload).not.toHaveProperty('punch_item_id'); // links go to photo_link (D128)
     expect(op.payload).not.toHaveProperty('number'); // numbered by the server (NEW until then)
     const card = (await loadDeviceCard(store, dev.id))!;
     const mine = card.photos.find((p) => p.id === id)!;
@@ -77,32 +78,96 @@ describe('photo capture model (T21)', () => {
     expect(ops).toHaveLength(1);
   });
 
-  it('offers the device punch items and connection ends as links and edits caption, link and markup in one group', async () => {
+  it('offers its ends, nearby devices nearest first with their ends, then its punch items (D128)', async () => {
     const { store, plan, editor, dev } = await setup();
-    const links = await photoLinks(store, dev.id);
-    expect(links.some((l) => l.kind === 'punch')).toBe(true);
-    expect(links.some((l) => l.kind === 'end' && l.label.startsWith('C-'))).toBe(true);
-    expect(await photoLinks(store, null)).toEqual([]);
+    const sheet = plan.sheet!.id;
+    const others = plan.devices.filter((d) => d.id !== dev.id);
+    // 06M-01 at (1000, 1000); one device 40 pt away, one 100 pt away, one far; the rest off the sheet
+    const place = (id: string, x: number, y: number | null) =>
+      editor.setField('device', id, 'pin', y === null ? null : { sheet, x, y }, { change_type: 'Correction', reason: 'test' });
+    await place(dev.id, 1000, 1000);
+    const [near, mid, far] = others;
+    await place(near!.id, 1040, 1000);
+    await place(mid!.id, 1000, 1100);
+    await place(far!.id, 1000, 1000 + NEARBY_PT + 1);
+    for (const o of others.slice(3)) await place(o.id, 0, null);
 
-    const target = { projectId: plan.level.projectId, levelId: DEMO_LEVEL_ID, deviceId: dev.id };
-    const { id } = await createPhoto(editor, {
+    const opts = await linkOptions(store, dev.id);
+    const kinds = opts.map((o) => o.kind);
+    expect(kinds[0]).toBe('cable_end'); // its own ends first
+    const devices = opts.filter((o) => o.kind === 'device');
+    expect(devices.map((d) => d.id)).toEqual([near!.id, mid!.id]); // nearest first, far one left out
+    expect(devices.map((d) => Math.round(d.distance!))).toEqual([40, 100]);
+    expect(kinds.lastIndexOf('punch')).toBe(kinds.length - 1); // punch items last
+    expect(kinds.indexOf('punch')).toBeGreaterThan(kinds.lastIndexOf('device'));
+    expect(await linkOptions(store, null)).toEqual([]);
+    // a far device already linked stays listed so it can be unlinked
+    const kept = await linkOptions(store, dev.id, [{ kind: 'device', id: far!.id }]);
+    expect(kept[kept.length - 1]).toMatchObject({ kind: 'device', id: far!.id, distance: null });
+  });
+
+  it('links one photo to several devices and ends; every linked card and end shows it, links edited in one group', async () => {
+    const { store, plan, editor, dev } = await setup();
+    const card0 = (await loadDeviceCard(store, dev.id))!;
+    const conn = card0.connections[0]!;
+    const other = plan.devices.find((d) => d.id !== dev.id)!;
+    const target = { projectId: plan.level.projectId, levelId: DEMO_LEVEL_ID, deviceId: dev.id, cableEndId: conn.id };
+    const fields = await newPhotoFields(store, target);
+    expect(fields.links).toEqual([{ kind: 'cable_end', id: conn.id }]); // 📷 from the end editor preselects the end (T21-5)
+    const made = await createPhoto(editor, {
       target,
-      fields: await newPhotoFields(store, target),
+      fields: { ...fields, links: toggleLink(fields.links, { kind: 'device', id: other.id }) },
       image: { sha256: sha(11), size: 1 },
       thumb: { sha256: sha(12), size: 1 },
       markupSha: null,
       takenAt: '2026-10-10T12:00:00.000Z',
     });
-    const end = links.find((l) => l.kind === 'end')!;
-    const before = (await loadPhoto(store, id))!;
-    expect(before).toMatchObject({ label: 'NEW', isNew: true, markup: null, deviceId: dev.id });
-    const ops = await updatePhoto(editor, id, { ...before.fields, whatItShows: 'Wire nuts', cableEndId: end.id }, sha(13));
-    expect(ops.map((o) => o.field).sort()).toEqual(['cable_end_id', 'markup_blob', 'what_it_shows']);
+    expect(made.links.map((o) => o.payload)).toEqual([
+      { target_kind: 'cable_end', target_id: conn.id },
+      { target_kind: 'device', target_id: other.id },
+    ]);
+    expect(new Set([made.op.group_id, ...made.links.map((o) => o.group_id)]).size).toBe(1);
+
+    // the photo's device, the linked device and the linked end all show it, each naming the others
+    const own = (await loadDeviceCard(store, dev.id))!.photos.find((p) => p.id === made.id)!;
+    expect(own.links).toEqual([conn.label, other.label]);
+    const linked = (await loadDeviceCard(store, other.id))!.photos.find((p) => p.id === made.id)!;
+    expect(linked.links).toEqual([dev.label, conn.label]);
+    const ends = (await loadCableEnds(store, conn.id))!;
+    expect(ends.ends[0].photos.map((p) => p.id)).toContain(made.id);
+    expect(ends.ends[0].photos.find((p) => p.id === made.id)!.links).toEqual([dev.label, other.label]);
+
+    // unlink the device, keep the end, change the caption: one group of set + link_remove
+    const before = (await loadPhoto(store, made.id))!;
+    const ops = await updatePhoto(editor, store, made.id, { ...before.fields, whatItShows: 'Wire nuts', links: [{ kind: 'cable_end', id: conn.id }] }, sha(13));
+    expect(ops.map((o) => o.kind + ':' + (o.field ?? (o.payload as { target_kind: string }).target_kind)).sort()).toEqual([
+      'link_remove:device',
+      'set:markup_blob',
+      'set:what_it_shows',
+    ]);
     expect(new Set(ops.map((o) => o.group_id)).size).toBe(1);
-    const after = (await loadPhoto(store, id))!;
-    expect(after).toMatchObject({ markup: sha(13), fields: { whatItShows: 'Wire nuts', cableEndId: end.id } });
+    expect((await photoStrip(store, { kind: 'device', id: other.id })).map((p) => p.id)).not.toContain(made.id);
+    const after = (await loadPhoto(store, made.id))!;
+    expect(after).toMatchObject({ markup: sha(13), fields: { whatItShows: 'Wire nuts', links: [{ kind: 'cable_end', id: conn.id }] } });
     // unchanged → nothing written
-    expect(await updatePhoto(editor, id, after.fields, sha(13))).toEqual([]);
+    expect(await updatePhoto(editor, store, made.id, after.fields, sha(13))).toEqual([]);
+  });
+
+  it('reads the legacy punch_item_id / cable_end_id as links and clears the column when unticked', async () => {
+    const { store, plan, editor, dev } = await setup();
+    const conn = (await loadDeviceCard(store, dev.id))!.connections[0]!;
+    const { id } = await editor.create(
+      'photo',
+      { level_id: DEMO_LEVEL_ID, device_id: dev.id, cable_end_id: conn.id, thumb_blob: sha(21), seed_thumbnail_only: true },
+      { change_type: 'Field survey', reason: 'Field survey' },
+    );
+    expect(plan.level.id).toBe(DEMO_LEVEL_ID);
+    expect((await photoStrip(store, { kind: 'cable_end', id: conn.id })).map((p) => p.id)).toContain(id);
+    const p = (await loadPhoto(store, id))!;
+    expect(p.fields.links).toEqual([{ kind: 'cable_end', id: conn.id }]);
+    const ops = await updatePhoto(editor, store, id, { ...p.fields, links: [] }, null);
+    expect(ops.map((o) => [o.kind, o.field, o.now])).toEqual([['set', 'cable_end_id', null]]);
+    expect((await photoStrip(store, { kind: 'cable_end', id: conn.id })).map((p) => p.id)).not.toContain(id);
   });
 });
 

@@ -7,9 +7,10 @@
  *   (it waited forever, iPad run of T21), so the picker runs with no modal up and the sheet opens
  *   afterwards on the picked image (`kind: 'picked'`).
  * - **edit**: the image with Skia markup on the left, caption fields on the right — Subject,
- *   What it shows (with phrase chips), the link (device only, or one of its punch items or
- *   connection ends), Location (from the device) — and the markup tools.
- * - **open**: an existing photo (tap a thumbnail): the same sheet, editing caption, link and markup.
+ *   What it shows (with phrase chips), Linked (multi-select, D128: the device's connection ends,
+ *   nearby devices and their ends nearest first, its punch items), Location (from the device) —
+ *   and the markup tools.
+ * - **open**: an existing photo (tap a thumbnail): the same sheet, editing caption, links and markup.
  *
  * Save writes the JPEG + thumbnail (+ markup) blobs to the queue and one `photo` op; Cancel throws
  * the capture away. The original JPEG is never changed (markup is a separate stroke-list blob).
@@ -52,18 +53,8 @@ import { INK_COLORS } from '../ink/geometry';
 import { popUndo, pushUndo } from '../ink/history';
 import { discardPhoto, preparePhoto, type PreparedPhoto } from './capture';
 import { MarkupCanvas, type MarkupTool } from './MarkupCanvas';
-import {
-  captionPhrases,
-  createPhoto,
-  loadPhoto,
-  newPhotoFields,
-  photoLinks,
-  updatePhoto,
-  type ExistingPhoto,
-  type PhotoFields,
-  type PhotoLink,
-  type PhotoTarget,
-} from './model';
+import { hasLink, linkOptions, toggleLink, type LinkOption } from './links';
+import { captionPhrases, createPhoto, loadPhoto, newPhotoFields, updatePhoto, type ExistingPhoto, type PhotoFields, type PhotoTarget } from './model';
 
 export type PhotoRequest =
   | { kind: 'camera'; target: PhotoTarget; title: string }
@@ -294,7 +285,7 @@ function PhotoEditor(props: {
   const { env, prepared, existing, target } = props;
   const insets = useSafeAreaInsets();
   const [fields, setFields] = useState<PhotoFields | null>(existing?.fields ?? null);
-  const [links, setLinks] = useState<PhotoLink[]>([]);
+  const [links, setLinks] = useState<LinkOption[]>([]);
   const [phrases, setPhrases] = useState<readonly string[]>([]);
   const [moreChips, setMoreChips] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(prepared ? getBlobFiles().file(prepared.image.path).uri : null);
@@ -338,11 +329,13 @@ function PhotoEditor(props: {
     let active = true;
     (async () => {
       const projectId = env.editor?.projectId ?? target?.projectId ?? null;
+      let linked = existing?.fields.links ?? [];
       if (!existing && target) {
         const f = await newPhotoFields(env.store, target);
+        linked = f.links;
         if (active) setFields(f);
       }
-      const l = await photoLinks(env.store, deviceId);
+      const l = await linkOptions(env.store, deviceId, linked);
       const ph = projectId ? await captionPhrases(env.store, projectId) : [];
       if (active) {
         setLinks(l);
@@ -433,7 +426,7 @@ function PhotoEditor(props: {
         props.onDone(true, made.id);
         return;
       } else if (existing) {
-        await updatePhoto(env.editor, existing.id, fields, markupSha);
+        await updatePhoto(env.editor, env.store, existing.id, fields, markupSha);
       }
       props.onDone(true, existing?.id);
     } catch (e) {
@@ -452,7 +445,6 @@ function PhotoEditor(props: {
   };
 
   const set = (patch: Partial<PhotoFields>) => setFields((f) => (f ? { ...f, ...patch } : f));
-  const linkKey = fields?.punchItemId ? `punch:${fields.punchItemId}` : fields?.cableEndId ? `end:${fields.cableEndId}` : 'none';
   const chips = moreChips ? phrases : phrases.slice(0, CHIPS_SHOWN);
   const lineWidth = list ? Math.max(list.width, list.height) / 250 : 4;
 
@@ -533,18 +525,20 @@ function PhotoEditor(props: {
               <Text style={styles.label}>Linked</Text>
               <Text style={styles.muted}>{deviceId ? props.title : 'Level only (no device)'}</Text>
               {links.length ? (
-                <View style={styles.rowWrap}>
-                  <LinkChip label="Device only" on={linkKey === 'none'} disabled={readOnly} onPress={() => set({ punchItemId: null, cableEndId: null })} />
-                  {links.map((l) => (
-                    <LinkChip
-                      key={l.id}
-                      label={l.label}
-                      on={linkKey === `${l.kind}:${l.id}`}
-                      disabled={readOnly}
-                      onPress={() => set(l.kind === 'punch' ? { punchItemId: l.id, cableEndId: null } : { cableEndId: l.id, punchItemId: null })}
-                    />
-                  ))}
-                </View>
+                <>
+                  <Text style={styles.muted}>Also linked to (tap any number; nearest first):</Text>
+                  <View style={styles.rowWrap}>
+                    {links.map((l) => (
+                      <LinkChip
+                        key={`${l.kind}:${l.id}`}
+                        label={`${hasLink(fields.links, l) ? '✓ ' : ''}${l.label}`}
+                        on={hasLink(fields.links, l)}
+                        disabled={readOnly}
+                        onPress={() => set({ links: toggleLink(fields.links, l) })}
+                      />
+                    ))}
+                  </View>
+                </>
               ) : null}
               <Text style={styles.label}>Location</Text>
               <TextInput style={styles.input} value={fields.location ?? ''} onChangeText={(t) => set({ location: t })} placeholder="Room / location" placeholderTextColor="#888" editable={!readOnly} />

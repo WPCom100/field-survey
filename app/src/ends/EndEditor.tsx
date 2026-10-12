@@ -3,7 +3,8 @@
  * stacked — the end it was opened on first — each with status buttons, note (with phrase chips),
  * From / To text (D32) and who surveyed it; the riser label check; "Jump to" the far end's device
  * (on this level: select it; on another: open that level's plan with the pin lit). Every tap is
- * one op (D45), `Field survey` (D96). Render with `key={endId}`.
+ * one op (D45), `Field survey` (D96). Each end shows the photos linked to it (D128, T65); its
+ * 📷 Photo preselects that end in the caption sheet. Render with `key={endId}`.
  */
 
 import { OpError, vocab, type Editor, type Store } from '@field-survey/core';
@@ -12,6 +13,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 
 import { appendPhrase } from '../card/actions';
 import type { JumpTarget } from '../card/model';
+import { PhotoStrip } from '../photo/PhotoStrip';
 import { chipStyles } from '../plan/chips';
 import { pinStyleFor } from '../plan/pins';
 import { setEndNote, setEndStatus, setEndText } from './actions';
@@ -33,6 +35,9 @@ export type EndEditorProps = {
   canOpenLevels: boolean;
   /** Photo of this end (T21), linked to the end and its device, on the end's level. */
   onPhoto?: (t: { endId: string; deviceId: string | null; levelId: string | null; title: string }) => void;
+  /** Thumbnails of the end's photos and opening one (caption, links, markup). */
+  resolveBlobUri?: (sha: string, kind: 'thumb' | 'image') => string | null;
+  onOpenPhoto?: (photoId: string, title: string) => void;
 };
 
 type Run = (fn: (e: Editor) => Promise<unknown>) => Promise<boolean>;
@@ -107,6 +112,8 @@ export function EndEditor(props: EndEditorProps) {
           onJump={props.onJump}
           canOpenLevels={props.canOpenLevels}
           onPhoto={props.onPhoto}
+          resolveBlobUri={props.resolveBlobUri}
+          onOpenPhoto={props.onOpenPhoto}
         />
         {other ? (
           <EndSection
@@ -119,6 +126,8 @@ export function EndEditor(props: EndEditorProps) {
             onJump={props.onJump}
             canOpenLevels={props.canOpenLevels}
             onPhoto={props.onPhoto}
+            resolveBlobUri={props.resolveBlobUri}
+            onOpenPhoto={props.onOpenPhoto}
           />
         ) : (
           <View style={styles.section}>
@@ -162,6 +171,8 @@ function EndSection(props: {
   onJump: (t: JumpTarget) => void;
   canOpenLevels: boolean;
   onPhoto?: EndEditorProps['onPhoto'];
+  resolveBlobUri?: EndEditorProps['resolveBlobUri'];
+  onOpenPhoto?: EndEditorProps['onOpenPhoto'];
 }) {
   const { end, view, run } = props;
   const readOnly = props.readOnly || end.deleted;
@@ -216,6 +227,16 @@ function EndSection(props: {
         phrases={view.phrases}
         onCommit={(t) => run((e) => setEndNote(e, end.id, t))}
       />
+      {end.photos.length && props.resolveBlobUri ? (
+        <>
+          <Text style={styles.muted}>Photos ({end.photos.length})</Text>
+          <PhotoStrip
+            photos={end.photos}
+            resolveBlobUri={props.resolveBlobUri}
+            onOpen={props.onOpenPhoto ? (id) => props.onOpenPhoto!(id, `${end.label} ${view.code ?? ''}`.trim()) : undefined}
+          />
+        </>
+      ) : null}
       <TextField label="From" value={end.fromText} marks={marks('from_text')} review={review('from_text')} readOnly={readOnly} onCommit={(t) => run((e) => setEndText(e, end.id, 'from_text', t))} />
       <TextField label="To" value={end.toText} marks={marks('to_text')} review={review('to_text')} readOnly={readOnly} onCommit={(t) => run((e) => setEndText(e, end.id, 'to_text', t))} />
       <View style={styles.rowWrap}>

@@ -10,8 +10,9 @@
 
 import { OpError, vocab, type Editor, type Store } from '@field-survey/core';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { PhotoStrip } from '../photo/PhotoStrip';
 import { BadgeStrip, Swatch, chipStyles } from '../plan/chips';
 import { UNSURVEYED } from '../plan/filters';
 import type { Badges } from '../plan/lists';
@@ -254,23 +255,7 @@ export function DeviceCard(props: DeviceCardProps) {
         <NeuronSection card={card} store={store} readOnly={readOnly} run={run} />
 
         <Section title={`Photos (${card.photos.length})`} marks={card.photosWaiting ? `📷 ${card.photosWaiting} waiting` : ''}>
-          {card.photos.length ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photos}>
-              {card.photos.map((p) => {
-                const uri = p.thumb ? props.resolveBlobUri(p.thumb, 'thumb') : null;
-                return (
-                  <Pressable key={p.id} style={styles.photo} onPress={() => props.onOpenPhoto?.(p.id)} disabled={!props.onOpenPhoto}>
-                    {uri ? <Image source={{ uri }} style={styles.photoImg} /> : <Text style={styles.photoNum}>📷</Text>}
-                    <Text style={styles.photoLabel} numberOfLines={1}>
-                      {p.label}
-                      {p.markup ? ' ✎' : ''}
-                      {p.waiting ? ' ↑' : ''}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          ) : null}
+          <PhotoStrip photos={card.photos} resolveBlobUri={props.resolveBlobUri} onOpen={props.onOpenPhoto} />
           <View style={styles.rowWrap}>
             <SmallButton label="📷 Camera" disabled={readOnly || !props.onPhoto} onPress={() => props.onPhoto?.('camera')} />
             <SmallButton label="🖼 Library" disabled={readOnly || !props.onPhoto} onPress={() => props.onPhoto?.('library')} />
@@ -642,11 +627,6 @@ const styles = StyleSheet.create({
   numText: { fontSize: 13 },
   numTextOn: { color: '#fff', fontWeight: '700' },
   neuron: { fontSize: 15, fontVariant: ['tabular-nums'], letterSpacing: 1 },
-  photos: { gap: 6 },
-  photo: { width: 64, alignItems: 'center' },
-  photoImg: { width: 64, height: 64, borderRadius: 4, backgroundColor: '#ddd' },
-  photoNum: { width: 64, height: 64, borderRadius: 4, backgroundColor: '#e3e5e8', textAlign: 'center', lineHeight: 64, fontSize: 20 },
-  photoLabel: { fontSize: 11, color: '#555' },
   item: { gap: 2, paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#eceef1' },
   itemLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   itemId: { fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },

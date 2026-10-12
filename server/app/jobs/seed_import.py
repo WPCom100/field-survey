@@ -293,8 +293,9 @@ class Builder:
         self.part_by_key: dict[tuple[uuid.UUID, int], uuid.UUID] = {}
         self.photo_by_key: dict[tuple[uuid.UUID, int], uuid.UUID] = {}
         self.end_by_key: dict[tuple[str, str], End] = {}
-        self.punch_photo_refs: dict[tuple[uuid.UUID, int], uuid.UUID] = {}
-        self.device_photo_refs: dict[tuple[uuid.UUID, int], uuid.UUID] = {}
+        # every punch item / device row naming a photo number, in sheet order (D128: all linked)
+        self.punch_photo_refs: dict[tuple[uuid.UUID, int], list[uuid.UUID]] = {}
+        self.device_photo_refs: dict[tuple[uuid.UUID, int], list[uuid.UUID]] = {}
         self.reviews = 0
         self.findings = 0
 
@@ -532,7 +533,7 @@ class Builder:
             self.by_display[display_id] = dev
             self.by_level.setdefault(lv.code, []).append(dev)
             for n in photo_numbers(row.get("photo")):
-                self.device_photo_refs.setdefault((lv.numbering_group_id, n), did)
+                self.device_photo_refs.setdefault((lv.numbering_group_id, n), []).append(did)
             self.count("devices")
 
     # ---------------------------------------------------- device matching
@@ -929,7 +930,7 @@ class Builder:
             if dev is None and row.get("device") and looks_like_device(row.get("device")):
                 self.count("punch_device_unmatched")
             for n in photo_numbers(row.get("photo")):
-                self.punch_photo_refs.setdefault((lv.numbering_group_id, n), pid)
+                self.punch_photo_refs.setdefault((lv.numbering_group_id, n), []).append(pid)
             self.count("punch_items")
 
     # ---------------------------------------------------------------- parts
@@ -1070,16 +1071,12 @@ class Builder:
             elif image.sha256 not in seen_blobs:
                 seen_blobs.add(image.sha256)
                 self.blobs.append(image)
-            ids = [
-                s.strip() for s in re.split(r",|\bto\b", row.get("device_id") or "") if s.strip()
-            ]
-            dev = first(self.by_display[i] for i in ids if i in self.by_display)
-            if dev is None:
-                ref = self.device_photo_refs.get((lv.numbering_group_id, number))
-                dev_id = ref
-            else:
-                dev_id = dev.id
-            if len(ids) > 1:
+            key = (lv.numbering_group_id, number)
+            named = photo_device_ids(row.get("device_id") or "", self.by_display)
+            devices = [self.by_display[i].id for i in named] or self.device_photo_refs.get(key, [])
+            devices = list(dict.fromkeys(devices))
+            punches = list(dict.fromkeys(self.punch_photo_refs.get(key, [])))
+            if len(named) > 1 or len(devices) > 1:
                 self.count("photos_with_several_devices")
             pid = uuid7()
             self.create(
@@ -1091,12 +1088,22 @@ class Builder:
                     "location": row.get("location"),
                     "subject": row.get("subject"),
                     "what_it_shows": row.get("what_it_shows"),
-                    "device_id": dev_id,
-                    "punch_item_id": self.punch_photo_refs.get((lv.numbering_group_id, number)),
+                    "device_id": devices[0] if devices else None,
+                    "punch_item_id": punches[0] if punches else None,
                     "thumb_blob": image.sha256 if image else None,
                     "seed_thumbnail_only": True,
                 },
             )
+            # D128: the other devices and punch items the master names for this photo
+            for kind, targets in (("device", devices[1:]), ("punch", punches[1:])):
+                for target in targets:
+                    self.op(
+                        "link_add",
+                        "photo_link",
+                        pid,
+                        payload={"target_kind": kind, "target_id": str(target)},
+                    )
+                    self.count("photo_links")
             self.photo_by_key[(lv.numbering_group_id, number)] = pid
             self.count("photos")
 
@@ -1208,6 +1215,27 @@ def jsonable(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     return value
+
+
+def photo_device_ids(text: str, known: dict[str, Any]) -> list[str]:
+    """The known device IDs a Photo Log Device ID cell names, in order: a list
+    (`B1-01, B1-02`) or a range (`01-S8 to 01-S12` → S8…S12, the IDs between that exist)."""
+    out: list[str] = []
+    for part in (p.strip() for p in text.split(",")):
+        ends = [e.strip() for e in re.split(r"\bto\b", part) if e.strip()]
+        if len(ends) == 2:
+            a, b = (re.fullmatch(r"(.*?)(\d+)", e) for e in ends)
+            if a and b and a.group(1) == b.group(1):
+                lo, hi = sorted((int(a.group(2)), int(b.group(2))))
+                width = len(a.group(2))
+                for n in range(lo, hi + 1):
+                    for cand in (f"{a.group(1)}{n}", f"{a.group(1)}{n:0{width}d}"):
+                        if cand in known:
+                            out.append(cand)
+                            break
+                continue
+        out.extend(e for e in ends if e in known)
+    return list(dict.fromkeys(out))
 
 
 def photo_numbers(text: str | None) -> list[int]:

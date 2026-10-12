@@ -189,6 +189,20 @@ describe('links', () => {
     expect(await store.list('part_source')).toHaveLength(1);
   });
 
+  it('photo_link (D128): several links per photo, each removed on its own', async () => {
+    const photo = uuidv7();
+    const [d1, d2, end] = [uuidv7(), uuidv7(), uuidv7()];
+    for (const [k, t] of [['device', d1], ['device', d2], ['cable_end', end]] as const) {
+      await store.apply(op({ entity_kind: 'photo_link', entity_id: photo, kind: 'link_add', payload: { target_kind: k, target_id: t } }));
+    }
+    expect(await store.list('photo_link')).toHaveLength(3);
+    await store.apply(op({ entity_kind: 'photo_link', entity_id: photo, kind: 'link_remove', payload: { target_kind: 'device', target_id: d2 } }));
+    expect((await store.list<{ target_id: string }>('photo_link')).map((l) => l.target_id).sort()).toEqual([d1, end].sort());
+    await expect(
+      store.apply(op({ entity_kind: 'photo_link', entity_id: photo, kind: 'link_add', payload: { target_kind: 'photo', target_id: d1 } })),
+    ).rejects.toThrow();
+  });
+
   it('assignment carries extra columns and needs its key', async () => {
     await store.apply(op({ entity_kind: 'assignment', entity_id: LEVEL, kind: 'link_add', payload: { user_id: ZACH, assigned_by_id: LANDRY, assigned_at: '2026-10-10T00:00:00Z' } }));
     expect(await store.list('assignment')).toMatchObject([{ level_id: LEVEL, user_id: ZACH, assigned_by_id: LANDRY }]);

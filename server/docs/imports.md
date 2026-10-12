@@ -49,7 +49,7 @@ tables; every iPad gets the baseline by pull. Stats (`import_batch.stats`) count
 | Connections | one `cable_end` per row (`C-nn` kept) + its `cable`; pairing below; the four Unison bus spellings → `Stations & Sensors` via one `ruling` row + a `Ruling` op per end (D50) | From/To verbatim (D32); `cable.endpoint_confirmed=false` on every cable (D6) |
 | Punch List | `punch_item` (# kept), `device_id` matched from the Device text (tag `S4`/`D6`, `PI1002 #2`, panel `CT01LCPB`, `EBDK (CT01LCPB)`, model + room, `UFMP4 #2`); `Missing all Device Neuron IDs` → `sort_last` | text naming several devices, a room or "All devices" → no device |
 | Missing Parts | `missing_part` (# kept, `device_location` verbatim, single-device text matched) + `part_source` links from Source: `Punch #8-14`, `#15, #19`, `Punch #14; Devices 06-S3`, `Connections C-06 (…)` | an unparsed segment → `finding(import.part_source)`; the parsed ones still link |
-| Photo Log | `photo` (number kept) with the picture as a complete `blob` (`thumb_blob`, 320×240, `seed_thumbnail_only`, D40); `device_id` = first Device ID (else the Devices tab's Photo column), `punch_item_id` = first punch row listing the number | a row without a picture keeps its record (check) |
+| Photo Log | `photo` (number kept) with the picture as a complete `blob` (`thumb_blob`, 320×240, `seed_thumbnail_only`, D40); `device_id` = first Device ID (else the Devices tab's Photo column), `punch_item_id` = first punch row listing the number; the other devices named (a list `B1-01, B1-02` or a range `01-S8 to 01-S12`, expanded to the IDs that exist) and the other punch rows listing the number become `photo_link` `link_add` ops (D128; 28 links on the master) | a row without a picture keeps its record (check) |
 | Change Log | one historical op per row: user `import`, `install_id` `IMPORT_INSTALL_ID`, **state `superseded`** (D124), `client_ts` = the row's date, `change_type`/`reason` as written, `was`/`now` verbatim, `payload` = `{source, sheet, ref, entry, field, level}`; `(row added)` → kind `create`; `field` = our column when the master's maps (`Notes` → `notes`, `Qty` → `cable.qty`…), else the master's name (`Photo`, `Source`) | Refs resolve against the imported numbering; a range (`#2-#27`) hangs off the level |
 | Lists / Floor Order | not imported (D16) | |
 
@@ -111,8 +111,8 @@ reach the client (follow-up).
   `device_id`. 20 of 215 master rows name no single device (`All devices`, rooms, two stations) and
   several name the device differently from its Device column (`P-NSPS-D` vs `P-NSPS-D-KIT`) → T29's
   round-trip diff will show them unless a text column is added (decision).
-- A photo links to **one** device and **one** punch item; the master lists several on 10 photos and
-  reuses a photo number on several punch rows. The first wins; T29 lists the rest as documented
-  differences, or a `photo_link` table is added (decision).
+- A photo the master lists on several devices or punch rows (10 photos name several devices) keeps
+  the first in `device_id` / `punch_item_id` and links the rest through `photo_link` (D128, T65), so
+  T29 can write them all.
 - Change Log refs resolve against the master's current numbering; rows written before a
   renumbering (`#28 → #29`) attach to whatever carries that number now.

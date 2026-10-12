@@ -30,6 +30,7 @@ from app.models import (
     Op,
     PartSource,
     Photo,
+    PhotoLink,
     Placeholder,
     PunchItem,
     ReviewItem,
@@ -419,6 +420,19 @@ def test_master_seed_import(session, store, factory, client):
     assert six.punch_item_id == v.punch("01", 24).id  # the first item listing photo 6
     assert v.photo("01", 12).punch_item_id == v.punch("01", 46).id
     assert stats["photos_with_several_devices"] == 10
+
+    # D128 (T65): the other devices and punch items naming a photo are links
+    def photo_links(ph):
+        rows = session.scalars(select(PhotoLink).where(PhotoLink.photo_id == ph.id)).all()
+        return {(r.target_kind, r.target_id) for r in rows}
+
+    six_links = photo_links(six)
+    assert {t for k, t in six_links if k == "device"} == {
+        v.device(f"01-S{n}").id for n in (9, 10, 11, 12)
+    }  # `01-S8 to 01-S12`: the first is device_id, the rest links
+    assert sum(1 for k, _ in six_links if k == "punch") == 5  # six more punch rows cite photo 6
+    assert photo_links(v.photo("B1", 1)) == {("device", v.device("B1-02").id)}  # `B1-01, B1-02`
+    assert stats["photo_links"] == 28
 
     # --- the import is ops: replaying the log reproduces the tables
     before = (v.count(Device), v.count(CableEnd), v.count(PunchItem), v.count(Photo))

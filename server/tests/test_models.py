@@ -29,6 +29,7 @@ PLAN_ENTITIES = {
     "punch_item",
     "missing_part",
     "part_source",
+    "photo_link",
     "photo",
     "ink_layer",
     "blob",

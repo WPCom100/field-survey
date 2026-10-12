@@ -61,7 +61,7 @@ await editor.group(ctx, async (g) => {                             // one group_
 | `setFields(kind, id, values, ctx)` | `set` × n | as above | One group. |
 | `delete(kind, id, ctx)` | `delete` | — / head of `deleted_at` | `reason` becomes `delete_reason`. Refuses an already-deleted record. |
 | `restore(kind, id, ctx)` | `restore` | — / head of `deleted_at` (the delete) | Refuses a live record. |
-| `link(kind, ownerId, key, ctx)` / `unlink(...)` | `link_add` / `link_remove` | — | `entity_id` = owner (`level` for `assignment`, `missing_part` for `part_source`); `key` = the other pk columns plus extras. |
+| `link(kind, ownerId, key, ctx)` / `unlink(...)` | `link_add` / `link_remove` | — | `entity_id` = owner (`level` for `assignment`, `missing_part` for `part_source`, `photo` for `photo_link`); `key` = the other pk columns plus extras. |
 | `group(ctx, fn)` | any of the above | chained inside the group | Every op shares one `group_id`; applied with `applyMany` (all or nothing). Inside a group, a `set` after a `create` bases on the create, a second `set` on one field bases on the first. |
 
 Every call takes an `EditContext`: `change_type` (one of the seven, CLAUDE.md §3) and a

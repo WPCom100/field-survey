@@ -326,6 +326,19 @@ export const ENTITIES = {
     },
   ),
 
+  /** D128 (T65): a photo linked to further devices, connection ends and punch items. */
+  photo_link: link(
+    'photo_link',
+    'photo_id',
+    ['photo_id', 'target_kind', 'target_id'],
+    {
+      photo_id: id(),
+      target_kind: enumCol(v.PHOTO_LINK_TARGET, { notNull: true }),
+      target_id: id(),
+    },
+    [['target_kind', 'target_id']],
+  ),
+
   photo: record(
     'photo',
     {

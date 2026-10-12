@@ -1050,6 +1050,8 @@ export function PlanScreen(props: PlanScreenProps) {
                       })
                   : undefined
               }
+              resolveBlobUri={props.resolveBlobUri ?? noBlob}
+              onOpenPhoto={props.blobs ? (photoId, title) => setPhotoReq({ kind: 'open', photoId, title }) : undefined}
             />
           ) : cardOpen && selectedId ? (
             <DeviceCard

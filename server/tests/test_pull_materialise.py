@@ -19,6 +19,7 @@ from app.models import (
     Level,
     NumberingGroup,
     Op,
+    PhotoLink,
     PunchItem,
     ReviewItem,
 )
@@ -255,6 +256,35 @@ def test_link_add_revives_a_removed_link(client, w):
     w.session.expire_all()
     link = w.session.get(Assignment, (w.l06.id, w.bob.id))
     assert link.deleted_at is None and link.assigned_by_id == w.ann.id
+
+
+def test_photo_links_materialise_and_replay(client, w):
+    """D128 (T65): a photo linked to two devices and a connection end; one link removed; a
+    caption edit by someone else alongside never conflicts with the links; replay rebuilds them."""
+    d1, d2, e = w.create(w.ann, "device"), w.create(w.ann, "device"), w.create(w.ann, "cable_end")
+    photo = w.create(w.ann, "photo", {"device_id": d1["entity_id"]})
+    pid = photo["entity_id"]
+    keys = [
+        {"target_kind": "device", "target_id": d2["entity_id"]},
+        {"target_kind": "cable_end", "target_id": e["entity_id"]},
+    ]
+    gid = str(uuid7())
+    adds = [w.op(w.ann, "link_add", "photo_link", pid, payload=k, group_id=gid) for k in keys]
+    assert outcomes(w.push(client, [d1, d2, e, photo, *adds])) == ["applied"] * 6
+    caption = w.set(w.bob, "photo", pid, "subject", "ERP interior", photo["op_id"])
+    rm = w.op(w.ann, "link_remove", "photo_link", pid, payload=keys[0])
+    assert outcomes(w.push(client, [caption, rm])) == ["applied", "applied"]
+
+    def live():
+        w.session.expire_all()
+        rows = w.session.scalars(select(PhotoLink).where(PhotoLink.deleted_at.is_(None))).all()
+        return {(r.target_kind, str(r.target_id)) for r in rows}
+
+    assert live() == {("cable_end", e["entity_id"])}
+    before = snapshot(w.session)
+    with Session(w.session.get_bind()) as s, s.begin():
+        materialise.replay(s, w.project.id)
+    assert snapshot(w.session) == before and live() == {("cable_end", e["entity_id"])}
 
 
 def test_replayed_create_never_overwrites(client, w):
