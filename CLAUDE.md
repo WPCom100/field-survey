@@ -32,6 +32,7 @@ field-survey/
                   riser.pdf, BOM.pdf, Level_06M_-_Lighting_Composite_vector.pdf,
                   15090056-BOM.pdf (format example only, never a project input — D4)
   docs/history/   Phase 0–4 documents and the original prompt
+  docs/ON_DEVICE_CHECKLIST.md  pending iPad checks, grown per task and reset on "tested"; archive in docs/on-device-log.md (D122)
 ```
 
 ## 3. Vocabulary — exact strings, never paraphrased
@@ -125,6 +126,8 @@ Golden tests read `fixtures/`; if a fixture is missing the test is skipped with 
 3. Implement, with tests named in the DoD. Run the full test suite for the package you touched.
 4. Update `TASKS.md`: mark the task `done`, note any deviation, and list follow-ups as new tasks at the end of the milestone (never silently expand scope).
 5. Append new decisions to `DECISIONS.md`.
+5a. If the task has anything only an iPad can prove (UI, Pencil, camera, airplane mode, two devices, a build), append a section to `docs/ON_DEVICE_CHECKLIST.md` in its format (what to do, what you should see, why it matters, `→ saw:`, new-dev-build flag, Decision lines for Proposed decisions) and have the task's `TASKS.md` entry say "checks added to the on-device checklist" instead of listing them inline. Mention the new checks in the summary.
+5b. When Landry says **"tested"** (pasting the checklist back with results), do that as its own small session, not part of a feature task: copy the round with results into `docs/on-device-log.md` under a dated heading, add a `TASKS.md` task for every failure, record each answered Decision line in `DECISIONS.md`, then reset the checklist to its "Before you start" block with an empty list and a new round date. Untested items stay; nothing is dropped.
 6. Commit with the message `T<nn>: <title>` and a body listing what the DoD check showed.
 7. End with a 5-line summary: what was built, test results, deviations, open questions, next task.
 8. Close with a **hand-off** for the next task: its number and title, the model and effort from `TASKS.md` decoded (e.g. "S/M = Sonnet 5.5, Medium") and whether that differs from the current session, a reminder that it runs in a **new session** (`/clear` or a new chat, then `/model` to switch if needed), the prompt to paste (`Read CLAUDE.md, then do task T<nn> in TASKS.md per the session protocol in CLAUDE.md §7.`), and any decision the user should settle before starting. Do the same at the end of any reply in a session whose task is already done.
