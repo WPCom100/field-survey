@@ -228,9 +228,11 @@ def replay(session: Session, project_id: uuid.UUID, *, reset: bool = True) -> in
     """Rebuild a project's materialised state from its op log, inside the caller's transaction.
 
     With `reset`, every row an op of this project created (and every link row its link ops
-    touched) is deleted first; rows that exist outside the log (`project`, `numbering_group`,
-    `app_user`, levels made by `POST /projects`) are left alone. Then every op in state
-    `applied` is projected again in `server_seq` order. Returns the number of ops replayed.
+    touched) is deleted first, except `project` and `numbering_group` rows: `POST /projects`
+    writes them as ops too (T41, D127), but the group counters live outside the log and the
+    project row is what every push locks, so both stay and their creates re-apply as no-ops.
+    `app_user` rows are never in the log. Then every op in state `applied` is projected again
+    in `server_seq` order. Returns the number of ops replayed.
     """
     if reset:
         created = (
@@ -239,7 +241,7 @@ def replay(session: Session, project_id: uuid.UUID, *, reset: bool = True) -> in
             .scalar_subquery()
         )
         for name, table in TABLES.items():
-            if name in ("op", "field_head"):
+            if name in ("op", "field_head", "project", "numbering_group"):
                 continue
             if name in LINK_OWNER:
                 owners = (

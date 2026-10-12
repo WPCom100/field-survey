@@ -672,40 +672,51 @@ export class BlobQueue {
         next_attempt_at = NULL, last_error = NULL WHERE blob_queue.state = 'done'`;
     const notCached = (col: string) =>
       `NOT EXISTS (SELECT 1 FROM blob b WHERE b.sha256 = ${col} AND b.local_path IS NOT NULL)`;
+    // The levels to cache: the user's assignments, or, with none at all (D97, T41), every
+    // in-scope level of every project on this iPad.
+    const scope = `WITH mine AS (SELECT level_id FROM assignment WHERE user_id = ? AND deleted_at IS NULL),
+      scope AS (SELECT level_id FROM mine
+                UNION ALL
+                SELECT l.id AS level_id FROM level l
+                WHERE l.deleted_at IS NULL AND l.in_scope = 1 AND NOT EXISTS (SELECT 1 FROM mine))`;
     await this.db.exec(
-      `INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
+      `${scope}
+       INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
        SELECT DISTINCT s.blob, 'download', 'sheet', ${DOWNLOAD_PRIORITY.sheet}, 'queued', 0, ?
-       FROM sheet s JOIN assignment a ON a.level_id = s.level_id AND a.user_id = ? AND a.deleted_at IS NULL
+       FROM sheet s JOIN scope a ON a.level_id = s.level_id
        WHERE s.deleted_at IS NULL AND s.kind = 'display' AND s.blob IS NOT NULL AND ${notCached('s.blob')}
        ${upsert}`,
-      [now, user],
+      [user, now],
     );
     await this.db.exec(
-      `INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
+      `${scope}
+       INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
        SELECT DISTINCT p.thumb_blob, 'download', 'thumb', ${DOWNLOAD_PRIORITY.thumb}, 'queued', 0, ?
-       FROM photo p JOIN assignment a ON a.level_id = p.level_id AND a.user_id = ? AND a.deleted_at IS NULL
+       FROM photo p JOIN scope a ON a.level_id = p.level_id
        WHERE p.deleted_at IS NULL AND p.thumb_blob IS NOT NULL AND ${notCached('p.thumb_blob')}
        ${upsert}`,
-      [now, user],
+      [user, now],
     );
-    // Plan ink layers (stroke lists, T24, D53): every user's layer on the assigned levels' sheets.
+    // Plan ink layers (stroke lists, T24, D53): every user's layer on the cached levels' sheets.
     await this.db.exec(
-      `INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
+      `${scope}
+       INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
        SELECT DISTINCT i.drawing_blob, 'download', 'ink', ${DOWNLOAD_PRIORITY.ink}, 'queued', 0, ?
        FROM ink_layer i JOIN sheet s ON s.id = i.sheet_id AND s.deleted_at IS NULL
-       JOIN assignment a ON a.level_id = s.level_id AND a.user_id = ? AND a.deleted_at IS NULL
+       JOIN scope a ON a.level_id = s.level_id
        WHERE i.deleted_at IS NULL AND i.drawing_blob IS NOT NULL AND ${notCached('i.drawing_blob')}
        ${upsert}`,
-      [now, user],
+      [user, now],
     );
     // Photo markup (stroke lists, T21): small, and needed to see a photo as marked up offline.
     await this.db.exec(
-      `INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
+      `${scope}
+       INSERT INTO blob_queue (sha256, direction, kind, priority, state, attempts, created_at)
        SELECT DISTINCT p.markup_blob, 'download', 'markup', ${DOWNLOAD_PRIORITY.markup}, 'queued', 0, ?
-       FROM photo p JOIN assignment a ON a.level_id = p.level_id AND a.user_id = ? AND a.deleted_at IS NULL
+       FROM photo p JOIN scope a ON a.level_id = p.level_id
        WHERE p.deleted_at IS NULL AND p.markup_blob IS NOT NULL AND ${notCached('p.markup_blob')}
        ${upsert}`,
-      [now, user],
+      [user, now],
     );
   }
 

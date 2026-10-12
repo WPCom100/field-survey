@@ -9,7 +9,25 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 3. **Logs.** In the Metro terminal press `j` to open React Native DevTools; app logs appear there, not in the terminal.
 4. **Mark results as you go.** Tick `[x]` for pass. For a fail, leave it `[ ]` and write what you saw after "→ saw:". Then paste this file back to Claude.
 
-Pending round started: **2026-10-11**. Items: T25, T26 (new), T20–T24 (carried over, never recorded as tested). A first pass on 2026-10-11 stopped early at T25/T20-1 (results in [on-device-log.md](on-device-log.md)); the steps below were corrected from it. **Most of T25, all of T26 and the "real level" steps need a project on the iPad, which arrives with T41** — until then they are skipped, not failed.
+Pending round started: **2026-10-11**. Items: T41 (new), T25, T26, T20–T24 (carried over, never recorded as tested). A first pass on 2026-10-11 stopped early at T25/T20-1 (results in [on-device-log.md](on-device-log.md)); the steps below were corrected from it. **Most of T25, all of T26 and the "real level" steps need a project on the iPad, which arrives with T41** — until then they are skipped, not failed.
+
+---
+
+## T41 — Projects and levels  ·  Needs: no new build (JS only; the server on the Droplet must be updated first — see the T41 deploy note in TASKS.md)
+
+**Why it matters:** this is how a project reaches an iPad at all. Until now nothing on the iPad could sync; after this round the Tower project exists on the server and every other pending check ("real level only") becomes possible.
+
+Do this **first** in the round, online.
+
+- [ ] **Projects screen.** Sidebar → **Projects** (new entry at the top). With nothing on the iPad it says so and offers "Refresh from server" and "+ New project". → saw:
+- [ ] **Create a scratch project.** **+ New project**: name "Scratch", site anything, ETC prefilled "ETC Field Service", copy-from left at "Nothing (app library only)". Levels: Add level `b2` → shows `B2`; Add level `06`; Add level `6m` → `06M`, set "Shares numbering with" = 06 and "Split of" = 06; **Add range** `09-12` → four rows out of scope (switch off). Move 06M below 06 with ↑↓ if needed. **Create project** → within a few seconds you land on the Levels screen showing Scratch with 7 levels, B2 … 12, the four range levels greyed "out of scope". → saw:
+- [ ] **It came by sync, not by magic.** Sync screen: "Last successful sync" shows a seq ≥ 12 (project + groups + levels). Airplane mode on, kill and relaunch the app: Scratch and its levels are still there (they are in the local store). → saw:
+- [ ] **Setup screen, offline.** Still in airplane mode: sidebar **Setup** → "2 Levels" table shows #, Code, In scope, Numbering group (06 and 06M read `06/06M ◀ shared`), Split of (06M → 06), Display sheet "(none yet)". Toggle 09 In scope on → row un-greys. **Share with…** on 10 → pick 09 → 10 reads `09/10 ◀ shared`; **Separate** on 10 → `10` again. Add level `13` with "Split of" 12 → it lands right after 12. Each action adds a pending edit in the top bar ("Offline · n pending"). → saw:
+- [ ] **Project fields, offline.** "1 Project": change the disclaimer, tap elsewhere → "Saved" and one more pending edit. Leave and reopen Setup: the change is there. → saw:
+- [ ] **It syncs.** Airplane mode off → the pending count drops to 0. On a **second iPad** (or after Re-sign-in with the data kept), Projects → Refresh from server → Scratch appears "downloading…" and then opens with the edited levels and disclaimer. → saw:
+- [ ] **Numbering group is fixed once used.** On any level of Scratch, long-press the plan… there is no plan yet, so instead: on the Tower project (below), a level with devices shows "n records" under its code and its **Share with…** / **Separate** buttons are greyed. → saw:
+- [ ] **The Tower project.** Create "Houston Methodist Centennial Tower" the same way with levels B2, B1, 01, 02, 03, 04, 06, 06M (shares with 06, split of 06), then Add range 09-12 out of scope. Then Landry runs the seed import on the Droplet (TASKS.md T27 deploy note, now with this project's id from the Projects screen or `GET /projects`), and the next sync brings 210 devices etc. → saw:
+- [ ] **Decision D127 is Proposed** (projects as ops, levels edited by ops, numbering group frozen once a level has records, app library always copied, seed CLI gone): approve or change.
 
 ---
 

@@ -83,3 +83,13 @@ to push or pull, so until 2026-10-11 it never contacted the server and reported 
 airplane mode. Now `SyncTransport.ping()` (`GET /health`, optional on test doubles) runs in that
 case: a network failure makes the cycle `offline` with the usual backoff, a 2xx keeps `idle` and
 `lastSyncAt` means "the server answered". With projects present the push/pull calls already tell.
+
+## Where an iPad learns its projects (T41, D127)
+
+The default project list is local `project` rows ∪ projects with outbox entries ∪
+`sync_state('known_projects')`. The app fills the last one from `GET /projects` (the Projects
+screen's refresh) and from its own `POST /projects` (`rememberProjects(store, ids)`), so a
+project the iPad has never seen is pulled on the next cycle: the server wrote the project, its
+numbering groups, levels and copied vocabulary/library/rulings/placeholders as ops at creation,
+and the first pull materialises them, the `project` row included. Nothing is written locally
+outside the pull; `knownProjects(store)` reads the list.

@@ -71,6 +71,9 @@ export {
 export {
   SyncEngine,
   TransportError,
+  KNOWN_PROJECTS_KEY,
+  knownProjects,
+  rememberProjects,
   type SyncTransport,
   type TransportFailure,
   type PushBody,

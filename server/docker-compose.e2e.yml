@@ -5,7 +5,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.e2e.yml exec -T api python -m app.storage ensure-bucket
 # then, from the repo root:
 #   FIELD_SURVEY_E2E_URL=http://127.0.0.1:8010 FIELD_SURVEY_E2E_TOKEN=e2e pnpm --filter @field-survey/core test:e2e
-# The harness seeds projects with `exec -T api python -m app.seed` and restarts the API with
+# The harness creates projects with `POST /projects` (T41) and restarts the API with
 # `restart api` through the same two compose files (packages/core/docs/e2e.md).
 services:
   api:

@@ -11,7 +11,7 @@ from conftest import HDR, SERVER_DIR
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app import materialise, seed
+from app import materialise, projects
 from app.auth import system_user, upsert_user
 from app.ids import uuid7
 from app.jobs import runner, seed_import
@@ -56,10 +56,18 @@ def factory(engine):
     return lambda: Session(engine)
 
 
+def new_project(session, name="Tower") -> uuid.UUID:
+    """A project with no levels (the import adds them), made as `POST /projects` would (T41)."""
+    out = projects.create_project(
+        session, projects.ProjectIn(name=name), upsert_user(session, "Landry")
+    )
+    return uuid.UUID(out.id)
+
+
 def import_file(session, store, factory, path: Path, project_id=None, user_name="Landry"):
     """Create a project (unless given), queue the file and run it; returns (project_id, batch)."""
     if project_id is None:
-        project_id = uuid.UUID(seed.seed_project(session, "Tower", [])["project_id"])
+        project_id = new_project(session, "Tower")
     user = upsert_user(session, user_name)
     batch = runner.create_batch(
         session,
@@ -633,7 +641,7 @@ def test_synthetic_workbook_checks(session, store, factory, tmp_path):
 def test_column_mapping_override(session, store, factory, tmp_path):
     path = tmp_path / "renamed.xlsx"
     write_workbook(path, notes_header="Comments")
-    project_id = uuid.UUID(seed.seed_project(session, "Tower", [])["project_id"])
+    project_id = new_project(session, "Tower")
     user = upsert_user(session, "Landry")
     batch = runner.create_batch(
         session,
@@ -651,7 +659,7 @@ def test_column_mapping_override(session, store, factory, tmp_path):
     batch2 = runner.create_batch(
         session,
         store,
-        project_id=uuid.UUID(seed.seed_project(session, "T2", [])["project_id"]),
+        project_id=new_project(session, "T2"),
         kind="floor_xlsx",
         filename="again.xlsx",
         data=path.read_bytes(),
@@ -664,7 +672,7 @@ def test_column_mapping_override(session, store, factory, tmp_path):
 
 
 def test_bad_file_fails_the_batch_and_leaves_the_project_untouched(session, store, factory):
-    project_id = uuid.UUID(seed.seed_project(session, "Tower", [])["project_id"])
+    project_id = new_project(session, "Tower")
     batch = runner.create_batch(
         session,
         store,
@@ -677,8 +685,9 @@ def test_bad_file_fails_the_batch_and_leaves_the_project_untouched(session, stor
     assert runner.run_batch(factory, store, batch.id) == "failed"
     session.expire_all()
     assert "not an .xlsx" in session.get(ImportBatch, batch.id).stats["error"]
+    # Only the project's own create op (T41) is in the log: nothing from the import.
     assert (
-        session.scalar(select(func.count()).select_from(Op).where(Op.project_id == project_id)) == 0
+        session.scalar(select(func.count()).select_from(Op).where(Op.project_id == project_id)) == 1
     )
 
 
@@ -688,7 +697,7 @@ def test_bad_file_fails_the_batch_and_leaves_the_project_untouched(session, stor
 def test_imports_api(client, session, store, factory, tmp_path):
     path = tmp_path / "Floor_B2.xlsx"
     write_workbook(path)
-    project_id = seed.seed_project(session, "Tower", [])["project_id"]
+    project_id = str(new_project(session))
     headers = {**HDR, "X-Survey-User": "Landry"}
     files = {"file": (path.name, path.read_bytes(), runner.XLSX_MIME)}
 

@@ -31,7 +31,7 @@ The worker picks the batch up within 5 s. From the server shell (the Droplet, be
 docker compose exec api python -m app.jobs.runner <project_id> /path/to/master.xlsx --user Landry
 ```
 
-The project must exist (`python -m app.seed project "<name>"` or, from T41, `POST /projects`); it needs
+The project must exist (`POST /projects`, T41); it needs
 no numbering groups or levels — the import creates them from the Summary (one group per floor,
 06 and 06M in one, D33). Existing levels with the same code are reused.
 

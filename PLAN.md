@@ -296,7 +296,7 @@ Cover: "ETC Lighting Controls Survey — Level NN", "Surveyed <date>" only (R7),
 |---|---|
 | `POST /ops` · `GET /ops?project&since` | push / pull (§3.2) |
 | `POST /blobs/{sha}` · `PUT …/chunks/{n}` · `GET /blobs/{sha}` · `POST …/complete` · `GET …/content` | resumable blobs |
-| `GET /projects` · `POST /projects` (+ copy-from) | project list and creation (server-side so numbering groups exist before any op) |
+| `GET /projects` · `POST /projects` (+ levels, copy-from) | project list and creation (server-side so numbering groups exist before any op); the project, its groups, levels and copies are written as ops so an iPad pulls them (D127) |
 | `POST /imports` · `GET /imports/{id}` | setup and seed jobs; drafts delivered as ops |
 | `POST /exports` · `GET /exports/{id}` · `GET /exports?project` | workbook / floor PDF jobs and history |
 | `GET /me` | user upsert from JWT |

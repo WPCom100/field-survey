@@ -7,6 +7,9 @@
  * page since the cursor, materialising other installs' ops, recording reviewed ones and
  * marking local pending ops the server will review ("will be reviewed").
  *
+ * A project the iPad learned from `GET /projects` but has no row for yet is pulled too
+ * (`rememberProjects`, T41): its first pull materialises the project row itself.
+ *
  * Nothing here ever blocks an edit: `Store.apply` is independent of the engine, and with no
  * transport (no server/token yet) a cycle simply reports `no_token`. Failures back off
  * exponentially (5 s … 5 min); a foreground `requestSync()` resets the backoff and tries at
@@ -161,6 +164,28 @@ function marksKey(projectId: string): string {
 
 function cursorKey(projectId: string): string {
   return `last_server_seq:${projectId}`;
+}
+
+/**
+ * Projects this install knows from the server (`GET /projects` / `POST /projects`, T41) but
+ * may not hold a `project` row for yet. The default project list includes them, so the first
+ * pull brings the project's own `create` op and everything after it (D127). Client-only
+ * `sync_state`, never synced.
+ */
+export const KNOWN_PROJECTS_KEY = 'known_projects';
+
+export async function knownProjects(store: Store): Promise<string[]> {
+  const ids = await store.getState<unknown>(KNOWN_PROJECTS_KEY);
+  return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [];
+}
+
+/** Add project ids to the known list (idempotent); returns the list. */
+export async function rememberProjects(store: Store, ids: readonly string[]): Promise<string[]> {
+  const known = new Set(await knownProjects(store));
+  for (const id of ids) known.add(id);
+  const list = [...known].sort();
+  await store.setState(KNOWN_PROJECTS_KEY, list);
+  return list;
 }
 
 // --------------------------------------------------------------------- engine
@@ -518,6 +543,7 @@ export class SyncEngine {
     const rows = await this.store.list<{ id: string }>('project', { includeDeleted: true });
     const ids = new Set(rows.map((r) => r.id));
     for (const p of await this.store.outboxProjects()) ids.add(p);
+    for (const p of await knownProjects(this.store)) ids.add(p);
     return [...ids].sort();
   }
 

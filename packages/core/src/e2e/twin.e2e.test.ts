@@ -159,7 +159,7 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
 
       const server = await expectConverged(a, b, w.projectId);
       const clientOps = server.filter((o) => o.install_id === a.installId || o.install_id === b.installId);
-      expect(clientOps).toHaveLength(3 + 1210); // levels + everything above, each exactly once
+      expect(clientOps).toHaveLength(1210); // everything above, each exactly once (levels are server ops, T41)
       expect(server.filter((o) => o.kind === 'assign')).toHaveLength(10);
       expect(server.every((o) => o.state === 'applied')).toBe(true); // disjoint records: nothing in review
       for (let i = 0; i < 10; i++) {
@@ -196,7 +196,7 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
       expect(tries).toBeGreaterThan(1);
 
       const server = await expectConverged(a, b, w.projectId);
-      expect(server.filter((o) => o.install_id === a.installId)).toHaveLength(3 + 1000);
+      expect(server.filter((o) => o.install_id === a.installId)).toHaveLength(1000);
       expect(server.filter((o) => o.kind === 'assign').map((o) => o.now).sort()).toEqual([1, 2, 3, 4, 5, 6]);
       // The last of 990 round-robin sets on device i is index 989 - ((989 - i) % 4).
       for (let i = 0; i < 4; i++) expect((await get(b, 'device', devs[i]!))!.notes).toBe(`n${989 - ((989 - i) % 4)}`);
@@ -228,7 +228,7 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
       expect((await a.store.list<Row>('photo')).map((p) => p.number).sort()).toEqual([1, 2, 3]);
       expect((await b.store.list<Row>('punch_item')).map((p) => p.number).sort()).toEqual([1, 2]);
       const server = await expectConverged(a, b, w.projectId);
-      expect(server).toHaveLength(3 + 5 + 5);
+      expect(server).toHaveLength(6 + 5 + 5); // project + 2 groups + 3 levels (T41), 5 client ops, 5 assigns
     }, 60_000);
   });
 

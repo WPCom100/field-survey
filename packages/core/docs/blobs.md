@@ -54,3 +54,7 @@ iPad sandbox and the server's `/blobs` routes (`server/docs/blobs.md`). Decision
 `src/blobs.e2e.test.ts` runs the queue against a real server when `FIELD_SURVEY_E2E_URL` and
 `FIELD_SURVEY_E2E_TOKEN` are set; it skips otherwise. It is part of `pnpm --filter
 @field-survey/core test:e2e` and the CI `e2e` job (T14, `docs/e2e.md`).
+
+## Prefetch scope
+
+**No assignment at all (D97, T41):** when the current user has no live `assignment` row in any project, `prefetch()` treats every in-scope level of every project on the iPad as assigned, so a one-person or unassigned team still gets its plans, thumbnails, ink and markup; the moment the user has one assignment, only assigned levels are cached from then on.

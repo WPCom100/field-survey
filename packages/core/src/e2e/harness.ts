@@ -4,9 +4,9 @@
  * FIELD_SURVEY_E2E_URL / FIELD_SURVEY_E2E_TOKEN (packages/core/docs/e2e.md); without them every
  * e2e test is skipped with a reason, never passed silently.
  *
- * Server-side setup goes through the compose files (`exec -T api python -m app.seed`,
- * `restart api`): FIELD_SURVEY_E2E_COMPOSE overrides the compose command, FIELD_SURVEY_E2E_SEED
- * the seed command, FIELD_SURVEY_E2E_RESTART the restart command (`skip` skips restart tests).
+ * Projects come from `POST /projects` (T41, D127) like the iPad's; the API restart goes through
+ * the compose files (`restart api`): FIELD_SURVEY_E2E_COMPOSE overrides the compose command,
+ * FIELD_SURVEY_E2E_RESTART the restart command (`skip` skips restart tests).
  */
 
 import { execFile } from 'node:child_process';
@@ -22,7 +22,7 @@ import { uuidv7 } from '../ids';
 import type { Op, StoredOp } from '../op';
 import type { EntityKind } from '../schema/entities';
 import { Store } from '../store';
-import { SyncEngine, type SyncEngineOptions } from '../sync';
+import { SyncEngine, rememberProjects, type SyncEngineOptions } from '../sync';
 
 const execFileAsync = promisify(execFile);
 
@@ -36,7 +36,6 @@ const COMPOSE = (
   process.env.FIELD_SURVEY_E2E_COMPOSE ??
   'docker compose -f server/docker-compose.yml -f server/docker-compose.e2e.yml'
 ).split(/\s+/);
-const SEED = process.env.FIELD_SURVEY_E2E_SEED?.split(/\s+/) ?? [...COMPOSE, 'exec', '-T', 'api', 'python', '-m', 'app.seed'];
 const RESTART = process.env.FIELD_SURVEY_E2E_RESTART?.split(/\s+/) ?? [...COMPOSE, 'restart', 'api'];
 export const RESTART_ENABLED = process.env.FIELD_SURVEY_E2E_RESTART !== 'skip';
 
@@ -56,13 +55,34 @@ async function run(cmd: string[]): Promise<string> {
 
 export interface Seeded {
   project_id: string;
+  /** Numbering-group id by label (`06/06M`). */
   groups: Record<string, string>;
+  /** Level id by code. */
+  levels: Record<string, string>;
 }
 
-/** `python -m app.seed project <name> <groups…>` inside the api container (D89). */
-export async function seedProject(name: string, groups: string[]): Promise<Seeded> {
-  const out = await run([...SEED, 'project', name, ...groups]);
-  return JSON.parse(out.trim().split('\n').pop()!) as Seeded;
+export interface SeedLevel {
+  level: string;
+  share_with?: string;
+  split_of?: string;
+  in_scope?: boolean;
+}
+
+interface ProjectOut {
+  id: string;
+  levels: { id: string; level: string; numbering_group_id: string; numbering_group_label: string | null }[];
+}
+
+/** `POST /projects` with these levels: the project, its groups and levels as ops (T41). */
+export async function seedProject(name: string, levels: SeedLevel[]): Promise<Seeded> {
+  const r = await http('harness').json<ProjectOut>('POST', '/projects', { name, levels });
+  const groups: Record<string, string> = {};
+  const byCode: Record<string, string> = {};
+  for (const lv of r.levels) {
+    groups[lv.numbering_group_label ?? lv.level] = lv.numbering_group_id;
+    byCode[lv.level] = lv.id;
+  }
+  return { project_id: r.id, groups, levels: byCode };
 }
 
 /** `docker compose restart api`: the server goes away for a few seconds. */
@@ -179,12 +199,12 @@ export interface ClientOptions {
   dbPath?: string;
 }
 
-/** A fresh iPad: its own SQLite file (or memory), the project row seeded locally, real transport. */
+/** A fresh iPad: its own SQLite file (or memory), the project known (its row arrives by pull), real transport. */
 export async function openClient(name: string, projectId: string, opts: ClientOptions = {}): Promise<Client> {
   const userId = await teamMember(name);
   const installId = uuidv7();
   const store = await Store.open(new BetterSqliteDriver(opts.dbPath), { installId, search: 'like' });
-  await seedProjectRow(store, projectId, userId);
+  await rememberProjects(store, [projectId]);
   const transport = new HttpTransport({
     serverUrl: URL_,
     token: TOKEN,
@@ -199,25 +219,6 @@ export async function openClient(name: string, projectId: string, opts: ClientOp
   });
   const editor = new Editor(store, { projectId, userId });
   return { name, userId, installId, store, editor, engine, transport, flapper: opts.flapper ?? null };
-}
-
-/** The project row exists locally (T41 will deliver it at sign-in; here it is seeded, D89). */
-export async function seedProjectRow(store: Store, projectId: string, userId: string): Promise<void> {
-  await store.applyRemote({
-    op_id: uuidv7(),
-    project_id: projectId,
-    user_id: userId,
-    install_id: uuidv7(),
-    client_ts: new Date().toISOString(),
-    entity_kind: 'project',
-    entity_id: projectId,
-    kind: 'create',
-    payload: { name: 'Twin harness' },
-    change_type: 'Master edit',
-    server_seq: 0,
-    server_ts: new Date().toISOString(),
-    state: 'applied',
-  } as Op);
 }
 
 /** `ResolveOptions.userName` for the clients' users (the iPad has no `app_user` rows yet). */
@@ -280,21 +281,17 @@ export interface World {
 
 /**
  * A fresh project on the server with levels 06 and 06M on one numbering group (D33) and 07 on
- * its own, created by Ann (client A) through ordinary ops and pulled by Bob (client B).
+ * its own, made by `POST /projects` (T41) and pulled by both clients on their first sync.
  */
 export async function makeWorld(
   optsA: ClientOptions = {},
   optsB: ClientOptions = {},
 ): Promise<{ a: Client; b: Client; w: World }> {
-  const seeded = await seedProject('Twin harness', ['06/06M', '07']);
+  const seeded = await seedProject('Twin harness', [{ level: '06' }, { level: '06M', share_with: '06' }, { level: '07' }]);
   const a = await openClient('Ann', seeded.project_id, optsA);
   const b = await openClient('Bob', seeded.project_id, optsB);
-  const level = async (code: string, group: string) =>
-    (await a.editor.create('level', { project_id: seeded.project_id, level: code, numbering_group_id: group }, CTX)).id;
-  const L06 = await level('06', seeded.groups['06/06M']!);
-  const L06M = await level('06M', seeded.groups['06/06M']!);
-  const L07 = await level('07', seeded.groups['07']!);
   await sync(a, b);
+  const { '06': L06, '06M': L06M, '07': L07 } = seeded.levels as { '06': string; '06M': string; '07': string };
   return { a, b, w: { projectId: seeded.project_id, groups: seeded.groups, levels: { L06, L06M, L07 } } };
 }
 

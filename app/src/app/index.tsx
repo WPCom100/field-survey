@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -38,8 +38,14 @@ const CACHE_LABEL: Record<HomeLevel['cache'], string> = {
 export default function ProjectHomeScreen() {
   const user = useCurrentUser();
   const sync = useSyncStatus();
+  const { project: wanted } = useLocalSearchParams<{ project?: string }>();
   const [projects, setProjects] = useState<HomeProject[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
+
+  // The Projects screen and project creation open the home on a given project (T41).
+  useEffect(() => {
+    if (typeof wanted === 'string' && wanted) setProjectId(wanted);
+  }, [wanted]);
   const [home, setHome] = useState<ProjectHome | null>(null);
   const [mineOnly, setMineOnly] = useState(false);
 
@@ -66,9 +72,16 @@ export default function ProjectHomeScreen() {
     <View style={styles.root}>
       <View style={styles.sidebar}>
         <Text style={styles.brand}>Field Survey</Text>
+        <Link href="/projects" style={[styles.navItem, styles.navText]}>
+          Projects
+        </Link>
         {SIDEBAR.map((name) =>
           name === 'Sync' || name === 'Needs review' ? (
             <Link key={name} href={name === 'Sync' ? '/sync' : '/review'} style={[styles.navItem, styles.navText]}>
+              {name}
+            </Link>
+          ) : name === 'Setup' && projectId ? (
+            <Link key={name} href={{ pathname: '/setup/[projectId]', params: { projectId } }} style={[styles.navItem, styles.navText]}>
               {name}
             </Link>
           ) : (
@@ -99,7 +112,12 @@ export default function ProjectHomeScreen() {
         ) : null}
 
         {!home ? (
-          <Text style={styles.empty}>No project on this iPad yet. Connect to the server and sync, or create one in Setup.</Text>
+          <View>
+            <Text style={styles.empty}>No project on this iPad yet.</Text>
+            <Link href="/projects" style={styles.link}>
+              Open Projects to download one from the server or create a new one →
+            </Link>
+          </View>
         ) : (
           <>
             <Text style={styles.title}>{home.project.name}</Text>
@@ -192,4 +210,5 @@ const styles = StyleSheet.create({
   red: { color: '#c62828', fontWeight: '600' },
   badge: { color: '#1565c0', fontWeight: '700', fontSize: 12 },
   empty: { fontSize: 15, color: '#666', marginTop: 24 },
+  link: { fontSize: 15, color: '#1565c0', marginTop: 8 },
 });

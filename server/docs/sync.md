@@ -14,7 +14,7 @@ references: PLAN §3.1 (the op), §3.2 (apply steps, pull), §3.3 (conflict rule
 | `app/api/ops.py` | The routes: one transaction per push (commit on success, rollback and 409/422/500 otherwise); paged pull. |
 | `tests/test_ops.py` | Every row of PLAN §3.3, D37 ordering, numbering, idempotency, validation, one-transaction. |
 | `tests/test_pull_materialise.py` | Pull paging and states; materialised rows per op kind; replay == state; no `server_seq` gaps under 8 concurrent pushers (TP-7 partial). |
-| `app/seed.py` | `python -m app.seed project <name> <group…>`: the `project` + `numbering_group` rows a push needs, until `POST /projects` exists (T41, D89). Used by the twin-client harness (`packages/core/docs/e2e.md`), which completes TP-7 (flaps, restart, duplicate push) end to end. |
+| `app/projects.py`, `app/api/projects.py` | `POST /projects` / `GET /projects` (T41, D127): the `project` row a push locks on, then the project, its `numbering_group`s, levels and copies written as trusted ops (`Push(trusted=True)`) so an iPad's first pull delivers them. Replaces the `app.seed` CLI (D89); the twin-client harness (`packages/core/docs/e2e.md`) uses it. |
 
 ## Request and response
 

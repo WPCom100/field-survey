@@ -4,7 +4,7 @@ import { uuidv7 } from './ids';
 import { BetterSqliteDriver } from './node';
 import type { Op } from './op';
 import { Store } from './store';
-import { SyncEngine, TransportError, type SyncStatus } from './sync';
+import { SyncEngine, TransportError, knownProjects, rememberProjects, type SyncStatus } from './sync';
 import { FakeServer } from './testing/fake-server';
 
 const PROJECT = uuidv7();
@@ -376,6 +376,35 @@ describe('reachability with no project yet (iPad round 2026-10-11, T25-3)', () =
     const a = await client(server, ANN, 'ipad-a', { projects: async () => [] });
     expect((await a.engine.sync()).outcome).toBe('ran');
     expect(a.engine.status().state).toBe('idle');
+  });
+});
+
+describe('known projects (T41, D127)', () => {
+  it('a project learned from the server is pulled before any local row exists, and the pull brings the row', async () => {
+    // The server holds the project as ops (what POST /projects writes): here a client pushes them.
+    const seeder = await Store.open(new BetterSqliteDriver(), { installId: 'server', search: 'like' });
+    const sEditor = new Editor(seeder, { projectId: PROJECT, userId: ANN, now: tsNext });
+    await sEditor.create('project', { id: PROJECT, name: 'Tower', settings: { export_title: 'ETC Lighting Controls Survey' } }, CTX);
+    const group = (await sEditor.create('numbering_group', { project_id: PROJECT, label: '06/06M' }, CTX)).id;
+    await sEditor.create('level', { id: LEVEL, project_id: PROJECT, level: '06M', numbering_group_id: group, floor_order: 1 }, CTX);
+    await new SyncEngine(seeder, server, { now, log: () => {} }).sync();
+    expect(server.ops(PROJECT).map((o) => o.entity_kind)).toEqual(['project', 'numbering_group', 'level']);
+
+    // A fresh iPad: no project row, only the id from GET /projects.
+    const store = await Store.open(new BetterSqliteDriver(), { installId: 'ipad-b', search: 'like' });
+    const engine = new SyncEngine(store, server, { now, log: () => {} });
+    expect(await store.list('project')).toEqual([]);
+    expect((await engine.sync()).projects).toEqual([]);
+
+    expect(await rememberProjects(store, [PROJECT])).toEqual([PROJECT]);
+    expect(await rememberProjects(store, [PROJECT])).toEqual([PROJECT]); // idempotent
+    expect(await knownProjects(store)).toEqual([PROJECT]);
+    const report = await engine.sync();
+    expect(report).toMatchObject({ outcome: 'ran', pulled: 3, projects: [PROJECT] });
+    expect((await store.get('project', PROJECT))!.name).toBe('Tower');
+    expect((await store.get('numbering_group', group))!.label).toBe('06/06M');
+    expect((await store.get('level', LEVEL))!.numbering_group_id).toBe(group);
+    expect(engine.status().lastServerSeq[PROJECT]).toBe(3);
   });
 });
 

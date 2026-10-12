@@ -386,6 +386,36 @@ describe('downloads', () => {
     expect(server.calls).toEqual([]);
   });
 
+  it('with no assignment at all, prefetches every in-scope level and skips far-end levels (D97, T41)', async () => {
+    const { store } = await openStore();
+    await seedLevels(store);
+    const L3 = uuidv7();
+    await store.applyRemote(remote('level', L3, 'create', { payload: { project_id: PROJECT, level: '09', numbering_group_id: GROUP, in_scope: false } }));
+    const t1 = server.seed(bytes(3000, 1));
+    const t2 = server.seed(bytes(3000, 2));
+    const tFar = server.seed(bytes(3000, 3));
+    const sheet = server.seed(bytes(50_000, 4), 'application/pdf');
+    await addPhoto(store, L1, { thumb: t1 });
+    await addPhoto(store, L2, { thumb: t2 });
+    await addPhoto(store, L3, { thumb: tFar });
+    await store.applyRemote(remote('sheet', uuidv7(), 'create', { payload: { level_id: L2, kind: 'display', blob: sheet } }));
+
+    const q = queue(store);
+    expect(await q.run()).toMatchObject({ outcome: 'ran', downloaded: 3 });
+    const downloads = server.calls.filter((c) => c.startsWith('download')).map((c) => c.slice(9));
+    expect(new Set(downloads)).toEqual(new Set([sheet, t1, t2].map((s) => s.slice(0, 8))));
+
+    // Once Ann has an assignment, only her levels are cached from then on.
+    await assign(store, L1, ANN);
+    const tLater = server.seed(bytes(3000, 5));
+    const tLater2 = server.seed(bytes(3000, 6));
+    await addPhoto(store, L1, { thumb: tLater });
+    await addPhoto(store, L2, { thumb: tLater2 });
+    server.calls.length = 0;
+    expect(await q.run()).toMatchObject({ outcome: 'ran', downloaded: 1 });
+    expect(server.calls.filter((c) => c.startsWith('download')).map((c) => c.slice(9))).toEqual([tLater.slice(0, 8)]);
+  });
+
   it('waits quietly for a thumbnail its author has not uploaded yet', async () => {
     const { store } = await openStore();
     await seedLevels(store);

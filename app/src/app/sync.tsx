@@ -149,8 +149,8 @@ export default function SyncScreen() {
             await q.prefetch();
             const n = await countQueuedDownloads();
             await q.requestRun();
-            if (!n) return 'Nothing to download: every plan you are assigned is already on this iPad.';
-            return `Downloading ${n} file${n === 1 ? '' : 's'} for your assigned levels.`;
+            if (!n) return 'Nothing to download: every plan for your levels is already on this iPad.';
+            return `Downloading ${n} file${n === 1 ? '' : 's'} for your levels (all in-scope levels when you have no assignment, D97).`;
           })}
         />
       </Section>

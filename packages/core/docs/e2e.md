@@ -9,11 +9,10 @@ Unit tests use `FakeServer`; everything here goes over HTTP to Postgres.
 
 | File | What |
 |---|---|
-| `src/e2e/harness.ts` | Server setup through compose (`seedProject`, `restartApi`), clients (`openClient`, `makeWorld`), the `Flapper` fetch wrapper, `drain`, `expectConverged`, `expectGapFree`. |
+| `src/e2e/harness.ts` | Server setup (`seedProject` over `POST /projects`, `restartApi` through compose), clients (`openClient`, `makeWorld`), the `Flapper` fetch wrapper, `drain`, `expectConverged`, `expectGapFree`. |
 | `src/e2e/twin.e2e.test.ts` | The TP scripts (table below). |
 | `src/blobs.e2e.test.ts` | T12's upload-resume test; same env, runs in the same CI job. |
 | `server/docker-compose.e2e.yml` | Compose override: API on `127.0.0.1:8010`, token `e2e`, local S3. |
-| `server/app/seed.py` | `python -m app.seed project <name> <group…>`: the project + numbering groups a push needs (D89). |
 
 ## Running it
 
@@ -33,11 +32,12 @@ one at a time (`--no-file-parallelism`) because the restart test takes the API d
 |---|---|---|
 | `FIELD_SURVEY_E2E_URL`, `_TOKEN` | — (required) | Where the server is and its shared token |
 | `FIELD_SURVEY_E2E_COMPOSE` | `docker compose -f server/docker-compose.yml -f server/docker-compose.e2e.yml` | Compose command, run from the repo root |
-| `FIELD_SURVEY_E2E_SEED` | `<compose> exec -T api python -m app.seed` | How to run the seed CLI (e.g. `uv run --directory server python -m app.seed` against uvicorn on the host) |
 | `FIELD_SURVEY_E2E_RESTART` | `<compose> restart api` | How to restart the API; `skip` skips the restart test (host uvicorn) |
 
-Each test seeds its **own project** (one `app.seed` call, ~0.3 s), so `server_seq` and numbering
-start at 1 and tests never see each other. Users are `POST /team` (`Ann`, `Bob`); install ids are
+Each test creates its **own project** with `POST /projects` (T41, D127: the project, its numbering
+groups and levels arrive as ops), so `server_seq` and numbering start after the project's own ops
+and tests never see each other. A client opens with the project id only (`rememberProjects`) and
+its first pull brings the project row, as on the iPad. Users are `POST /team` (`Ann`, `Bob`); install ids are
 fresh UUID v7s. Clients open with `backoffMs: 50`, `maxBackoffMs: 200` and no log.
 
 ## What is covered
