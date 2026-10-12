@@ -47,7 +47,7 @@ reads the server's tables, never the local store.
 | `export.blob` | SHA-256 of the file; the bytes live at `blobs/<sha>` with a complete `blob` row (MIME `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`) |
 | `export.stats` | `filename`, `levels`, `rows` per tab, `images`, `images_missing`, `markup_flattened`, `strokes_skipped`, `bytes`, `seconds`, `checks_list`, `previous_export`; on failure `error` (+ `traceback` for a crash) |
 | `export.diff_summary` | against the project's previous done xlsx export: per data tab `rows`, `added`, `removed`, `changed` (by Level + ID / #) and up to five `examples`; `null` for the first export |
-| `export.job_state` | `queued → running → done | failed` (D137; `failed` rows are retried by `run_export` only on request) |
+| `export.job_state` | `queued → running → done` or `failed` (D137; `failed` rows are retried by `run_export` only on request) |
 
 Filename: `Lighting_Control_Survey_Master_<first>-<last>_<n>.xlsx` — Landry's convention for the
 fixture (`…_B2-06_4.xlsx`): first and last level by floor order (`06M` folds into `06`, D33), `n`
