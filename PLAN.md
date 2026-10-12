@@ -284,7 +284,7 @@ Seed placeholders: `Fixtures`, `120v Power`, `Stations & Sensors`, `Level 09`…
 
 Dense layout: tables run several items per page with inline thumbnails; no single-item pages; sections flow without forced page breaks. Finalise against Landry's example report when attached (G5-1).
 
-Cover: "ETC Lighting Controls Survey — Level NN", "Surveyed <date>" only (R7), status counts table, plan snapshot with status-coloured pins, ID labels and all users' ink flattened. Then: findings (devices with Status ≠ Installed, untested: ID, Device, Room, Status, Notes, thumbnails); connections for the level; punch list ordered (`sort_last`, #); missing parts; photo appendix 2×3 grid, caption "Photo n — <Subject> — <Device ID>".
+Cover: "ETC Lighting Controls Survey — Level NN", "Surveyed <date>" only (R7), status counts table, plan snapshot with status-coloured, category-shaped pins labelled by device type (Type, else Device, else category — D119/D120) and all users' ink flattened. Then: findings (devices with Status ≠ Installed, untested: ID, Device, Room, Status, Notes, thumbnails); connections for the level; punch list ordered (`sort_last`, #); missing parts; photo appendix 2×3 grid, caption "Photo n — <Subject> — <Device ID>".
 
 ### 7.8 MSS (M7, blocked on the file — A4)
 
