@@ -3,3 +3,5 @@
 export { BetterSqliteDriver } from './better-sqlite-driver';
 // The in-memory server stand-in, for app read-model tests that need a sync round (T26).
 export { FakeServer } from './testing/fake-server';
+// A blob sandbox on the local disk, for Node tools that drive a `BlobQueue` (TP-3, T32).
+export { NodeBlobFiles } from './testing/fake-blob-server';

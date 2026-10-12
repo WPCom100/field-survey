@@ -112,6 +112,21 @@ Decision D133 (🎨 Recolour tool; erase beats recolour; offline writes merged a
 Decision D140 (share sheet instead of `expo-sharing`, files kept on the iPad, photos still uploading warn but do not block the export): approve / change →
 Decision D141 (tab choice: Summary and Lists always included, a Summary table dropped with its tab): approve / change →
 
+## T32 — TP-3: a tower-sized project on the iPad  ·  Needs: no new build; **the synthetic project on the Droplet** (see the Decision line: it is created only after you say yes); the T29 + T31 server deploy for the export step
+
+**Why it matters:** the Tower will reach about 2,000 devices and 10,000 photos; the app must still open a crowded floor quickly, scroll its lists and cache every thumbnail over Wi-Fi in reasonable time. Results go in `docs/perf/tp3.md` §3.
+
+- [ ] **First sync.** Projects → Refresh → open "TP-3 synthetic". Time from opening it until the status bar reads "Synced": write the minutes. Editing stays possible meanwhile. → saw:
+- [ ] **Open the crowded floor.** Levels → 06M (1,000 devices). From the tap until the pins are on the plan: under 3 seconds? → saw:
+- [ ] **Scroll the lists.** On 06M, flick the Devices tab from top to bottom, then Conns and Punch: smooth, no blank rows that stay blank, no freeze. → saw:
+- [ ] **Search.** Type `Run` in the search box: the lists narrow within a moment. → saw:
+- [ ] **Prefetch on Wi-Fi.** Sync screen → Download assigned levels; note the time until downloads reach zero (10,000 thumbnails): under 10 minutes? → saw:
+- [ ] **Export.** Export → Generate workbook (all levels, all tabs): time from Generate until Ready: under 5 minutes? Open it in Excel from the share sheet. → saw:
+- [ ] **Memory (dev build only).** Perf Monitor after opening 06M and scrolling: RAM under 600 MB? → saw:
+
+Decision D142 (synthetic project shape: half the devices on 06M, distinct thumbnails, no full-size photo bytes): approve / change →
+Decision (TP-3 on the iPad): create the synthetic project "TP-3 synthetic" on the Droplet — about 110 MB of thumbnails in R2 and a permanent project, since projects cannot be deleted yet? yes / no →
+
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:
