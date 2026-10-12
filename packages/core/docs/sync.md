@@ -28,7 +28,11 @@ For each project (local `project` rows ∪ projects with outbox entries, or the 
    `applyRemoteMany`. A failed push counts an attempt and keeps the error on the outbox rows.
 2. **Pull** pages of ≤ 500 from the cursor until `has_more` is false, applying each page with
    `applyRemoteMany` and advancing `last_server_seq:<project>` to the last op's seq. Orphans
-   (an applied op on a record this iPad never received) are logged, never fatal.
+   (an applied op on a record this iPad never received) are logged, never fatal. The cursor only
+   ever moves to the seq of an op this iPad applied: an empty page whose `server_seq` is above
+   the cursor is a **gap** (logged `pull_gap`), the cursor stays and the next cycle asks again
+   (T74, D144). The server reads the top before the page so this never happens in practice;
+   the client still refuses to skip ahead if it does.
 3. A **network** failure ends the cycle for every project (nothing else will work either). A
    **refusal** (401, 409, 422, 5xx) on the push still lets the pull run, so the iPad keeps
    receiving edits while a poison batch waits; the status carries the message.

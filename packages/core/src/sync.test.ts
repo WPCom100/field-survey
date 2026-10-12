@@ -176,6 +176,41 @@ describe('pull', () => {
     expect(server.pulls).toEqual([{ project: PROJECT, since: 7, limit: 3 }]);
   });
 
+  it('never advances the cursor past ops it was not given: an empty page under a higher top is a gap (T74, D144)', async () => {
+    const events: Record<string, unknown>[] = [];
+    const a = await client(server, ANN, 'ipad-a');
+    const b = await client(server, BOB, 'ipad-b', { log: (_l: string, e: string, d?: Record<string, unknown>) => events.push({ e, ...d }) });
+    const d = await newDevice(a);
+    await a.engine.sync();
+    await b.engine.sync(); // Bob is caught up at seq 1 (create) + its assign
+    const caughtUp = await b.store.getState<number>(`last_server_seq:${PROJECT}`);
+    await a.editor.setField('device', d, 'notes', 'landed between the reads', CTX);
+    await a.engine.sync();
+
+    // A racy server: the page was read before Ann's push, the top after it.
+    let racy = true;
+    b.engine.setTransport({
+      push: server.push.bind(server),
+      pull: async (project, since, limit) => {
+        const page = await server.pull(project, since, limit);
+        if (racy) {
+          racy = false;
+          return { ops: [], server_seq: page.server_seq, has_more: false };
+        }
+        return page;
+      },
+    });
+    expect((await b.engine.sync()).pulled).toBe(0);
+    expect(await b.store.getState(`last_server_seq:${PROJECT}`)).toBe(caughtUp); // not moved
+    expect(events).toContainEqual({ e: 'pull_gap', project: PROJECT, since: caughtUp, server_seq: server.serverSeq });
+    expect((await b.store.get('device', d))!.notes).toBeNull();
+
+    // The next cycle gets the ops the gap hid.
+    expect((await b.engine.sync()).pulled).toBe(1);
+    expect((await b.store.get('device', d))!.notes).toBe('landed between the reads');
+    expect(await b.store.getState(`last_server_seq:${PROJECT}`)).toBe(server.serverSeq);
+  });
+
   it('two iPads converge: edits on different fields merge both ways', async () => {
     const a = await client(server, ANN, 'ipad-a');
     const b = await client(server, BOB, 'ipad-b');

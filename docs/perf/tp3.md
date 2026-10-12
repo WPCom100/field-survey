@@ -87,7 +87,7 @@ cd server && S3_ENDPOINT=http://localhost:9000 uv run python -m app.jobs.exports
 
 | Where | What | Action |
 |---|---|---|
-| Server push loop | Applying 16,293 trusted creates took 264 s on the PC, ≈ 16 ms per op. Normal iPad pushes are ≤ 500 ops (≈ 8 s at that rate) and imports are ~1,500 ops, so nothing breaks today, but a seed import or a copied floor at tower size would be slow, and the project lock is held for the whole push | Follow-up task **T74** (profile `Push.run`, batch the per-op queries) |
+| Server push loop | Applying 16,293 trusted creates took 264 s on the PC, ≈ 16 ms per op. Normal iPad pushes are ≤ 500 ops (≈ 8 s at that rate) and imports are ~1,500 ops, so nothing breaks today, but a seed import or a copied floor at tower size would be slow, and the project lock is held for the whole push | Follow-up task **T76** (profile `Push.run`, batch the per-op queries). *T75 (2026-10-12) already took the first step: 500 device creates in one push went from 5.0 s to 1.6 s on the PC (per-push caches for field heads, duplicates and device numbers; op rows inserted ten per statement) — see T75 in TASKS.md* |
 | Local dev database | It was still on migration 0001 (0002/0003 never applied locally), so the first export attempt failed | Upgraded with `alembic upgrade head`; nothing to change in code |
 
 No client hot spot showed on the PC. The iPad numbers may add some (§3).

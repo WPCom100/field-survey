@@ -456,10 +456,12 @@ export class SyncEngine {
         total += page.ops.length;
         const last = page.ops[page.ops.length - 1]!.server_seq ?? since;
         await this.store.setState(cursorKey(project), Math.max(since, last));
-      } else if (page.server_seq > since && !page.has_more) {
-        // Nothing between the cursor and the top (cannot happen with a gap-free log, but a
-        // stale cursor must not pin us): catch up.
-        await this.store.setState(cursorKey(project), page.server_seq);
+      } else if (page.server_seq > since) {
+        // An empty page under a higher top means ops exist that we were not given (a server
+        // reading the top after the page, T74/D144). Never advance past ops never received:
+        // keep the cursor and let the next cycle ask again.
+        this.opts.log('warn', 'pull_gap', { project, since, server_seq: page.server_seq });
+        return total;
       }
       if (!page.has_more) return total;
     }

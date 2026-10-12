@@ -168,6 +168,38 @@ def test_pull_pages_in_server_seq_order_and_carries_every_state(client, w):
     assert [o["server_seq"] for o in tail["ops"]] == [top - 1, top] and not tail["has_more"]
 
 
+def test_a_push_landing_between_the_pull_reads_is_never_skipped(client, w, engine, monkeypatch):
+    """T74 (D144): the top sequence is read before the page. A push committing in between can
+    only add ops to the page; the client never sees an empty page under a higher top (which its
+    old catch-up branch turned into a skipped op)."""
+    first = w.push(client, [w.create(w.ann, "device")])
+    cursor = first["server_seq"]  # the client is caught up
+    landed = w.create(w.bob, "device", {"display_id": "06-02"})
+
+    real_page = sync._pull_page
+
+    def page_after_bobs_push(session, project_id, since, n):
+        with Session(engine) as other:  # another request commits Bob's push between the reads
+            out = sync.Push(other, sync.PushIn(project_id=project_id, ops=[sync.OpIn(**landed)]))
+            out.run([sync.OpIn(**landed)])
+            other.commit()
+        return real_page(session, project_id, since, n)
+
+    monkeypatch.setattr(sync, "_pull_page", page_after_bobs_push)
+    page = pull(client, w, since=cursor)
+    monkeypatch.setattr(sync, "_pull_page", real_page)
+
+    # The invariant the client relies on: an empty page never comes with a higher top.
+    assert not (page["ops"] == [] and page["server_seq"] > cursor)
+    # Bob's create (and its assign) are in the page, in order; the top is at least the last op.
+    assert [o["op_id"] for o in page["ops"]][0] == landed["op_id"]
+    assert page["server_seq"] >= page["ops"][-1]["server_seq"]
+    assert not page["has_more"]
+    # Following the client's rule (cursor = last op's seq) nothing is missed afterwards either.
+    after = pull(client, w, since=page["ops"][-1]["server_seq"])
+    assert after["ops"] == [] and after["server_seq"] == page["ops"][-1]["server_seq"]
+
+
 def test_pull_limit_is_capped_and_validated(client, w):
     survey_a_floor(client, w)
     pull(client, w, limit=0, status=422)

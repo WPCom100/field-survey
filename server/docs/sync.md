@@ -54,6 +54,12 @@ Every state is returned: the client acknowledges its own echoes, materialises ot
 `applied` ops and records `review`/`superseded` ones (D81). The client is caught up when its
 cursor equals `server_seq`.
 
+`pull_ops` reads `server_seq` (the top) **before** the page (T74, D144). The two statements see
+different snapshots under READ COMMITTED, so a push committing between them can only add ops to
+the page, never raise the top above a page that misses them; `server_seq` is then at least the
+last op returned. The client treats an empty page under a higher top as a gap and keeps its
+cursor instead of jumping to the top (which skipped those ops before T74).
+
 ## Outcomes
 
 | Outcome | Meaning | Stored as |

@@ -156,21 +156,35 @@ MAX_OPS_PER_PULL = 500
 
 
 def pull_ops(session: Session, project_id: uuid.UUID, since: int, limit: int) -> PullOut:
+    """The top sequence is read **before** the page (T74, D144): a push committing between the
+    two statements (READ COMMITTED: each sees its own snapshot) can then only add ops to the page,
+    never raise the top above a page that misses them. The client treats an empty page under a
+    higher top as a gap and keeps its cursor; this ordering means it never sees one."""
     if session.get(Project, project_id) is None:
         raise PushError(404, f"unknown project {project_id}")
     limit = max(1, min(limit, MAX_OPS_PER_PULL))
-    rows = list(
+    top = _pull_top(session, project_id)
+    rows = _pull_page(session, project_id, since, limit + 1)
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    if rows:
+        top = max(top, rows[-1].server_seq or 0)
+    return PullOut(ops=[op_to_json(o) for o in rows], server_seq=top, has_more=has_more)
+
+
+def _pull_top(session: Session, project_id: uuid.UUID) -> int:
+    return session.scalar(select(func.max(Op.server_seq)).where(Op.project_id == project_id)) or 0
+
+
+def _pull_page(session: Session, project_id: uuid.UUID, since: int, n: int) -> list[Op]:
+    return list(
         session.scalars(
             select(Op)
             .where(Op.project_id == project_id, Op.server_seq > since)
             .order_by(Op.server_seq)
-            .limit(limit + 1)
+            .limit(n)
         )
     )
-    has_more = len(rows) > limit
-    rows = rows[:limit]
-    top = session.scalar(select(func.max(Op.server_seq)).where(Op.project_id == project_id)) or 0
-    return PullOut(ops=[op_to_json(o) for o in rows], server_seq=top, has_more=has_more)
 
 
 # ----------------------------------------------------------------- validation
