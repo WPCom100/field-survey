@@ -363,6 +363,8 @@ class Op(Base):
     __table_args__ = (
         UniqueConstraint("project_id", "server_seq"),
         Index(None, "entity_id", "field"),
+        # Device-ID assignment scans a project's device creates/sets/assigns (T75, D146).
+        Index(None, "project_id", "entity_kind", "kind"),
         one_of("kind", vocab.OP_KIND),
         one_of("change_type", vocab.CHANGE_TYPE),
         one_of("state", vocab.OP_STATE),

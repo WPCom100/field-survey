@@ -268,11 +268,12 @@ describe('pull', () => {
     const pending = await b.editor.setField('device', d, 'status', 'No access', CTX);
     await b.editor.setField('device', d, 'notes', 'unrelated', CTX);
 
-    // Bob's push is refused (409: poison batch); the pull still runs and finds the collision.
-    server.fail({ on: 'push', failure: 'rejected', status: 409 });
+    // Bob's status edit is refused for good (409 naming no op): it is quarantined, the notes edit
+    // still goes, and the pull still runs and finds the collision (T75).
+    server.poisonOp(pending!.op_id, 409);
     const report = await b.engine.sync();
-    expect(report.outcome).toBe('failed');
-    expect(b.engine.status()).toMatchObject({ state: 'error', willReview: 1, pendingOps: 2 });
+    expect(report.outcome).toBe('ran');
+    expect(b.engine.status()).toMatchObject({ state: 'idle', willReview: 1, pendingOps: 1, quarantinedOps: 1 });
     const marks = await b.engine.willBeReviewed(PROJECT);
     expect(marks).toEqual([
       { op_id: pending!.op_id, entity_kind: 'device', entity_id: d, field: 'status', source: 'pull' },
@@ -280,7 +281,8 @@ describe('pull', () => {
     expect((await b.store.get('device', d))!.status).toBe('Issue'); // Ann's value landed
 
     clock += 10_000;
-    await b.engine.requestSync();
+    server.curePoison(pending!.op_id);
+    await b.engine.retryQuarantined(PROJECT);
     expect(await b.engine.willBeReviewed(PROJECT)).toEqual([]);
     expect((await b.store.getOp(pending!.op_id))!.state).toBe('review');
     expect(b.engine.status()).toMatchObject({ state: 'idle', willReview: 0, pendingOps: 0 });
@@ -304,6 +306,73 @@ describe('pull', () => {
     expect(report.outcome).toBe('ran');
     expect(events).toContain('orphan');
     expect(await b.store.get('device', ghost)).toBeNull();
+  });
+});
+
+describe('quarantine (T75, D145)', () => {
+  it('a 422 naming an op quarantines that op with its group; the rest of the outbox still goes', async () => {
+    const events: Record<string, unknown>[] = [];
+    const a = await client(server, ANN, 'ipad-a', { log: (_l: string, e: string, d?: Record<string, unknown>) => events.push({ e, ...d }) });
+    const d1 = await newDevice(a);
+    const bad = await a.editor.group(CTX, async (g) => {
+      await g.setField('device', d1, 'status', 'Issue');
+      await g.setField('device', d1, 'notes', 'grouped with the bad one');
+    });
+    const d2 = await newDevice(a);
+    server.poisonOp(bad[0]!.op_id, 422);
+
+    const report = await a.engine.sync();
+    expect(report.outcome).toBe('ran'); // not a failed cycle: the other ops were applied
+    expect(report.pushed).toBe(2);
+    expect(server.ops(PROJECT).map((o) => o.entity_id)).toContain(d2);
+    expect(await a.store.outboxCount()).toBe(2);
+    expect(a.engine.status()).toMatchObject({ state: 'idle', pendingOps: 2, quarantinedOps: 2 });
+    const q = await a.store.quarantined(PROJECT);
+    expect(q.map((x) => x.op.op_id).sort()).toEqual(bad.map((o) => o.op_id).sort());
+    expect(q[0]!.error).toMatch(/422/);
+    expect(q[0]!.attempts).toBe(1);
+    expect(events).toContainEqual(expect.objectContaining({ e: 'quarantined', status: 422 }));
+
+    // Quarantined ops are not pushed again on their own…
+    server.pushes.length = 0;
+    await a.engine.sync();
+    expect(server.pushes).toHaveLength(0);
+    // …until Retry; the server still refusing puts them straight back.
+    expect(await a.engine.retryQuarantined(PROJECT)).toBe(2);
+    expect(a.engine.status().quarantinedOps).toBe(2);
+    // Once the server accepts them, Retry drains the outbox.
+    server.curePoison(bad[0]!.op_id);
+    await a.engine.retryQuarantined(PROJECT);
+    expect(a.engine.status()).toMatchObject({ pendingOps: 0, quarantinedOps: 0, state: 'idle' });
+    expect((await a.store.getOp(bad[0]!.op_id))!.state).toBe('applied');
+  });
+
+  it('a 409 naming no op is narrowed by halving the batch until the one bad group stands alone', async () => {
+    const a = await client(server, ANN, 'ipad-a');
+    const ids = [];
+    for (let i = 0; i < 7; i++) ids.push(await newDevice(a));
+    const ops = await a.store.outbox(PROJECT);
+    const culprit = ops[3]!;
+    server.poisonOp(culprit.op_id, 409);
+
+    const report = await a.engine.sync();
+    expect(report.outcome).toBe('ran');
+    expect(report.pushed).toBe(6);
+    expect(server.pushes.length).toBeLessThanOrEqual(8); // ≤ 1 + 2·log2(7) attempts
+    const q = await a.store.quarantined();
+    expect(q.map((x) => x.op.op_id)).toEqual([culprit.op_id]);
+    expect(q[0]!.error).toMatch(/409.*narrowed/);
+    // Order was kept: the six accepted creates arrived in client_ts order.
+    const applied = server.ops(PROJECT).filter((o) => o.kind === 'create' && o.entity_kind === 'device').map((o) => o.entity_id);
+    expect(applied).toEqual(ids.filter((id) => id !== culprit.entity_id));
+  });
+
+  it('5xx and 401 still retry with backoff, nothing is quarantined', async () => {
+    const a = await client(server, ANN, 'ipad-a');
+    await newDevice(a);
+    server.fail({ on: 'push', failure: 'server', status: 503 });
+    expect((await a.engine.sync()).outcome).toBe('failed');
+    expect(a.engine.status()).toMatchObject({ state: 'error', pendingOps: 1, quarantinedOps: 0 });
   });
 });
 

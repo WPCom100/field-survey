@@ -88,8 +88,10 @@ export type SyncState =
 
 export interface SyncStatus {
   state: SyncState;
-  /** Ops waiting in the outbox, all projects. */
+  /** Ops waiting in the outbox, all projects (quarantined ones included: they are unsynced). */
   pendingOps: number;
+  /** Outbox ops the server refused (409/422) and parked until Retry (T75, D145). */
+  quarantinedOps: number;
   /** Local pending ops the server will put in review once pushed. */
   willReview: number;
   /** End of the last fully successful cycle (ISO 8601). */
@@ -199,6 +201,7 @@ export class SyncEngine {
   private current: SyncStatus = {
     state: 'idle',
     pendingOps: 0,
+    quarantinedOps: 0,
     willReview: 0,
     lastSyncAt: null,
     lastServerSeq: {},
@@ -250,6 +253,7 @@ export class SyncEngine {
   /** Refresh the counts (outbox, marks, cursors) from the store without syncing. */
   async refresh(): Promise<SyncStatus> {
     const pendingOps = await this.store.outboxCount();
+    const quarantinedOps = await this.store.quarantinedCount();
     const projects = await this.opts.projects();
     const lastServerSeq: Record<string, number> = {};
     let willReview = 0;
@@ -257,8 +261,15 @@ export class SyncEngine {
       lastServerSeq[p] = await this.cursor(p);
       willReview += Object.keys(await this.marks(p)).length;
     }
-    this.set({ pendingOps, willReview, lastServerSeq });
+    this.set({ pendingOps, quarantinedOps, willReview, lastServerSeq });
     return this.current;
+  }
+
+  /** Sync screen Retry: quarantined ops go back to pending and a cycle runs now. */
+  async retryQuarantined(projectId?: string): Promise<number> {
+    const n = await this.store.requeueQuarantined(projectId);
+    if (n > 0) await this.requestSync();
+    return n;
   }
 
   /** Local pending ops the server will review, for the "will be reviewed" badge. */
@@ -401,30 +412,73 @@ export class SyncEngine {
     for (;;) {
       const batch = await this.nextBatch(project);
       if (batch.length === 0) return total;
-      const since = await this.cursor(project);
-      let res: PushResponse;
-      try {
-        res = await transport.push({ project_id: project, since, ops: batch.map(wire) });
-      } catch (e) {
-        await this.store.noteOutboxFailure(
-          batch.map((o) => o.op_id),
-          e instanceof Error ? e.message : String(e),
-        );
-        throw e;
-      }
-      await this.store.acknowledgeMany(res.results);
-      await this.markFromPush(project, batch, res.results);
-      total += res.results.length;
-      if (res.server_ops.length) await this.applyIncoming(project, res.server_ops);
-      // Every op was answered and left the outbox, so the loop always advances; a server that
-      // answers for nothing (should not happen) must not spin.
-      if (res.results.length === 0) {
-        throw new TransportError('server', 'push answered with no results');
-      }
+      total += await this.sendBatch(transport, project, batch);
     }
   }
 
-  /** The next ≤ batchSize outbox ops in client_ts order, never splitting a group. */
+  /**
+   * Push one batch. A refusal (409/422: the server rolled the whole batch back) never blocks
+   * the outbox (T75, D145): the op the error names is quarantined with its group; an error
+   * naming no op (409 integrity) is narrowed by halving the batch at group boundaries until
+   * one group fails alone and is quarantined. Everything else is pushed as usual.
+   */
+  private async sendBatch(transport: SyncTransport, project: string, batch: StoredOp[]): Promise<number> {
+    const since = await this.cursor(project);
+    let res: PushResponse;
+    try {
+      res = await transport.push({ project_id: project, since, ops: batch.map(wire) });
+    } catch (e) {
+      if (e instanceof TransportError && e.failure === 'rejected') {
+        return this.narrowRejection(transport, project, batch, e);
+      }
+      await this.store.noteOutboxFailure(
+        batch.map((o) => o.op_id),
+        e instanceof Error ? e.message : String(e),
+      );
+      throw e;
+    }
+    await this.store.acknowledgeMany(res.results);
+    await this.markFromPush(project, batch, res.results);
+    if (res.server_ops.length) await this.applyIncoming(project, res.server_ops);
+    // Every op was answered and left the outbox, so the loop always advances; a server that
+    // answers for nothing (should not happen) must not spin.
+    if (res.results.length === 0) {
+      throw new TransportError('server', 'push answered with no results');
+    }
+    return res.results.length;
+  }
+
+  private async narrowRejection(
+    transport: SyncTransport,
+    project: string,
+    batch: StoredOp[],
+    e: TransportError,
+  ): Promise<number> {
+    const named = rejectedOpId(e);
+    const culprit = named ? batch.find((o) => o.op_id === named) : undefined;
+    const units = groupUnits(batch);
+    let quarantine: StoredOp[] | null = null;
+    if (culprit) {
+      quarantine = units.find((u) => u.includes(culprit)) ?? [culprit];
+    } else if (units.length === 1) {
+      quarantine = batch;
+    }
+    if (quarantine) {
+      const ids = quarantine.map((o) => o.op_id);
+      await this.store.quarantine(ids, e.message + (named ? '' : ' (narrowed)'));
+      this.opts.log('warn', 'quarantined', { project, ops: ids, error: e.message, status: e.status ?? null });
+      return 0;
+    }
+    // No op named and more than one group: try each half alone.
+    const mid = Math.ceil(units.length / 2);
+    let total = 0;
+    for (const half of [units.slice(0, mid).flat(), units.slice(mid).flat()]) {
+      total += await this.sendBatch(transport, project, half);
+    }
+    return total;
+  }
+
+    /** The next ≤ batchSize outbox ops in client_ts order, never splitting a group. */
   private async nextBatch(project: string): Promise<StoredOp[]> {
     const size = this.opts.batchSize;
     const ops = await this.store.outbox(project, size + 1);
@@ -556,6 +610,23 @@ export class SyncEngine {
 }
 
 /** The op as the server wants it: no local-only state. */
+/** The batch as consecutive runs sharing one `group_id` (single ops are runs of one). */
+function groupUnits(batch: StoredOp[]): StoredOp[][] {
+  const units: StoredOp[][] = [];
+  for (const op of batch) {
+    const last = units[units.length - 1];
+    if (last && op.group_id != null && last[0]!.group_id === op.group_id) last.push(op);
+    else units.push([op]);
+  }
+  return units;
+}
+
+/** The `op_id` a FastAPI 422 names (`{"detail": {"index", "op_id", "error"}}`), if any. */
+export function rejectedOpId(e: TransportError): string | null {
+  const d = (e.detail as { detail?: { op_id?: unknown } } | null | undefined)?.detail;
+  return typeof d?.op_id === 'string' ? d.op_id : null;
+}
+
 function wire(op: StoredOp): Op {
   const out: Op = { ...op };
   delete out.server_seq;

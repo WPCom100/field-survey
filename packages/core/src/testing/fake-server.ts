@@ -39,11 +39,25 @@ export class FakeServer implements SyncTransport {
   private readonly serverOpsFor = new Map<string, Op[]>();
   private counters = new Map<string, number>();
   private faults: Fault[] = [];
+  /** Ops the server refuses for good (T75): a push containing one fails whole, as the real server rolls back. */
+  private readonly poison = new Map<string, { status: number; named: boolean }>();
   private clock = 1_760_000_000_000;
 
   /** Queue failures; each is consumed by the next matching call. */
   fail(...faults: Fault[]): void {
     this.faults.push(...faults);
+  }
+
+  /**
+   * Refuse every push containing `opId` with `status`; `named` = the body names the op as the
+   * real 422 does (`{detail: {index, op_id, error}}`), else a 409-style `{detail: {error}}`.
+   */
+  poisonOp(opId: string, status = 422, named = status === 422): void {
+    this.poison.set(opId, { status, named });
+  }
+
+  curePoison(opId: string): void {
+    this.poison.delete(opId);
   }
 
   get serverSeq(): number {
@@ -74,6 +88,14 @@ export class FakeServer implements SyncTransport {
     const fault = this.takeFault('push');
     if (fault && !fault.afterApply) this.throwFault(fault, 'push');
     if (body.ops.length > 500) throw new TransportError('rejected', 'push → 422', 422);
+    const bad = body.ops.findIndex((o) => this.poison.has(o.op_id));
+    if (bad >= 0) {
+      const { status, named } = this.poison.get(body.ops[bad]!.op_id)!;
+      const detail = named
+        ? { detail: { index: bad, op_id: body.ops[bad]!.op_id, error: 'bad op (test poison)' } }
+        : { detail: { error: 'integrity', detail: 'test poison' } };
+      throw new TransportError('rejected', `push → ${status}`, status, detail);
+    }
     this.pushes.push(body);
     const results: PushAck[] = [];
     const serverOps: Op[] = [];

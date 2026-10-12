@@ -109,7 +109,8 @@ def _head_seq(table: Table, seq: int | None) -> Any:
 
 
 def materialise(session: Session, op: Op) -> bool:
-    """Project one applied op onto its entity table. Returns False for an orphan (no row)."""
+    """Project one applied op onto its entity table. Returns False for an orphan (no row) or a
+    `create` whose row already existed."""
     table = TABLES[op.entity_kind]
     match op.kind:
         case "create":
@@ -128,12 +129,15 @@ def materialise(session: Session, op: Op) -> bool:
 
 
 def _create(session: Session, table: Table, op: Op) -> bool:
+    """True when the row was inserted; False when it already existed (a replayed create, which
+    never overwrites) — the push loop uses that to skip the head lookup of a brand-new record."""
     values = _values(table, {**(op.payload or {}), "id": op.entity_id})
     if _is_record(table):
         values["version"] = 1
         values["head_seq"] = op.server_seq
-    session.execute(pg_insert(table).values(**values).on_conflict_do_nothing())
-    return True
+    # RETURNING tells inserted from skipped (psycopg reports no rowcount for this statement).
+    stmt = pg_insert(table).values(**values).on_conflict_do_nothing().returning(table.c.id)
+    return session.execute(stmt).first() is not None
 
 
 def _set(session: Session, table: Table, op: Op) -> bool:

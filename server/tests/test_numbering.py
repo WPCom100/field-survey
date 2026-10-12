@@ -7,6 +7,7 @@ and neither a duplicate push, a restore nor a replay of the log ever renumbers.
 Device IDs of the `level_number` scheme (D93, T63) follow the same rules per level code.
 """
 
+import time
 import uuid
 
 import pytest
@@ -280,3 +281,37 @@ def test_a_level_created_by_an_op_gives_its_code_from_the_log(client, w):
     d = new_device(w, w.ann, w.l06m)
     d["payload"]["level_id"] = lvl["entity_id"]
     assert ids(w.push(client, [lvl, d])) == {d["entity_id"]: "08-01"}
+
+
+# ---------------------------------------------------------- T75 (D146): one scan per push
+
+
+def test_500_device_creates_in_one_push_count_from_one_scan(client, w):
+    """The log is scanned once per level code per push, then the cache counts on; the index
+    `(project_id, entity_kind, kind)` keeps that scan cheap. Target: < 2 s against Docker."""
+    ops = [new_device(w, w.ann, w.l06m) for _ in range(500)]
+    t0 = time.perf_counter()
+    res = w.push(client, ops)
+    elapsed = time.perf_counter() - t0
+    assert outcomes(res) == ["applied"] * 500
+    got = ids(res)
+    assert [got[o["entity_id"]] for o in ops] == [f"06M-{n:02d}" for n in range(1, 501)]
+    assert elapsed < 2.0, f"500 device creates took {elapsed:.2f} s"
+
+
+def test_carried_and_renamed_ids_in_the_same_push_are_counted_past(client, w):
+    """A trusted-style carried ID, a rename and a server-assigned ID in one push: the cache
+    sees every ID the push itself applies (not only the log before it)."""
+    carried = w.create(w.ann, "device", {"level_id": str(w.l06m.id), "display_id": "06M-07"})
+    fresh1 = new_device(w, w.ann, w.l06m)
+    res = w.push(client, [carried, fresh1])
+    assert ids(res)[fresh1["entity_id"]] == "06M-08"
+
+    assign_op = next(o["op_id"] for o in res["server_ops"] if o["field"] == "display_id")
+    rename = w.set(w.ann, "device", fresh1["entity_id"], "display_id", "06M-20", assign_op)
+    fresh2 = new_device(w, w.ann, w.l06m)
+    station = new_device(w, w.ann, w.l06m, category="Station")
+    res = w.push(client, [rename, fresh2, station])
+    assert outcomes(res) == ["applied"] * 3
+    assert ids(res)[fresh2["entity_id"]] == "06M-21"  # counts past the rename in the same push
+    assert ids(res)[station["entity_id"]] == "06M-S1"

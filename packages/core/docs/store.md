@@ -109,7 +109,9 @@ the LIKE path is a safety net exercised by tests with `Store.open(db, { search: 
 
 ## Client-only tables
 
-`outbox(op_id, project_id, client_ts, attempts, last_error, created_at)`,
+`outbox(op_id, project_id, client_ts, attempts, last_error, created_at, state)` (`state` is
+`pending` or `quarantined`, T75; `outbox()` / `outboxProjects()` see pending rows only, `outboxCount()`
+counts both, `quarantined()` / `quarantine()` / `requeueQuarantined()` manage the parked ones),
 `blob_queue(sha256, direction, kind, priority, state, attempts, next_attempt_at, last_error,
 created_at)` (T12), `sync_state(key, value)` with `install_id`, `search_mode`, `last_server_seq:<project_id>` (pull
 cursor) and `will_review:<project_id>` (pending ops the server will review).

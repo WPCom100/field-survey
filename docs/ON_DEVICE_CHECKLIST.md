@@ -141,6 +141,15 @@ Decision (TP-3 on the iPad): create the synthetic project "TP-3 synthetic" on th
 
 Decision D143 (floor PDF: plan snapshot as an image with ink and type-labelled pins; findings = every device not Installed, untested, about four per page with a plan crop; photos six per page): approve / change →
 
+## T75 — Refused edits are quarantined, the rest keeps syncing  ·  Needs: no new build (JS only); the Droplet on `alembic upgrade head` (0004, an index only)
+
+**Why it matters:** one edit the server refuses must never stop every other edit on the iPad from syncing, and you must be able to see and retry it.
+
+- [ ] **Nothing changes when all is well.** Sync screen → Pending edits: no "edits the server refused" line and no Retry refused edits button; the status bar reads as before. → saw:
+- [ ] **A refused edit shows and the rest goes.** (Only if one happens: a refused edit cannot be provoked from the iPad on purpose.) If the status bar ever reads "· N need attention": the Sync screen lists each refused edit (what · when · tries · the server's error) with Retry refused edits, other edits made afterwards still reach the other iPad, and Retry sends the listed ones again. → saw:
+
+Decision D145 (quarantine semantics: 422 → the named edit's group, 409 → narrowed by halving, Retry only, refused edits still count as pending so Export stays disabled) and D146 (index + per-push caches on the server): approve / change →
+
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:

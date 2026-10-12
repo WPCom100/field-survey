@@ -7,12 +7,24 @@
 import type { BlobFiles, Store } from '@field-survey/core';
 
 export type OutboxSummary = {
+  /** Every op still in the outbox, quarantined ones included. */
   pending: number;
   /** `created_at` of the oldest unsent op, null when the outbox is empty. */
   oldestAt: string | null;
-  /** Ops the server has refused or that failed to send, with the last error seen. */
+  /** Ops still pending that failed to send at least once, with the last error seen. */
   failing: number;
   lastError: string | null;
+  /** Ops the server refused (409/422), parked until Retry (T75, D145). */
+  quarantined: QuarantinedEdit[];
+};
+
+export type QuarantinedEdit = {
+  opId: string;
+  /** "device status", "photo create", "cable_end delete"… */
+  what: string;
+  at: string;
+  attempts: number;
+  error: string | null;
 };
 
 export type FailedUpload = { sha256: string; kind: string; attempts: number; error: string | null };
@@ -33,11 +45,19 @@ export type SyncScreenData = {
 export async function loadSyncScreen(store: Store, projectId: string | null): Promise<SyncScreenData> {
   const db = store.db;
   const ob = await db.query<{ n: number; oldest: string | null; failing: number; err: string | null }>(
-    `SELECT count(*) AS n, min(created_at) AS oldest, sum(CASE WHEN attempts > 0 THEN 1 ELSE 0 END) AS failing,
-            (SELECT last_error FROM outbox WHERE last_error IS NOT NULL ORDER BY created_at DESC LIMIT 1) AS err
+    `SELECT count(*) AS n, min(created_at) AS oldest,
+            sum(CASE WHEN attempts > 0 AND state = 'pending' THEN 1 ELSE 0 END) AS failing,
+            (SELECT last_error FROM outbox WHERE last_error IS NOT NULL AND state = 'pending' ORDER BY created_at DESC LIMIT 1) AS err
      FROM outbox ${projectId ? 'WHERE project_id = ?' : ''}`,
     projectId ? [projectId] : [],
   );
+  const quarantined = (await store.quarantined(projectId ?? undefined)).map((q) => ({
+    opId: q.op.op_id,
+    what: `${q.op.entity_kind} ${q.op.field ?? q.op.kind}`,
+    at: q.op.client_ts,
+    attempts: q.attempts,
+    error: q.error,
+  }));
   const failed = await db.query<{ sha256: string; kind: string; attempts: number; last_error: string | null }>(
     `SELECT sha256, kind, attempts, last_error FROM blob_queue
      WHERE direction = 'upload' AND state = 'failed' ORDER BY created_at`,
@@ -75,7 +95,7 @@ export async function loadSyncScreen(store: Store, projectId: string | null): Pr
     if (r.kind === 'image') storage.reclaimableBytes += r.reclaim ?? 0;
   }
   return {
-    outbox: { pending: ob[0]?.n ?? 0, oldestAt: ob[0]?.oldest ?? null, failing: ob[0]?.failing ?? 0, lastError: ob[0]?.err ?? null },
+    outbox: { pending: ob[0]?.n ?? 0, oldestAt: ob[0]?.oldest ?? null, failing: ob[0]?.failing ?? 0, lastError: ob[0]?.err ?? null, quarantined },
     failedUploads: failed.map((f) => ({ sha256: f.sha256, kind: f.kind, attempts: f.attempts, error: f.last_error })),
     openReviews: reviews[0]?.n ?? 0,
     levels: levels.map((l) => ({

@@ -110,6 +110,8 @@ export const EXPORT_KIND = ['xlsx', 'floor_pdf'] as const;
 export const BLOB_DIRECTION = ['upload', 'download'] as const;
 export const BLOB_KIND = ['thumb', 'image', 'markup', 'ink', 'sheet', 'export'] as const;
 export const QUEUE_STATE = ['queued', 'active', 'done', 'failed'] as const;
+/** Outbox rows: `pending` is pushed; `quarantined` (the server refused it, T75/D145) waits for Retry. */
+export const OUTBOX_STATE = ['pending', 'quarantined'] as const;
 
 export type DeviceStatus = (typeof DEVICE_STATUS)[number];
 export type ConnectionStatus = (typeof CONNECTION_STATUS)[number];

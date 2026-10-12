@@ -197,6 +197,7 @@ def import_workbook(session: Session, store: ObjectStore, batch: ImportBatch) ->
         )
     for h in plan.history:
         push.store(Op(**h), "superseded")
+    push.flush_ops()  # `store` batches op rows; `run` flushed its own, these need it too (T75)
     stored = 0
     for image in plan.blobs:
         if session.get(Blob, image.sha256) is None:

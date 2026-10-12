@@ -6,6 +6,7 @@ import { getSyncEngine } from './engine';
 const INITIAL: SyncStatus = {
   state: 'no_token',
   pendingOps: 0,
+  quarantinedOps: 0,
   willReview: 0,
   lastSyncAt: null,
   lastServerSeq: {},
@@ -34,17 +35,18 @@ export function useSyncStatus(): SyncStatus {
 /** One line for the status bar: "Synced 09:41 · 3 pending" and the like. */
 export function describeSync(s: SyncStatus): string {
   const pending = s.pendingOps ? ` · ${s.pendingOps} pending` : '';
+  const held = s.quarantinedOps ? ` · ${s.quarantinedOps} need attention` : '';
   const review = s.willReview ? ` · ${s.willReview} will be reviewed` : '';
   switch (s.state) {
     case 'syncing':
       return `Syncing…${pending}`;
     case 'offline':
-      return `Offline${pending}${review}`;
+      return `Offline${pending}${held}${review}`;
     case 'error':
-      return `Sync error: ${s.lastError ?? 'unknown'}${pending}`;
+      return `Sync error: ${s.lastError ?? 'unknown'}${pending}${held}`;
     case 'no_token':
       return `Not connected${pending}`;
     case 'idle':
-      return (s.lastSyncAt ? `Synced ${new Date(s.lastSyncAt).toLocaleTimeString()}` : 'Not synced yet') + pending + review;
+      return (s.lastSyncAt ? `Synced ${new Date(s.lastSyncAt).toLocaleTimeString()}` : 'Not synced yet') + pending + held + review;
   }
 }

@@ -67,6 +67,13 @@ export interface RemoteResult {
 }
 
 /** One `results[]` entry of `POST /ops` (server/docs/sync.md). */
+/** An outbox op the server refused (T75, D145). */
+export interface QuarantinedOp {
+  op: StoredOp;
+  error: string | null;
+  attempts: number;
+}
+
 export interface PushAck {
   op_id: string;
   outcome: 'applied' | 'duplicate' | 'review' | 'superseded';
@@ -527,31 +534,80 @@ export class Store {
     return rows.map((r) => decodeRow<StoredOp>(ENTITIES.op, r));
   }
 
-  /** Outbox in `client_ts` order (PLAN §3.2), joined to the ops. */
+  /** Pending outbox ops in `client_ts` order (PLAN §3.2), joined to the ops; quarantined rows wait. */
   async outbox(projectId?: string, limit = 500): Promise<StoredOp[]> {
     const rows = await this.db.query(
-      `SELECT o.* FROM op o JOIN outbox x ON x.op_id = o.op_id` +
-        (projectId ? ` WHERE x.project_id = ?` : '') +
+      `SELECT o.* FROM op o JOIN outbox x ON x.op_id = o.op_id WHERE x.state = 'pending'` +
+        (projectId ? ` AND x.project_id = ?` : '') +
         ` ORDER BY x.client_ts, o.op_id LIMIT ?`,
       projectId ? [projectId, limit] : [limit],
     );
     return rows.map((r) => decodeRow<StoredOp>(ENTITIES.op, r));
   }
 
-  /** Projects with something waiting to be pushed. */
+  /** Projects with something pending to be pushed. */
   async outboxProjects(): Promise<string[]> {
     const rows = await this.db.query<{ project_id: string }>(
-      `SELECT DISTINCT project_id FROM outbox ORDER BY project_id`,
+      `SELECT DISTINCT project_id FROM outbox WHERE state = 'pending' ORDER BY project_id`,
     );
     return rows.map((r) => r.project_id);
   }
 
+  /** Every op still in the outbox, quarantined ones included: nothing is synced until they go. */
   async outboxCount(projectId?: string): Promise<number> {
     const rows = await this.db.query<{ n: number }>(
       `SELECT count(*) AS n FROM outbox` + (projectId ? ` WHERE project_id = ?` : ''),
       projectId ? [projectId] : [],
     );
     return rows[0]?.n ?? 0;
+  }
+
+  /** Quarantined outbox ops (T75, D145), oldest first, with the server's error. */
+  async quarantined(projectId?: string): Promise<QuarantinedOp[]> {
+    const rows = await this.db.query<{ last_error: string | null; attempts: number }>(
+      `SELECT o.*, x.last_error AS last_error, x.attempts AS attempts FROM op o JOIN outbox x ON x.op_id = o.op_id` +
+        ` WHERE x.state = 'quarantined'` +
+        (projectId ? ` AND x.project_id = ?` : '') +
+        ` ORDER BY x.client_ts, o.op_id`,
+      projectId ? [projectId] : [],
+    );
+    return rows.map((r) => ({
+      op: decodeRow<StoredOp>(ENTITIES.op, r),
+      error: r.last_error,
+      attempts: r.attempts,
+    }));
+  }
+
+  async quarantinedCount(projectId?: string): Promise<number> {
+    const rows = await this.db.query<{ n: number }>(
+      `SELECT count(*) AS n FROM outbox WHERE state = 'quarantined'` + (projectId ? ` AND project_id = ?` : ''),
+      projectId ? [projectId] : [],
+    );
+    return rows[0]?.n ?? 0;
+  }
+
+  /** The server refused these ops (409/422): park them with the error so the rest can go (T75). */
+  async quarantine(opIds: readonly string[], error: string): Promise<void> {
+    if (opIds.length === 0) return;
+    await this.db.transaction(async (tx) => {
+      for (const id of opIds) {
+        await tx.exec(
+          `UPDATE outbox SET state = 'quarantined', attempts = attempts + 1, last_error = ? WHERE op_id = ?`,
+          [error.slice(0, 500), id],
+        );
+      }
+    });
+  }
+
+  /** Retry: quarantined ops (all, or one project's) go back to `pending`; returns how many. */
+  async requeueQuarantined(projectId?: string): Promise<number> {
+    const n = await this.quarantinedCount(projectId);
+    await this.db.exec(
+      `UPDATE outbox SET state = 'pending', last_error = NULL WHERE state = 'quarantined'` +
+        (projectId ? ` AND project_id = ?` : ''),
+      projectId ? [projectId] : [],
+    );
+    return n;
   }
 
   async fieldHead(entityId: string, field: string): Promise<string | null> {

@@ -97,6 +97,25 @@ export default function SyncScreen() {
             {data.outbox.failing} edit{data.outbox.failing === 1 ? '' : 's'} failed to send: {data.outbox.lastError ?? 'unknown error'}
           </Text>
         ) : null}
+        {data?.outbox.quarantined.length ? (
+          <>
+            <Text style={styles.warn}>
+              {data.outbox.quarantined.length} edit{data.outbox.quarantined.length === 1 ? '' : 's'} the server refused. The other edits keep syncing; these wait here until Retry.
+            </Text>
+            {data.outbox.quarantined.map((q) => (
+              <Text key={q.opId} style={styles.sub}>
+                {q.what} · {time(q.at)} · {q.attempts} {q.attempts === 1 ? 'try' : 'tries'}: {q.error ?? 'unknown error'}
+              </Text>
+            ))}
+            <Btn
+              label="Retry refused edits"
+              onPress={run(async () => {
+                const n = await (await getSyncEngine()).retryQuarantined();
+                return `${n} edit${n === 1 ? '' : 's'} sent again.`;
+              })}
+            />
+          </>
+        ) : null}
       </Section>
 
       <Section label="Photos waiting">

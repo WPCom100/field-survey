@@ -65,11 +65,13 @@ export {
   type RemoteOutcome,
   type RemoteResult,
   type PushAck,
+  type QuarantinedOp,
   type OpenOptions,
   type ListOptions,
 } from './store';
 export {
   SyncEngine,
+  rejectedOpId,
   TransportError,
   KNOWN_PROJECTS_KEY,
   knownProjects,

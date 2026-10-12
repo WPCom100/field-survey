@@ -26,6 +26,14 @@ For each project (local `project` rows ∪ projects with outbox entries, or the 
    removed, `head_seq` moved for applied ops; `duplicate` keeps the op `pending` until its echo.
    The response's `server_ops` (assign ops, review-item creates) are applied at once with
    `applyRemoteMany`. A failed push counts an attempt and keeps the error on the outbox rows.
+   A **refusal** (409/422 — the server rolled the whole batch back) never blocks the outbox
+   (T75, D145): the op a 422 names is **quarantined** with its group (`outbox.state =
+   'quarantined'`, the server's error in `last_error`); a 409 that names no op is narrowed by
+   pushing each half of the batch alone, at group boundaries, until one group fails by itself
+   and is quarantined. The rest of the outbox is pushed in the same cycle, which counts as
+   `ran`, not `failed`. Quarantined ops are not pushed again until the Sync screen's **Retry**
+   (`SyncEngine.retryQuarantined`); they still count in `pendingOps` (the iPad is not synced
+   while it holds them, so D94's export gate stays shut) and in `quarantinedOps`.
 2. **Pull** pages of ≤ 500 from the cursor until `has_more` is false, applying each page with
    `applyRemoteMany` and advancing `last_server_seq:<project>` to the last op's seq. Orphans
    (an applied op on a record this iPad never received) are logged, never fatal. The cursor only
@@ -34,8 +42,8 @@ For each project (local `project` rows ∪ projects with outbox entries, or the 
    (T74, D144). The server reads the top before the page so this never happens in practice;
    the client still refuses to skip ahead if it does.
 3. A **network** failure ends the cycle for every project (nothing else will work either). A
-   **refusal** (401, 409, 422, 5xx) on the push still lets the pull run, so the iPad keeps
-   receiving edits while a poison batch waits; the status carries the message.
+   401 or 5xx on the push still lets the pull run, so the iPad keeps receiving edits; the
+   status carries the message and the cycle retries with backoff.
 
 Concurrent `sync()` calls share the running cycle. `requestSync()` (foreground, a tap on the
 status) clears the backoff and runs now. `start()` runs a cycle at once and then every

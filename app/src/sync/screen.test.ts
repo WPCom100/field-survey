@@ -1,4 +1,4 @@
-import { Store, type BlobFiles } from '@field-survey/core';
+import { Editor, Store, type BlobFiles } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
@@ -50,6 +50,27 @@ describe('loadSyncScreen', () => {
     expect(d.failedUploads).toEqual([{ sha256: 'b', kind: 'image', attempts: 3, error: 'file missing' }]);
     expect(d.storage).toEqual({ photosBytes: 1500, plansBytes: 4000, otherBytes: 0, reclaimableBytes: 1000 });
     expect(d.levels.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('lists quarantined edits apart from pending ones (T75)', async () => {
+    const store = await open();
+    await ensureDemoLevel(store);
+    const [project] = await listProjects(store);
+    const [device] = await store.list<{ id: string }>('device', { limit: 1 });
+    const editor = new Editor(store, { projectId: project!.id, userId: 'u', now: () => '2026-01-02T00:00:00Z' });
+    const bad = await editor.setField('device', device!.id, 'notes', 'refused', { change_type: 'Field survey', reason: 't' });
+    await editor.setField('device', device!.id, 'status', 'Issue', { change_type: 'Field survey', reason: 't' });
+    await store.quarantine([bad!.op_id], 'POST /ops → 422');
+
+    const d = await loadSyncScreen(store, project!.id);
+    expect(d.outbox.pending).toBe(2); // still unsynced, so the export gate stays shut
+    expect(d.outbox.failing).toBe(0); // the pending one never failed
+    expect(d.outbox.lastError).toBeNull();
+    expect(d.outbox.quarantined).toEqual([
+      { opId: bad!.op_id, what: 'device notes', at: '2026-01-02T00:00:00Z', attempts: 1, error: 'POST /ops → 422' },
+    ]);
+    expect(await store.requeueQuarantined(project!.id)).toBe(1);
+    expect((await loadSyncScreen(store, project!.id)).outbox.quarantined).toEqual([]);
   });
 
   it('is empty-safe with no project', async () => {

@@ -630,6 +630,8 @@ export const ENTITIES = {
       attempts: i({ notNull: true, default: 0 }),
       last_error: t(),
       created_at: t({ notNull: true }),
+      /** `quarantined` = refused by the server (409/422); pushed again only on Retry (T75). */
+      state: enumCol(v.OUTBOX_STATE, { notNull: true, default: 'pending' }),
     },
     ['op_id'],
     [['project_id', 'client_ts']],

@@ -141,16 +141,47 @@ def used_device_numbers(
     return {int(m[1]) for v in values if isinstance(v, str) and (m := pattern.match(v))}
 
 
+DeviceNumberCache = dict[tuple[str, str], int]
+
+
 def next_device_id(
-    session: Session, project_id: uuid.UUID, level_id: uuid.UUID, head_value, prefix: str = ""
+    session: Session,
+    project_id: uuid.UUID,
+    level_id: uuid.UUID,
+    head_value,
+    prefix: str = "",
+    cache: DeviceNumberCache | None = None,
 ) -> str | None:
     """`<code>-<nn>` = highest number ever used on that level code + 1, two digits (then as
     many as needed); with a prefix (D118: stations `S`, sensors `D`) `<code>-S<n>`, no padding,
     counted per prefix. Per level code, not per numbering group: 06 and 06M count separately.
     Called inside the push, which holds the project lock, so two pushes never race. None when
-    the level is unknown."""
+    the level is unknown.
+
+    `cache` (T75, D146) holds the highest number per `(code, prefix)` for the length of one
+    push: the log is scanned once per level code, then each assignment counts on from the cache,
+    so 500 device creates in one push cost one scan each per level, not 500."""
     code = level_code(session, level_id, head_value)
     if not code:
         return None
-    n = max(used_device_numbers(session, project_id, code, prefix), default=0) + 1
+    key = (code, prefix)
+    if cache is None or key not in cache:
+        n = max(used_device_numbers(session, project_id, code, prefix), default=0)
+        if cache is not None:
+            cache[key] = n
+    else:
+        n = cache[key]
+    n += 1
+    if cache is not None:
+        cache[key] = n
     return f"{code}-{prefix}{n}" if prefix else f"{code}-{n:02d}"
+
+
+def note_device_id(cache: DeviceNumberCache, display_id: str) -> None:
+    """A carried ID applied mid-push (seed import, copied floor) raises the cache for its level
+    code and prefix so a later assignment in the same push counts past it."""
+    m = re.fullmatch(r"(.+)-([SD]?)(\d+)", display_id)
+    if m is None:
+        return
+    key = (m[1], m[2])
+    cache[key] = max(cache.get(key, 0), int(m[3]))
