@@ -24,4 +24,9 @@ export class HttpTransport implements SyncTransport {
     const q = new URLSearchParams({ project_id: projectId, since: String(since), limit: String(limit) });
     return this.http.json<PullResponse>('GET', `/ops?${q.toString()}`);
   }
+
+  /** `GET /health` (public, no token needed): resolves when the server answers 2xx. */
+  async ping(): Promise<void> {
+    await this.http.send('GET', '/health');
+  }
 }

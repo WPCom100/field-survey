@@ -75,3 +75,11 @@ drains it. Nothing in the engine deletes an op: a refused batch stays until the 
 `IdentityGate`, so the server URL, token and user are known) attaches an `HttpTransport`,
 starts the engine, and calls `requestSync()` on every `AppState` change to `active`.
 `useSyncStatus()` subscribes a component; `describeSync(status)` is the status-bar text.
+
+## Reachability without a project
+
+A cycle whose project list is empty (an iPad before setup has given it a project) has nothing
+to push or pull, so until 2026-10-11 it never contacted the server and reported `idle` even in
+airplane mode. Now `SyncTransport.ping()` (`GET /health`, optional on test doubles) runs in that
+case: a network failure makes the cycle `offline` with the usual backoff, a 2xx keeps `idle` and
+`lastSyncAt` means "the server answered". With projects present the push/pull calls already tell.

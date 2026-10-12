@@ -350,6 +350,35 @@ describe('no token', () => {
   });
 });
 
+describe('reachability with no project yet (iPad round 2026-10-11, T25-3)', () => {
+  it('a cycle with nothing to sync still asks the server, so airplane mode reads offline', async () => {
+    let up = false;
+    const transport = {
+      push: server.push.bind(server),
+      pull: server.pull.bind(server),
+      ping: async () => {
+        if (!up) throw new TransportError('network', 'Network request failed');
+      },
+    };
+    const a = await client(server, ANN, 'ipad-a', { projects: async () => [] });
+    a.engine.setTransport(transport);
+    expect(await a.engine.sync()).toMatchObject({ outcome: 'failed', pushed: 0, pulled: 0, projects: [] });
+    expect(a.engine.status()).toMatchObject({ state: 'offline', failures: 1 });
+    expect(a.engine.status().lastSyncAt).toBeNull();
+
+    up = true;
+    expect((await a.engine.requestSync()).outcome).toBe('ran');
+    expect(a.engine.status()).toMatchObject({ state: 'idle', failures: 0 });
+    expect(a.engine.status().lastSyncAt).not.toBeNull();
+  });
+
+  it('a transport without ping keeps the old behaviour: idle with nothing to do', async () => {
+    const a = await client(server, ANN, 'ipad-a', { projects: async () => [] });
+    expect((await a.engine.sync()).outcome).toBe('ran');
+    expect(a.engine.status().state).toBe('idle');
+  });
+});
+
 describe('status and scheduling', () => {
   it('notifies subscribers of every change and unsubscribes cleanly', async () => {
     const a = await client(server, ANN, 'ipad-a');

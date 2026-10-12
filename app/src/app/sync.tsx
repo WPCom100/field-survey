@@ -23,12 +23,14 @@ export default function SyncScreen() {
   const blobs = useBlobStatus();
   const [data, setData] = useState<SyncScreenData | null>(null);
   const [installId, setInstallId] = useState('');
+  const [hasProject, setHasProject] = useState<boolean | null>(null);
   const [note, setNote] = useState('');
 
   const load = useCallback(async () => {
     const store = await openAppStore();
     const [project] = await listProjects(store);
     setInstallId(store.installId);
+    setHasProject(!!project);
     setData(await loadSyncScreen(store, project?.id ?? null));
   }, []);
 
@@ -70,6 +72,11 @@ export default function SyncScreen() {
           Last successful sync {time(sync.lastSyncAt)}
           {seq ? ` (seq ${seq.toLocaleString()})` : ''}
         </Text>
+        {hasProject === false ? (
+          <Text style={styles.sub}>
+            No project on this iPad yet, so there is nothing to push or pull; "Synced" means the server answered. The demo plan never syncs.
+          </Text>
+        ) : null}
         {sync.nextAttemptAt && !online ? <Text style={styles.sub}>Next try {time(sync.nextAttemptAt)}</Text> : null}
         <Btn
           label="Sync now"
@@ -130,15 +137,20 @@ export default function SyncScreen() {
               {l.code} {l.cache === 'cached' ? '✓' : l.cache === 'downloading' ? '…' : '⬇'}
             </Text>
           ))}
-          {data && !data.levels.length ? <Text style={styles.sub}>No plan sheets yet.</Text> : null}
+          {data && !data.levels.length ? (
+            <Text style={styles.sub}>{hasProject ? 'No plan sheets yet.' : 'No levels on this iPad yet (a project arrives with setup).'}</Text>
+          ) : null}
         </View>
         <Btn
           label="Download assigned levels"
+          disabled={data ? !data.levels.length : false}
           onPress={run(async () => {
             const q = await getBlobQueue();
             await q.prefetch();
+            const n = await countQueuedDownloads();
             await q.requestRun();
-            return 'Downloading plans for your assigned levels.';
+            if (!n) return 'Nothing to download: every plan you are assigned is already on this iPad.';
+            return `Downloading ${n} file${n === 1 ? '' : 's'} for your assigned levels.`;
           })}
         />
       </Section>
@@ -198,6 +210,14 @@ export default function SyncScreen() {
       {note ? <Text style={styles.note}>{note}</Text> : null}
     </ScrollView>
   );
+}
+
+async function countQueuedDownloads(): Promise<number> {
+  const store = await openAppStore();
+  const rows = await store.db.query<{ n: number }>(
+    `SELECT count(*) AS n FROM blob_queue WHERE direction = 'download' AND state IN ('queued', 'active')`,
+  );
+  return rows[0]?.n ?? 0;
 }
 
 function Section({ label, children }: { label: string; children: ReactNode }) {

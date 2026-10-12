@@ -86,6 +86,7 @@ function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
         autoCapitalize="none"
         autoCorrect={false}
         placeholder="Server URL"
+        placeholderTextColor="#888"
       />
       <TextInput
         style={styles.input}
@@ -95,6 +96,7 @@ function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
         autoCorrect={false}
         secureTextEntry
         placeholder="Team token"
+        placeholderTextColor="#888"
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable style={styles.button} onPress={submit}>
@@ -131,6 +133,7 @@ function Picker({ identity, onDone }: { identity: Identity; onDone: (u: TeamMemb
         value={newName}
         onChangeText={setNewName}
         placeholder="Not listed? Add your name"
+        placeholderTextColor="#888"
       />
       {newName.trim() ? (
         <Pressable
@@ -145,10 +148,15 @@ function Picker({ identity, onDone }: { identity: Identity; onDone: (u: TeamMemb
   );
 }
 
+// Explicit light colours: the app's screens are light-only, and with the iPad in dark mode the
+// window behind this screen is black, so default text (black) vanished (T25-11, 2026-10-11).
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
-  title: { fontSize: 28, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#999', borderRadius: 8, padding: 12, width: 360, fontSize: 18 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, backgroundColor: '#ffffff' },
+  title: { fontSize: 28, fontWeight: '600', color: '#111' },
+  input: {
+    borderWidth: 1, borderColor: '#999', borderRadius: 8, padding: 12, width: 360, fontSize: 18,
+    color: '#111', backgroundColor: '#ffffff',
+  },
   button: { backgroundColor: '#1f6feb', borderRadius: 8, padding: 14, width: 360, alignItems: 'center' },
   buttonText: { color: 'white', fontSize: 18, fontWeight: '600' },
   error: { color: '#c00' },

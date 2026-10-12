@@ -40,6 +40,17 @@ describe('HttpTransport', () => {
     expect(s.calls[0]!.init.headers).not.toHaveProperty('X-Survey-User');
   });
 
+  it('pings GET /health and maps a dead network to a network failure', async () => {
+    const s = stub([
+      () => json(200, { status: 'ok' }),
+      () => Promise.reject(new TypeError('Network request failed')),
+    ]);
+    const t = new HttpTransport({ serverUrl: 'https://s', token: 'tok', fetch: s.fetch });
+    await t.ping();
+    expect(s.calls[0]!.url).toBe('https://s/health');
+    await expect(t.ping()).rejects.toMatchObject({ failure: 'network' });
+  });
+
   it('maps failures: network, 401 auth, 409/422 rejected, 5xx server', async () => {
     const s = stub([
       () => Promise.reject(new TypeError('Network request failed')),

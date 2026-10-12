@@ -40,6 +40,12 @@ export interface PullResponse {
 export interface SyncTransport {
   push(body: PushBody): Promise<PushResponse>;
   pull(projectId: string, since: number, limit: number): Promise<PullResponse>;
+  /**
+   * Reachability probe (`GET /health`), used when a cycle has no project to push or pull: an
+   * iPad with no project yet must still learn it is offline (T25 iPad round, 2026-10-11).
+   * Rejects with a `TransportError` like the other calls. Optional for test doubles.
+   */
+  ping?(): Promise<void>;
 }
 
 export type TransportFailure =
@@ -308,6 +314,16 @@ export class SyncEngine {
     let pushed = 0;
     let pulled = 0;
     let failure: TransportError | Error | null = null;
+    if (projects.length === 0 && transport.ping) {
+      // Nothing to push or pull (no project on this iPad yet): the server is still asked, so
+      // "Synced" means reached, and airplane mode shows as offline.
+      try {
+        await transport.ping();
+      } catch (e) {
+        failure = e as Error;
+        this.opts.log('warn', 'ping_failed', { error: String(failure.message) });
+      }
+    }
     for (const project of projects) {
       try {
         pushed += await this.push(transport, project);

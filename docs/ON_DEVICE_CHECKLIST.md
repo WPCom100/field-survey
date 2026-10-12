@@ -9,7 +9,7 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 3. **Logs.** In the Metro terminal press `j` to open React Native DevTools; app logs appear there, not in the terminal.
 4. **Mark results as you go.** Tick `[x]` for pass. For a fail, leave it `[ ]` and write what you saw after "→ saw:". Then paste this file back to Claude.
 
-Pending round started: **2026-10-11**. Items: T25, T26 (new), T20–T24 (carried over, never recorded as tested).
+Pending round started: **2026-10-11**. Items: T25, T26 (new), T20–T24 (carried over, never recorded as tested). A first pass on 2026-10-11 stopped early at T25/T20-1 (results in [on-device-log.md](on-device-log.md)); the steps below were corrected from it. **Most of T25, all of T26 and the "real level" steps need a project on the iPad, which arrives with T41** — until then they are skipped, not failed.
 
 ---
 
@@ -21,9 +21,10 @@ Open it from the sidebar on the Levels screen: **Sync**.
 
 - [ ] **Screen opens and reads sensibly.** You should see eight sections: Connection, Pending edits, Photos waiting, Review items, Cached levels, Storage, Install, plus the hint line about cellular. → saw:
 - [ ] **Sync now.** Online, tap **Sync now**. The Connection line should read "Online · Synced hh:mm" and "Last successful sync" shows today's time and a seq number. → saw:
-- [ ] **Airplane mode, pending edits.** Turn on airplane mode. Go to the demo plan (or a real level), make two edits (e.g. set a status, add a note), return to **Sync**. Connection must read "Not connected" / "Offline", and **Pending edits** must show 2 (or more) with an "oldest" time. The top bar should also say "Offline · n pending". This proves edits are never blocked offline. → saw:
+- [ ] **Airplane mode shows offline.** Turn on airplane mode, wait up to a minute or tap **Sync now**. Connection must read "Not connected · Offline" (the server is asked even when there is no project on the iPad; fixed 2026-10-11). → saw:
+- [ ] **Airplane mode, pending edits — real level only.** Still offline, on a *real* level make two edits (set a status, add a note), return to **Sync**. **Pending edits** must show 2 (or more) with an "oldest" time and the top bar "Offline · n pending". The demo plan never counts here: it lives in its own never-synced database (D101). → saw:
 - [ ] **Come back online.** Turn airplane mode off, tap **Sync now**. Pending edits drops to 0 and the time updates. → saw:
-- [ ] **Cached levels.** On a real project, level chips show ✓ (plan on the iPad), … (downloading) or ⬇ (not downloaded). Tap **Download assigned levels**; a ⬇ chip for one of *your* assigned levels should turn … then ✓. (Levels with no assignment to you will not download until T41; that is expected.) → saw:
+- [ ] **Cached levels — real level only.** Level chips show ✓ (plan on the iPad), … (downloading) or ⬇ (not downloaded). Tap **Download assigned levels**; the message says how many files were queued (or that nothing was), and a ⬇ chip for one of *your* assigned levels turns … then ✓. With no project on the iPad the button is greyed out and the section says so. → saw:
 - [ ] **Storage numbers.** Photos / plans / other show non-zero sizes after you have taken photos and cached a plan. → saw:
 - [ ] **Free uploaded photos.** Only after a photo has uploaded (↑ cleared). The button shows how many MB it would free. Tap it, confirm, and the number drops to 0. Open that photo on a card: the full-size image should download again (needs network); the thumbnail is still there offline. → saw:
 - [ ] **Retry failed uploads.** Normally the button is greyed out. If any upload ever shows a red "Upload failed" line, tap Retry and note whether it clears. Skip if nothing has failed. → saw:
@@ -58,7 +59,7 @@ You need a conflict first. It takes **two iPads with different team names** (the
 
 Not yet recorded as tested. Open **Demo plan (06M composite)** from the Levels sidebar (it seeds sample devices on first open), then tap pin **06M-01**.
 
-- [ ] **Status taps.** Tap a status; the pin recolours at once and the card's History gains a line. This proves the edit is applied immediately, not after a sync. → saw:
+- [ ] **Status taps.** Tap a status; the pin recolours at once and the card's History gains a line. This proves the edit is applied immediately, not after a sync. On the demo the line stays marked unsynced (↑): the demo never syncs, by design. → saw:
 - [ ] **Notes save on leaving the field.** Type a note, tap elsewhere → exactly one ↑ (unsynced) mark appears, not one per keystroke. → saw:
 - [ ] **Chips and phrases.** Tap a standard-phrase chip; it appends to the note. → saw:
 - [ ] **Neuron ID normalising.** Enter `00:a1:b2:c3:d4:e5` → it saves as `00A1B2C3D4E5`. Entering the same ID on 06M-02 warns "Already on 06M-01". → saw:
