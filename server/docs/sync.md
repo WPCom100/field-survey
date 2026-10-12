@@ -165,3 +165,20 @@ SERVER_INSTALL_ID` (`uuid5(NAMESPACE_URL, "field-survey:server")`), `user_id` an
 `change_type` copied from the op that caused them, `base_op_id` = that op's `op_id`,
 `client_ts = server_ts`, state `applied`. A retried push returns them again by that
 `base_op_id`.
+
+## Trusted producers (T27)
+
+`Push(session, body, trusted=True)` is how a server-side job (the seed import, `app/jobs/runner.py`)
+delivers its results as ops. The only difference from an iPad push: a `create` may carry a display
+number or device ID (`punch_item.number`, `missing_part.number`, `photo.number`, `cable_end.display_id`,
+`device.display_id`). `Push.assign` then keeps it, sets the field head to the create and moves the
+numbering-group counter up to that number (`numbering.parse_number`), so later field additions
+continue after the imported ones (PLAN §7.5, D25). A `set` on a server-assigned field is refused
+either way, and an untrusted create carrying a number is still 422.
+
+Two general rules came with it: the side-B end of a `single_row` cable (`P`, `0-10V`, `120V`) is
+never numbered (it is not a Connections row), and a `cable_end` created without a level logs
+`assign_skipped` at info, not warning (a placeholder far end has no level by design).
+
+Historical ops (the master's Change Log) bypass `run()` and are written with `Push.store(row,
+"superseded")`: a `server_seq`, no materialisation, no head (D124). See `docs/imports.md`.

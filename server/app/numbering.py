@@ -31,6 +31,17 @@ def display_value(entity_kind: str, n: int) -> int | str:
     return f"C-{n:02d}" if entity_kind == "cable_end" else n
 
 
+def parse_number(entity_kind: str, value) -> int | None:
+    """The inverse of `display_value` for a number a trusted create carries; None if malformed."""
+    if entity_kind == "cable_end":
+        m = re.fullmatch(r"C-(\d+)", str(value))
+        return int(m.group(1)) if m else None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass(frozen=True)
 class Assigned:
     group: NumberingGroup

@@ -4,14 +4,15 @@ from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.api import blobs, ops
-from app.auth import SessionDep, current_user, require_token, upsert_user
+from app.api import blobs, imports, ops
+from app.auth import SessionDep, current_user, is_system_user, require_token, upsert_user
 from app.config import settings
 from app.models import User
 
 app = FastAPI(title="Field Survey")
 app.include_router(ops.router)
 app.include_router(blobs.router)
+app.include_router(imports.router)
 
 
 @app.get("/health")
@@ -30,7 +31,7 @@ class NewMember(BaseModel):
 
 def _team(session: SessionDep) -> list[TeamMember]:
     users = session.scalars(select(User).order_by(User.name)).all()
-    return [TeamMember(id=str(u.id), name=u.name) for u in users]
+    return [TeamMember(id=str(u.id), name=u.name) for u in users if not is_system_user(u)]
 
 
 @app.get("/team", dependencies=[Depends(require_token)])

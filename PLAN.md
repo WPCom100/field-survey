@@ -255,11 +255,11 @@ Per level: one display sheet (composite) + N source sheets (D29). pdfplumber wor
 | Tab | Mapping |
 |---|---|
 | Devices | → `device` (`origin=import`, ID kept, panel_name parsed) |
-| Connections | → `cable_end`s paired into cables by (code, level cross-reference, labels) as proposals; single-row codes → one cable; unpaired → placeholder far end + `import_pair` review; From/To verbatim; the four Unison spellings → rename ruling to `Stations & Sensors` recorded at import (D50) |
+| Connections | → `cable_end`s paired into cables by (code, level cross-reference, labels) with a confidence, paired at ≥ 0.8 (D126); single-row codes → one cable; a To text naming an out-of-scope level or a seed placeholder → that placeholder far end; otherwise unpaired → own cable with an unresolved far end + `import_pair` review listing the candidates (D126); From/To verbatim; the four Unison spellings → rename ruling to `Stations & Sensors` recorded at import (D50) |
 | Punch List | → `punch_item`; Device text matched by ID prefix; Neuron ID row → `sort_last` |
 | Missing Parts | Source parsed (`Punch #8-14`, `#15, #19`, `Devices 06-S3`, `Connections C-06`) → `part_source`; unparsed → finding |
 | Photo Log | → `photo` with the 320×240 image, `seed_thumbnail_only` (D40) |
-| Change Log | → historical ops (`user="import"`), not re-logged; never exported (D51) |
+| Change Log | → historical ops (`user="import"`, state `superseded`: recorded, shown in History, never materialised — D124), not re-logged; never exported (D51) |
 | Summary/Lists/Floor Order | not imported (D16); levels and dates from Summary |
 | Counters | set to max per tab; 06/06M merged (D33) |
 | Checks | column-mapping UI pre-matched; out-of-list values → Needs review; BOM/riser-derived drafts vs imported rows → `source_conflict` |

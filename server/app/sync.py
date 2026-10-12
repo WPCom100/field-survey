@@ -35,7 +35,15 @@ from app.db import Base
 from app.ids import uuid7
 from app.materialise import materialise
 from app.models import FieldHead, Level, Op, Project, ReviewItem, User
-from app.numbering import NUMBERED, TAG_PREFIX, device_scheme, next_device_id, next_number
+from app.numbering import (
+    NUMBERED,
+    TAG_PREFIX,
+    device_scheme,
+    next_device_id,
+    next_number,
+    numbering_group_for_level,
+    parse_number,
+)
 
 log = logging.getLogger("sync")
 
@@ -170,8 +178,12 @@ def _check_enum(kind: str, column: str, value: Any, where: str) -> None:
         raise ValueError(f"{where}: {kind}.{column} must be one of {' · '.join(allowed)}")
 
 
-def validate_op(op: OpIn, project_id: uuid.UUID) -> None:
-    """Shape checks the client already made (T07/T08); a failure means a client bug → 422."""
+def validate_op(op: OpIn, project_id: uuid.UUID, *, trusted: bool = False) -> None:
+    """Shape checks the client already made (T07/T08); a failure means a client bug → 422.
+
+    A `trusted` producer (the seed import, T27) may carry display numbers in a `create`
+    payload: the master's `#`, photo numbers, `C-nn` and device IDs are kept, never renumbered
+    (D25). A `set` on a server-assigned field is refused either way."""
     if op.project_id != project_id:
         raise ValueError("op.project_id differs from the push's project_id")
     if op.entity_kind not in OP_TARGETS:
@@ -209,7 +221,7 @@ def validate_op(op: OpIn, project_id: uuid.UUID) -> None:
                     raise ValueError("payload.id does not match entity_id")
             elif name in PROTECTED:
                 raise ValueError(f"{op.entity_kind}.{name} is not settable")
-            if (op.entity_kind, name) in SERVER_ASSIGNED and value is not None:
+            if (op.entity_kind, name) in SERVER_ASSIGNED and value is not None and not trusted:
                 raise ValueError(f"{op.entity_kind}.{name} is assigned by the server")
             _check_enum(op.entity_kind, name, value, "create")
     elif is_link:
@@ -277,7 +289,7 @@ Overlay = dict[tuple[uuid.UUID, str], Op]
 
 
 class Push:
-    def __init__(self, session: Session, body: PushIn):
+    def __init__(self, session: Session, body: PushIn, *, trusted: bool = False):
         self.session = session
         self.project_id = body.project_id
         self.since = body.since
@@ -285,13 +297,15 @@ class Push:
         self.seq = 0
         self.server_ops: list[Op] = []
         self.duplicates: list[uuid.UUID] = []
+        # Server-side producers (the seed import) may carry display numbers; see `validate_op`.
+        self.trusted = trusted
 
     # ------------------------------------------------------------- entry point
 
     def run(self, ops: list[OpIn]) -> PushOut:
         for i, op in enumerate(ops):
             try:
-                validate_op(op, self.project_id)
+                validate_op(op, self.project_id, trusted=self.trusted)
             except ValueError as e:
                 raise PushError(422, {"index": i, "op_id": str(op.op_id), "error": str(e)}) from e
         known = set(
@@ -656,17 +670,42 @@ class Push:
             return
         if create.entity_kind not in NUMBERED:
             return
-        _, field = NUMBERED[create.entity_kind]
+        counter, field = NUMBERED[create.entity_kind]
         if self.head(create.entity_id, field, {}) is not None:
             return  # a replayed create never renumbers
-        level_id = (create.payload or {}).get("level_id")
+        payload = create.payload or {}
+        level_id = payload.get("level_id")
+        carried = payload.get(field)
+        if carried is not None:
+            # A trusted create keeps its number (seed import, D25); the counter catches up so
+            # the next field addition continues after it (PLAN §7.5 "counters set to max").
+            self.set_head(create.entity_id, field, create.op_id)
+            n = parse_number(create.entity_kind, carried)
+            group = (
+                numbering_group_for_level(self.session, uuid.UUID(str(level_id)), self.head_value)
+                if level_id
+                else None
+            )
+            if group is not None and n is not None and n > getattr(group, counter):
+                setattr(group, counter, n)
+                self.session.flush()
+            return
+        if create.entity_kind == "cable_end" and payload.get("side") == "B":
+            # The far end of a single-row cable (`P`, `0-10V`, `120V`: PLAN §6 R2) is never a
+            # Connections row, so it gets no `C-nn`.
+            cable_id = payload.get("cable_id")
+            if cable_id and self.head_value(uuid.UUID(str(cable_id)), "single_row"):
+                return
         assigned = (
             next_number(self.session, create.entity_kind, uuid.UUID(str(level_id)), self.head_value)
             if level_id
             else None
         )
         if assigned is None:
-            log.warning(
+            # A cable end without a level is a far end (placeholder, out-of-scope level): no row,
+            # no number, by design. Anything else unnumbered is worth a warning (T13's lint).
+            expected = create.entity_kind == "cable_end" and not level_id
+            (log.info if expected else log.warning)(
                 json.dumps(
                     {
                         "event": "assign_skipped",

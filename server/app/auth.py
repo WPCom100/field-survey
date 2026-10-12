@@ -49,6 +49,26 @@ def upsert_user(session: Session, name: str) -> User:
     return user
 
 
+SYSTEM_OID_PREFIX = "system:"
+
+
+def system_user(session: Session, name: str) -> User:
+    """A server-side actor (the seed import's `import` user, PLAN §7.5): an `app_user` whose
+    `entra_oid` is `system:<name>`, so it never merges with a person and never shows in the
+    team picker (`GET /team`)."""
+    oid = f"{SYSTEM_OID_PREFIX}{name}"
+    user = session.scalars(select(User).where(User.entra_oid == oid)).first()
+    if user is None:
+        user = User(entra_oid=oid, name=name)
+        session.add(user)
+        session.flush()
+    return user
+
+
+def is_system_user(user: User) -> bool:
+    return bool(user.entra_oid and user.entra_oid.startswith(SYSTEM_OID_PREFIX))
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 
 

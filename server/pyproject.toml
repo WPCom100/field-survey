@@ -11,6 +11,7 @@ dependencies = [
   "pydantic-settings",
   "boto3",
   "python-multipart",
+  "openpyxl>=3.1.5",
 ]
 
 [dependency-groups]

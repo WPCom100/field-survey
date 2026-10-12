@@ -15,8 +15,8 @@ The projection mirrors the client store (D81) so a replayed server and a synced 
 
 Ops in state `review`, `superseded` or `rejected` are never materialised (the first-arrived value
 stays official, A7). Setting `review_item.state` to `resolved`/`dismissed` settles the ops the item
-held, as its `resolution` lists them (T15, D91). A `set`/`delete` whose row is missing is logged as `materialise_orphan` and
-skipped; the log still holds the op.
+held, as its `resolution` lists them (T15, D91). A `set`/`delete` whose row is missing is logged
+as `materialise_orphan` and skipped; the log still holds the op.
 
 Payload values arrive as JSON (UUIDs, dates and timestamps as strings) and are coerced to the
 column's Python type here. Foreign keys are deferred (D76), so a push may create records in any
