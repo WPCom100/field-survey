@@ -29,7 +29,7 @@ index 43fea3bfc16a3b0c526ec96d993d2120cbb2ef0b..e13b776487670ffaed2889a166ca2cf5
  
   export default codegenNativeComponent<NativeProps>('RNPDFPdfView');
 diff --git a/index.d.ts b/index.d.ts
-index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..b4fc57032b24861dec6362eab3a2d92075aa515f 100644
+index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..4f4688f75b19a4981ec8426b93a0e94a9a1f9eda 100644
 --- a/index.d.ts
 +++ b/index.d.ts
 @@ -31,6 +31,17 @@ export type PdfError = Error & {
@@ -81,7 +81,7 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..b4fc57032b24861dec6362eab3a2d920
  
  declare const Pdf: React.ForwardRefExoticComponent<PdfProps & React.RefAttributes<PdfRef>>
 diff --git a/index.js b/index.js
-index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..237292ea842e6de7cabc1408adeb5b478459f809 100644
+index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..c0dc41781cc8759a9af7a749077b1f20cfa18dc0 100644
 --- a/index.js
 +++ b/index.js
 @@ -69,6 +69,10 @@ export default class Pdf extends Component {
@@ -117,7 +117,7 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..237292ea842e6de7cabc1408adeb5b47
      _onChange = (event) => {
          // Handle direct events for text selection/highlight
          if (event.nativeEvent.type) {
-@@ -412,6 +431,32 @@ export default class Pdf extends Component {
+@@ -412,6 +431,35 @@ export default class Pdf extends Component {
                  return;
              }
  
@@ -133,6 +133,9 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..237292ea842e6de7cabc1408adeb5b47
 +            } else if (message[0] === 'pageSingleTap') {
 +                this.props.onPageSingleTap && this.props.onPageSingleTap(
 +                    Number(message[1]), Number(message[2]), Number(message[3]), Number(message[4]), Number(message[5]));
++                return;
++            } else if (message[0] === 'patch') {
++                console.log(`[plan] pdf native patch: ${message.slice(1).join(' ')}`);
 +                return;
 +            } else if (message[0] === 'ink') {
 +                this.props.onInkMessage && this.props.onInkMessage(event.nativeEvent.message);
@@ -151,7 +154,7 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..237292ea842e6de7cabc1408adeb5b47
                  message[4] = message.splice(4).join('|');
              }
 diff --git a/ios/RNPDFPdf/RNPDFPdfView.mm b/ios/RNPDFPdf/RNPDFPdfView.mm
-index 1bc263bb95c584c950583d42485059b8bf34168b..4f9d36f37a591799deff8b1b18ec1dca7fceadb4 100644
+index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390861731ed 100644
 --- a/ios/RNPDFPdf/RNPDFPdfView.mm
 +++ b/ios/RNPDFPdf/RNPDFPdfView.mm
 @@ -61,6 +61,81 @@ const float MIN_SCALE = 1.0f;
@@ -411,7 +414,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..4f9d36f37a591799deff8b1b18ec1dca
  
          }
  
-@@ -567,6 +784,10 @@ using namespace facebook::react;
+@@ -567,6 +784,12 @@ using namespace facebook::react;
          _pdfView.backgroundColor = [UIColor clearColor];
          [_pdfView layoutDocumentView];
          [self setNeedsDisplay];
@@ -419,10 +422,12 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..4f9d36f37a591799deff8b1b18ec1dca
 +        [self disableTextSelectionGestures];
 +        if (_inkMode) [self applyInkMode:YES];
 +        [self emitViewport];
++        // field-survey patch (T70): which patch this binary carries, logged by the app once per load
++        [self notifyOnChangeWithMessage:@"patch|t70|ink,longpress-move"];
      }
  }
  
-@@ -600,6 +821,7 @@ using namespace facebook::react;
+@@ -600,6 +823,7 @@ using namespace facebook::react;
  
  - (void)dealloc{
  
@@ -430,7 +435,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..4f9d36f37a591799deff8b1b18ec1dca
      _pdfDocument = Nil;
      _pdfView = Nil;
  
-@@ -734,6 +956,7 @@ using namespace facebook::react;
+@@ -734,6 +958,7 @@ using namespace facebook::react;
  
  - (void)onScaleChanged:(NSNotification *)noti
  {
@@ -438,7 +443,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..4f9d36f37a591799deff8b1b18ec1dca
  
      if (_initialed && _fixScaleFactor>0) {
          if (_scale != _pdfView.scaleFactor/_fixScaleFactor) {
-@@ -741,6 +964,117 @@ using namespace facebook::react;
+@@ -741,6 +966,117 @@ using namespace facebook::react;
              [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"scaleChanged|%f", _scale]]];
          }
      }
@@ -556,7 +561,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..4f9d36f37a591799deff8b1b18ec1dca
  }
  
  #pragma mark gesture process
-@@ -839,8 +1173,10 @@ using namespace facebook::react;
+@@ -839,8 +1175,10 @@ using namespace facebook::react;
      PDFPage *pdfPage = [_pdfView pageForPoint:point nearest:NO];
      if (pdfPage) {
          unsigned long page = [_pdfDocument indexForPage:pdfPage];
@@ -568,7 +573,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..4f9d36f37a591799deff8b1b18ec1dca
      }
  
      //[self setNeedsDisplay];
-@@ -860,12 +1196,48 @@ using namespace facebook::react;
+@@ -860,12 +1198,48 @@ using namespace facebook::react;
  }
  
  /**
@@ -619,7 +624,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..4f9d36f37a591799deff8b1b18ec1dca
  }
  
  /**
-@@ -915,6 +1287,17 @@ using namespace facebook::react;
+@@ -915,6 +1289,17 @@ using namespace facebook::react;
  
      [self addGestureRecognizer:longPressRecognizer];
      _longPressRecognizer = longPressRecognizer;

@@ -18,7 +18,9 @@
  * - The photo flow (T21) is a full-screen modal over all of it.
  * - Long-press on the sheet (T23, Phase 3 §4.6) opens the add-here menu: + Device (field
  *   addition, form in the side panel, a grey "+" pin marks the spot), + Note here, + Photo here,
- *   ✎ Markup. The single tap PDFKit reports when that finger lifts is ignored.
+ *   ✎ Markup. The menu opens while the finger is still down and the dot follows it; after the
+ *   lift the dot can be dragged to fine-tune the spot (T70). The single tap PDFKit reports when
+ *   that finger lifts is ignored.
  * - Plan ink (T24, D53): every user's layer drawn under the pins (Layers ▸ Ink); "✎ Ink" (or
  *   Markup / Note here) enters draw mode, where one finger or the Pencil draws into the user's
  *   own layer — pen with Pencil pressure, highlighter, text note, eraser (own strokes only), undo —
@@ -48,6 +50,7 @@ import {
   Alert,
   FlatList,
   type LayoutChangeEvent,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -225,6 +228,7 @@ export function PlanScreen(props: PlanScreenProps) {
   /** The long-pressing finger is still down: the dot follows it and a viewport change is not a pan. */
   const pressHolding = useRef(false);
   const pressOpen = useRef(false);
+  const pressMoves = useRef(0);
   pressOpen.current = !!press;
   /** "+ Device": the form in the side panel and the grey pin at the spot. */
   const [adding, setAdding] = useState<{ at: Point; category: string | null } | null>(null);
@@ -651,7 +655,9 @@ export function PlanScreen(props: PlanScreenProps) {
       const p = pressAt(x, y);
       if (!p) return;
       pressHolding.current = true;
+      pressMoves.current = 0;
       lastLongPress.current = Date.now();
+      console.log('[plan] long press: began (menu open, finger down)');
       setMenu(null);
       setPress(p);
     },
@@ -660,6 +666,7 @@ export function PlanScreen(props: PlanScreenProps) {
   const onPageLongPressMove = useCallback(
     (_page: number, x: number, y: number) => {
       if (!pressHolding.current) return;
+      pressMoves.current++;
       const p = pressAt(x, y);
       if (p) setPress(p);
     },
@@ -670,6 +677,16 @@ export function PlanScreen(props: PlanScreenProps) {
       if (!pressHolding.current) return;
       pressHolding.current = false;
       lastLongPress.current = Date.now();
+      // T70: the iPad round saw neither the follow nor the early menu; Metro shows which part arrives
+      console.log(`[plan] long press: lifted after ${pressMoves.current} move event(s)`);
+      const p = pressAt(x, y);
+      if (p) setPress(p);
+    },
+    [pressAt],
+  );
+  /** T70: dragging the dot after the lift moves the spot (and the device under it) before an item is picked. */
+  const onPressDrag = useCallback(
+    (x: number, y: number) => {
       const p = pressAt(x, y);
       if (p) setPress(p);
     },
@@ -929,6 +946,7 @@ export function PlanScreen(props: PlanScreenProps) {
                 <PressMenu
                   at={press.view}
                   size={size}
+                  onDrag={onPressDrag}
                   deviceLabel={press.deviceId ? (deviceById.get(press.deviceId)?.label ?? null) : null}
                   canEdit={!!editor}
                   canPhoto={!!props.blobs}
@@ -1251,9 +1269,14 @@ const MENU_W = 250;
 const MENU_H = 230;
 
 /** The long-press menu (Phase 3 §4.6), next to the finger, kept inside the plan area. */
+/** Touch target of the add-here dot (T70). */
+const PRESS_HANDLE = 44;
+
 function PressMenu(props: {
   at: Point;
   size: { width: number; height: number };
+  /** The dot was dragged to this view point (T70). */
+  onDrag: (x: number, y: number) => void;
   deviceLabel: string | null;
   canEdit: boolean;
   canPhoto: boolean;
@@ -1266,9 +1289,33 @@ function PressMenu(props: {
 }) {
   const left = Math.max(8, Math.min(props.at.x + 12, props.size.width - MENU_W - 8));
   const top = Math.max(8, Math.min(props.at.y - 20, props.size.height - MENU_H - 8));
+  // the dot is draggable once the finger that long-pressed has lifted (T70): a 44 pt handle
+  const at = useRef(props.at);
+  at.current = props.at;
+  const onDrag = useRef(props.onDrag);
+  onDrag.current = props.onDrag;
+  const origin = useRef<Point>(props.at);
+  const drag = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: () => {
+          origin.current = at.current;
+        },
+        onPanResponderMove: (_e, g) => onDrag.current(origin.current.x + g.dx, origin.current.y + g.dy),
+      }),
+    [],
+  );
   return (
     <>
-      <View style={[styles.pressDot, { left: props.at.x - 7, top: props.at.y - 7 }]} pointerEvents="none" />
+      <View
+        {...drag.panHandlers}
+        style={[styles.pressHandle, { left: props.at.x - PRESS_HANDLE / 2, top: props.at.y - PRESS_HANDLE / 2 }]}
+        accessibilityLabel="Drag to move the spot">
+        <View style={styles.pressDot} pointerEvents="none" />
+      </View>
       <View style={[styles.pressMenu, { left, top, width: MENU_W }]}>
         <PressItem label="+ Device (field addition)" disabled={!props.canEdit} onPress={props.onDevice} />
         <PressItem label="+ Note here" disabled={!props.canInk} onPress={props.onNote} />
@@ -1570,7 +1617,8 @@ const styles = StyleSheet.create({
   menuNoteInline: { fontSize: 11, color: '#888' },
   disabled: { color: '#aaa' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
-  pressDot: { position: 'absolute', width: 14, height: 14, borderRadius: 7, borderWidth: 3, borderColor: '#00bcd4', backgroundColor: 'rgba(255,255,255,0.8)' },
+  pressHandle: { position: 'absolute', width: PRESS_HANDLE, height: PRESS_HANDLE, alignItems: 'center', justifyContent: 'center' },
+  pressDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 3, borderColor: '#00bcd4', backgroundColor: 'rgba(255,255,255,0.8)' },
   pressMenu: {
     position: 'absolute',
     paddingVertical: 4,

@@ -55,6 +55,17 @@ Decision D131 (how "nearby" is measured — two inches of drawing around the pho
 
 Decision D132 (a second finger cancels the stroke; taps, double tap and long press are off while drawing): approve / change →
 
+## T70 — Long-press feel  ·  Needs: **new dev build** (same build as T69)
+
+**Why it matters:** placing a device or a note exactly on the drawing is the point of the long press; the spot must be adjustable before choosing.
+
+Before these steps, in the Metro DevTools console after opening a plan: the line **`[plan] pdf native patch: t70 ink,longpress-move`** must appear. If it does not, the iPad is running an older build — install the new one from its build link and stop here.
+
+- [ ] **Menu while the finger is down.** Long-press the plan and keep the finger down: the blue dot and the menu appear while the finger is still on the glass (Metro: `[plan] long press: began`). → saw:
+- [ ] **Dot follows the finger.** Still holding, slide the finger: the dot follows; lift: it stays where you lifted (Metro: `lifted after n move event(s)`, n > 0). → saw:
+- [ ] **Drag the dot after lifting.** With the menu open, drag the blue dot to a nearby spot (or onto a pin): it moves; the menu follows; "+ Photo of <device>" names the device now under the dot. Pick + Device: the grey "+" pin sits where the dot was dropped. → saw:
+- [ ] **Pan still closes the menu.** With the menu open, pan the plan (away from the dot): the menu closes. → saw:
+
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:
