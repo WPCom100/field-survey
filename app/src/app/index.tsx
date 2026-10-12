@@ -82,6 +82,10 @@ export default function ProjectHomeScreen() {
             <Link key={name} href={name === 'Sync' ? '/sync' : '/review'} style={[styles.navItem, styles.navText]}>
               {name}
             </Link>
+          ) : name === 'Export' && projectId ? (
+            <Link key={name} href={{ pathname: '/export', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+              {name}
+            </Link>
           ) : name === 'Setup' && projectId ? (
             <Link key={name} href={{ pathname: '/setup/[projectId]', params: { projectId } }} style={[styles.navItem, styles.navText]}>
               {name}

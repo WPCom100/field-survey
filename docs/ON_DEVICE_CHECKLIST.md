@@ -95,6 +95,23 @@ Before these steps, in the Metro DevTools console after opening a plan: the line
 
 Decision D133 (🎨 Recolour tool; erase beats recolour; offline writes merged after the pull, named in the merge's reason): approve / change →
 
+## T31 — Export screen and history  ·  Needs: no new build (JS only); **the server must run T29 + T31** (deploy and `alembic upgrade head` to 0003 first — until then the Export screen's requests fail)
+
+**Why it matters:** this is how the master workbook reaches the EC, ETC and GC without anyone touching the PC, and the gate is what guarantees an export never misses an edit still sitting on an iPad (D94).
+
+- [ ] **Open it.** Levels screen sidebar → Export. Three panes on the left: Master workbook, Floor PDF, History; the project name under "Export"; the sync line at the top. → saw:
+- [ ] **Gate while edits are pending.** Airplane mode on, change a device note, open Export → Master workbook: the pre-flight counts "1 unsynced edit on this iPad", an amber line says Offline / Sync first, and Generate workbook is greyed out. → saw:
+- [ ] **Sync first.** Airplane mode off, tap Sync first: the status turns "Synced hh:mm", the amber line turns green ("Synced — the export will include every edit…") and Generate workbook becomes active. → saw:
+- [ ] **Levels and tabs.** Tap one level chip (e.g. 06M): "All in scope" turns off and row 2 reads "Levels 06-06"; tap All in scope again. Untick Photo Log: Summary and Lists stay ticked and cannot be unticked. → saw:
+- [ ] **Generate and follow it.** Generate workbook (all levels, all tabs): the card goes Queued → Building the workbook… → Ready · ~1 MB with the filename `Lighting_Control_Survey_Master_B2-06_<n>.xlsx` and a diff line. → saw:
+- [ ] **Open in Excel / Save to Files.** Tap Open in… / Share / Save to Files: the iOS share sheet shows the workbook; Save to Files saves it; Open in Excel (if installed) opens it with its tabs. "✓ on this iPad" appears on the card. → saw:
+- [ ] **Diff vs previous.** Change one device's status, sync, Generate again: the new card says "Diff vs previous export: 1 changed ▸"; tapping it lists "Devices: +0 −0 ~1 (e.g. …)". → saw:
+- [ ] **History.** History pane: every export newest first, each labelled "Exported <date>, <time>" with its levels/tabs and state; the weekly Sunday export (if one ran) says "weekly export". → saw:
+- [ ] **Offline history.** Airplane mode on, History → Refresh: a note says it is showing the last list; an export marked "✓ on this iPad" still opens the share sheet; one not on the iPad shows an error when tapped (needs a connection), no crash. → saw:
+
+Decision D140 (share sheet instead of `expo-sharing`, files kept on the iPad, photos still uploading warn but do not block the export): approve / change →
+Decision D141 (tab choice: Summary and Lists always included, a Summary table dropped with its tab): approve / change →
+
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:

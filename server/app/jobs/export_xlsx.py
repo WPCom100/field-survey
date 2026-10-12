@@ -215,6 +215,7 @@ PHOTOS = TabSpec(
     ),
 )
 TABS = (DEVICES, CONNECTIONS, PUNCH, PARTS, PHOTOS)
+DATA_TAB_NAMES = tuple(t.name for t in TABS)
 LISTS = (
     ("Device status", vocab.DEVICE_STATUS),
     ("Tracking status", vocab.TRACKING_STATUS),
@@ -855,7 +856,12 @@ def _quote(sheet: str) -> str:
 
 
 def _write_summary(
-    wb, f: _Formats, data: ExportData, levels_text: str, level_dates: dict[str, tuple]
+    wb,
+    f: _Formats,
+    data: ExportData,
+    levels_text: str,
+    level_dates: dict[str, tuple],
+    tabs: tuple[str, ...] = DATA_TAB_NAMES,
 ) -> None:
     ws = wb.add_worksheet("Summary")
     ws.set_column_pixels(0, 8, _px(14))  # A–I, as the master
@@ -924,6 +930,9 @@ def _write_summary(
             _counts(data.rows["Missing Parts"], 0, 8),
         ),
     ]
+    # a table counts rows of its own tab; it is left out with that tab (T31: no formula may
+    # point at a sheet the workbook does not have, or Excel treats it as an external link)
+    tables = [t for t in tables if t.sheet in tabs]
     r = 5  # zero-based row of the first table title (row 6)
     for t in tables:
         hdr = r + 1
@@ -1025,17 +1034,33 @@ def _write_lists(wb, f: _Formats) -> None:
             ws.write_string(r, c, v, f.plain)
 
 
-def write(data: ExportData, out: BinaryIO, level_dates: dict[str, tuple] | None = None) -> None:
+def selected_tabs(params: dict[str, Any] | None) -> tuple[str, ...]:
+    """The data tabs an export writes: `params.tabs` (T31, D141) in workbook order, else all
+    five. Summary and Lists are always written."""
+    wanted = (params or {}).get("tabs")
+    if not wanted:
+        return DATA_TAB_NAMES
+    return tuple(t for t in DATA_TAB_NAMES if t in set(wanted))
+
+
+def write(
+    data: ExportData,
+    out: BinaryIO,
+    level_dates: dict[str, tuple] | None = None,
+    tabs: tuple[str, ...] = DATA_TAB_NAMES,
+) -> None:
     """Write the workbook for `data` to `out`. `level_dates` = {code: (surveyed, updated)} as ISO
-    text or None (the Summary keeps them as text in General format, T02 follow-up)."""
+    text or None (the Summary keeps them as text in General format, T02 follow-up). `tabs` = the
+    data tabs to write (Summary tables of a missing tab are left out)."""
     level_dates = level_dates or {c: (None, None) for c in data.levels}
     first, last = (data.levels[0], data.levels[-1]) if data.levels else ("", "")
     levels_text = f"Levels {family(first)}-{family(last)}" if data.levels else "Levels"
     wb = xlsxwriter.Workbook(out, {"in_memory": True})
     f = _Formats(wb)
-    _write_summary(wb, f, data, levels_text, level_dates)
+    _write_summary(wb, f, data, levels_text, level_dates, tabs)
     for spec in TABS:
-        _write_tab(wb, f, spec, data, levels_text)
+        if spec.name in tabs:
+            _write_tab(wb, f, spec, data, levels_text)
     _write_lists(wb, f)
     wb.close()
 
@@ -1046,7 +1071,11 @@ def export_bytes(
     project_id: uuid.UUID,
     params: dict[str, Any] | None = None,
 ) -> tuple[bytes, ExportData]:
-    data = load(session, store, project_id, params)
+    tabs = selected_tabs(params)
+    # no Photo Log → no pictures to read from storage
+    data = load(session, store if PHOTOS.name in tabs else None, project_id, params)
+    data.stats["rows"] = {t: n for t, n in data.stats.get("rows", {}).items() if t in tabs}
+    data.stats["tabs"] = list(tabs)
     dates = {
         lv.level: (
             lv.surveyed.isoformat() if lv.surveyed else None,
@@ -1057,5 +1086,5 @@ def export_bytes(
         )
     }
     buf = io.BytesIO()
-    write(data, buf, dates)
+    write(data, buf, dates, tabs)
     return buf.getvalue(), data

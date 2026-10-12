@@ -82,6 +82,11 @@ def create_export(
         not isinstance(levels, list) or not all(isinstance(c, str) and c for c in levels)
     ):
         raise ExportError("params.levels must be a list of level codes")
+    tabs = params.get("tabs")
+    if tabs is not None and (
+        not isinstance(tabs, list) or not tabs or not set(tabs) <= set(DATA_TABS)
+    ):
+        raise ExportError(f"params.tabs must be a non-empty list of: {', '.join(DATA_TABS)}")
     row = Export(
         id=uuid7(),
         project_id=project_id,
@@ -212,7 +217,11 @@ def diff_summary(
     except (ObjectMissing, KeyError, Exception) as e:  # noqa: BLE001 - a summary, never fatal
         out["note"] = f"previous export unreadable: {type(e).__name__}"
         return out
+    exported = set(data.stats.get("tabs") or DATA_TABS)
     for tab in DATA_TABS:
+        # compare only tabs both files have (an export may leave tabs out, D141)
+        if tab not in exported or tab not in old.sheetnames:
+            continue
         new_rows = {
             (r[0], r[1]): tuple(v.isoformat() if hasattr(v, "isoformat") else v for v in r)
             for r in data.rows.get(tab, [])

@@ -30,7 +30,9 @@ GET  /exports?project_id → history, newest first
 ```
 
 `params.levels` narrows the export to those level codes; without it every **in-scope** level is
-exported. `kind` is `xlsx` only until T59 adds `floor_pdf`. The worker picks the row up within
+exported. `params.tabs` (D141) narrows the data tabs (`Devices`, `Connections`, `Punch List`,
+`Missing Parts`, `Photo Log`, written in that order); Summary and Lists are always written, and a
+Summary table is left out with its source tab so no formula names a missing sheet. `kind` is `xlsx` only until T59 adds `floor_pdf`. The worker picks the row up within
 5 s. From the server shell:
 
 ```

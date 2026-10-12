@@ -212,6 +212,42 @@ def test_empty_project_exports_a_valid_workbook(session, store, factory, client)
     assert len(wb["Summary"]._charts) == 1  # only the by-owner table has rows to chart
 
 
+def test_tabs_param_writes_only_those_tabs(session, store, factory, client, tmp_path):
+    """T31 / D141: `params.tabs` leaves data tabs out; Summary and Lists stay, and no Summary
+    formula points at a missing sheet."""
+    project_id = new_project(session, "Tabs")
+    got = run_export_via_api(
+        client, factory, store, project_id, params={"tabs": ["Punch List", "Devices"]}
+    )
+    assert got["stats"]["tabs"] == ["Devices", "Punch List"]
+    assert set(got["stats"]["rows"]) == {"Devices", "Punch List"}
+    data = store.read(object_key(got["blob"]))
+    wb = openpyxl.load_workbook(io.BytesIO(data))
+    assert wb.sheetnames == ["Summary", "Devices", "Punch List", "Lists"]
+    formulas = [
+        c.value
+        for row in wb["Summary"].iter_rows()
+        for c in row
+        if isinstance(c.value, str) and c.value.startswith("=")
+    ]
+    assert formulas and not any("Missing Parts" in f for f in formulas)
+    out = tmp_path / "tabs.xlsx"
+    out.write_bytes(data)
+    assert tp5_precheck.check(out) == []
+    # a previous export with every tab: the diff compares only the tabs both files have
+    again = run_export_via_api(client, factory, store, project_id, params={"tabs": ["Devices"]})
+    assert set(again["diff_summary"]["tabs"]) == {"Devices"}
+
+    headers = {**HDR, "X-Survey-User": "Landry"}
+    for bad in ([], ["Change Log"], "Devices", ["Summary"]):
+        r = client.post(
+            "/exports",
+            json={"project_id": str(project_id), "params": {"tabs": bad}},
+            headers=headers,
+        )
+        assert r.status_code == 422, bad
+
+
 # ---------------------------------------------------------------- the API
 
 
