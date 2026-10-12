@@ -9,7 +9,7 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 3. **Logs.** In the Metro terminal press `j` to open React Native DevTools; app logs appear there, not in the terminal.
 4. **Mark results as you go.** Tick `[x]` for pass. For a fail, leave it `[ ]` and write what you saw after "→ saw:". Then paste this file back to Claude.
 
-Pending round started: **2026-10-11**. Items: T25 (new), T20–T24 (carried over, never recorded as tested).
+Pending round started: **2026-10-11**. Items: T25, T26 (new), T20–T24 (carried over, never recorded as tested).
 
 ---
 
@@ -30,6 +30,27 @@ Open it from the sidebar on the Levels screen: **Sync**.
 - [ ] **Install section.** Shows your name, `app 1.0.0 (build number)`, the server URL and an 8-character install id. Confirm the build number matches the latest TestFlight/dev build. → saw:
 - [ ] **Export local log.** Tap it. The iOS share sheet should open with a log file; AirDrop or save it to Files, open it, and confirm it has lines like `[sync] …` with times. → saw:
 - [ ] **Re-sign in.** Tap, confirm. You should land on the Connect screen. Re-enter the server and token, pick your name. Your earlier edits must still be there and any unsynced ones must still sync. **Do this last in the round**, since it takes a minute. → saw:
+
+---
+
+## T26 — Needs review screen  ·  Needs: no new build (JS only)
+
+**Why it matters:** two people editing the same thing offline is normal here. This screen is where you settle it; nothing is overwritten until someone picks, and the pick must reach every iPad.
+
+You need a conflict first. It takes **two iPads with different team names** (the same name on two iPads never conflicts, D37), both on a real level and synced:
+1. Turn on airplane mode on both. On iPad 1 type a note on a device (e.g. "Cover plate loose"); on iPad 2 type a different note on the same device ("LVD card missing").
+2. Airplane mode off on iPad 1 → Sync now. Then iPad 2 → Sync now. Then iPad 1 → Sync now again.
+3. For the pin check: repeat with **[⋯] → Move pin** on the same device, to two different spots.
+
+- [ ] **Badges.** On both iPads the device's Notes field has the amber outline, its list row shows IN REVIEW, and its pin has an **amber ring**. The Levels row's Review column shows `IN REVIEW 1`. → saw:
+- [ ] **Open the screen.** Sidebar → **Needs review** (also Sync → "Open Needs review →"). Title "Needs review (1)", tabs All / Sync conflict 1 / Extraction 0 / Source conflict 0 / Import pair 0, a Level chip for your level, Sort toggle. The row reads "<device> · Notes", "sync conflict · <level> · <date>". → saw:
+- [ ] **A/B panel.** A (official now, first to arrive) and B side by side, each with the person's name, date/time and the iPad ("this iPad" on the iPad that made it). Under them "was: …" shows the note before both edits. → saw:
+- [ ] **Combine.** Tap **Combine ▸**: the box is pre-filled "A; B" (A first). Edit it, tap **Save combined**: a confirmation shows the reason "Review: combined A (…) and B (…)". Tap Resolve. The row disappears and the device's note is the combined text. → saw:
+- [ ] **Badges clear on the other iPad after its sync.** On the other iPad, Sync now: the amber outline, IN REVIEW chip and amber ring are gone and the note is the combined text. → saw:
+- [ ] **No Dismiss.** A sync conflict has only Choose A / Choose B / Combine (and Set value for a number field). There is no Dismiss button. → saw:
+- [ ] **Pin conflict on the plan.** With the Move-pin conflict, the panel shows "Resolve on the plan ▸". Tap it: the plan opens framed on **two pins, A solid and B dashed with a "B"**, not merged into a cluster, and a bar "Pin conflict on <ID>" with **Choose A / Choose B**. Pinch out: neither pin joins a cluster. Tap **Choose B**: a confirmation shows "Review: chose B (…) over A (…)"; tap Resolve and you are back on Needs review with the item gone. The pin now sits at B on both iPads after they sync. → saw:
+- [ ] **Context link.** On any item, "Context: open the device card on the plan ▸" opens the level with that device's card. → saw:
+- [ ] **Decision D123 is Proposed** (confirmation before each choice, iPad shown by id tail, other kinds read-only, pin conflicts on the plan, amber ring): approve or change.
 
 ---
 

@@ -67,9 +67,9 @@ export default function ProjectHomeScreen() {
       <View style={styles.sidebar}>
         <Text style={styles.brand}>Field Survey</Text>
         {SIDEBAR.map((name) =>
-          name === 'Sync' ? (
-            <Link key={name} href="/sync" style={[styles.navItem, styles.navText]}>
-              Sync
+          name === 'Sync' || name === 'Needs review' ? (
+            <Link key={name} href={name === 'Sync' ? '/sync' : '/review'} style={[styles.navItem, styles.navText]}>
+              {name}
             </Link>
           ) : (
             <View key={name} style={[styles.navItem, name === 'Levels' && styles.navActive]}>

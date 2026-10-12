@@ -7,7 +7,8 @@
  * Per pin (D64, Phase 3 §2.2): shape = category, fill = status (hollow red for `Not installed`),
  * a glyph inside as the non-colour signal, the ID label below (labels layer), a "+" corner mark
  * for field additions, a camera mark with the photo count (photos layer), a cyan ring when
- * selected. A cluster is a circle in its most urgent member's colour with the member count.
+ * selected, an amber ring while in review (Phase 3 §13). Side B of a pin conflict (T26) is a
+ * dashed outline in the status colour with a "B" glyph. A cluster is a circle in its most urgent member's colour with the member count.
  */
 
 import { PaintStyle, Skia, type SkCanvas, type SkFont, type SkPath } from '@shopify/react-native-skia';
@@ -19,6 +20,7 @@ export const PIN_PX = 26;
 const SELECT = '#00bcd4';
 const HALO = '#ffffff';
 const INK = '#111111';
+const REVIEW = '#ff8f00';
 
 export type PinFonts = { glyph: SkFont; label: SkFont; badge: SkFont };
 export type PinDrawOptions = { labels: boolean; photos: boolean; selectedId: string | null };
@@ -71,7 +73,25 @@ function drawPin(canvas: SkCanvas, pin: RenderPin, x: number, y: number, fonts: 
     paint.setColor(Skia.Color(SELECT));
     canvas.drawPath(shape, paint);
   }
-  if (pin.hollow) {
+  if (pin.review) {
+    paint.setStyle(PaintStyle.Stroke);
+    paint.setStrokeWidth(3);
+    paint.setColor(Skia.Color(REVIEW));
+    canvas.drawCircle(x, y, PIN_PX * 0.85, paint);
+  }
+  if (pin.ghost) {
+    paint.setStyle(PaintStyle.Fill);
+    paint.setColor(Skia.Color(HALO));
+    paint.setAlphaf(0.7);
+    canvas.drawPath(shape, paint);
+    paint.setAlphaf(1);
+    paint.setStyle(PaintStyle.Stroke);
+    paint.setStrokeWidth(2.5);
+    paint.setColor(Skia.Color(pin.fill));
+    paint.setPathEffect(Skia.PathEffect.MakeDash([5, 4], 0));
+    canvas.drawPath(shape, paint);
+    paint.setPathEffect(null);
+  } else if (pin.hollow) {
     paint.setStyle(PaintStyle.Fill);
     paint.setColor(Skia.Color(HALO));
     canvas.drawPath(shape, paint);
@@ -88,7 +108,7 @@ function drawPin(canvas: SkCanvas, pin: RenderPin, x: number, y: number, fonts: 
     paint.setColor(Skia.Color(HALO));
     canvas.drawPath(shape, paint);
   }
-  centredText(canvas, pin.glyph, x, y + 4, fonts.glyph, pin.hollow ? pin.fill : HALO, false);
+  centredText(canvas, pin.glyph, x, y + 4, fonts.glyph, pin.hollow || pin.ghost ? pin.fill : HALO, false);
 
   if (pin.plus) {
     // field addition: "+" in a small dark disc at the top-left corner

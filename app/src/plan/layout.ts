@@ -32,6 +32,12 @@ export type RenderPin = {
   photos: number;
   /** `statusRank`: the most urgent member colours a cluster. */
   rank: number;
+  /** Open review item on the device (Phase 3 §13): amber ring. */
+  review?: boolean;
+  /** Side B of a pin conflict (Phase 3 §6): dashed outline, no fill. */
+  ghost?: boolean;
+  /** Never merged into a cluster (both pins of a conflict stay visible). */
+  solo?: boolean;
 };
 
 export type PlacedPin = { index: number; vx: number; vy: number };
@@ -78,6 +84,10 @@ export function layoutPins(
   if (r > 0) {
     const seeds = new Map<string, number[]>();
     for (let i = 0; i < n; i++) {
+      if (pins[i]!.solo) {
+        groups.push([i]);
+        continue;
+      }
       const cx = Math.floor(vx[i]! / r);
       const cy = Math.floor(vy[i]! / r);
       let joined = -1;

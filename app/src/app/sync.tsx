@@ -118,7 +118,9 @@ export default function SyncScreen() {
         <Text style={styles.value}>
           {data?.openReviews ?? 0} open{sync.willReview ? ` · ${sync.willReview} of my pending edits will be reviewed` : ''}
         </Text>
-        <Text style={styles.sub}>The Needs review screen arrives with T26.</Text>
+        <Link href="/review" style={styles.link}>
+          Open Needs review →
+        </Link>
       </Section>
 
       <Section label="Cached levels">

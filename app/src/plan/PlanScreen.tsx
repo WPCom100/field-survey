@@ -23,15 +23,20 @@
  *   Markup / Note here) enters draw mode, where touches draw into the user's own layer — pen
  *   with Pencil pressure, highlighter, text note, eraser (own strokes only), undo — and "✋ Pan"
  *   hands touches back to PDFKit. The layer is saved a second after the last stroke and on Done.
+ * - A pin-position conflict (T26, Phase 3 §6) opened from Needs review (`reviewItemId`) draws
+ *   side A solid at the device and side B dashed, both kept out of clusters, with Choose A /
+ *   Choose B under the plan. Devices with an open review item have an amber ring (§13).
  */
 
 import {
   Editor,
   emptyStrokeList,
+  resolutionReason,
   makeStroke,
   uuidv7,
   withStroke,
   type BlobQueue,
+  type ReviewItem,
   type Store,
   type StrokeList,
   type StrokePoint,
@@ -39,6 +44,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   type LayoutChangeEvent,
   Pressable,
@@ -58,6 +64,7 @@ import { AddDevicePanel } from '../additions/AddDevicePanel';
 import { INK_COLORS, photoMarkAt } from '../ink/geometry';
 import { InkCapture, type InkTool } from '../ink/InkCapture';
 import { recordStrokes } from '../ink/render';
+import { loadPinConflict, type PinConflict } from '../review/model';
 import { useInkLayers } from '../ink/useInkLayers';
 import type { JumpTarget } from '../card/model';
 import { NOT_WIRED } from '../card/proposals';
@@ -129,6 +136,8 @@ const ROW_H = 52;
 const LONG_PRESS_TAP_GUARD_MS = 900;
 /** The placeholder pin of a device being added (never a real id). */
 const NEW_PIN_ID = '__adding__';
+/** Side B of a pin conflict (never a real id). */
+const REVIEW_B_PIN_ID = '__review_b__';
 
 type Menu = 'category' | 'status' | 'owner' | 'layers' | null;
 
@@ -156,17 +165,23 @@ export type PlanScreenProps = {
   initialDeviceId?: string;
   /** Where captured photo bytes go (T21); without it the card cannot take photos. */
   blobs?: Pick<BlobQueue, 'addLocal' | 'ensureLocal'> | null;
+  /** A pin-position review item to resolve on this plan (T26). */
+  reviewItemId?: string;
+  /** Called after Choose A / Choose B on that item. */
+  onReviewResolved?: (itemId: string) => void;
 };
 
 const NO_NAMES: ReadonlyMap<string, string> = new Map();
 const noBlob = () => null;
 
-function toRenderPin(d: PlanDevice): RenderPin {
+function toRenderPin(d: PlanDevice, conflict: PinConflict | null): RenderPin {
   const st = pinStyleFor(d.status);
+  // In a pin conflict the device's pin is side A (official): the losing iPad still has B (A7).
+  const at = conflict?.deviceId === d.id && conflict.a ? conflict.a : d.pin!;
   return {
     id: d.id,
-    x: d.pin!.x,
-    y: d.pin!.y,
+    x: at.x,
+    y: at.y,
     category: d.category,
     fill: st.fill,
     hollow: st.hollow,
@@ -176,11 +191,14 @@ function toRenderPin(d: PlanDevice): RenderPin {
     isNew: d.isNew,
     photos: d.photos,
     rank: statusRank(d.status),
+    review: d.inReview,
+    solo: conflict?.deviceId === d.id,
   };
 }
 
 export function PlanScreen(props: PlanScreenProps) {
-  const { store, levelId, resolveSheetUri, onBack, status, reloadKey, bench, userId, initialDeviceId, onOpenLevel } = props;
+  const { store, levelId, resolveSheetUri, onBack, status, reloadKey, bench, userId, initialDeviceId, onOpenLevel, reviewItemId, onReviewResolved } =
+    props;
   const [plan, setPlan] = useState<LevelPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<PlanPrefs>({ filter: EMPTY_FILTER, layers: DEFAULT_LAYERS });
@@ -253,12 +271,61 @@ export function PlanScreen(props: PlanScreenProps) {
     };
   }, [store, levelId, reloadKey, showDeleted, edits]);
 
+  // --- a pin conflict to resolve here (T26)
+  const [pinConflict, setPinConflict] = useState<PinConflict | null>(null);
+  const [conflictNote, setConflictNote] = useState<string | null>(null);
+  const names = props.names ?? NO_NAMES;
+  useEffect(() => {
+    if (!reviewItemId || !plan) return setPinConflict(null);
+    let active = true;
+    loadPinConflict(store, reviewItemId, plan.sheet?.id ?? null, names).then(
+      (c) => active && setPinConflict(c),
+      (e: unknown) => active && setConflictNote(String(e)),
+    );
+    return () => {
+      active = false;
+    };
+  }, [store, reviewItemId, plan, names]);
+
   const projectId = plan?.level.projectId ?? null;
   const editor = useMemo(
     () => (projectId && userId ? new Editor(store, { projectId, userId }) : null),
     [store, projectId, userId],
   );
   const onEdited = useCallback(() => setEdits((n) => n + 1), []);
+
+  /**
+   * Choose A / Choose B on the pin conflict: confirmed with the auto-filled reason (D123), one
+   * Reconcile group (T15), then back to the review list.
+   */
+  const resolvePin = useCallback(
+    async (choice: 'A' | 'B') => {
+      if (!editor || !pinConflict) return;
+      const itemId = pinConflict.itemId;
+      const userName = (id: string) => names.get(id);
+      const item = await store.get<ReviewItem>('review_item', itemId);
+      if (!item) return;
+      const reason = await resolutionReason(store, item, { choice }, { userName });
+      Alert.alert(`Choose ${choice}`, `Reason (auto-filled):\n${reason}`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Resolve',
+          onPress: () =>
+            editor.resolve(itemId, { choice }, { userName }).then(
+              () => {
+                console.log(`[plan] pin conflict ${itemId} resolved: ${choice}`);
+                setPinConflict(null);
+                setConflictNote(null);
+                onEdited();
+                onReviewResolved?.(itemId);
+              },
+              (e: unknown) => setConflictNote(`Not resolved: ${String((e as Error)?.message ?? e)}`),
+            ),
+        },
+      ]);
+    },
+    [store, editor, pinConflict, names, onEdited, onReviewResolved],
+  );
 
   /** System photo picker (T21 fix): opened with no modal up, then the photo sheet on the pick. */
   const openLibrary = useCallback((target: PhotoTarget, title: string) => {
@@ -361,7 +428,27 @@ export function PlanScreen(props: PlanScreenProps) {
   }, [tabData]);
   const placed = useMemo(() => visible.filter((d) => d.pin), [visible]);
   const renderPins = useMemo(() => {
-    const pins = placed.map(toRenderPin);
+    const pins = placed.map((d) => toRenderPin(d, pinConflict));
+    const conflictDevice = pinConflict ? (plan?.devices.find((d) => d.id === pinConflict.deviceId) ?? null) : null;
+    if (pinConflict?.b && conflictDevice) {
+      const st = pinStyleFor(conflictDevice.status);
+      pins.push({
+        id: REVIEW_B_PIN_ID,
+        x: pinConflict.b.x,
+        y: pinConflict.b.y,
+        category: conflictDevice.category,
+        fill: st.fill,
+        hollow: false,
+        glyph: 'B',
+        label: 'B',
+        plus: false,
+        isNew: false,
+        photos: 0,
+        rank: 98,
+        ghost: true,
+        solo: true,
+      });
+    }
     if (adding) {
       const st = pinStyleFor(null);
       pins.push({
@@ -380,7 +467,7 @@ export function PlanScreen(props: PlanScreenProps) {
       });
     }
     return pins;
-  }, [placed, adding, plan]);
+  }, [placed, adding, plan, pinConflict]);
   const categories = useMemo(() => {
     const extra = new Set((plan?.devices ?? []).map((d) => d.category).filter((c): c is string => !!c));
     return [...DEVICE_CATEGORIES, ...[...extra].filter((c) => !(DEVICE_CATEGORIES as readonly string[]).includes(c)).sort()];
@@ -395,6 +482,10 @@ export function PlanScreen(props: PlanScreenProps) {
   /** Where a jump from another level arrives: the first viewport focuses it instead of fitting. */
   const arrivalPin = useRef<Point | null>(null);
   arrivalPin.current = initialDeviceId ? (deviceById.get(initialDeviceId)?.pin ?? null) : null;
+  /** A pin conflict arrives showing both of its pins. */
+  const arrivalPoints = useRef<Point[]>([]);
+  const conflictPoints = [pinConflict?.a, pinConflict?.b].filter((p): p is Point => !!p);
+  arrivalPoints.current = conflictPoints.length ? conflictPoints : arrivalPin.current ? [arrivalPin.current] : [];
 
   // `sheetTick` re-reads the cache after "Download plan".
   const sheetUri = useMemo(() => (plan?.sheet ? resolveSheetUri(plan.sheet) : null), [plan, resolveSheetUri, sheetTick]);
@@ -435,8 +526,8 @@ export function PlanScreen(props: PlanScreenProps) {
       // the device a jump from another level arrived for.
       if (first) {
         console.log(`[plan] first viewport, zoom ${scaleOf(sheetToView(vp)).toFixed(3)}`);
-        const arrival = arrivalPin.current;
-        focusSheetRect(arrival && size.width ? focusRect([arrival], size, REVEAL_ZOOM) : sheetRect(vp), false);
+        const arrival = arrivalPoints.current;
+        focusSheetRect(arrival.length && size.width ? focusRect(arrival, size, REVEAL_ZOOM) : sheetRect(vp), false);
       }
     },
     [setFromJs, attachUi, focusSheetRect, size],
@@ -515,14 +606,15 @@ export function PlanScreen(props: PlanScreenProps) {
         setCardOpen(false);
         setEndView(null);
       } else if (hit.kind === 'pin') {
-        if (renderPins[hit.index]!.id === NEW_PIN_ID) return;
-        select(renderPins[hit.index]!.id, 'plan');
+        const id = renderPins[hit.index]!.id;
+        if (id === NEW_PIN_ID) return;
+        select(id === REVIEW_B_PIN_ID && pinConflict ? pinConflict.deviceId : id, 'plan');
       } else {
         const points = hit.members.map((i) => renderPins[i]!);
         focusSheetRect(focusRect(points, size, REVEAL_ZOOM), true);
       }
     },
-    [renderPins, size, prefs.layers.pins, prefs.layers.ink, select, focusSheetRect, moving, editor, plan, onEdited, press, adding, ink.others, ink.mine, props.blobs],
+    [renderPins, size, prefs.layers.pins, prefs.layers.ink, select, focusSheetRect, moving, editor, plan, onEdited, press, adding, ink.others, ink.mine, props.blobs, pinConflict],
   );
 
   /** Where a long press is, as the menu needs it; null off the sheet. */
@@ -536,11 +628,13 @@ export function PlanScreen(props: PlanScreenProps) {
       let deviceId: string | null = null;
       if (prefs.layers.pins) {
         const hit = hitTest(layoutPins(renderPins, sheetToView(vp), size.width, size.height), x, y, HIT_PX);
-        if (hit?.kind === 'pin' && renderPins[hit.index]!.id !== NEW_PIN_ID) deviceId = renderPins[hit.index]!.id;
+        const id = hit?.kind === 'pin' ? renderPins[hit.index]!.id : null;
+        if (id === REVIEW_B_PIN_ID) deviceId = pinConflict?.deviceId ?? null;
+        else if (id && id !== NEW_PIN_ID) deviceId = id;
       }
       return { view: { x, y }, sheet: at, deviceId };
     },
-    [prefs.layers.pins, renderPins, size],
+    [prefs.layers.pins, renderPins, size, pinConflict],
   );
 
   /**
@@ -855,6 +949,25 @@ export function PlanScreen(props: PlanScreenProps) {
                   <Pressable onPress={() => setLibraryError(null)} hitSlop={8}>
                     <Text style={styles.moveCancel}>OK</Text>
                   </Pressable>
+                </View>
+              ) : null}
+              {pinConflict ? (
+                <View style={styles.moveBanner}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.moveText}>
+                      Pin conflict on {deviceById.get(pinConflict.deviceId)?.label ?? 'this device'}
+                      {!pinConflict.a || !pinConflict.b ? ' (one position is on another sheet)' : ''}
+                    </Text>
+                    <Text style={styles.conflictSides}>
+                      {pinConflict.aLabel} · {pinConflict.bLabel}
+                    </Text>
+                    {conflictNote ? <Text style={styles.conflictError}>{conflictNote}</Text> : null}
+                  </View>
+                  {(['A', 'B'] as const).map((choice) => (
+                    <Pressable key={choice} style={[styles.conflictBtn, !editor && { opacity: 0.4 }]} disabled={!editor} onPress={() => void resolvePin(choice)}>
+                      <Text style={styles.conflictBtnText}>Choose {choice}</Text>
+                    </Pressable>
+                  ))}
                 </View>
               ) : null}
               {moving ? (
@@ -1382,6 +1495,10 @@ const styles = StyleSheet.create({
   },
   moveText: { flex: 1, fontSize: 15, color: '#333' },
   moveCancel: { fontSize: 15, fontWeight: '700', color: '#1565c0' },
+  conflictSides: { fontSize: 13, color: '#555', marginTop: 2 },
+  conflictError: { fontSize: 13, color: '#b42318', marginTop: 2 },
+  conflictBtn: { backgroundColor: '#e65100', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9, marginLeft: 8 },
+  conflictBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   side: { flex: 28, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
   sideHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
   sideTitle: { fontSize: 16, fontWeight: '600' },

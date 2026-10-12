@@ -41,6 +41,8 @@ export type PlanDevice = Filterable & {
   photos: number;
   /** Soft-deleted; only loaded with `includeDeleted`, never pinned. */
   deleted: boolean;
+  /** Has an open review item (Phase 3 §13: amber ring around the pin). */
+  inReview: boolean;
 };
 
 export type LevelPlan = { level: PlanLevel; sheet: PlanSheet | null; devices: PlanDevice[] };
@@ -140,6 +142,15 @@ export async function loadLevelPlan(
     if (it.owner) owners.set(it.device_id, [...(owners.get(it.device_id) ?? []), it.owner]);
   }
 
+  const inReview = new Set(
+    (
+      await store.db.query<{ id: string | null }>(
+        `SELECT json_extract(subject, '$.entity_id') AS id FROM review_item
+         WHERE state = 'open' AND deleted_at IS NULL AND json_extract(subject, '$.entity_kind') = 'device'`,
+      )
+    ).map((r) => r.id),
+  );
+
   const devices = rows.map((r): PlanDevice => {
     const id = String(r.id);
     const deleted = !!r.deleted_at;
@@ -158,6 +169,7 @@ export async function loadLevelPlan(
       fieldAddition: r.origin === 'field_addition',
       photos: photos.get(id) ?? 0,
       deleted,
+      inReview: inReview.has(id),
       openPunch: openPunch.get(id) ?? 0,
       openOwners: owners.get(id) ?? [],
     };

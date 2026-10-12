@@ -16,9 +16,10 @@ import { describeSync, useSyncStatus } from '../../sync/useSyncStatus';
  * Plan view of one level from the app store; the sheet and photo thumbnails come from the blob
  * cache (T12). `?device=` selects and opens that device's card on arrival (a cross-level jump).
  * Photos taken here go to the app's blob queue (T21); the top bar shows "N photos waiting".
+ * `?review=` draws that pin-position conflict on the plan with Choose A / Choose B (T26).
  */
 export default function LevelPlanRoute() {
-  const { levelId, device } = useLocalSearchParams<{ levelId: string; device?: string }>();
+  const { levelId, device, review } = useLocalSearchParams<{ levelId: string; device?: string; review?: string }>();
   const user = useCurrentUser();
   const [store, setStore] = useState<Store | null>(null);
   const [blobs, setBlobs] = useState<BlobQueue | null>(null);
@@ -63,6 +64,8 @@ export default function LevelPlanRoute() {
       names={names}
       resolveBlobUri={resolveBlobUri}
       initialDeviceId={device}
+      reviewItemId={review}
+      onReviewResolved={() => (router.canGoBack() ? router.back() : router.replace('/review'))}
       blobs={blobs}
       onOpenLevel={(other, deviceId) => router.push({ pathname: '/plan/[levelId]', params: { levelId: other, device: deviceId } })}
     />

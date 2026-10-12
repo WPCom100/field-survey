@@ -102,6 +102,13 @@ describe('layout and clustering', () => {
     expect(lay.pins.map((p) => p.index)).toEqual([3]);
   });
 
+  it('solo pins (both sides of a pin conflict, T26) never join a cluster', () => {
+    const solo = pins.map((p, i) => (i < 2 ? { ...p, solo: true } : p));
+    const lay = layoutPins(solo, sheetToView(vp(0.2)), 1000, 800);
+    expect(lay.clusters).toEqual([]);
+    expect(lay.pins.map((p) => p.index).sort()).toEqual([0, 1, 2, 3]);
+  });
+
   it('splits as the zoom grows and never clusters at or above offZoom', () => {
     const mid = layoutPins(pins, sheetToView(vp(0.5)), 4000, 4000);
     expect(mid.clusters.map((c) => c.members)).toEqual([[0, 1]]);
