@@ -122,7 +122,10 @@ export class FakeServer implements SyncTransport {
       case 'set': {
         const field = op.field!;
         const head = this.head(op.entity_id, field);
+        // Ink layers and photo blobs are last-write-wins (server LAST_WRITE_WINS_*, PLAN §3.3).
+        const lastWriteWins = op.entity_kind === 'ink_layer' || (op.entity_kind === 'photo' && field.endsWith('_blob'));
         const conflict =
+          !lastWriteWins &&
           head &&
           head.op_id !== op.base_op_id &&
           head.user_id !== op.user_id &&

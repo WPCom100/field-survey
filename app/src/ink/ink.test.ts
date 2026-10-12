@@ -8,14 +8,19 @@ import {
   serializeStrokeList,
   uuidv7,
   withStroke,
+  withStrokeColor,
+  withoutStroke,
+  SyncEngine,
   type Op,
+  type StrokeList,
 } from '@field-survey/core';
-import { BetterSqliteDriver } from '@field-survey/core/node';
+import { BetterSqliteDriver, FakeServer } from '@field-survey/core/node';
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { DEMO_LEVEL_ID, DEMO_SHEET_ID, DEMO_SHEET_SIZE, ensureDemoLevel } from '../plan/demo';
 import { loadLevelPlan } from '../plan/data';
-import { INK_CONTEXT, loadInkLayers, ownLayer, saveInkLayer } from './model';
+import { INK_CONTEXT, INK_MERGE_PREFIX, listToSave, loadInkLayers, ownLayer, reconcileInkLayer, saveInkLayer } from './model';
 import { createInkBus, parseInkMessage } from './touches';
 
 const ANN = uuidv7();
@@ -53,14 +58,17 @@ describe('plan ink layers (T24, D53)', () => {
     expect(ownLayer(layers, BOB)).toBeNull();
   });
 
-  it('one layer per (sheet, user): others are listed for read-only drawing and cannot be written', async () => {
+  it("one layer per (sheet, user); since D129 anyone writes anyone's layer, which stays its owner's", async () => {
     const { store, ann, bob } = await setup();
     const a = await saveInkLayer(ann, { sheetId: DEMO_SHEET_ID, layerId: null, sha256: sha(3), at: '2026-10-10T15:00:00.000Z' });
     const b = await saveInkLayer(bob, { sheetId: DEMO_SHEET_ID, layerId: null, sha256: sha(4), at: '2026-10-10T15:01:00.000Z' });
-    const layers = await loadInkLayers(store, DEMO_SHEET_ID);
+    let layers = await loadInkLayers(store, DEMO_SHEET_ID);
     expect(layers.map((l) => l.userId)).toEqual([BOB, ANN]); // newest first
     expect(ownLayer(layers, ANN)!.id).toBe(a.layerId);
-    await expect(saveInkLayer(ann, { sheetId: DEMO_SHEET_ID, layerId: b.layerId, sha256: sha(5), at: '2026-10-10T15:02:00.000Z' })).rejects.toThrow(/owner only/);
+    const edit = await saveInkLayer(ann, { sheetId: DEMO_SHEET_ID, layerId: b.layerId, sha256: sha(5), at: '2026-10-10T15:02:00.000Z' });
+    expect(edit.ops.every((o) => o.user_id === ANN && o.kind === 'set')).toBe(true); // Ann's edit, Bob's layer
+    layers = await loadInkLayers(store, DEMO_SHEET_ID);
+    expect(layers.find((l) => l.id === b.layerId)).toMatchObject({ userId: BOB, blob: sha(5) });
     expect(await loadInkLayers(store, uuidv7())).toEqual([]);
   });
 
@@ -163,5 +171,101 @@ describe('draw-mode touches from the PDF view (T69, D129)', () => {
     off();
     bus.emit('ink|end');
     expect(seen).toEqual(['start:1', 'cancel:0']);
+  });
+});
+
+describe("editing other people's ink (T72, D129)", () => {
+  const PROJECT = uuidv7();
+  const SHEET = uuidv7();
+  let clock = 1_760_600_000_000;
+  const tsNext = () => new Date((clock += 60_000)).toISOString();
+  const at = '2026-10-12T10:00:00.000Z';
+  const st = (id: string) => makeStroke({ id, tool: 'pen', color: '#e53935', width: 2, points: [{ x: 10, y: 10, p: 0.5 }], at });
+  const listOf = (...ids: string[]) => ids.reduce((l, id) => withStroke(l, st(id)), emptyStrokeList('sheet', 100, 100));
+  const ids = (l: { strokes: { id: string }[] } | null) => (l?.strokes ?? []).map((s) => s.id);
+
+  /** The blob store every iPad shares in these tests: content-addressed like the real one. */
+  const blobs = new Map<string, StrokeList>();
+  const put = (l: StrokeList) => {
+    const key = createHash('sha256').update(serializeStrokeList(l)).digest('hex');
+    blobs.set(key, l);
+    return key;
+  };
+  const read = async (key: string) => blobs.get(key) ?? null;
+  const head = async (c: Client, layerId: string) => read(String((await c.store.get<{ drawing_blob: string }>('ink_layer', layerId))!.drawing_blob));
+
+  type Client = { store: Store; editor: Editor; engine: SyncEngine };
+  async function client(server: FakeServer, user: string): Promise<Client> {
+    const store = await Store.open(new BetterSqliteDriver(), { installId: uuidv7(), search: 'like' });
+    await store.applyRemote({
+      op_id: uuidv7(), project_id: PROJECT, user_id: ANN, install_id: 'seed', client_ts: '2026-10-01T00:00:00.000Z',
+      entity_kind: 'project', entity_id: PROJECT, kind: 'create', payload: { name: 'Tower' },
+      change_type: 'Master edit', server_seq: 0, server_ts: '2026-10-01T00:00:00.000Z', state: 'applied',
+    } as Op);
+    const editor = new Editor(store, { projectId: PROJECT, userId: user, now: tsNext });
+    return { store, editor, engine: new SyncEngine(store, server, { log: () => {} }) };
+  }
+  async function sync(...cs: Client[]) {
+    for (const c of cs) expect((await c.engine.sync()).outcome).toBe('ran');
+  }
+  /** Bob's layer with three strokes, on every iPad. */
+  async function world() {
+    const server = new FakeServer();
+    const ann = await client(server, ANN);
+    const bob = await client(server, BOB);
+    const base = listOf('s1', 's2', 's3');
+    const { layerId } = await saveInkLayer(bob.editor, { sheetId: SHEET, layerId: null, sha256: put(base), at });
+    await sync(bob, ann);
+    expect(ids(await head(ann, layerId))).toEqual(['s1', 's2', 's3']);
+    return { ann, bob, base, layerId, baseBlob: put(base) };
+  }
+
+  it('a save merges with a copy pulled since the edit started (edit after a pull)', async () => {
+    const { ann, bob, base, layerId, baseBlob } = await world();
+    const annErased = withoutStroke(base, 's1'); // Ann erases one of Bob's strokes…
+    await saveInkLayer(bob.editor, { sheetId: SHEET, layerId, sha256: put(withStroke(base, st('s4'))), at }); // …while Bob draws on
+    await sync(bob, ann);
+    const toWrite = await listToSave(ann.store, { layerId, base, baseBlob, list: annErased }, read);
+    expect(toWrite !== 'wait' && ids(toWrite)).toEqual(['s2', 's3', 's4']); // Bob's new stroke kept, Ann's erase kept
+    // no newer copy: the edit is written as it is; a newer copy not downloaded yet: wait
+    expect(await listToSave(ann.store, { layerId, base: toWrite as StrokeList, baseBlob: put(toWrite as StrokeList), list: annErased }, read)).not.toBe('wait');
+    expect(await listToSave(ann.store, { layerId, base, baseBlob, list: annErased }, async () => null)).toBe('wait');
+  });
+
+  it("two iPads edit another user's layer offline, then sync: nothing is lost, and the merge is done once", async () => {
+    const { ann, bob, base, layerId } = await world();
+    // both offline from the same copy: Ann erases s1 and recolours s2 in Bob's layer, Bob erases s3 and draws s4
+    const annList = withStrokeColor(withoutStroke(base, 's1'), 's2', '#1e88e5');
+    await saveInkLayer(ann.editor, { sheetId: SHEET, layerId, sha256: put(annList), at });
+    const bobList = withStroke(withoutStroke(base, 's3'), st('s4'));
+    await saveInkLayer(bob.editor, { sheetId: SHEET, layerId, sha256: put(bobList), at });
+    await sync(ann, bob, ann); // the server keeps the last write (Bob's): Ann's erase and recolour are not in it
+    expect(ids(await head(ann, layerId))).toEqual(['s1', 's2', 's4']);
+
+    // after the pull, the writes made from the same copy are merged (on either iPad: same result)
+    const onAnn = (await reconcileInkLayer(ann.store, layerId, read))!;
+    const onBob = (await reconcileInkLayer(bob.store, layerId, read))!;
+    expect(serializeStrokeList(onAnn.merged)).toBe(serializeStrokeList(onBob.merged));
+    expect(onAnn.merged.strokes.map((s) => [s.id, s.color])).toEqual([
+      ['s2', '#1e88e5'],
+      ['s4', '#e53935'],
+    ]);
+    await saveInkLayer(ann.editor, { sheetId: SHEET, layerId, sha256: put(onAnn.merged), at, reason: `${INK_MERGE_PREFIX}${onAnn.mergedOpIds.join(',')}` });
+    await sync(ann, bob);
+    expect(ids(await head(bob, layerId))).toEqual(['s2', 's4']);
+    // merged once: neither iPad finds anything left to merge, so a later change is never undone
+    expect(await reconcileInkLayer(ann.store, layerId, read)).toBeNull();
+    expect(await reconcileInkLayer(bob.store, layerId, read)).toBeNull();
+    const layer = (await loadInkLayers(bob.store, SHEET)).find((l) => l.id === layerId)!;
+    expect(layer.userId).toBe(BOB); // still Bob's layer: the strokes keep their author
+  });
+
+  it('a merge waits while a needed copy is not on this iPad', async () => {
+    const { ann, bob, base, layerId } = await world();
+    await saveInkLayer(ann.editor, { sheetId: SHEET, layerId, sha256: put(withoutStroke(base, 's1')), at });
+    await saveInkLayer(bob.editor, { sheetId: SHEET, layerId, sha256: put(withoutStroke(base, 's2')), at });
+    await sync(ann, bob, ann);
+    expect(await reconcileInkLayer(ann.store, layerId, async () => null)).toBeNull();
+    expect(ids((await reconcileInkLayer(ann.store, layerId, read))!.merged)).toEqual(['s3']);
   });
 });

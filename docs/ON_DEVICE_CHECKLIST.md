@@ -66,6 +66,18 @@ Before these steps, in the Metro DevTools console after opening a plan: the line
 - [ ] **Drag the dot after lifting.** With the menu open, drag the blue dot to a nearby spot (or onto a pin): it moves; the menu follows; "+ Photo of <device>" names the device now under the dot. Pick + Device: the grey "+" pin sits where the dot was dropped. → saw:
 - [ ] **Pan still closes the menu.** With the menu open, pan the plan (away from the dot): the menu closes. → saw:
 
+## T72 — Edit other people's ink  ·  Needs: the T69/T70 dev build; a level with a plan (T45) and two iPads or two team names
+
+**Why it matters:** the floor's markup is shared work; anyone should be able to clean up or correct it without anyone's strokes getting lost when two people change it at once.
+
+- [ ] **Erase someone else's stroke.** Ann draws, syncs; on Bob's iPad, Ink → ⌫ Erase → touch Ann's stroke: it disappears. After both sync it is gone on Ann's iPad too. → saw:
+- [ ] **Recolour.** Bob: Ink → 🎨 Recolour, pick blue, touch one of Ann's strokes: it turns blue (and stays faded as Ann's). After sync Ann sees it blue. → saw:
+- [ ] **Undo across layers.** Bob: erase one of Ann's strokes and one of his own, then ↶ Undo twice: both come back, in reverse order. → saw:
+- [ ] **Both at once, online.** Ann draws new strokes while Bob erases one of Ann's older strokes, within a few seconds of each other: after both sync, Ann's new strokes are there and the erased one is gone, on both iPads. → saw:
+- [ ] **Both offline.** Both iPads in airplane mode: Ann erases stroke X of her own layer, Bob recolours stroke Y of Ann's layer. Airplane mode off on both, wait ~10 s (two sync cycles): on both iPads X is gone and Y has the new colour (Metro may log `ink: merged 1 concurrent write(s)`). → saw:
+
+Decision D133 (🎨 Recolour tool; erase beats recolour; offline writes merged after the pull, named in the merge's reason): approve / change →
+
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:
@@ -99,7 +111,7 @@ Make a conflict: both iPads in airplane mode, iPad 1 note "Cover plate loose", i
 
 - [ ] **T21 · Upload resume.** On a real level take several photos, force-quit while they upload, relaunch: uploads finish, nothing sent twice; Sync shows Photos waiting → 0. (T71) → saw:
 - [ ] **T23 · Real ID after sync.** On a real level with a plan, long-press → + Device, wait for a sync: `06M-?` becomes a real ID (`06M-49`, or `06M-S16` for a station). (T45) → saw:
-- [ ] **T24 · Two people's ink.** Two team names or iPads on a real level with a plan: each draws, both sync; each sees the other's ink faded and cannot erase it. (T45) → saw:
+- [ ] **T24 · Two people's ink.** Two team names or iPads on a real level with a plan: each draws, both sync; each sees the other's ink faded. (Erasing it is allowed since D129 — see T72.) (T45) → saw:
 
 ---
 

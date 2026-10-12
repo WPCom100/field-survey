@@ -23,7 +23,8 @@
  *   that finger lifts is ignored.
  * - Plan ink (T24, D53): every user's layer drawn under the pins (Layers ▸ Ink); "✎ Ink" (or
  *   Markup / Note here) enters draw mode, where one finger or the Pencil draws into the user's
- *   own layer — pen with Pencil pressure, highlighter, text note, eraser (own strokes only), undo —
+ *   own layer — pen with Pencil pressure, highlighter, text note; eraser, recolour and undo on
+ *   anyone's strokes, saved into the owner's layer and merged by stroke id (T72, D129) —
  *   and two fingers pan and zoom the plan (T69, D129: the patched PDF view captures the single
  *   touch, `ink/touches.ts`). The layer is saved a second after the last stroke and on Done.
  * - A pin-position conflict (T26, Phase 3 §6) opened from Needs review (`reviewItemId`) draws
@@ -910,6 +911,8 @@ export function PlanScreen(props: PlanScreenProps) {
                   widthPx={inkWidth}
                   mine={ink.mine}
                   onChange={ink.setMine}
+                  onErase={(at, tol) => void ink.eraseAt(at.x, at.y, tol)}
+                  onRecolor={(at, tol) => void ink.recolorAt(at.x, at.y, tol, inkColor)}
                   onTextAt={(at, size) => {
                     setNoteAt({ at, size });
                     setNoteText('');
@@ -1332,6 +1335,7 @@ const INK_TOOLS: [InkTool, string][] = [
   ['highlighter', '▬ Highlight'],
   ['text', 'T Note'],
   ['erase', '⌫ Erase'],
+  ['recolor', '🎨 Recolour'],
 ];
 const INK_WIDTHS: [number, string][] = [
   [1.5, 'thin'],
@@ -1407,7 +1411,9 @@ function InkBar(props: {
           <Text style={styles.inkNote}>Tap the plan where the note goes.</Text>
         )
       ) : props.tool === 'erase' ? (
-        <Text style={styles.inkNote}>Touch your strokes to erase them (other people's ink is theirs).</Text>
+        <Text style={styles.inkNote}>Touch any stroke to erase it, yours or someone else's (it stays in their layer).</Text>
+      ) : props.tool === 'recolor' ? (
+        <Text style={styles.inkNote}>Pick a colour, then touch any stroke to give it that colour.</Text>
       ) : null}
       {props.error ? <Text style={[styles.inkNote, styles.inkErr]}>{props.error}</Text> : null}
       {props.missing ? <Text style={styles.inkNote}>{props.missing} ink layer{props.missing === 1 ? '' : 's'} not downloaded yet.</Text> : null}

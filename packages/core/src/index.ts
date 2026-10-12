@@ -151,6 +151,8 @@ export {
   withStroke,
   withoutLast,
   withoutStroke,
+  withStrokeColor,
+  mergeStrokeLists,
   strokeBounds,
   strokeAt,
   serializeStrokeList,

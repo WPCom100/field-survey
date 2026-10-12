@@ -66,9 +66,46 @@ few strokes is 1–5 KB; a busy sheet layer a few hundred KB.
 
 | Rule | |
 |---|---|
-| One layer per (sheet, user) | `ink_layer` {`sheet_id`, `user_id`, `drawing_blob`, `updated_at`}; `space: sheet`, `width`/`height` = the display sheet's CropBox. The owner writes it; the app draws every other user's layer read-only (alpha 0.8) under the pins, gated by Layers ▸ Ink. |
+| One layer per (sheet, user) | `ink_layer` {`sheet_id`, `user_id`, `drawing_blob`, `updated_at`}; `space: sheet`, `width`/`height` = the display sheet's CropBox. A user **draws** only into their own layer, so every stroke stays in its author's layer; since D129 anyone may **erase, recolour or undo** any stroke, and that change is written into the stroke's layer by the person making it (the ops carry their name). Other users' layers are drawn at alpha 0.8 under the pins, gated by Layers ▸ Ink. |
 | Saving | Debounced 1.5 s after the last change, and at once on Done / leaving the plan: serialise → new blob (new SHA-256, `kind: ink`) queued for upload → the first save `create`s the layer, later ones `set` `drawing_blob` + `updated_at` as one group (`Field survey` / "Plan ink"). Old blobs are never edited. |
-| Never conflicts | The server applies `ink_layer` last-write-wins (PLAN §3.3) and the client never marks an ink op "will be reviewed". If one person's two iPads both create a layer for a sheet offline, both rows are kept and drawn; the newest is the one that person edits. |
+| Never conflicts | The server applies `ink_layer` last-write-wins (PLAN §3.3) and the client never marks an ink op "will be reviewed"; what keeps a write from dropping another person's change is the merge below. If one person's two iPads both create a layer for a sheet offline, both rows are kept and drawn; the newest is the one that person draws in. |
 | Sizes | Line widths are picked on screen (thin 1.5 / medium 3 / thick 6 view points; highlighter 4×) and stored in sheet points at the zoom the stroke starts at, so ink keeps its size relative to the drawing. A text note is 14 view points; a "Photo here" camera mark is 26 view points (T23, `marker` with the photo's id). |
-| Editing | Undo removes the user's last stroke; the eraser removes the user's stroke under the finger (within 14 view points). Nobody erases another user's ink. |
+| Editing | ↶ Undo steps back through the session's changes in whichever layer they were made; ⌫ Erase removes and 🎨 Recolour recolours the topmost stroke under the finger (within 14 view points) — the user's own layer first (it is drawn on top), then the others, newest first. |
 | Download | Layers of assigned levels are prefetched with the sheets (`BlobQueue.prefetch`); a missing one is fetched on demand when the plan opens, and the draw bar says how many are not downloaded yet. |
+
+## Merging edits of one layer (T72, D129)
+
+Since anyone can change anyone's layer, two people can change one layer at the same time, and the
+server keeps only the last `drawing_blob` it receives. The client therefore merges **by stroke id**
+(`mergeStrokeLists(base, a, b)` in `src/strokes.ts`), three-way against the copy both edits started
+from:
+
+| Stroke in `base` | in `a` | in `b` | Result |
+|---|---|---|---|
+| yes | yes | yes | kept; if one side changed it (recolour) that side's version, if both did the larger canonical JSON (so either side computes the same) |
+| yes | no | any | gone (erased on one side wins) |
+| yes | any | no | gone |
+| no | yes / no | no / yes | kept (added on one side, e.g. an undo that brought a stroke back) |
+| no | yes | yes | kept; the larger canonical JSON if they differ |
+
+The result lists strokes in id order (UUID v7 = drawing order) with `b`'s envelope, so the same
+three inputs always give the same bytes and the same blob, whichever iPad merges.
+
+The app merges at two moments (`app/src/ink/model.ts`, `useInkLayers.ts`):
+
+1. **On save.** Each changed layer remembers the copy its edits started from (`baseBlob`). If the
+   layer's `drawing_blob` has changed since (someone else's write was pulled), the save writes
+   `merge(base, mine, newest)` instead of `mine`. If the newest copy is not downloaded yet, the
+   edit stays unsaved ("waiting for the newest copy") and the next try merges it.
+2. **After a pull.** Two iPads that changed the layer offline both wrote from the same copy; the
+   server kept the later write. A write is *concurrent* when it is not on the head's line (the
+   chain of `base_op_id`s from the current head). `reconcileInkLayer` merges each concurrent write
+   into the head against the nearest copy both lines share and, if that changes anything, writes
+   the result with the reason `Plan ink: merged <op_id>,…`. A write named by a merge on the head's
+   line (and everything it was based on) is never merged again, so a later deliberate change (an
+   undo that brings a stroke back) is not undone. Two iPads that merge at the same moment write the
+   same blob, which changes nothing.
+
+Both need the older blobs of the layer on the iPad; a merge that cannot read one waits for the next
+reload.
+

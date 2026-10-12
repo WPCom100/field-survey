@@ -4,16 +4,14 @@
  * Pencil pressure, and shows the stroke being drawn. It takes no touches itself, so two fingers
  * still reach PDFKit and pan and zoom the plan; a second finger cancels the stroke under way.
  * Committed strokes are drawn by the overlay's ink picture (`PinOverlay`), so this layer only ever
- * draws one stroke.
+ * draws one stroke. Erase and recolour act on any user's stroke under the touch (D129, T72).
  */
 
 import {
   emptyStrokeList,
   makeStroke,
-  strokeAt,
   uuidv7,
   withStroke,
-  withoutStroke,
   type Stroke,
   type StrokeList,
   type StrokePoint,
@@ -27,7 +25,7 @@ import { recordStroke } from './render';
 import type { InkBus } from './touches';
 import type { DrawPoint } from './useDrawGesture';
 
-export type InkTool = 'pen' | 'highlighter' | 'text' | 'erase';
+export type InkTool = 'pen' | 'highlighter' | 'text' | 'erase' | 'recolor';
 
 type Props = {
   /** Draw-mode touches from the Pdf view. */
@@ -40,6 +38,9 @@ type Props = {
   widthPx: number;
   mine: StrokeList | null;
   onChange: (list: StrokeList) => void;
+  /** Erase / recolour the topmost stroke of any layer near a sheet point (tolerance in sheet points). */
+  onErase: (at: StrokePoint, tolerance: number) => void;
+  onRecolor: (at: StrokePoint, tolerance: number) => void;
   /** Text tool: where the note goes (sheet points), and its size in sheet points. */
   onTextAt: (at: StrokePoint, size: number) => void;
 };
@@ -48,11 +49,11 @@ export function surfaceOf(vp: PdfViewport): { width: number; height: number } {
   return { width: vp.cropBox.width, height: vp.cropBox.height };
 }
 
-export function InkCapture({ touches, viewport, tool, color, widthPx, mine, onChange, onTextAt }: Props) {
+export function InkCapture({ touches, viewport, tool, color, widthPx, mine, onChange, onErase, onRecolor, onTextAt }: Props) {
   const [live, setLive] = useState<{ stroke: Stroke; vp: PdfViewport } | null>(null);
   const pts = useRef<StrokePoint[]>([]);
   const start = useRef<{ vp: PdfViewport; zoom: number } | null>(null);
-  /** The list as this layer last changed it, so a fast eraser sees its own previous erase. */
+  /** The user's layer as last changed, so a quick second stroke builds on the first. */
   const latest = useRef<StrokeList | null>(mine);
   latest.current = mine;
 
@@ -73,16 +74,7 @@ export function InkCapture({ touches, viewport, tool, color, widthPx, mine, onCh
       minStep: 1 / zoom,
     });
   };
-  const erase = (p: StrokePoint, zoom: number) => {
-    const list = latest.current;
-    if (!list) return;
-    const hit = strokeAt(list, p.x, p.y, 14 / zoom);
-    if (!hit) return;
-    const next = withoutStroke(list, hit.id);
-    latest.current = next;
-    console.log(`[plan] ink: erased a ${hit.tool} stroke (${next.strokes.length} left)`);
-    onChange(next);
-  };
+  const erase = (p: StrokePoint, zoom: number) => onErase(p, 14 / zoom);
 
   const handlers = {
     onStart: (d: DrawPoint) => {
@@ -93,6 +85,7 @@ export function InkCapture({ touches, viewport, tool, color, widthPx, mine, onCh
       const p = toSheet(d, vp);
       pts.current = [p];
       if (tool === 'erase') erase(p, zoom);
+      else if (tool === 'recolor') onRecolor(p, 14 / zoom);
       else {
         const s = build(zoom);
         if (s) setLive({ stroke: s, vp });
@@ -103,7 +96,7 @@ export function InkCapture({ touches, viewport, tool, color, widthPx, mine, onCh
       if (!st) return;
       const p = toSheet(d, st.vp);
       if (tool === 'erase') return erase(p, st.zoom);
-      if (tool === 'text') return;
+      if (tool === 'text' || tool === 'recolor') return;
       pts.current.push(p);
       const s = build(st.zoom);
       if (s) setLive({ stroke: s, vp: st.vp });

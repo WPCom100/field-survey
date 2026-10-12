@@ -151,6 +151,56 @@ export function withoutStroke(list: StrokeList, id: string): StrokeList {
   return strokes.length === list.strokes.length ? list : { ...list, strokes };
 }
 
+/** Recolour one stroke (D129: any user's); unchanged when the id is unknown or the colour is the same. */
+export function withStrokeColor(list: StrokeList, id: string, color: string): StrokeList {
+  let changed = false;
+  const strokes = list.strokes.map((s) => {
+    if (s.id !== id || s.color === color) return s;
+    changed = true;
+    return { ...s, color };
+  });
+  return changed ? { ...list, strokes } : list;
+}
+
+const strokeKey = (s: Stroke): string => serializeStrokeList({ ...EMPTY_ENVELOPE, strokes: [s] });
+const EMPTY_ENVELOPE: StrokeList = { format: 'field-survey/strokes', version: 1, space: 'sheet', width: 0, height: 0, strokes: [] };
+
+/**
+ * Three-way merge of two edits of one layer by stroke id (D129, T72): `a` and `b` both started from
+ * `base`. A stroke added on either side is kept; a stroke erased on either side is gone; a stroke
+ * changed on one side (recoloured) takes that side's version, and when both changed it the larger
+ * canonical JSON wins, so the result never depends on which side calls it. Strokes come out in id
+ * order (UUID v7 = drawing order), so two iPads merging the same three lists write the same bytes
+ * and the same blob. The envelope (surface size) is `b`'s. `base` null = the layer had no strokes.
+ */
+export function mergeStrokeLists(base: StrokeList | null, a: StrokeList, b: StrokeList): StrokeList {
+  const inBase = new Map((base?.strokes ?? []).map((s) => [s.id, s]));
+  const inA = new Map(a.strokes.map((s) => [s.id, s]));
+  const inB = new Map(b.strokes.map((s) => [s.id, s]));
+  const ids = new Set([...inA.keys(), ...inB.keys()]);
+  const out: Stroke[] = [];
+  for (const id of ids) {
+    const sa = inA.get(id);
+    const sb = inB.get(id);
+    const s0 = inBase.get(id);
+    if (s0 && (!sa || !sb)) continue; // erased on one side
+    if (!sa || !sb) {
+      out.push((sa ?? sb)!); // added on one side
+      continue;
+    }
+    const ka = strokeKey(sa);
+    const kb = strokeKey(sb);
+    if (ka === kb) out.push(sa);
+    else if (!s0) out.push(ka > kb ? sa : sb);
+    else {
+      const k0 = strokeKey(s0);
+      out.push(kb === k0 ? sa : ka === k0 ? sb : ka > kb ? sa : sb);
+    }
+  }
+  out.sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+  return { ...b, strokes: out };
+}
+
 /** Axis-aligned bounds of a stroke's points (text and markers: their anchor point). */
 export function strokeBounds(s: Stroke): { x0: number; y0: number; x1: number; y1: number } {
   let x0 = Infinity;
