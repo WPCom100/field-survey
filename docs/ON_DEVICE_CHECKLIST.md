@@ -11,7 +11,7 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 
 Pending round started: **2026-10-12**. Items: carried over from the 2026-10-11 round (archived in [on-device-log.md](on-device-log.md)): steps skipped there. Decisions D111–D115, D123 and D127 were answered on 2026-10-12 (D128–D130). Most need **T71** (open a level without a plan sheet) or **T45** (plan sheets); each step says which. New tasks add their checks below.
 
-**This round's build:** dev build `ddf99272` (T69 + T70), install from https://expo.dev/accounts/wpcom/projects/field-survey/builds/ddf99272-0e81-474c-8af7-2392c0232e81 before step 2. Every dev build reads `1.0.0 (6)` on the Sync screen, so check Metro instead: opening a plan must log `[plan] pdf native patch: t70 ink,longpress-move`. **Server:** the Droplet runs `c032c14` with migration 0002 (deployed 2026-10-12), so T65 photo links sync.
+**This round's build:** dev build `ddf99272` (T69 + T70), install from https://expo.dev/accounts/wpcom/projects/field-survey/builds/ddf99272-0e81-474c-8af7-2392c0232e81 before step 2. Every dev build reads `1.0.0 (6)` on the Sync screen, so check Metro instead: opening a plan must log `[plan] pdf native patch: t70 ink,longpress-move`. **Server:** the Droplet runs `2444a69` with migration 0005 (deployed 2026-10-12 evening, pre-migration dump `backups/pg/survey-2026-10-12T231434Z.dump`), so T29/T31/T59 exports, T75 and T45 plan sheets all have their server side. **TestFlight:** production build 8 (`41d313ab`, from `2444a69`) was submitted the same evening.
 
 ---
 
