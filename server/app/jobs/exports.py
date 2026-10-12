@@ -38,14 +38,15 @@ from app.auth import system_user, upsert_user
 from app.blobs import object_key
 from app.config import settings
 from app.ids import uuid7
-from app.jobs import export_xlsx
+from app.jobs import export_xlsx, floor_pdf
 from app.models import Blob, Export, Project, User
 from app.storage import ObjectMissing, ObjectStore
 
 log = logging.getLogger("jobs")
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-KINDS = ("xlsx",)  # floor_pdf is T59's
+KINDS = ("xlsx", "floor_pdf")  # floor_pdf: T59, app.jobs.floor_pdf
+MIME = {"xlsx": XLSX_MIME, "floor_pdf": "application/pdf"}
 STATES = ("queued", "running", "done", "failed")
 EXPORT_USER_NAME = "export"  # the weekly job's system user
 WEEKLY_GAP = timedelta(days=6)
@@ -82,6 +83,19 @@ def create_export(
         not isinstance(levels, list) or not all(isinstance(c, str) and c for c in levels)
     ):
         raise ExportError("params.levels must be a list of level codes")
+    if kind == "floor_pdf":
+        level = params.get("level")
+        if not isinstance(level, str) or not level:
+            raise ExportError("params.level (one level code) is required for a floor PDF")
+        sections = params.get("sections")
+        if sections is not None and (
+            not isinstance(sections, list)
+            or not sections
+            or not set(sections) <= set(floor_pdf.SECTIONS)
+        ):
+            raise ExportError(
+                f"params.sections must be a non-empty list of: {', '.join(floor_pdf.SECTIONS)}"
+            )
     tabs = params.get("tabs")
     if tabs is not None and (
         not isinstance(tabs, list) or not tabs or not set(tabs) <= set(DATA_TABS)
@@ -134,7 +148,9 @@ def filename_for(levels: list[str], n: int) -> str:
 def build(session: Session, store: ObjectStore, row: Export) -> dict[str, Any]:
     """Write the workbook for one export row into the object store and return its stats. The
     caller owns the transaction."""
-    if row.kind not in KINDS:
+    if row.kind == "floor_pdf":
+        return build_floor_pdf(session, store, row)
+    if row.kind != "xlsx":
         raise ExportError(f"not an xlsx export: {row.kind}")
     started = time.monotonic()
     try:
@@ -180,6 +196,72 @@ def build(session: Session, store: ObjectStore, row: Export) -> dict[str, Any]:
         "seconds": round(time.monotonic() - started, 2),
         "checks_list": data.checks[:200],
         "previous_export": str(previous.id) if previous else None,
+    }
+    _event(
+        "export_built",
+        export=str(row.id),
+        project=str(row.project_id),
+        **{k: v for k, v in stats.items() if k != "checks_list"},
+    )
+    return stats
+
+
+def floor_filename(level: str, n: int) -> str:
+    """`ETC_Lighting_Controls_Survey_Level_06M_<n>.pdf`, `n` = that level's finished floor PDFs."""
+    return f"ETC_Lighting_Controls_Survey_Level_{re.sub(r'[^A-Za-z0-9-]', '', level)}_{n}.pdf"
+
+
+def build_floor_pdf(session: Session, store: ObjectStore, row: Export) -> dict[str, Any]:
+    """The floor PDF of `params.level` (T59, PLAN §7.7) as a blob; returns its stats."""
+    started = time.monotonic()
+    params = row.params or {}
+    level = str(params.get("level") or "")
+    sections = tuple(params.get("sections") or floor_pdf.SECTIONS)
+    try:
+        data = floor_pdf.load(session, store, row.project_id, level, sections)
+    except LookupError as e:
+        raise ExportError(str(e)) from e
+    pdf = floor_pdf.render(data)
+    sha = hashlib.sha256(pdf).hexdigest()
+    if session.get(Blob, sha) is None:
+        store.put_file(object_key(sha), io.BytesIO(pdf), floor_pdf.PDF_MIME)
+        session.add(
+            Blob(
+                sha256=sha,
+                size=len(pdf),
+                mime=floor_pdf.PDF_MIME,
+                upload_state="complete",
+                chunks_received=[],
+            )
+        )
+    done = session.scalars(
+        select(Export).where(
+            Export.project_id == row.project_id,
+            Export.kind == "floor_pdf",
+            Export.job_state == "done",
+            Export.id != row.id,
+        )
+    ).all()
+    n = sum(1 for e in done if (e.params or {}).get("level") == data.level) + 1
+    row.blob = sha
+    row.diff_summary = None
+    stats = {
+        "filename": floor_filename(data.level, n),
+        "levels": [data.level],
+        "sections": list(data.sections),
+        "rows": {
+            "Devices": len(data.devices),
+            "Findings": sum(1 for d in data.devices if d.status != floor_pdf.NOT_A_FINDING),
+            "Connections": len(data.connections),
+            "Punch List": len(data.punch),
+            "Missing Parts": len(data.parts),
+            "Photos": len(data.photos),
+        },
+        "images_missing": sum(1 for p in data.photos if p.jpeg is None),
+        "sha256": sha,
+        "bytes": len(pdf),
+        "seconds": round(time.monotonic() - started, 2),
+        "checks_list": data.checks[:200],
     }
     _event(
         "export_built",

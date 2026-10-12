@@ -25,7 +25,7 @@ export type ExportRow = {
   id: string;
   project_id: string;
   kind: ExportKind;
-  params: { levels?: string[]; tabs?: string[]; scheduled?: boolean; [k: string]: unknown } | null;
+  params: { levels?: string[]; tabs?: string[]; level?: string; sections?: string[]; scheduled?: boolean; [k: string]: unknown } | null;
   job_state: ExportState;
   blob: string | null;
   filename: string | null;
@@ -66,7 +66,7 @@ export function startGate(s: SyncStatus): Gate {
 
 // ------------------------------------------------------------------ pre-flight
 
-export type ExportLevel = { id: string; code: string };
+export type ExportLevel = { id: string; code: string; surveyed: string | null };
 export type Preflight = {
   /** In-scope levels in floor order (what "All in scope" exports). */
   levels: ExportLevel[];
@@ -90,7 +90,7 @@ export async function loadPreflight(store: Store, projectId: string): Promise<Pr
     [projectId],
   );
   return {
-    levels: levels.map((l) => ({ id: String(l.id), code: String(l.level) })),
+    levels: levels.map((l) => ({ id: String(l.id), code: String(l.level), surveyed: typeof l.surveyed === 'string' ? l.surveyed : null })),
     lint: Number(lint?.n ?? 0),
     reviews: (await openReviewItems(store, projectId)).length,
   };
@@ -125,6 +125,33 @@ export function levelsTitle(levels: ExportLevel[], choice: string[] | 'all'): st
   if (!codes.length) return 'Levels';
   const fold = (c: string) => c.replace(/M$/, '');
   return `Levels ${fold(codes[0]!)}-${fold(codes[codes.length - 1]!)}`;
+}
+
+// ------------------------------------------------------------------ floor PDF
+
+/** The floor PDF's sections (T59, Phase 3 §11.2), in report order. */
+export const FLOOR_SECTIONS = [
+  { key: 'plan', label: 'Plan snapshot with pins' },
+  { key: 'findings', label: 'Findings' },
+  { key: 'connections', label: 'Connections' },
+  { key: 'punch', label: 'Punch list' },
+  { key: 'parts', label: 'Missing parts' },
+  { key: 'photos', label: 'Photo appendix (markup flattened)' },
+] as const;
+export type FloorSection = (typeof FLOOR_SECTIONS)[number]['key'];
+
+/** `POST /exports` body for one level's floor PDF; `sections` only when not all. */
+export function floorBody(projectId: string, level: string, sections: FloorSection[]): { project_id: string; kind: 'floor_pdf'; params: Record<string, unknown> } {
+  const all = FLOOR_SECTIONS.map((s) => s.key);
+  const params: Record<string, unknown> = { level };
+  if (sections.length !== all.length) params.sections = all.filter((k) => sections.includes(k));
+  return { project_id: projectId, kind: 'floor_pdf', params };
+}
+
+/** The report's header: the survey date only, never a company name (R7). */
+export function floorHeader(level: ExportLevel | undefined, title = 'ETC Lighting Controls Survey'): string {
+  if (!level) return title;
+  return `${title} — Level ${level.code} · Surveyed ${level.surveyed ?? '—'}`;
 }
 
 // ------------------------------------------------------------------ history
@@ -162,9 +189,17 @@ export function formatSize(bytes: number): string {
 
 /** "Levels B2-06 · all tabs" / "Level 06M · Devices, Punch List" for a history row. */
 export function scopeLine(e: ExportRow): string {
-  const lv = e.stats?.levels ?? e.params?.levels;
+  const lv = e.stats?.levels ?? e.params?.levels ?? (e.params?.level ? [e.params.level] : undefined);
   const levels = !lv?.length ? 'all in-scope levels' : lv.length === 1 ? `Level ${lv[0]}` : `Levels ${lv[0]}-${lv[lv.length - 1]}`;
-  const tabs = e.kind === 'xlsx' ? (e.params?.tabs?.length ? e.params.tabs.join(', ') : 'all tabs') : null;
+  const sections = e.params?.sections;
+  const tabs =
+    e.kind === 'xlsx'
+      ? e.params?.tabs?.length
+        ? e.params.tabs.join(', ')
+        : 'all tabs'
+      : sections?.length
+        ? FLOOR_SECTIONS.filter((s) => sections.includes(s.key)).map((s) => s.label.split(' (')[0]).join(', ')
+        : 'all sections';
   const by = e.params?.scheduled ? ' · weekly export' : '';
   return [levels, tabs].filter(Boolean).join(' · ') + by;
 }

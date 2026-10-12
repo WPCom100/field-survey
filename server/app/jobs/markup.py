@@ -183,6 +183,23 @@ def _draw_stroke(layer: Image.Image, stroke: dict[str, Any], scale: float) -> No
         raise MarkupError(f"unknown tool {tool!r}")
 
 
+def draw_strokes(layer: Image.Image, strokes: bytes | str | dict[str, Any], scale: float) -> int:
+    """Draw a stroke list onto an RGBA `layer` with its coordinates multiplied by `scale` (T59:
+    plan ink in sheet points onto a plan raster of `scale` pixels per point). Returns how many
+    strokes were skipped."""
+    doc = parse_strokes(strokes)
+    skipped = 0
+    for stroke in doc["strokes"]:
+        if not isinstance(stroke, dict):
+            skipped += 1
+            continue
+        try:
+            _draw_stroke(layer, stroke, scale)
+        except (MarkupError, ValueError, TypeError):
+            skipped += 1
+    return skipped
+
+
 def flatten(image_bytes: bytes, strokes: bytes | str | dict[str, Any] | None) -> tuple[bytes, int]:
     """The JPEG with the strokes drawn over it, and how many strokes were skipped. With no strokes
     (None, or an empty list) the input bytes come back untouched."""

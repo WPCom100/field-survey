@@ -18,6 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      # WeasyPrint's system libraries (floor PDF, T59)
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
       - run: uv sync
       - run: uv run ruff check
       - run: uv run pytest

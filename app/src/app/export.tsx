@@ -8,6 +8,10 @@ import { ensureExportFile, localExport, shareExportFile } from '../export/files'
 import {
   DATA_TABS,
   FIXED_TABS,
+  FLOOR_SECTIONS,
+  floorBody,
+  floorHeader,
+  type FloorSection,
   KIND_LABEL,
   cachedHistory,
   diffDetail,
@@ -56,6 +60,8 @@ export default function ExportScreen() {
   const [pre, setPre] = useState<Preflight | null>(null);
   const [levels, setLevels] = useState<string[] | 'all'>('all');
   const [tabs, setTabs] = useState<DataTab[]>([...DATA_TABS]);
+  const [floorLevel, setFloorLevel] = useState<string | null>(null);
+  const [sections, setSections] = useState<FloorSection[]>(FLOOR_SECTIONS.map((s) => s.key));
   const [job, setJob] = useState<ExportRow | null>(null);
   const [history, setHistory] = useState<ExportRow[]>([]);
   const [historyNote, setHistoryNote] = useState<string | null>(null);
@@ -138,6 +144,23 @@ export default function ExportScreen() {
   const running = job !== null && !finished;
   const chosenLevels = levels === 'all' ? (pre?.levels.length ?? 0) : levels.length;
   const canGenerate = gate.ok && !running && busy === null && tabs.length > 0 && chosenLevels > 0;
+  const floor = pre?.levels.find((l) => l.code === floorLevel) ?? pre?.levels[0];
+  const canGeneratePdf = gate.ok && !running && busy === null && sections.length > 0 && !!floor;
+
+  const generatePdf = async () => {
+    if (!projectId || !floor || !canGeneratePdf) return;
+    setError(null);
+    setBusy('Asking the server…');
+    try {
+      setJob(await startExport(identity, floorBody(projectId, floor.code, sections)));
+    } catch (e) {
+      fail(e);
+    } finally {
+      if (live.current) setBusy(null);
+    }
+  };
+  const toggleSection = (k: FloorSection) =>
+    setSections((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : FLOOR_SECTIONS.map((s) => s.key).filter((x) => x === k || cur.includes(x))));
 
   const generate = async () => {
     if (!projectId || !canGenerate) return;
@@ -245,7 +268,31 @@ export default function ExportScreen() {
 
         {projectId && pane === 'pdf' ? (
           <Section title="Floor PDF">
-            <Text style={styles.hint}>The floor report (cover with the plan, findings, connections, punch list, missing parts, photos) arrives with task T59.</Text>
+            <Text style={styles.label}>Level</Text>
+            <View style={styles.chips}>
+              {pre?.levels.map((l) => (
+                <Chip key={l.id} label={l.code} on={floor?.code === l.code} onPress={() => setFloorLevel(l.code)} />
+              ))}
+            </View>
+            <Text style={styles.label}>Include</Text>
+            <View style={styles.chips}>
+              {FLOOR_SECTIONS.map((s) => (
+                <Check key={s.key} label={s.label} value={sections.includes(s.key)} onChange={() => toggleSection(s.key)} />
+              ))}
+            </View>
+            <Text style={styles.hint}>Header: "{floorHeader(floor)}" — the survey date only, no company name.</Text>
+            <Text style={styles.hint}>Findings are the devices whose status is not Installed, untested, several per page with a plan crop and photos. Everyone's ink is drawn on the plan.</Text>
+
+            <Text style={styles.label}>Pre-flight</Text>
+            <Text style={styles.value}>{pre ? preflightLine(pre, sync.pendingOps, blobs.photosWaiting) : '…'}</Text>
+            <Text style={[styles.gate, gate.ok ? styles.gateOk : styles.gateNo]}>{gate.reason}</Text>
+            <View style={styles.row}>
+              <Btn title="Sync first" onPress={syncFirst} disabled={sync.state === 'syncing'} />
+              <Btn title="Generate PDF" primary onPress={() => void generatePdf()} disabled={!canGeneratePdf} />
+            </View>
+            {busy ? <Text style={styles.hint}>{busy}</Text> : null}
+            <Notice text={error} error />
+            {job ? <JobCard e={job} onShare={share} downloaded={!!onIpad[job.id]} /> : null}
           </Section>
         ) : null}
 

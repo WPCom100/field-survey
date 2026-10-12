@@ -127,6 +127,20 @@ Decision D141 (tab choice: Summary and Lists always included, a Summary table dr
 Decision D142 (synthetic project shape: half the devices on 06M, distinct thumbnails, no full-size photo bytes): approve / change →
 Decision (TP-3 on the iPad): create the synthetic project "TP-3 synthetic" on the Droplet — about 110 MB of thumbnails in R2 and a permanent project, since projects cannot be deleted yet? yes / no →
 
+## T59 — Floor PDF  ·  Needs: no new build (JS only); **the server rebuilt with T29 + T31 + T59** (`docker compose up -d --build` — the image gains Pango for WeasyPrint — and `alembic upgrade head` to 0003)
+
+**Why it matters:** this is the per-floor report the EC, ETC and GC read; it must be dense (several findings per page), show the plan with everyone's markings, and carry the survey date but no company name.
+
+- [ ] **Open the pane.** Export → Floor PDF: level chips (in-scope levels), six Include boxes all ticked, a header line "ETC Lighting Controls Survey — Level <NN> · Surveyed <date>". → saw:
+- [ ] **Generate.** Pick a level with devices (e.g. 06M on the Tower), Generate PDF: the card goes Queued → Building the PDF… → Ready with `ETC_Lighting_Controls_Survey_Level_06M_1.pdf`. → saw:
+- [ ] **Look at it.** Share sheet → open the PDF (Quick Look or Files): the cover has the status counts and the plan with pins shaped by category, coloured by status and labelled with the device type, and any ink you drew on the plan. → saw:
+- [ ] **Findings are dense.** The Findings pages show about four devices per page, each with status | owner | category, notes, open punch items, thumbnails and a small plan crop with the device ringed. → saw:
+- [ ] **Header and tables.** Every page after the cover has the header with the survey date only (no company name); Connections, Punch list and Missing parts tables match the workbook for that level. → saw:
+- [ ] **Photos.** The appendix shows six photos per page with "Photo n — subject — device IDs", markups drawn on them. → saw:
+- [ ] **Sections.** Untick Photo appendix and Connections, Generate again: the new PDF (`…_06M_2.pdf`) has neither; the History pane lists both PDFs with their sections. → saw:
+
+Decision D143 (floor PDF: plan snapshot as an image with ink and type-labelled pins; findings = every device not Installed, untested, about four per page with a plan crop; photos six per page): approve / change →
+
 ## Carried over: T41 — Projects and levels  ·  Needs: no new build
 
 - [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:

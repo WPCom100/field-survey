@@ -2,7 +2,8 @@
 (PLAN §8, T29).
 
 An export is a job: `POST` queues an `export` row (JSON `{project_id, kind, params}`; `kind` is
-`xlsx` until T59 adds `floor_pdf`; `params.levels` narrows the levels), the worker builds the
+`xlsx` or `floor_pdf`; `params.levels` / `params.tabs` narrow a workbook, `params.level` and
+`params.sections` choose a floor PDF), the worker builds the
 workbook (`app.jobs.exports`), and `GET /exports/{id}` reports `job_state` (`queued · running ·
 done · failed`), `stats` (filename, row counts, error) and `blob` — the finished file's SHA-256,
 downloadable through `GET /blobs/{sha}/content` or, with its filename, `GET /exports/{id}/file`.
@@ -74,11 +75,13 @@ def export_file(export_id: uuid.UUID, session: SessionDep, store: StoreDep) -> S
         pieces = store.stream(object_key(row.blob))
     except ObjectMissing as e:
         raise HTTPException(404, {"error": "not_available"}) from e
-    filename = (row.stats or {}).get("filename") or f"export-{row.id}.xlsx"
+    ext = "pdf" if row.kind == "floor_pdf" else "xlsx"
+    filename = (row.stats or {}).get("filename") or f"export-{row.id}.{ext}"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"', "ETag": f'"{row.blob}"'}
     if blob is not None:
         headers["Content-Length"] = str(blob.size)
-    return StreamingResponse(pieces, media_type=exports.XLSX_MIME, headers=headers)
+    mime = exports.MIME.get(row.kind, "application/octet-stream")
+    return StreamingResponse(pieces, media_type=mime, headers=headers)
 
 
 @router.get("")

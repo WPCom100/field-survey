@@ -32,7 +32,7 @@ GET  /exports?project_id → history, newest first
 `params.levels` narrows the export to those level codes; without it every **in-scope** level is
 exported. `params.tabs` (D141) narrows the data tabs (`Devices`, `Connections`, `Punch List`,
 `Missing Parts`, `Photo Log`, written in that order); Summary and Lists are always written, and a
-Summary table is left out with its source tab so no formula names a missing sheet. `kind` is `xlsx` only until T59 adds `floor_pdf`. The worker picks the row up within
+Summary table is left out with its source tab so no formula names a missing sheet. `kind` is `xlsx` or `floor_pdf` (see Floor PDF below). The worker picks the row up within
 5 s. From the server shell:
 
 ```
@@ -109,6 +109,47 @@ Row heights are reported, not failed (≤ 3 % of rows differ). Run it by hand:
 ```
 uv run python tests/xlsx_diff.py ../fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx export.xlsx
 ```
+
+## Floor PDF (T59)
+
+`app/jobs/floor_pdf.py` (+ `floor_pdf.css`) builds one level's report, PLAN §7.7, D56, D66,
+D120, D143. Ask for it like a workbook:
+
+```
+POST /exports {"project_id": "<uuid>", "kind": "floor_pdf",
+               "params": {"level": "06M", "sections": ["plan", "findings", "punch"]}}
+```
+
+`params.level` (one level code) is required; `params.sections` narrows the report to some of
+`plan` · `findings` · `connections` · `punch` · `parts` · `photos` (default all). The file is a
+blob like the workbook (MIME `application/pdf`), downloadable through `GET /exports/{id}/file`;
+filename `ETC_Lighting_Controls_Survey_Level_<code>_<n>.pdf` with `n` that level's finished
+floor PDFs. No `diff_summary`. `stats.rows` counts devices, findings, connections, punch items,
+parts and photos; `stats.checks_list` names anything left out (a sheet or picture not in storage,
+strokes not drawn).
+
+| Part | What |
+|---|---|
+| Header | every page but the cover: `ETC Lighting Controls Survey — Level 06M · Surveyed 2026-10-08` — the survey date only, never a company or project name (R7); page n of m bottom right |
+| Cover | the title, `Surveyed <date>`, the status counts (five statuses + Unsurveyed + total) and the plan snapshot: the display sheet rasterised with pdfium in sheet coordinates, **every user's ink layer** drawn over it with the `strokes.md` rules (`markup.draw_strokes`), then every pinned device — shape = category, fill = status, glyph inside (D64, `pins.ts`), labelled with the device **type** (Type, else Device, else category, 22 characters — `pinLabel`, D120) |
+| Findings | devices whose status is not `Installed, untested` (Unsurveyed included), by ID; each a block that never splits: ● status colour, `ID — Device`, `Status \| Owner \| Category` (owners of open punch items and parts), Room / Location, Type, Notes, open punch items, up to four thumbnails, and a 300 × 200 pt crop of the plan around its pin with the neighbours drawn and the device ringed. Four per Letter page in practice |
+| Connections · Punch list · Missing parts | tables with the workbook's rows for this level (the same generated texts: From/To verbatim, Device text, Source); the punch list by (`sort_last`, #) |
+| Photos | the level's photos by number in a 2 × 3 grid (two columns, three rows per page), the full JPEG when the server has it, else the thumbnail, markup flattened, scaled to ≤ 1,100 px; caption `Photo n — <Subject> — <Device IDs>` |
+
+Sections follow one another without forced page breaks (D66); only the cover ends its page.
+Rendering is WeasyPrint, which needs Pango: the server image installs `libpango-1.0-0`,
+`libpangoft2-1.0-0`, `libharfbuzz-subset0`, and so does CI. On a Windows host WeasyPrint does not
+load, so the rendering test skips there with the reason; run it in the image:
+
+```
+docker compose build api
+MSYS_NO_PATHCONV=1 docker run --rm --network server_default -v "<repo>:/repo" -w /repo/server \
+  -e UV_PROJECT_ENVIRONMENT=/tmp/venv -e DATABASE_URL=postgresql+psycopg://survey:change-me@postgres:5432/survey \
+  server-api sh -c "uv sync --frozen -q && uv run --frozen pytest -q tests/test_floor_pdf.py"
+```
+
+Speed: level 01 of the TP-3 project (143 devices, 113 findings, 715 photos → 151 pages, 6.3 MB)
+in 36 s in the image on the PC.
 
 ## TP-5: Excel opens it (T30)
 

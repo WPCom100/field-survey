@@ -8,6 +8,8 @@ import {
   diffLine,
   downloadedExports,
   exportTime,
+  floorBody,
+  floorHeader,
   jobLine,
   levelsTitle,
   loadPreflight,
@@ -95,6 +97,21 @@ describe('request body', () => {
     expect(workbookBody('p', { levels: ['06M'], tabs: ['Punch List', 'Devices'] })).toEqual({
       project_id: 'p', kind: 'xlsx', params: { levels: ['06M'], tabs: ['Devices', 'Punch List'] },
     });
+  });
+});
+
+describe('floor PDF', () => {
+  it('sends the level and only a narrowed section list; the header is the date only', () => {
+    expect(floorBody('p', '06M', ['plan', 'findings', 'connections', 'punch', 'parts', 'photos'])).toEqual({
+      project_id: 'p', kind: 'floor_pdf', params: { level: '06M' },
+    });
+    expect(floorBody('p', '06M', ['punch', 'plan'])).toEqual({ project_id: 'p', kind: 'floor_pdf', params: { level: '06M', sections: ['plan', 'punch'] } });
+    expect(floorHeader({ id: 'x', code: '06M', surveyed: '2026-10-08' })).toBe('ETC Lighting Controls Survey — Level 06M · Surveyed 2026-10-08');
+    expect(floorHeader({ id: 'x', code: '07', surveyed: null })).toBe('ETC Lighting Controls Survey — Level 07 · Surveyed —');
+    const pdf = row({ kind: 'floor_pdf', filename: 'ETC_Lighting_Controls_Survey_Level_06M_1.pdf', stats: { levels: ['06M'] }, params: { level: '06M', sections: ['plan', 'photos'] } });
+    expect(scopeLine(pdf)).toBe('Level 06M · Plan snapshot with pins, Photo appendix');
+    expect(diffLine(pdf)).toBeNull();
+    expect(shareName(pdf)).toBe('ETC_Lighting_Controls_Survey_Level_06M_1.pdf');
   });
 });
 

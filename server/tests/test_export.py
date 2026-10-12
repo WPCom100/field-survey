@@ -275,13 +275,13 @@ def test_exports_api_errors(client, session):
 
 def test_failed_export_is_recorded(session, store, factory):
     project_id = new_project(session)
-    row = exports.create_export(session, project_id=project_id, user=None)
-    # a kind the xlsx job cannot build (T59's floor PDF) fails cleanly and is recorded
-    session.execute(update(Export).where(Export.id == row.id).values(kind="floor_pdf"))
-    session.commit()
+    # a floor PDF of a level the project does not have fails cleanly and is recorded
+    row = exports.create_export(
+        session, project_id=project_id, kind="floor_pdf", params={"level": "ZZ"}, user=None
+    )
     assert exports.run_export(factory, store, row.id) == "failed"
     session.expire_all()
-    assert "not an xlsx export" in session.get(Export, row.id).stats["error"]
+    assert "unknown level ZZ" in session.get(Export, row.id).stats["error"]
     assert exports.run_queued(factory, store) == []
 
 
