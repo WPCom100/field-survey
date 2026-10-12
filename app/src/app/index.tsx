@@ -169,8 +169,7 @@ function LevelRow({ level: l }: { level: HomeLevel }) {
       <Text style={[styles.cCache, l.cache === 'not cached' && styles.red]}>{CACHE_LABEL[l.cache]}</Text>
     </View>
   );
-  // A level opens its plan only with a display sheet; without one the row is informational.
-  if (l.cache === 'no sheet') return cells;
+  // Every level opens, sheet or not (T71): without a sheet the plan area says so and the lists still work.
   return (
     <Link href={{ pathname: '/plan/[levelId]', params: { levelId: l.id } }} asChild>
       <Pressable>{cells}</Pressable>

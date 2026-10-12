@@ -3,6 +3,7 @@ import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
 import { filterLevels, listProjects, loadProjectHome } from './data';
+import { loadLevelPlan } from '../plan/data';
 import { DEMO_LEVEL_ID, ensureDemoLevel } from '../plan/demo';
 
 const ME = uuidv7();
@@ -74,5 +75,25 @@ describe('loadProjectHome', () => {
     home = (await loadProjectHome(store, pid, ME))!;
     expect(home.levels.find((x) => x.id === level2)!.cache).toBe('cached');
     expect(await loadProjectHome(store, 'nope', ME)).toBeNull();
+  });
+
+  it('a level with no plan sheet still opens its plan data (T71)', async () => {
+    const store = await open();
+    await ensureDemoLevel(store);
+    const [project] = await listProjects(store);
+    const pid = project!.id;
+    const bare = uuidv7();
+    const dev = uuidv7();
+    await store.apply(op('level', bare, 'create', pid, { project_id: pid, level: 'B2', floor_order: 1, numbering_group_id: uuidv7() }));
+    await store.apply(op('device', dev, 'create', pid, { level_id: bare, category: 'Relay panel', status: 'Issue' }));
+
+    const home = (await loadProjectHome(store, pid, ME))!;
+    expect(home.levels.find((x) => x.id === bare)).toMatchObject({ code: 'B2', cache: 'no sheet', devices: 1, issueOrNi: 1 });
+
+    const plan = (await loadLevelPlan(store, bare))!;
+    expect(plan.level.code).toBe('B2');
+    expect(plan.sheet).toBeNull();
+    expect(plan.devices.map((d) => d.id)).toEqual([dev]);
+    expect(plan.devices[0]!.pin).toBeNull();
   });
 });

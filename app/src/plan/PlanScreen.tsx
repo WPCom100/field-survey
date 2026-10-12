@@ -815,7 +815,7 @@ export function PlanScreen(props: PlanScreenProps) {
           ) : !plan ? (
             <Centered spinner />
           ) : !plan.sheet ? (
-            <Centered text={`Level ${plan.level.code} has no display sheet yet (setup, T45).`} />
+            <Centered text={`No plan sheet yet — level ${plan.level.code} has no display sheet. Use the list on the right; the plan appears once a sheet is assigned (setup, T45).`} />
           ) : !sheetUri ? (
             <View style={styles.centered}>
               <Text style={styles.centeredText}>

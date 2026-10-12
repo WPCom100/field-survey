@@ -33,6 +33,10 @@ Pending round started: **2026-10-12**. Items: carried over from the 2026-10-11 r
 - [ ] **Free uploaded photos.** After a photo uploaded (↑ cleared): the button shows MB, confirm → 0; the thumbnail still shows offline, the full image downloads again online. (T71) → saw:
 - [ ] **Retry failed uploads.** Greyed normally; if a red "Upload failed" line appears, Retry clears it. Skip if nothing failed. → saw:
 
+## T71 — Open a level with no plan sheet  ·  Needs: no new build
+
+- [ ] **Tap a Tower level with "No sheet"** on the Levels screen: the plan opens showing "No plan sheet yet…", the device list, cards, end editor and photos work. Why: the imported Tower levels had no way in, so the T21/T25/T26 checks above (marked T71) were skipped. → saw:
+
 ## Carried over: T26 — Needs review screen  ·  Needs: T71, two iPads with different team names on a real level
 
 Make a conflict: both iPads in airplane mode, iPad 1 note "Cover plate loose", iPad 2 note "LVD card missing" on the same device; sync iPad 1, iPad 2, iPad 1. For the pin step, repeat with [⋯] → Move pin (needs a plan, T45).
