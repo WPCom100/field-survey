@@ -1,6 +1,6 @@
 /** Line format and rotation rule of the on-device log (no Expo imports, tested in Node). */
 
-export const LOG_CATEGORIES = ['sync', 'store', 'rules', 'plan'] as const;
+export const LOG_CATEGORIES = ['sync', 'store', 'rules', 'plan', 'update'] as const;
 export type LogCategory = (typeof LOG_CATEGORIES)[number];
 
 export const MAX_LOG_BYTES = 512 * 1024;

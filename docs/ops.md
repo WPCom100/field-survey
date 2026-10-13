@@ -179,8 +179,44 @@ The build number auto-increments in EAS (`appVersionSource: remote`). Export com
 
 ### 5.4 Build log
 
-| Date | Profile | EAS build id | Build no. | Notes |
+Two row types. A **build** row has the profile, the EAS build id and the build number. An **update** row (T84, §5.5) has `update` in the Profile column, the update group id in the id column and the runtime version (first 8 characters) in the Build no. column; its Notes say which commit and message it carries. Builds and updates after 2026-10-10 that are not listed here are noted in `TASKS.md` under their task.
+
+| Date | Profile | EAS build / update group id | Build no. / runtime | Notes |
 |---|---|---|---|---|
 | 2026-10-10 | development | `19e26a75-0635-4624-acbe-f062b37e5291` | 1 | internal (ad hoc), SDK 57, commit `0e188fc`; installed on Landry's iPad (UDID `00008122-001070500251801C`), Developer Mode on; `npx expo start --dev-client --lan` bundled 1268 modules, IdentityGate shown |
 | 2026-10-10 | production | `833be746-0079-4511-a0d6-ca0281475c0a` | 2 | store; `eas submit --latest` uploaded to ASC app `6821263690`; TestFlight internal group `LTP team` (auto-distribute), Zach invited |
 | 2026-10-10 | development | `b146b497-c5c0-493c-9618-d69fc3797b48` | 2 | internal (ad hoc); EAS shows commit `d8c30e9` because the T07 tree was uploaded before it was committed (content = `cb23a55`); development and production profiles keep separate build counters; adds `expo-sqlite` + `expo-crypto` (T07); installed on Landry's iPad over build 1; first launch logged `[store] open: search=fts5 install=01a124c1-95f1-70d4-bf84-e9568f1399b9` (A21 confirmed on device). Note: since RN 0.77 app logs show in React Native DevTools (press `j` in Metro, Console tab, then `r`), not in the terminal |
+
+### 5.5 JS updates (T84, D153, D157)
+
+A TestFlight build runs its embedded JS until an **update** is published to its channel. At launch the app starts at once on the JS it has, checks for an update in the background (`checkAutomatically: ON_LOAD`, `fallbackToCacheTimeout: 0`) and applies a downloaded update on the **next cold launch**. So a TestFlight iPad gets new JS by launching the app twice (swipe it away from the app switcher in between). An offline iPad starts exactly as before and catches up the next time it launches online. The Sync screen's Install section shows the runtime version, the running update (or "embedded") and a **Check for update** button.
+
+**Build or update?** The runtime version is a fingerprint of everything native: `app.json`, config plugins, native modules, the `react-native-pdf` patch (D92), the lockfile entries of native packages. An update only reaches binaries with the same runtime version.
+
+| The change touches | Ship it with |
+|---|---|
+| Only TypeScript under `app/src`, `packages/core`, `packages/rules` | an update |
+| A native module, `app.json`, `eas.json` build settings, a config plugin, a package patch, an Expo SDK bump | a new build (§5.2 and §5.3), then updates again |
+
+Check before publishing: `cd app && npx expo-updates fingerprint:generate --platform ios` prints the hash the update will carry. If it is not the runtime version of the current TestFlight build (`eas build:list --platform ios --profile production --limit 1`), the change needs a build; an update published anyway reaches nobody.
+
+**Publish** (manual fallback; CI does this after the server deploy once T85 lands). From `app/`, in Git Bash, with the tree committed:
+
+```
+M="T<nn>: <title>"
+EXPO_PUBLIC_UPDATE_MESSAGE="$M" eas update --channel production --environment production --platform ios --clear-cache --message "$M"
+```
+
+- `EXPO_PUBLIC_UPDATE_MESSAGE` is how the Sync screen knows the message: the EAS manifest does not carry it (D157), so Metro bakes it into the bundle.
+- `--clear-cache` is required. Without it Metro reuses a cached bundle that still holds the previous message.
+- `--environment production` is required when non-interactive. The project has no EAS environment variables; the flag just has to be there.
+
+**Server first.** An update that needs a new endpoint or migration goes out only after the server deploy (§2). The JS must never call a server that does not have its routes yet.
+
+**See what is out:** `eas update:list --branch production --non-interactive` (newest first, with group ids, messages and runtime versions). `eas channel:view production` shows which branch the channel serves.
+
+**Roll back:** `eas update:republish --group <previous group id> --message "Rollback to <id>: <reason>"` publishes the older JS again as a new update; iPads take it on their next two launches. The Sync screen then shows a new update id with the older update's message, because the message is part of the republished bundle. **Never roll back past an update whose task added a `packages/core` migration.** Migrations are forward-only, and older JS on a newer local schema is not supported. In that case fix forward with a new update. `eas update:roll-back-to-embedded` is the same rule with the build's own JS as the target; use it only when no migration has shipped since that build.
+
+**Development builds** have `updates` off. They load JS from Metro (`npx expo start --dev-client`) and show "JS from the development server (Metro)" on the Sync screen. Nothing is ever published to the `development` or `preview` channels.
+
+Log every published update as an update row in §5.4.

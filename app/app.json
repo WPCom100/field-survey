@@ -3,6 +3,9 @@
     "name": "Field Survey",
     "slug": "field-survey",
     "version": "1.0.0",
+    "platforms": [
+      "ios"
+    ],
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "fieldsurvey",
@@ -45,6 +48,14 @@
         "projectId": "01613384-c07a-4547-894f-2cc92ea38dac"
       }
     },
-    "owner": "wpcom"
+    "owner": "wpcom",
+    "updates": {
+      "url": "https://u.expo.dev/01613384-c07a-4547-894f-2cc92ea38dac",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    }
   }
 }

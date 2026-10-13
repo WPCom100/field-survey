@@ -3,7 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { KEEP_LOGS, MAX_LOG_BYTES, formatLine, rotationNames, type LogCategory } from './format';
 
 /**
- * The tiny logger (CLAUDE.md §5): categories sync, store, rules, plan, written to a rotating
+ * The tiny logger (CLAUDE.md §5): categories sync, store, rules, plan, update (T84), written to a rotating
  * file in `Documents/logs/` that the Sync screen exports. Writes are buffered and appended in
  * one go; a logging failure is swallowed, it must never break an edit.
  */

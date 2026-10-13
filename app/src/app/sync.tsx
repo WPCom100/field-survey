@@ -11,6 +11,8 @@ import { useIdentity, useSignOut } from '../identity/IdentityGate';
 import { exportLog } from '../log';
 import { getSyncEngine } from '../sync/engine';
 import { formatBytes, freeUploadedPhotos, loadSyncScreen, retryFailedUploads, type SyncScreenData } from '../sync/screen';
+import { checkAndFetch, runningInfo, useUpdateCheckState } from '../sync/useAppUpdates';
+import { describeCheck, describeRunning } from '../sync/updates';
 import { describeSync, useSyncStatus } from '../sync/useSyncStatus';
 
 const time = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '—');
@@ -25,6 +27,10 @@ export default function SyncScreen() {
   const [installId, setInstallId] = useState('');
   const [hasProject, setHasProject] = useState<boolean | null>(null);
   const [note, setNote] = useState('');
+  const updates = useUpdateCheckState();
+  const info = runningInfo();
+  const running = describeRunning(info);
+  const checkLine = describeCheck(updates);
 
   const load = useCallback(async () => {
     const store = await openAppStore();
@@ -205,6 +211,10 @@ export default function SyncScreen() {
         <Text style={styles.sub}>
           Server {identity.serverUrl} · install {installId.slice(0, 8)}
         </Text>
+        <Text style={styles.sub}>
+          JS {running.running} · {running.runtime}
+        </Text>
+        {checkLine ? <Text style={checkLine.startsWith('Could not') ? styles.warn : styles.sub}>{checkLine}</Text> : null}
         <View style={styles.row}>
           <Btn
             label="Re-sign in"
@@ -214,6 +224,11 @@ export default function SyncScreen() {
                 { text: 'Re-sign in', onPress: () => void signOut() },
               ])
             }
+          />
+          <Btn
+            label="Check for update"
+            disabled={!info.enabled || updates.isChecking || updates.isDownloading}
+            onPress={() => void checkAndFetch()}
           />
           <Btn
             label="Export local log"

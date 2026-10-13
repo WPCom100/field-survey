@@ -6,6 +6,8 @@ Session rule: if a task turns out to need more than one session, stop at a commi
 
 Native-build rule: a task that adds a native module (CLAUDE.md §5 list) ends with `eas build --profile development --platform ios` and a note of the build id; the next session installs that build on the iPad before starting.
 
+Update rule (T84, D153): a task that changes only JS (no native module, `app.json`, config plugin or package patch, so `npx expo-updates fingerprint:generate --platform ios` still equals the current TestFlight build's runtime version) ends with an update to the `production` channel (`docs/ops.md` §5.5) and the update group id in the task's notes, after the server deploy when the task touched the server. Once T85 lands, CI publishes it on the push to `main` and the task just checks `eas update:list`. A task that changes the fingerprint follows the native-build rule instead and also ends with a production build + `eas submit`, since no update reaches the old binary.
+
 ## M0 — Foundations (6)
 
 | # | Task | Model/Effort | Deps | Definition of done | Status |

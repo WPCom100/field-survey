@@ -8,8 +8,12 @@ import { openAppStore } from '../db';
 import { IdentityGate } from '../identity/IdentityGate';
 import { logTo } from '../log';
 import { SyncRunner } from '../sync/SyncRunner';
+import { useUpdateLog } from '../sync/useAppUpdates';
 
 export default function RootLayout() {
+  // OTA updates (T84): launch line (embedded vs update id, runtime version) and every check result.
+  useUpdateLog();
+
   useEffect(() => {
     // Migrate the local store at launch; a failure is logged, never blocks the UI.
     openAppStore().then(
