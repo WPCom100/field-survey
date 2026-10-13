@@ -168,7 +168,9 @@ describe(`${N} devices in the side lists`, () => {
     console.log(`[density] ${plan.devices.length} devices / ${lists.punch.length} punch / ${lists.parts.length} parts / ${lists.connections.length} conns — load ${loadMs.toFixed(0)} ms, filter+search ${filterMs.toFixed(0)} ms`);
     expect(loadMs).toBeLessThan(1500);
     expect(filterMs).toBeLessThan(500);
-  });
+    // Seeding ~2,000 ops dominates and runs past the 5 s default on CI runners; the timed parts
+    // keep their own limits above.
+  }, 30_000);
 });
 
 describe('the 500-pin demo level', () => {
