@@ -102,10 +102,11 @@ jobs:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s
-' "$DROPLET_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          echo "$DROPLET_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           # The key is a forced command on the Droplet: the only thing it can send is the sha.
-          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes             -o UserKnownHostsFile=server/deploy/known_hosts -o ServerAliveInterval=30             "root@$DROPLET_HOST" "$SHA"
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=server/deploy/known_hosts -o ServerAliveInterval=30 \
+            "root@$DROPLET_HOST" "$SHA"
       - name: Public /health reports the commit
         run: |
           body=$(curl -fsS --max-time 10 https://survey.wpcom.cloud/health)
@@ -137,4 +138,5 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           M="$(git log -1 --pretty=%s)"
-          EXPO_PUBLIC_UPDATE_MESSAGE="$M" npx eas-cli@24.12.1 update --channel production --environment production             --platform ios --clear-cache --message "$M" --non-interactive
+          EXPO_PUBLIC_UPDATE_MESSAGE="$M" npx eas-cli@24.12.1 update --channel production --environment production \
+            --platform ios --clear-cache --message "$M" --non-interactive
