@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # The commit this image was built from (Dockerfile build arg, D154); "dev" outside a deploy.
+    git_sha: str = "dev"
     database_url: str = "postgresql+psycopg://survey:survey@localhost:5432/survey"
     auth_mode: str = "token"
     survey_shared_token: str = ""

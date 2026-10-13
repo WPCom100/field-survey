@@ -8,12 +8,20 @@ x-prod: &prod
     driver: json-file
     options: { max-size: "10m", max-file: "5" }
 
+# GIT_SHA is exported by deploy/deploy.sh (D154); /health reports it. A hand-run build gets "dev".
+x-build: &build
+  context: .
+  args:
+    GIT_SHA: ${GIT_SHA:-dev}
+
 services:
   api:
     <<: *prod
+    build: *build
     depends_on: !reset [postgres]
   worker:
     <<: *prod
+    build: *build
     depends_on: !reset [postgres]
   postgres:
     <<: *prod

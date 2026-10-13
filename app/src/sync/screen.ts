@@ -142,3 +142,24 @@ export function formatBytes(n: number): string {
   return `${(n / 1024 ** 3).toFixed(1)} GB`;
 }
 
+
+/**
+ * The server's deployed commit and Alembic revision from public `GET /health` (D154 (4)), shown
+ * beside the server URL so JS/server skew is visible. Never throws: offline or an older server
+ * gives a plain line instead.
+ */
+export async function loadServerVersion(serverUrl: string, fetchFn: typeof fetch = fetch, timeoutMs = 5000): Promise<string> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await fetchFn(`${serverUrl.replace(/\/+$/, '')}/health`, { signal: ctl.signal });
+    if (!r.ok) return `server answered ${r.status}`;
+    const h = (await r.json()) as { commit?: string; migration?: string };
+    if (!h.commit) return 'commit not reported';
+    return `commit ${h.commit.slice(0, 7)} · migration ${h.migration ?? '?'}`;
+  } catch {
+    return 'commit unknown (not connected)';
+  } finally {
+    clearTimeout(timer);
+  }
+}

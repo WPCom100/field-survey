@@ -1,5 +1,14 @@
 name: ci
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  # Redeploy or roll back (docs/ops.md §2): runs the tests on that commit, then deploys it.
+  # Never publishes an update; roll the JS back with `eas update:republish`.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full 40-character commit sha on main to deploy
+        required: true
 
 jobs:
   server:
@@ -17,6 +26,8 @@ jobs:
         ports: ["5432:5432"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
       - uses: astral-sh/setup-uv@v5
       # WeasyPrint's system libraries (floor PDF, T59)
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
@@ -28,6 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -46,6 +59,8 @@ jobs:
       COMPOSE: docker compose -f server/docker-compose.yml -f server/docker-compose.e2e.yml
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -65,3 +80,61 @@ jobs:
           FIELD_SURVEY_E2E_TOKEN: e2e
       - if: failure()
         run: $COMPOSE logs api
+
+  # Delivery (D154, docs/ops.md §2): a green push to main deploys the server, then publishes the
+  # JS update. One deploy at a time; a queued one waits, never cancels the running one.
+  deploy:
+    needs: [server, client, e2e]
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    env:
+      SHA: ${{ inputs.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: server/deploy
+      - name: Deploy over ssh
+        env:
+          DROPLET_SSH_KEY: ${{ secrets.DROPLET_SSH_KEY }}
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s
+' "$DROPLET_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          # The key is a forced command on the Droplet: the only thing it can send is the sha.
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes             -o UserKnownHostsFile=server/deploy/known_hosts -o ServerAliveInterval=30             "root@$DROPLET_HOST" "$SHA"
+      - name: Public /health reports the commit
+        run: |
+          body=$(curl -fsS --max-time 10 https://survey.wpcom.cloud/health)
+          echo "$body"
+          [[ "$body" == *"\"commit\":\"$SHA\""* ]]
+
+  update:
+    needs: deploy
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: update
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # D157: the manifest has no message, so it is baked into the bundle (--clear-cache, or
+      # Metro reuses the previous one); --environment is required non-interactively.
+      - name: Publish to the production channel
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          M="$(git log -1 --pretty=%s)"
+          EXPO_PUBLIC_UPDATE_MESSAGE="$M" npx eas-cli@24.12.1 update --channel production --environment production             --platform ios --clear-cache --message "$M" --non-interactive

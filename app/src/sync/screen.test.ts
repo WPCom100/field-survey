@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { formatLine, rotationNames } from '../log/format';
 import { listProjects } from '../home/data';
 import { ensureDemoLevel } from '../plan/demo';
-import { formatBytes, freeUploadedPhotos, loadSyncScreen, retryFailedUploads } from './screen';
+import { formatBytes, freeUploadedPhotos, loadServerVersion, loadSyncScreen, retryFailedUploads } from './screen';
 
 async function open() {
   return Store.open(new BetterSqliteDriver(), { installId: 'i', search: 'like' });
@@ -120,5 +120,29 @@ describe('helpers', () => {
   it('formats log lines and rotation names', () => {
     expect(formatLine(new Date('2026-10-11T10:00:00Z'), 'sync', 'warn', 'x', { a: 1 })).toBe('2026-10-11T10:00:00.000Z WARN [sync] x {"a":1}\n');
     expect(rotationNames(3)).toEqual(['app.log', 'app.1.log', 'app.2.log']);
+  });
+});
+
+describe('loadServerVersion', () => {
+  const answer = (status: number, body: unknown) =>
+    (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+
+  it('shows the short commit and the migration from /health', async () => {
+    let url = '';
+    const f = (async (u: string) => {
+      url = u;
+      return new Response(JSON.stringify({ status: 'ok', commit: '0123456789abcdef', migration: '0005' }));
+    }) as unknown as typeof fetch;
+    expect(await loadServerVersion('https://s/', f)).toBe('commit 0123456 · migration 0005');
+    expect(url).toBe('https://s/health');
+  });
+
+  it('degrades to a plain line for an old server, an error status or no network', async () => {
+    expect(await loadServerVersion('https://s', answer(200, { status: 'ok' }))).toBe('commit not reported');
+    expect(await loadServerVersion('https://s', answer(503, {}))).toBe('server answered 503');
+    const offline = (async () => {
+      throw new TypeError('Network request failed');
+    }) as unknown as typeof fetch;
+    expect(await loadServerVersion('https://s', offline)).toBe('commit unknown (not connected)');
   });
 });

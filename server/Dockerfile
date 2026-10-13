@@ -20,4 +20,7 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 ENV PATH="/srv/.venv/bin:$PATH"
+# Last, so a new commit only rebuilds this layer. /health reports it (D154, server/deploy/deploy.sh).
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.api import blobs, exports, imports, ops, projects
 from app.auth import SessionDep, current_user, is_system_user, require_token, upsert_user
@@ -18,8 +18,14 @@ app.include_router(exports.router)
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health(session: SessionDep) -> dict[str, str]:
+    """The deployed commit and the database's Alembic revision (D154 (4)).
+
+    The deploy job waits for `commit` to equal the sha it shipped; the Sync screen shows it
+    beside the server URL. A database that cannot be read fails the check.
+    """
+    migration = session.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+    return {"status": "ok", "commit": settings.git_sha, "migration": migration}
 
 
 class TeamMember(BaseModel):

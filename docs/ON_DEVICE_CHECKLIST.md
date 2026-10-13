@@ -277,6 +277,16 @@ Install the dev build from https://expo.dev/accounts/wpcom/projects/field-survey
 
 Decision D157: the update message is baked into the bundle at publish time (`EXPO_PUBLIC_UPDATE_MESSAGE`, with `--clear-cache`), because the EAS manifest does not carry it; `app.json` lists `platforms: ["ios"]` so the PC and EAS compute the same runtime version; `eas update` needs `--environment production`. Status **Default** → approve or say otherwise:
 
+## T85 — Delivery pipeline (server commit on the Sync screen)  ·  Needs: no new build (JS only; arrives by the CI update on TestFlight iPads, from Metro on the dev build)
+
+**Why it matters:** from now on a push to `main` deploys the server and then the JS; the commit beside the server URL is how you see that the iPad and the server are on the same code.
+
+- [ ] **Server commit shown.** Sync → Install: the second line reads "Server https://survey.wpcom.cloud (commit xxxxxxx · migration 0005) · install …", and the 7 characters match the start of `curl -s https://survey.wpcom.cloud/health` (or the commit GitHub shows for the last green *ci* run on `main`). → saw:
+- [ ] **Offline.** Airplane mode on, open Sync: "(commit unknown (not connected))" after a few seconds; nothing else on the screen changes or waits. Airplane mode off: the commit comes back after the next sync. → saw:
+- [ ] **A push reaches the iPad.** After the next task's push to `main` turns green: on a TestFlight iPad launch the app twice; Install shows that task's `T<nn>: …` message, and the server commit equals the pushed commit. → saw:
+
+Decision D158: how T85 meets D154 (forced-command deploy key, pinned host key in the repo, `/health` reads the database's revision, dispatch tests the sha it deploys and never publishes). Status **Default** → approve or say otherwise:
+
 ---
 
 ## Rules for this file

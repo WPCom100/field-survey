@@ -38,24 +38,68 @@ Every command below runs on the Droplet in `/opt/field-survey/server` unless it 
    ```
 8. **Check** from anywhere (PC or iPad Safari for the first line):
    ```
-   curl https://survey.wpcom.cloud/health                       # {"status":"ok"}
+   curl https://survey.wpcom.cloud/health                       # {"status":"ok","commit":…,"migration":…}
    curl -H "Authorization: Bearer <SURVEY_SHARED_TOKEN>" https://survey.wpcom.cloud/team
    ```
    In the app: first launch asks for the server URL (`https://survey.wpcom.cloud`) and the shared token, then shows the team picker (Landry, Zach, Wiley).
 
-## 2. Update
+## 2. Update (D154, T85)
+
+### 2.1 Automatic: push to `main`
+
+Every push to `main` runs `.github/workflows/ci.yml`. When the `server`, `client` and `e2e` jobs pass:
+
+1. **`deploy`** SSHes to the Droplet with the deploy-only key and sends the commit sha. The key is a forced command (§2.3), so the Droplet runs `server/deploy/deploy.sh <sha>`:
+   `git fetch` + `git checkout --detach <sha>` → `docker compose build` (the old containers keep serving) → `pg_dump -Fc` to `/root/deploys/<sha>.dump` (the newest 10 are kept) → `alembic upgrade head` → `docker compose up -d` → waits up to 2 min for the api's `/health` to report the sha. A failing step exits non-zero, so a failed build, dump or migration stops before `up -d` and the old stack is still serving. The job then checks the public `https://survey.wpcom.cloud/health` too.
+2. **`update`** (only after `deploy` passed, only on a push) publishes the JS to the `production` channel from Linux, with the commit subject as the message (§5.5, D157). TestFlight iPads take it on their next two launches.
+
+`concurrency` groups `deploy` and `update` keep two pushes from overlapping; a newer push waiting in line replaces an older one that has not started. A red job emails the repo owner. **Accepted consequence (D154 (5)):** every push to `main`, a mid-task commit included, reaches the field iPads.
+
+Check a deploy: `curl -s https://survey.wpcom.cloud/health` → `{"status":"ok","commit":"<sha>","migration":"<alembic revision>"}`; the iPad's Sync screen shows the same short commit beside the server URL. `eas update:list --branch production --non-interactive` shows the new update row.
+
+**Migrations run automatically**, behind the dump (D154 (3)). They are forward-only in `packages/core`; on the server a bad one is recovered from the dump (§2.4).
+
+### 2.2 Manual fallback
+
+The same script, by hand on the Droplet (when GitHub Actions is down, or to watch every step):
 
 ```
-cd /opt/field-survey && git pull
-cd server
-docker compose up -d --build
-docker compose run --rm api alembic upgrade head    # only when the pull brought a migration
-docker compose ps && curl -s https://survey.wpcom.cloud/health
+bash /opt/field-survey/server/deploy/deploy.sh <full 40-character sha>
 ```
 
-Migrations are applied by hand, so a bad one never starts on its own. Before any migration, take a dump (§3.2). Roll back with `git checkout <previous-sha>` and `docker compose up -d --build`. If the migration already ran, also run `alembic downgrade -1` before the rebuild.
+Then publish the JS from the PC (§5.5, *Publish*), unless the deploy was a rollback. The commit `/health` reports is whatever `GIT_SHA` the image was built with: a plain `docker compose up -d --build` without the script reports `dev`.
 
-Changing `.env`: edit the master copy on the PC, `scp` it as in §1.6, then `docker compose up -d` (containers whose env changed are recreated).
+Changing `.env`: edit the master copy on the PC, `scp` it as in §1.6, then `docker compose up -d` (containers whose env changed are recreated). No deploy needed.
+
+### 2.3 Secrets and the deploy key (once)
+
+| GitHub secret (repo → Settings → Secrets and variables → Actions) | What | Made by |
+|---|---|---|
+| `DROPLET_SSH_KEY` | private half of a **deploy-only** ed25519 key, no passphrase | Claude in T85 (2026-10-13) |
+| `DROPLET_HOST` | `142.93.54.143` — the IP, because the pinned `server/deploy/known_hosts` names the IP | Claude in T85 |
+| `EXPO_TOKEN` | an Expo **robot** token (expo.dev → account → Access tokens → Robot users), role Developer | Landry (2026-10-13) |
+
+Make a new deploy key (rotation, or a new Droplet). On the PC, in Git Bash, outside the repo:
+
+```
+ssh-keygen -t ed25519 -N "" -C "github-actions deploy" -f ~/field_survey_ci
+gh secret set DROPLET_SSH_KEY < ~/field_survey_ci
+gh secret set DROPLET_HOST --body 142.93.54.143
+```
+
+Then put the public half on the Droplet as a forced command, so the key can run nothing but the deploy script (the sha arrives as `$SSH_ORIGINAL_COMMAND`):
+
+```
+echo "restrict,command=\"bash /opt/field-survey/server/deploy/deploy.sh\" $(cat ~/field_survey_ci.pub)"   | ssh -i ~/.ssh/field_survey_droplet root@142.93.54.143 'cat >> /root/.ssh/authorized_keys'
+rm ~/field_survey_ci ~/field_survey_ci.pub
+```
+
+Remove the old line from `/root/.ssh/authorized_keys` when rotating. A new Droplet also needs a new `server/deploy/known_hosts` (`ssh-keyscan -t ed25519 <ip>`, checked against the DigitalOcean console) and a new `DROPLET_HOST`. The Droplet's own read-only GitHub deploy key (§1.5) is separate and unchanged.
+
+### 2.4 Roll back
+
+1. **Server:** GitHub → Actions → *ci* → **Run workflow** with the previous good sha (or `gh workflow run ci.yml -f sha=<sha>`). It tests that commit and deploys it; it never publishes an update. If the bad deploy ran a migration, the old code does not downgrade it: restore `/root/deploys/<bad sha>.dump` (taken just before that migration) with §3.3 after the rollback deploy, or fix forward.
+2. **JS:** `eas update:republish` of the previous update group (§5.5, *Roll back*), never past a `packages/core` migration.
 
 ## 3. Backup and restore
 
@@ -87,7 +131,7 @@ docker compose logs worker | grep export_                        # export_daily_
 
 ### 3.2 Manual dump
 
-Take one before every migration (§2), even though a nightly one exists:
+The deploy script takes one before every migration (§2.1, `/root/deploys/<sha>.dump`). By hand:
 
 ```
 docker compose exec -T postgres pg_dump -U survey -Fc survey > /root/survey-$(date +%F-%H%M).dump
@@ -175,7 +219,7 @@ eas build --profile production --platform ios
 eas submit --platform ios --latest
 ```
 
-The build number auto-increments in EAS (`appVersionSource: remote`). Export compliance is pre-answered (`ITSAppUsesNonExemptEncryption: false`, HTTPS only). Processing in App Store Connect takes 5–30 min; the `LTP team` group gets it automatically. TestFlight builds expire after 90 days.
+The build number auto-increments in EAS (`appVersionSource: remote`). Export compliance is pre-answered (`ITSAppUsesNonExemptEncryption: false`, HTTPS only). Processing in App Store Connect takes 5–30 min; the `LTP team` group gets it automatically. TestFlight builds expire after 90 days. `.github/workflows/build-expiry.yml` runs every Monday and fails (GitHub emails the owner) once the newest finished production build is older than 50 days; that email is the reminder (D154 (6)). Run it any time from Actions → *build-expiry* → Run workflow.
 
 ### 5.4 Build log
 
@@ -206,7 +250,7 @@ Check before publishing: `cd app && npx expo-updates fingerprint:generate --plat
 
 **Keep the fingerprint the same everywhere.** EAS fails a build when the runtime version it computes on its Mac differs from the one `eas build` computed on the PC ("Runtime version mismatch" in the *Configure expo-updates* phase). T84 hit this and fixed three causes; keep them fixed: `virtualStoreDirMaxLength: 60` in `pnpm-workspace.yaml` (pnpm's Windows default; macOS and Linux default to 120, which changes every native module's path); `/ios` and `/android` in `app/.gitignore` (the builder has no `.git` and reads only that file, so a prebuilt `ios/` would otherwise count as a bare project); and LF line endings for the raw-hashed `app/.gitignore`, `app/eas.json`, `app/app.json`, `app/package.json` (`.gitattributes`). `app.json` lists `platforms: ["ios"]` because the local CLI otherwise adds `web` and EAS does not. To check without a build: `eas fingerprint:compare --build-id <id> --environment production` against a finished build.
 
-**Publish** (manual fallback; CI does this after the server deploy once T85 lands). From `app/`, in Git Bash, with the tree committed:
+**Publish** (manual fallback; CI does this after the server deploy, §2.1). From `app/`, in Git Bash, with the tree committed:
 
 ```
 M="T<nn>: <title>"

@@ -10,7 +10,7 @@ import { listProjects } from '../home/data';
 import { useIdentity, useSignOut } from '../identity/IdentityGate';
 import { exportLog } from '../log';
 import { getSyncEngine } from '../sync/engine';
-import { formatBytes, freeUploadedPhotos, loadSyncScreen, retryFailedUploads, type SyncScreenData } from '../sync/screen';
+import { formatBytes, freeUploadedPhotos, loadServerVersion, loadSyncScreen, retryFailedUploads, type SyncScreenData } from '../sync/screen';
 import { checkAndFetch, runningInfo, useUpdateCheckState } from '../sync/useAppUpdates';
 import { describeCheck, describeRunning } from '../sync/updates';
 import { describeSync, useSyncStatus } from '../sync/useSyncStatus';
@@ -27,6 +27,7 @@ export default function SyncScreen() {
   const [installId, setInstallId] = useState('');
   const [hasProject, setHasProject] = useState<boolean | null>(null);
   const [note, setNote] = useState('');
+  const [serverVersion, setServerVersion] = useState('');
   const updates = useUpdateCheckState();
   const info = runningInfo();
   const running = describeRunning(info);
@@ -43,6 +44,11 @@ export default function SyncScreen() {
   useEffect(() => {
     load().catch((e: unknown) => setNote(String(e)));
   }, [load, sync.lastSyncAt, sync.pendingOps, blobs.photosWaiting, blobs.uploadsFailed, blobs.downloadsPending, blobs.cacheBytes]);
+
+  // Re-read when sync state changes, so a deploy shows up once the iPad is online again.
+  useEffect(() => {
+    void loadServerVersion(identity.serverUrl).then(setServerVersion);
+  }, [identity.serverUrl, sync.lastSyncAt, sync.state]);
 
   const run = (fn: () => Promise<string | void>) => () =>
     fn().then(
@@ -209,7 +215,8 @@ export default function SyncScreen() {
           {identity.user.name} · app {version} ({build})
         </Text>
         <Text style={styles.sub}>
-          Server {identity.serverUrl} · install {installId.slice(0, 8)}
+          Server {identity.serverUrl}
+          {serverVersion ? ` (${serverVersion})` : ''} · install {installId.slice(0, 8)}
         </Text>
         <Text style={styles.sub}>
           JS {running.running} · {running.runtime}

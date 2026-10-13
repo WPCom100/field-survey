@@ -1,0 +1,39 @@
+# TestFlight builds expire after 90 days (D59). Weekly, this fails once the newest finished
+# production build is older than 50 days; GitHub's failure email is the reminder to run
+# docs/ops.md §5.3 (D154 (6)). Replaces the hand-kept due date.
+name: build-expiry
+on:
+  schedule:
+    - cron: "0 14 * * 1" # Mondays 14:00 UTC (09:00 Houston CDT)
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      # eas-cli reads app.json through the project's `expo` package, so install it.
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Newest production build is younger than 50 days
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx --yes eas-cli@24.12.1 build:list --platform ios --profile production --status finished \
+            --limit 1 --json --non-interactive > /tmp/builds.json
+          node -e '
+            const [b] = require("/tmp/builds.json");
+            if (!b) { console.error("no finished production build"); process.exit(1); }
+            const days = (Date.now() - Date.parse(b.createdAt)) / 864e5;
+            console.log(`build ${b.appBuildVersion} (${b.id}) is ${days.toFixed(1)} days old`);
+            if (days > 50) {
+              console.error(`::error::TestFlight build ${b.appBuildVersion} is ${Math.floor(days)} days old; it expires at 90. Run docs/ops.md §5.3 (eas build --profile production, eas submit).`);
+              process.exit(1);
+            }'

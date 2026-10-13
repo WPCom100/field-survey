@@ -113,7 +113,8 @@ pnpm --filter app lint
 cd app && npx expo start --dev-client     # iPad with the dev build installed loads over Wi-Fi
 eas build --profile development --platform ios   # only when a native module changes
 eas submit --platform ios                        # TestFlight (D59)
-EXPO_PUBLIC_UPDATE_MESSAGE="T<nn>: <title>" eas update --channel production --environment production --platform ios --clear-cache --message "T<nn>: <title>"   # JS-only change to TestFlight iPads (docs/ops.md §5.5; CI once T85 lands)
+EXPO_PUBLIC_UPDATE_MESSAGE="T<nn>: <title>" eas update --channel production --environment production --platform ios --clear-cache --message "T<nn>: <title>"   # manual fallback only: CI publishes after the deploy (docs/ops.md §2.1, §5.5)
+bash /opt/field-survey/server/deploy/deploy.sh <sha>   # on the Droplet: what CI's deploy job runs on a push to main (D154, docs/ops.md §2)
 ```
 
 Workstation: Windows 11, Claude Code (native Windows), Git, Node 24, pnpm, Docker Desktop, `uv`, EAS CLI (`npm i -g eas-cli`), the Expo development build installed on each team iPad. No WSL required; if a tool misbehaves on Windows, WSL 2 is the fallback, not a Mac.
