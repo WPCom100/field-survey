@@ -114,7 +114,7 @@ Decision D133: answered 2026-10-12, **Approved**.
 - [ ] **Generate and follow it.** Generate workbook (all levels, all tabs): the card goes Queued → Building the workbook… → Ready · ~1 MB with the filename `Lighting_Control_Survey_Master_B2-06_<n>.xlsx` and a diff line. → saw:
 - [ ] **Open in Excel / Save to Files.** Tap Open in… / Share / Save to Files: the iOS share sheet shows the workbook; Save to Files saves it; Open in Excel (if installed) opens it with its tabs. "✓ on this iPad" appears on the card. → saw:
 - [ ] **Diff vs previous.** Change one device's status, sync, Generate again: the new card says "Diff vs previous export: 1 changed ▸"; tapping it lists "Devices: +0 −0 ~1 (e.g. …)". → saw:
-- [ ] **History.** History pane: every export newest first, each labelled "Exported <date>, <time>" with its levels/tabs and state; the weekly Sunday export (if one ran) says "weekly export". → saw:
+- [ ] **History.** History pane: every export newest first, each labelled "Exported <date>, <time>" with its levels/tabs and state; a daily backup (if one ran) says "daily backup". → saw:
 - [ ] **Offline history.** Airplane mode on, History → Refresh: a note says it is showing the last list; an export marked "✓ on this iPad" still opens the share sheet; one not on the iPad shows an error when tapped (needs a connection), no crash. → saw:
 
 Decision D140 (share sheet instead of `expo-sharing`, files kept on the iPad, photos still uploading warn but do not block the export): approve / change →
@@ -234,6 +234,18 @@ Use a throw-away project with the master imported **after** the server runs T81 
 - [ ] **Export.** Export the workbook (Export screen, synced): Punch List row B1 #8 shows the renamed room; 04 #22 shows the new panel's name; an item left unlinked shows the master's text (e.g. `Stations & sensors`). → saw:
 
 Decision D151: the derived Device text format (named panels, racks and NSPS by name, `EBDK (<panel>)`, the rest with tag and room), the Neuron ID rows not raised, Create device unplaced with Place pin… (see DECISIONS.md). Approve / change → answer:
+
+---
+
+## T82 — Daily master export backup  ·  Needs: no new build (JS: the history label); the server deployed with T82 (see the TASKS.md deploy note)
+
+**Why it matters:** if the server or the data is ever lost, the newest master workbook for each project should be at most a day old, without filling the bucket with identical copies.
+
+- [ ] **First backup.** The morning after the deploy (after 08:00 UTC = 03:00 Houston): Export screen → history shows one export per project labelled "daily backup", made overnight. Open/Share it: a normal master workbook. → saw:
+- [ ] **No edit, no backup.** On a day with no edits on a project, the next morning shows no new "daily backup" row for it. → saw:
+- [ ] **An edit makes one.** Change one device's notes, sync; the next morning there is a new "daily backup" row for that project only. → saw:
+
+Decision D152 recorded from your answer (skip unchanged, keep six months): no answer needed.
 
 ---
 

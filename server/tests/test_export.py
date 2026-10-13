@@ -1,5 +1,5 @@
 """Excel export (T29, PLAN §7.6): TP-4 round trip of the master, the `/exports` routes, the
-job lifecycle, the weekly export, markup flattening and the empty-project workbook."""
+job lifecycle, the daily export backup, markup flattening and the empty-project workbook."""
 
 import hashlib
 import io
@@ -16,7 +16,7 @@ import xlsx_diff
 import xlsxwriter
 from conftest import HDR
 from PIL import Image
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from test_seed_import import FIXTURE, import_file, needs_fixture, new_project
 
 from app import projects
@@ -25,7 +25,7 @@ from app.blobs import object_key
 from app.config import settings
 from app.ids import uuid7
 from app.jobs import export_xlsx, exports, markup
-from app.models import Blob, Device, Export, Level, PunchItem
+from app.models import Blob, Device, Export, Level, Op, PunchItem
 
 # Master quirks TP-4 documents: cells whose master value cannot come back from the records.
 ALLOW = {
@@ -328,30 +328,176 @@ def test_failed_export_is_recorded(session, store, factory):
     assert exports.run_queued(factory, store) == []
 
 
-# ------------------------------------------------------------ weekly export
+# ------------------------------------------------------- daily export backup
 
 
-def test_weekly_export_runs_once_per_project_per_week(session, store, factory, monkeypatch):
-    p1, p2 = new_project(session, "One"), new_project(session, "Two")
-    now = datetime(2026, 10, 18, 9, 0, tzinfo=UTC)  # a Sunday
+def edit_project(session, project_id):
+    """One more op on the project (an edit arriving), as the server stores it."""
+    seq = session.scalar(select(func.max(Op.server_seq)).where(Op.project_id == project_id)) or 0
+    user = upsert_user(session, "Landry")
+    session.add(
+        Op(
+            op_id=uuid7(),
+            project_id=project_id,
+            user_id=user.id,
+            install_id=uuid7(),
+            client_ts=datetime.now(UTC),
+            server_seq=seq + 1,
+            server_ts=datetime.now(UTC),
+            entity_kind="project",
+            entity_id=project_id,
+            kind="set",
+            field="name",
+            now="Renamed",
+            change_type="Field survey",
+            state="applied",
+        )
+    )
+    session.commit()
+
+
+@pytest.fixture
+def daily(monkeypatch):
+    """Backups on from 00 UTC, the once-a-day memo cleared; returns a 'worker restarted' reset."""
     monkeypatch.setattr(settings, "backup_enabled", True)
-    monkeypatch.setattr(settings, "backup_hour_utc", 8)
-    monkeypatch.setattr(settings, "export_weekly_weekday", 7)
-    monkeypatch.setattr(exports, "_weekly_checked_on", None)
-    assert exports.weekly_tick(factory, store, now - timedelta(hours=2)) == []  # before the hour
-    assert exports.weekly_tick(factory, store, now) == ["done", "done"]
-    rows = session.scalars(select(Export).where(Export.project_id.in_([p1, p2]))).all()
-    assert len(rows) == 2 and all(r.params == {"scheduled": True} for r in rows)
+    monkeypatch.setattr(settings, "backup_hour_utc", 0)
+    monkeypatch.setattr(exports, "_daily_checked_on", None)
+    return lambda: monkeypatch.setattr(exports, "_daily_checked_on", None)
+
+
+def scheduled_rows(session, *project_ids):
+    session.expire_all()
+    return session.scalars(
+        select(Export)
+        .where(Export.project_id.in_(project_ids))
+        .order_by(Export.created_at, Export.id)
+    ).all()
+
+
+def test_daily_backup_runs_once_a_day_per_project(session, store, factory, monkeypatch, daily):
+    p1, p2 = new_project(session, "One"), new_project(session, "Two")
+    now = datetime.now(UTC)  # export rows are stamped by the database clock
+    monkeypatch.setattr(settings, "backup_hour_utc", 23)
+    if now.hour < 23:
+        assert exports.daily_tick(factory, store, now) == []  # before BACKUP_HOUR_UTC
+    monkeypatch.setattr(settings, "backup_hour_utc", 0)
+    assert exports.daily_tick(factory, store, now) == ["done", "done"]
+    rows = scheduled_rows(session, p1, p2)
+    assert len(rows) == 2
     export_user = system_user(session, "export")
-    assert all(r.created_by_id == export_user.id for r in rows)
-    # the same day again: nothing (checked once a day); the next Sunday: due again
-    assert exports.weekly_tick(factory, store, now + timedelta(hours=1)) == []
-    monkeypatch.setattr(exports, "_weekly_checked_on", None)
-    assert exports.weekly_tick(factory, store, now + timedelta(days=1)) == []  # Monday
-    assert exports.weekly_tick(factory, store, now + timedelta(days=7)) == ["done", "done"]
+    assert all(r.created_by_id == export_user.id and r.params["scheduled"] for r in rows)
+    assert all(isinstance(r.params["server_seq"], int) for r in rows)
+    # the same day again: nothing (checked once a day) …
+    assert exports.daily_tick(factory, store, now + timedelta(hours=1)) == []
+    # … not even after a worker restart: a scheduled export in the last 20 hours
+    daily()
+    assert exports.daily_tick(factory, store, now + timedelta(hours=1)) == []
+    assert len(scheduled_rows(session, p1, p2)) == 2
+
+
+def test_daily_backup_skips_a_project_with_no_edit(session, store, factory, daily):
+    p1, p2 = new_project(session, "One"), new_project(session, "Two")
+    now = datetime.now(UTC)
+    assert exports.daily_tick(factory, store, now) == ["done", "done"]
+    # the next day: nothing changed anywhere → no backup, logged as unchanged
+    daily()
+    assert exports.daily_tick(factory, store, now + timedelta(days=1)) == []
+    # the day after: an edit on One → One alone is backed up
+    edit_project(session, p1)
+    daily()
+    assert exports.daily_tick(factory, store, now + timedelta(days=2)) == ["done"]
+    rows = scheduled_rows(session, p1, p2)
+    assert [r.project_id for r in rows].count(p1) == 2 and [r.project_id for r in rows].count(
+        p2
+    ) == 1
+    # a backup that missed a picture (still uploading) is taken again the next day
+    last_p2 = [r for r in rows if r.project_id == p2][-1]
+    session.execute(
+        update(Export)
+        .where(Export.id == last_p2.id)
+        .values(stats={**last_p2.stats, "images_missing": 1})
+    )
+    session.commit()
+    daily()
+    assert exports.daily_tick(factory, store, now + timedelta(days=3)) == ["done"]
+    assert [r.project_id for r in scheduled_rows(session, p1, p2)].count(p2) == 2
+
+
+def test_daily_backup_is_off_without_backup_enabled(session, store, factory, monkeypatch, daily):
+    p1 = new_project(session, "One")
     monkeypatch.setattr(settings, "backup_enabled", False)
-    monkeypatch.setattr(exports, "_weekly_checked_on", None)
-    assert exports.weekly_tick(factory, store, now + timedelta(days=14)) == []
+    assert exports.daily_tick(factory, store, datetime.now(UTC)) == []
+    assert scheduled_rows(session, p1) == []
+
+
+def test_backups_older_than_six_months_are_pruned(session, store, factory, client, daily):
+    p1 = new_project(session, "One")
+    now = datetime.now(UTC)
+    assert settings.export_backup_retention_days == 183
+    for day in range(4):  # four daily backups, each after an edit
+        edit_project(session, p1)
+        daily()
+        assert exports.daily_tick(factory, store, now + timedelta(days=day)) == ["done"]
+    rows = scheduled_rows(session, p1)
+    # an empty project exports the same bytes every day: give each backup a file of its own
+    for i, r in enumerate(rows):
+        data = f"backup {i}".encode()
+        sha = hashlib.sha256(data).hexdigest()
+        store.put_bytes(object_key(sha), data)
+        session.add(
+            Blob(sha256=sha, size=len(data), mime=exports.XLSX_MIME, upload_state="complete")
+        )
+        session.execute(update(Export).where(Export.id == r.id).values(blob=sha))
+    session.commit()
+    rows = scheduled_rows(session, p1)
+    # age the three oldest past six months; the newest stays recent
+    for i, r in enumerate(rows[:3]):
+        session.execute(
+            update(Export).where(Export.id == r.id).values(created_at=now - timedelta(days=200 - i))
+        )
+    session.commit()
+    assert sorted(exports.prune_backups(factory, store, now)) == sorted(str(r.id) for r in rows[:3])
+    session.expire_all()
+    for r in rows[:3]:
+        row = session.get(Export, r.id)
+        assert row.stats["pruned_at"] and row.blob == r.blob  # the row stays in the history
+        with pytest.raises(KeyError):
+            store.read(object_key(r.blob))
+        assert session.get(Blob, r.blob) is None
+        got = client.get(f"/exports/{r.id}/file", headers=HDR)
+        assert got.status_code == 404 and got.json()["detail"]["error"] == "not_available"
+    assert store.read(object_key(rows[3].blob))  # the newest is kept
+    assert exports.prune_backups(factory, store, now) == []  # nothing twice
+
+    # each project's newest backup is kept however old (no edit for months: still current)
+    session.execute(
+        update(Export).where(Export.id == rows[3].id).values(created_at=now - timedelta(days=190))
+    )
+    session.commit()
+    assert exports.prune_backups(factory, store, now) == []
+    assert store.read(object_key(rows[3].blob))
+
+
+def test_prune_keeps_a_file_another_export_uses(session, store, factory, daily):
+    p1 = new_project(session, "One")
+    now = datetime.now(UTC)
+    for day in range(2):
+        edit_project(session, p1)
+        daily()
+        assert exports.daily_tick(factory, store, now + timedelta(days=day)) == ["done"]
+    old, new = scheduled_rows(session, p1)
+    # a manual export that happens to have the same bytes as the old backup
+    manual = exports.create_export(session, project_id=p1, params=None, user=None)
+    session.execute(
+        update(Export).where(Export.id == manual.id).values(job_state="done", blob=old.blob)
+    )
+    session.execute(
+        update(Export).where(Export.id == old.id).values(created_at=now - timedelta(days=200))
+    )
+    session.commit()
+    assert exports.prune_backups(factory, store, now) == [str(old.id)]
+    assert store.read(object_key(old.blob))  # still used by the manual export
+    assert session.get(Blob, old.blob) is not None
 
 
 # --------------------------------------------------------------- markup

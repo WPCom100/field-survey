@@ -124,7 +124,7 @@ describe('history', () => {
     expect(jobLine(row({ job_state: 'failed', stats: { error: 'unknown project' } }))).toBe('Failed: unknown project');
     expect(scopeLine(row())).toBe('Levels B2-06M · all tabs');
     expect(scopeLine(row({ stats: { levels: ['06M'] }, params: { levels: ['06M'], tabs: ['Devices'] } }))).toBe('Level 06M · Devices');
-    expect(scopeLine(row({ stats: null, params: { scheduled: true } }))).toBe('all in-scope levels · all tabs · weekly export');
+    expect(scopeLine(row({ stats: null, params: { scheduled: true } }))).toBe('all in-scope levels · all tabs · daily backup');
 
     expect(diffLine(row())).toBe('First export: nothing to compare with');
     const d = row({

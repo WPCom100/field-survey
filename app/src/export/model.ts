@@ -200,7 +200,7 @@ export function scopeLine(e: ExportRow): string {
       : sections?.length
         ? FLOOR_SECTIONS.filter((s) => sections.includes(s.key)).map((s) => s.label.split(' (')[0]).join(', ')
         : 'all sections';
-  const by = e.params?.scheduled ? ' · weekly export' : '';
+  const by = e.params?.scheduled ? ' · daily backup' : '';
   return [levels, tabs].filter(Boolean).join(' · ') + by;
 }
 

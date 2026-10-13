@@ -1,5 +1,5 @@
 """Export jobs (PLAN §8 `/exports`, T29): the `export` row's lifecycle, the worker tick, the
-weekly master export (D67) and a command line.
+daily master export backup (D149, T82) and a command line.
 
     POST /exports → export(job_state="queued") → worker: run_queued() → done | failed
     python -m app.jobs.exports <project_id> --out master.xlsx [--levels B2,B1] [--user NAME]
@@ -39,7 +39,7 @@ from app.blobs import object_key
 from app.config import settings
 from app.ids import uuid7
 from app.jobs import export_xlsx, floor_pdf
-from app.models import Blob, Export, Project, User
+from app.models import Blob, Export, Op, Project, User
 from app.storage import ObjectMissing, ObjectStore
 
 log = logging.getLogger("jobs")
@@ -48,8 +48,8 @@ XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 KINDS = ("xlsx", "floor_pdf")  # floor_pdf: T59, app.jobs.floor_pdf
 MIME = {"xlsx": XLSX_MIME, "floor_pdf": "application/pdf"}
 STATES = ("queued", "running", "done", "failed")
-EXPORT_USER_NAME = "export"  # the weekly job's system user
-WEEKLY_GAP = timedelta(days=6)
+EXPORT_USER_NAME = "export"  # the daily backup's system user
+DAILY_GAP = timedelta(hours=20)  # D149: a restart never doubles the day's backup
 DATA_TABS = ("Devices", "Connections", "Punch List", "Missing Parts", "Photo Log")
 
 
@@ -387,20 +387,37 @@ def run_queued(session_factory: SessionFactory, store: ObjectStore, limit: int =
     return [run_export(session_factory, store, i) for i in ids]
 
 
-_weekly_checked_on = None
+_daily_checked_on = None
 
 
-def weekly_tick(
+def _project_seq(session: Session, project_id: uuid.UUID) -> int | None:
+    """The project's newest server sequence: every edit, import and assignment is an op."""
+    return session.scalar(select(func.max(Op.server_seq)).where(Op.project_id == project_id))
+
+
+def _unchanged_since(last: Export | None, seq: int | None) -> bool:
+    """True when `last` (the newest finished backup) already holds everything up to `seq` with
+    every picture in it; a backup that missed a photo still in upload is taken again."""
+    if last is None or seq is None:
+        return False
+    return (last.params or {}).get("server_seq") == seq and not (last.stats or {}).get(
+        "images_missing"
+    )
+
+
+def daily_tick(
     session_factory: SessionFactory, store: ObjectStore, now: datetime | None = None
 ) -> list[str]:
-    """D67's weekly master export to R2: on `EXPORT_WEEKLY_WEEKDAY` from `BACKUP_HOUR_UTC`, queue
-    and run one xlsx export per project that has none by the `export` user in the last six days.
-    Gated by `BACKUP_ENABLED` like the dumps. Checked once a day; never raises."""
-    global _weekly_checked_on
+    """D149's daily master export backup: from `BACKUP_HOUR_UTC`, gated by `BACKUP_ENABLED`, queue
+    and run one xlsx export per project by the `export` user (`params.scheduled`, with the
+    project's `server_seq`), unless the project has a scheduled export in the last 20 hours or
+    nothing changed since its last finished one (T82). Then prune backups past
+    `EXPORT_BACKUP_RETENTION_DAYS`. Checked once a day; never raises."""
+    global _daily_checked_on
     now = now or datetime.now(UTC)
-    if not settings.backup_enabled or _weekly_checked_on == now.date():
+    if not settings.backup_enabled or _daily_checked_on == now.date():
         return []
-    if now.isoweekday() != settings.export_weekly_weekday or now.hour < settings.backup_hour_utc:
+    if now.hour < settings.backup_hour_utc:
         return []
     ran: list[str] = []
     try:
@@ -408,30 +425,96 @@ def weekly_tick(
             user = system_user(s, EXPORT_USER_NAME)
             s.commit()
             projects = s.scalars(select(Project).where(Project.deleted_at.is_(None))).all()
-            due = []
+            scheduled = (
+                Export.kind == "xlsx",
+                Export.created_by_id == user.id,
+                Export.params["scheduled"].as_boolean().is_(True),
+            )
+            due: list[tuple[uuid.UUID, int | None]] = []
             for p in projects:
                 recent = s.scalar(
                     select(func.count())
                     .select_from(Export)
                     .where(
-                        Export.project_id == p.id,
-                        Export.kind == "xlsx",
-                        Export.created_by_id == user.id,
-                        Export.created_at >= now - WEEKLY_GAP,
+                        Export.project_id == p.id, *scheduled, Export.created_at >= now - DAILY_GAP
                     )
                 )
-                if not recent:
-                    due.append(p.id)
+                if recent:
+                    continue
+                seq = _project_seq(s, p.id)
+                last = s.scalars(
+                    select(Export)
+                    .where(Export.project_id == p.id, *scheduled, Export.job_state == "done")
+                    .order_by(Export.created_at.desc())
+                    .limit(1)
+                ).first()
+                if _unchanged_since(last, seq):
+                    _event("export_daily_unchanged", project=str(p.id), server_seq=seq)
+                    continue
+                due.append((p.id, seq))
             ids = []
-            for pid in due:
-                row = create_export(s, project_id=pid, params={"scheduled": True}, user=user)
+            for pid, seq in due:
+                params = {"scheduled": True, "server_seq": seq}
+                row = create_export(s, project_id=pid, params=params, user=user)
                 ids.append(row.id)  # read while the session is open (commit expires the row)
         for export_id in ids:
             ran.append(run_export(session_factory, store, export_id))
-        _weekly_checked_on = now.date()
+        prune_backups(session_factory, store, now)
+        _daily_checked_on = now.date()
     except Exception as e:  # noqa: BLE001 - the worker must keep running (CLAUDE.md §5)
-        _event("export_weekly_failed", error=repr(e), ran=ran)
+        _event("export_daily_failed", error=repr(e), ran=ran)
     return ran
+
+
+def prune_backups(
+    session_factory: SessionFactory, store: ObjectStore, now: datetime | None = None
+) -> list[str]:
+    """Delete the files of scheduled exports older than `EXPORT_BACKUP_RETENTION_DAYS` (T82: six
+    months), always keeping each project's newest one (with skip-unchanged it can be old and still
+    current). The export row stays in the history with `stats.pruned_at`; its file then answers
+    404. A file another export row still uses is kept. The copy bucket keeps every file it ever
+    received (rclone copy, never sync). Returns the pruned export ids."""
+    now = now or datetime.now(UTC)
+    cutoff = now - timedelta(days=settings.export_backup_retention_days)
+    pruned: list[str] = []
+    with session_factory() as s:
+        user = system_user(s, EXPORT_USER_NAME)
+        rows = s.scalars(
+            select(Export)
+            .where(
+                Export.kind == "xlsx",
+                Export.created_by_id == user.id,
+                Export.params["scheduled"].as_boolean().is_(True),
+                Export.job_state == "done",
+                Export.blob.is_not(None),
+            )
+            .order_by(Export.project_id, Export.created_at.desc())
+        ).all()
+        newest: set[uuid.UUID] = set()
+        old: list[Export] = []
+        for row in rows:
+            if row.project_id not in newest:
+                newest.add(row.project_id)  # each project's newest backup is always kept
+            elif row.created_at < cutoff and not (row.stats or {}).get("pruned_at"):
+                old.append(row)
+        old_ids = {r.id for r in old}
+        for row in old:
+            shared = s.scalar(
+                select(func.count())
+                .select_from(Export)
+                .where(Export.blob == row.blob, Export.id.not_in(old_ids))
+            )
+            if not shared:
+                store.delete_many([object_key(row.blob)])
+                blob = s.get(Blob, row.blob)
+                if blob is not None:
+                    s.delete(blob)  # so an identical file later is stored again, not assumed
+            row.stats = {**(row.stats or {}), "pruned_at": now.isoformat()}
+            pruned.append(str(row.id))
+        s.commit()
+    if pruned:
+        _event("export_backup_pruned", exports=len(pruned), cutoff=cutoff.isoformat())
+    return pruned
 
 
 # ------------------------------------------------------------------- CLI

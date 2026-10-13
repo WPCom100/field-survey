@@ -27,7 +27,7 @@ def main() -> None:
         if tick % HEARTBEAT_EVERY == 0:
             log.info(json.dumps({"event": "heartbeat", "concurrency": settings.worker_concurrency}))
             backup.tick()
-            exports.weekly_tick(SessionLocal, get_object_store())  # D67 weekly master export
+            exports.daily_tick(SessionLocal, get_object_store())  # D149 daily export backup
         try:
             runner.run_queued(SessionLocal, get_object_store(), limit=settings.worker_concurrency)
             plans.run_queued(SessionLocal, get_object_store(), limit=settings.worker_concurrency)

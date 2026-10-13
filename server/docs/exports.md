@@ -3,7 +3,7 @@
 How the project's records become the master workbook (PLAN §7.6), the job around it (PLAN §8
 `/exports`) and the TP-4 round-trip check. Normative: PLAN §7.6 (every format detail),
 §2.2 (which columns are generated at export), §8 (routes). Decisions: D16, D17, D25, D32, D33,
-D50, D51, D67, D94, D110, D128, D136–D139, D148–D151.
+D50, D51, D67, D94, D110, D128, D136–D139, D148–D152.
 
 ## Files
 
@@ -11,11 +11,11 @@ D50, D51, D67, D94, D110, D128, D136–D139, D148–D151.
 |---|---|
 | `app/jobs/export_xlsx.py` | `load()` reads the materialised tables into rows per tab (sorting, generated columns, pictures with markup flattened); `write()` writes the workbook with XlsxWriter, modelled on `fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx`. No job rows. |
 | `app/jobs/markup.py` | Flattens a photo's `markup_blob` (stroke list, `packages/core/docs/strokes.md`) onto its JPEG with Pillow; a photo without markup is passed through byte for byte. T59 reuses it. |
-| `app/jobs/exports.py` | The `export` row's lifecycle (`create_export`, `build`, `run_export`, `run_queued`), the `diff_summary` against the previous export, the weekly master export (`weekly_tick`, D67), the CLI. |
+| `app/jobs/exports.py` | The `export` row's lifecycle (`create_export`, `build`, `run_export`, `run_queued`), the `diff_summary` against the previous export, the daily export backup and its pruning (`daily_tick`, `prune_backups`, D149, D152), the CLI. |
 | `app/api/exports.py` | `POST /exports`, `GET /exports/{id}`, `GET /exports/{id}/file`, `GET /exports?project_id`. |
-| `app/worker.py` | Runs queued exports after queued imports every 5 s; `weekly_tick` with the backup tick once a minute. |
+| `app/worker.py` | Runs queued exports after queued imports every 5 s; `daily_tick` with the backup tick once a minute. |
 | `tests/xlsx_diff.py` | TP-4: the cell-by-cell diff of two workbooks, with the documented differences tagged. Also a CLI. |
-| `tests/test_export.py` | TP-4 on the master, the routes, the job states, the weekly export, markup, an empty project. |
+| `tests/test_export.py` | TP-4 on the master, the routes, the job states, the daily export backup and its pruning, markup, an empty project. |
 
 ## Running one
 
@@ -55,12 +55,24 @@ Filename: `Lighting_Control_Survey_Master_<first>-<last>_<n>.xlsx` — Landry's 
 fixture (`…_B2-06_4.xlsx`): first and last level by floor order (`06M` folds into `06`, D33), `n`
 the project's count of finished xlsx exports.
 
-### The weekly export (D67)
+### The daily export backup (D149, D152)
 
-`exports.weekly_tick()` runs with the backup tick: on `EXPORT_WEEKLY_WEEKDAY` (ISO, default 7 =
-Sunday) from `BACKUP_HOUR_UTC`, gated by `BACKUP_ENABLED`, it queues and runs one xlsx export per
-project that has none by the `export` system user in the last six days (`params.scheduled: true`).
-The file lands in R2 as any export, so the nightly dump + weekly bucket copy carry it.
+`exports.daily_tick()` runs with the backup tick, checked once a day from `BACKUP_HOUR_UTC` and gated
+by `BACKUP_ENABLED`. For each project it queues and runs one xlsx export by the `export` system user,
+`params = {"scheduled": true, "server_seq": <the project's newest op>}`, unless
+
+- the project has a scheduled export from the last 20 hours (a worker restart never doubles a day), or
+- **nothing changed** since its last finished one: same `server_seq` (every edit, import and ID
+  assignment is an op) and no picture missing from it (a backup taken while a photo was still
+  uploading is taken again). Logged as `export_daily_unchanged`.
+
+The file lands in R2 as any export, so the nightly dump and the weekly bucket copy carry it, and it
+shows in the export history. Then `exports.prune_backups()` deletes the files of scheduled exports
+older than `EXPORT_BACKUP_RETENTION_DAYS` (183 ≈ six months), **always keeping each project's newest
+one** (with skip-unchanged it can be months old and still current) and any file another export row
+uses. The row stays in the history with `stats.pruned_at`; `GET /exports/{id}/file` then answers 404
+`not_available`. The copy bucket keeps every file it ever received (rclone copy, never sync).
+Logs: `export_daily_unchanged`, `export_backup_pruned`, `export_daily_failed`.
 
 ## What is written
 
