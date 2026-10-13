@@ -249,6 +249,18 @@ Decision D152 recorded from your answer (skip unchanged, keep six months): no an
 
 ---
 
+## T83 — Needs review opens the project on screen  ·  Needs: no new build (JS only)
+
+**Why it matters:** with more than one project on the iPad, Needs review showed the first project's items (often none), so the test project's review items, and the T81 checks that start from them, could not be reached.
+
+- [ ] **From the home.** Two projects on the iPad. On the Levels home tap the **test** project's chip (not the first), then sidebar → Needs review: the list shows the test project's items (the T81 Lint items, if it was imported after T81), with its levels in the Level filter. → saw:
+- [ ] **Back keeps the project.** In Needs review tap "← Levels": the home still shows the test project, not the first one. → saw:
+- [ ] **From Projects and Setup.** Projects → Open the test project → Needs review: same items. Setup → Sources after an import → "Open Needs review": that project's items. → saw:
+- [ ] **From Sync.** With the test project on the home, Sync → "Open Needs review": the test project's items; "← Levels" from Sync returns to the test project. → saw:
+- [ ] **Then redo T81 from "Review items arrive"** (the A-4 that failed). → saw:
+
+---
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

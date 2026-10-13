@@ -11,6 +11,7 @@ import {
   type HomeProject,
   type ProjectHome,
 } from '../home/data';
+import { pickProject, rememberProject } from '../home/currentProject';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { syncDataKey } from '../sync/dataKey';
@@ -59,8 +60,12 @@ export default function ProjectHomeScreen() {
       const list = await listProjects(store);
       if (!live) return;
       setProjects(list);
-      const id = projectId && list.some((p) => p.id === projectId) ? projectId : (list[0]?.id ?? null);
+      const id = pickProject(
+        list.map((p) => p.id),
+        projectId,
+      );
       if (id !== projectId) setProjectId(id);
+      rememberProject(id);
       setHome(id ? await loadProjectHome(store, id, user.id) : null);
     })().catch((e: unknown) => console.warn('[home] load', e));
     return () => {
@@ -78,8 +83,12 @@ export default function ProjectHomeScreen() {
           Projects
         </Link>
         {SIDEBAR.map((name) =>
-          name === 'Sync' || name === 'Needs review' ? (
-            <Link key={name} href={name === 'Sync' ? '/sync' : '/review'} style={[styles.navItem, styles.navText]}>
+          name === 'Sync' ? (
+            <Link key={name} href="/sync" style={[styles.navItem, styles.navText]}>
+              {name}
+            </Link>
+          ) : name === 'Needs review' && projectId ? (
+            <Link key={name} href={{ pathname: '/review', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
               {name}
             </Link>
           ) : name === 'Export' && projectId ? (

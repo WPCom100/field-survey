@@ -216,7 +216,7 @@ export function SourcesStep({ projectId }: { projectId: string }) {
                 </Text>
               ))}
               <View style={styles.row}>
-                <Btn title="Open Needs review" primary onPress={() => router.push('/review')} />
+                <Btn title="Open Needs review" primary onPress={() => router.push({ pathname: '/review', params: { project: projectId } })} />
               </View>
             </>
           ) : null}

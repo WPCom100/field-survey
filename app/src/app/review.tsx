@@ -5,6 +5,7 @@ import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 
 import { AddDevicePanel } from '../additions/AddDevicePanel';
 import { openAppStore } from '../db';
+import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamNames } from '../identity/useTeamNames';
@@ -29,7 +30,8 @@ const CHOICE_LABEL: Record<ResolveChoice['choice'], string> = { A: 'Choose A', B
  * item's A/B panel on the right. A sync conflict is closed only by Choose A / Choose B / Combine /
  * a typed value (D98: no Dismiss); each choice writes one Reconcile group with the auto-filled
  * reason (T15). Pin conflicts are resolved on the plan, both pins drawn. The `IN REVIEW` badges
- * clear here at once and on the other iPads on their next pull. `?item=` selects an item.
+ * clear here at once and on the other iPads on their next pull. `?item=` selects an item;
+ * `?project=` names the project (else the one the home last showed, T83).
  *
  * An imported punch row linked to no device (T81, D148) shows the master's Device text with Link
  * to device (a device of the row's level) and Create device (the + Device form, created unplaced);
@@ -37,7 +39,7 @@ const CHOICE_LABEL: Record<ResolveChoice['choice'], string> = { A: 'Choose A', B
  * item keeps the master's text in the export (D150).
  */
 export default function NeedsReviewScreen() {
-  const params = useLocalSearchParams<{ item?: string }>();
+  const params = useLocalSearchParams<{ item?: string; project?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
   const dataKey = syncDataKey(sync);
@@ -57,11 +59,12 @@ export default function NeedsReviewScreen() {
     openAppStore().then(
       async (s) => {
         setStore(s);
-        setProjectId((await listProjects(s))[0]?.id ?? null);
+        // The project the link names, else the one the home last showed (T83), else the first.
+        setProjectId(pickProject((await listProjects(s)).map((p) => p.id), params.project));
       },
       (e: unknown) => setNote(String(e)),
     );
-  }, []);
+  }, [params.project]);
   // Back from the plan (a pin conflict resolved there): reload.
   useFocusEffect(useCallback(() => setTick((n) => n + 1), []));
 
@@ -153,7 +156,7 @@ export default function NeedsReviewScreen() {
             <Chip key={t.kind} label={`${t.label}${t.kind === 'all' ? '' : ` ${t.count}`}`} on={kind === t.kind} onPress={() => setKind(t.kind)} />
           ))}
         </ScrollView>
-        <Link href="/" style={styles.link}>
+        <Link href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.link}>
           ← Levels
         </Link>
       </View>
