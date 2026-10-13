@@ -88,6 +88,16 @@ class Project(Id, Synced, Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class Install(Id, Synced, Base):
+    """One iPad (`id` = install id) and the label typed on its Sync screen (T86, D155)."""
+
+    __tablename__ = "install"
+
+    label: Mapped[str | None]
+    user_id: Mapped[uuid.UUID | None] = mapped_column(fk("app_user.id"))
+    updated_at: Mapped[datetime | None]
+
+
 class NumberingGroup(Id, Base):
     """Counters hold the last number handed out; only the server moves them."""
 

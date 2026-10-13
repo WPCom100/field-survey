@@ -662,3 +662,40 @@ def test_push_is_one_transaction(client, w, monkeypatch):
     res = w.push(client, [p1, p2])
     assert outcomes(res) == ["applied", "applied"]
     assert [o["now"] for o in res["server_ops"]] == [1, 2]
+
+
+def test_install_label_create_then_set_is_materialised(client, w, session):
+    """T86 (D155): the per-iPad label is an `install` record keyed by the install id."""
+    from app.models import Install
+
+    inst = uuid.uuid5(uuid.NAMESPACE_URL, "ipad:Ann:label")
+    create = w.op(
+        w.ann,
+        "create",
+        "install",
+        inst,
+        install=str(inst),
+        payload={"id": str(inst), "label": "Field 1", "user_id": str(w.ann.id)},
+    )
+    r = client.post(
+        "/ops", headers=HDR, json={"project_id": str(w.project.id), "ops": [create]}
+    )
+    assert r.status_code == 200, r.text
+    rename = w.op(
+        w.ann,
+        "set",
+        "install",
+        inst,
+        install=str(inst),
+        field="label",
+        was="Field 1",
+        now="Field 2",
+        base_op_id=create["op_id"],
+    )
+    r = client.post(
+        "/ops", headers=HDR, json={"project_id": str(w.project.id), "ops": [rename]}
+    )
+    assert r.status_code == 200, r.text
+    session.expire_all()
+    row = session.get(Install, inst)
+    assert row.label == "Field 2" and row.version == 2

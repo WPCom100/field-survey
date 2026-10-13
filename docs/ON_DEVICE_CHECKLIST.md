@@ -219,6 +219,17 @@ Decision D147: `sheet.features` beside `grid_sets`; pypdf rewrites the display P
 
 ---
 
+## T86 — Per-install label  ·  Needs: no new build (JS only); the server on `alembic upgrade head` to 0006 (a new `install` table — CI's deploy runs it); the iPad's local database migrates to 0007 on first open
+
+**Why it matters:** the Needs review A/B panel names the other side's iPad; "iPad …1a2b3c" means nothing in the field, "Field 2" does.
+
+- [ ] **Set a label.** Sync & uploads → Install: type `Field 1` in "This iPad:" and tap elsewhere. The field keeps `Field 1`; the pending-ops count goes up by one and clears after the next sync. → saw:
+- [ ] **Empty field shows the tail.** On an iPad with no label the field's placeholder reads `iPad …` plus six characters. → saw:
+- [ ] **Label reaches the other iPad.** Label iPad A `Field 1`, iPad B `Field 2`, sync both. Cause a conflict (same field, two values, both offline), sync, open it in Needs review: side A/B read `Field 1` / `Field 2 (this iPad)` instead of install-id tails. → saw:
+- [ ] **Rename and clear.** Change the label to `Field 3`, then clear it: the A/B panel on the other iPad follows after a sync, falling back to the `iPad …` tail when cleared. → saw:
+
+---
+
 ## T81 — Punch List Device text follows the device  ·  Needs: no new build (JS only); the server rebuilt with T81 (no migration)
 
 **Why it matters:** the EC reads the Punch List's Device column to find the device; it must match the device as it is now (renamed, retagged), and a row the import could not link must not vanish into a wrong device.

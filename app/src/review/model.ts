@@ -22,6 +22,8 @@ import {
   type Store,
 } from '@field-survey/core';
 
+import { installName, loadInstallLabels } from '../sync/install';
+
 type Row = Record<string, unknown>;
 
 /** Review kinds (PLAN §2.2) in tab order, with the tab label. */
@@ -268,7 +270,7 @@ export type ReviewSide = {
   who: string;
   /** client_ts of the op. */
   when: string;
-  /** "this iPad" or "iPad …1a2b3c". */
+  /** "this iPad", the other iPad's label ("Field 1"), else "iPad …1a2b3c" (D155). */
   install: string;
 };
 
@@ -300,12 +302,17 @@ export type ReviewDetail = {
   punchDevice: PunchDeviceReview | null;
 };
 
-function side(c: Candidate | undefined, names: ReadonlyMap<string, string>, installId: string): ReviewSide | null {
+function side(
+  c: Candidate | undefined,
+  names: ReadonlyMap<string, string>,
+  installId: string,
+  labels: ReadonlyMap<string, string>,
+): ReviewSide | null {
   if (!c) return null;
   return {
     who: names.get(c.user_id) ?? `user …${c.user_id.slice(-6)}`,
     when: c.client_ts,
-    install: c.install_id === installId ? 'this iPad' : `iPad …${c.install_id.slice(-6)}`,
+    install: c.install_id === installId ? (labels.get(installId) ? `${labels.get(installId)} (this iPad)` : 'this iPad') : installName(c.install_id, labels),
   };
 }
 
@@ -371,14 +378,15 @@ export async function loadReviewDetail(
     fields.push({ field: f, label: fieldLabel(f), a: formatValue(f, aValue), b: b ? formatValue(f, b.value) : '(unchanged)', was });
   }
 
+  const labels = await loadInstallLabels(store);
   const isPin = row.pin;
   const resolvable = item.kind === 'sync_conflict' && item.state === 'open';
   const choices = resolvable ? choicesFor(item) : [];
   return {
     item,
     row,
-    a: side(as[0], names, store.installId),
-    b: side(bs[0], names, store.installId),
+    a: side(as[0], names, store.installId, labels),
+    b: side(bs[0], names, store.installId, labels),
     fields,
     choices,
     combine: choices.includes('combine') ? combineText(item) : null,

@@ -56,7 +56,7 @@ describe('migrations', () => {
       'accessory', 'cable', 'cable_end', 'placeholder', 'punch_item', 'missing_part',
       'part_source', 'photo', 'photo_link', 'ink_layer', 'blob', 'op', 'review_item', 'ruling', 'proposal',
       'finding', 'import_batch', 'draft_device', 'draft_cable', 'library_type', 'vocab', 'export',
-      'field_head', 'outbox', 'blob_queue', 'sync_state',
+      'install', 'field_head', 'outbox', 'blob_queue', 'sync_state',
     ];
     for (const k of expected) expect(entity(k).table).toBe(k);
   });

@@ -131,6 +131,13 @@ export const ENTITIES = {
     created_at: t(),
   }),
 
+  /** One iPad's label (T86, D155): `id` = the install id; written as an op so it syncs. */
+  install: record('install', {
+    label: t(),
+    user_id: t(),
+    updated_at: t(),
+  }),
+
   numbering_group: plain(
     'numbering_group',
     {

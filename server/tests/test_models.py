@@ -44,6 +44,7 @@ PLAN_ENTITIES = {
     "library_type",
     "vocab",
     "export",
+    "install",
     "field_head",
 }
 MAPPERS = {m.local_table.name: m for m in Base.registry.mappers}

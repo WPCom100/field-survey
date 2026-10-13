@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { Link } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { getBlobFiles, getBlobQueue } from '../blobs/queue';
 import { useBlobStatus } from '../blobs/useBlobStatus';
@@ -10,6 +10,7 @@ import { listProjects } from '../home/data';
 import { useIdentity, useSignOut } from '../identity/IdentityGate';
 import { exportLog } from '../log';
 import { getSyncEngine } from '../sync/engine';
+import { loadInstallLabels, saveInstallLabel } from '../sync/install';
 import { formatBytes, freeUploadedPhotos, loadServerVersion, loadSyncScreen, retryFailedUploads, type SyncScreenData } from '../sync/screen';
 import { checkAndFetch, runningInfo, useUpdateCheckState } from '../sync/useAppUpdates';
 import { describeCheck, describeRunning } from '../sync/updates';
@@ -25,6 +26,9 @@ export default function SyncScreen() {
   const blobs = useBlobStatus();
   const [data, setData] = useState<SyncScreenData | null>(null);
   const [installId, setInstallId] = useState('');
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [label, setLabel] = useState('');
+  const [labelFocused, setLabelFocused] = useState(false);
   const [hasProject, setHasProject] = useState<boolean | null>(null);
   const [note, setNote] = useState('');
   const [serverVersion, setServerVersion] = useState('');
@@ -37,9 +41,11 @@ export default function SyncScreen() {
     const store = await openAppStore();
     const [project] = await listProjects(store);
     setInstallId(store.installId);
+    setProjectId(project?.id ?? null);
+    if (!labelFocused) setLabel((await loadInstallLabels(store)).get(store.installId) ?? '');
     setHasProject(!!project);
     setData(await loadSyncScreen(store, project?.id ?? null));
-  }, []);
+  }, [labelFocused]);
 
   useEffect(() => {
     load().catch((e: unknown) => setNote(String(e)));
@@ -214,6 +220,27 @@ export default function SyncScreen() {
         <Text style={styles.value}>
           {identity.user.name} · app {version} ({build})
         </Text>
+        <View style={styles.row}>
+          <Text style={styles.value}>This iPad:</Text>
+          <TextInput
+            style={styles.input}
+            value={label}
+            placeholder={`iPad …${installId.slice(-6)}`}
+            autoCorrect={false}
+            maxLength={40}
+            editable={!!projectId}
+            onChangeText={setLabel}
+            onFocus={() => setLabelFocused(true)}
+            onBlur={() => {
+              setLabelFocused(false);
+              if (!projectId) return;
+              void openAppStore()
+                .then((s) => saveInstallLabel(s, projectId, identity.user.id, label))
+                .then(() => load())
+                .catch((e: unknown) => setNote(String(e)));
+            }}
+          />
+        </View>
         <Text style={styles.sub}>
           Server {identity.serverUrl}
           {serverVersion ? ` (${serverVersion})` : ''} · install {installId.slice(0, 8)}
@@ -291,7 +318,8 @@ const styles = StyleSheet.create({
   warn: { fontSize: 13, color: '#b42318' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: '#eef1f5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 14 },
-  row: { flexDirection: 'row', gap: 10 },
+  row: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  input: { flex: 1, maxWidth: 260, borderWidth: 1, borderColor: '#c7c7cc', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 16 },
   btn: { alignSelf: 'flex-start', backgroundColor: '#1f6feb', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
   btnText: { color: 'white', fontSize: 15, fontWeight: '600' },
   note: { color: '#0a5', fontSize: 14 },
