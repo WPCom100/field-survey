@@ -4,7 +4,7 @@
  * (writes go through `actions.ts` → `Editor`); no React or Expo imports, so it runs in Node.
  */
 
-import { displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
+import { defaultDeviceText, displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
 
 import { photoStrip } from '../photo/links';
 
@@ -115,6 +115,8 @@ export type CardConnection = {
 export type CardPunch = {
   id: string;
   label: string;
+  /** The Punch List's Device text, derived from this device (D148): what the export writes. */
+  deviceText: string | null;
   item: string;
   type: string | null;
   owner: string | null;
@@ -368,10 +370,12 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
   // --- punch items (sort_last last, then by number) and missing parts with their sources
   const punchRows = await store.list<Row>('punch_item', { where: 'device_id = ?', params: [deviceId] });
   punchRows.sort((a, b) => Number(!!a.sort_last) - Number(!!b.sort_last) || byNumber(a, b));
+  const deviceText = defaultDeviceText(d);
   const punch = punchRows.map(
     (p): CardPunch => ({
       id: String(p.id),
       label: displayNumber('punch_item', p),
+      deviceText,
       item: str(p.item) ?? '(no text)',
       type: str(p.type),
       owner: str(p.owner),

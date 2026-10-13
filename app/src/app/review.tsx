@@ -1,14 +1,24 @@
-import { Editor, resolutionReason, type ResolveChoice, type Store } from '@field-survey/core';
+import { Editor, linkPunchDevice, resolutionReason, type ResolveChoice, type Store } from '@field-survey/core';
 import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { AddDevicePanel } from '../additions/AddDevicePanel';
 import { openAppStore } from '../db';
 import { listProjects } from '../home/data';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamNames } from '../identity/useTeamNames';
 import { logTo } from '../log';
-import { kindLabel, loadReviewDetail, loadReviewList, shortStamp, type ReviewDetail, type ReviewList, type ReviewRow } from '../review/model';
+import {
+  kindLabel,
+  loadReviewDetail,
+  loadReviewList,
+  shortStamp,
+  type PunchDeviceReview,
+  type ReviewDetail,
+  type ReviewList,
+  type ReviewRow,
+} from '../review/model';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 
@@ -20,6 +30,11 @@ const CHOICE_LABEL: Record<ResolveChoice['choice'], string> = { A: 'Choose A', B
  * a typed value (D98: no Dismiss); each choice writes one Reconcile group with the auto-filled
  * reason (T15). Pin conflicts are resolved on the plan, both pins drawn. The `IN REVIEW` badges
  * clear here at once and on the other iPads on their next pull. `?item=` selects an item.
+ *
+ * An imported punch row linked to no device (T81, D148) shows the master's Device text with Link
+ * to device (a device of the row's level) and Create device (the + Device form, created unplaced);
+ * either writes one Reconcile op on `punch_item.device_id` and closes the item. Left unlinked, the
+ * item keeps the master's text in the export (D150).
  */
 export default function NeedsReviewScreen() {
   const params = useLocalSearchParams<{ item?: string }>();
@@ -106,6 +121,27 @@ export default function NeedsReviewScreen() {
     [store, editor, detail, names],
   );
 
+  const linkPunch = useCallback(
+    (deviceId: string, deviceLabel: string, confirm: boolean) => {
+      if (!editor || !detail) return;
+      const run = () =>
+        linkPunchDevice(editor, detail.item.id, deviceId, { deviceLabel }).then(
+          (r) => {
+            logTo('sync', 'info', 'punch_device_linked', { item: detail.item.id, device: deviceId });
+            setNote(`Linked: ${r.reason}`);
+            setTick((n) => n + 1);
+          },
+          (e: unknown) => setNote(`Not linked: ${String((e as Error)?.message ?? e)}`),
+        );
+      if (!confirm) return void run();
+      Alert.alert('Link to device', `Link this punch item to ${deviceLabel}? Its Device text then follows the device.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Link', onPress: () => void run() },
+      ]);
+    },
+    [editor, detail],
+  );
+
   const total = list?.tabs.find((t) => t.kind === 'all')?.count ?? 0;
 
   return (
@@ -140,7 +176,13 @@ export default function NeedsReviewScreen() {
           ListEmptyComponent={<Text style={styles.empty}>{list ? 'Nothing to review.' : 'Loading…'}</Text>}
         />
         <ScrollView style={styles.panel} contentContainerStyle={{ padding: 16, gap: 12 }}>
-          {detail ? <Panel detail={detail} canEdit={!!editor} onResolve={resolve} /> : <Text style={styles.empty}>Select an item.</Text>}
+          {detail?.punchDevice && store && editor && projectId ? (
+            <PunchDevicePanel detail={detail} review={detail.punchDevice} store={store} editor={editor} projectId={projectId} onLink={linkPunch} />
+          ) : detail ? (
+            <Panel detail={detail} canEdit={!!editor} onResolve={resolve} />
+          ) : (
+            <Text style={styles.empty}>Select an item.</Text>
+          )}
           {note ? <Text style={styles.note}>{note}</Text> : null}
         </ScrollView>
       </View>
@@ -251,6 +293,91 @@ function Panel({ detail: d, canEdit, onResolve }: { detail: ReviewDetail; canEdi
   );
 }
 
+/** The room part of a master Device text (`UFMP4 - BH OBS RM 47` → `BH OBS RM 47`), for the form. */
+function roomOf(master: string): string {
+  const i = master.indexOf(' - ');
+  return i >= 0 ? master.slice(i + 3).trim() : '';
+}
+
+function PunchDevicePanel(props: {
+  detail: ReviewDetail;
+  review: PunchDeviceReview;
+  store: Store;
+  editor: Editor;
+  projectId: string;
+  onLink: (deviceId: string, deviceLabel: string, confirm: boolean) => void;
+}) {
+  const { detail: d, review: r } = props;
+  const [filter, setFilter] = useState('');
+  const [creating, setCreating] = useState(false);
+  useEffect(() => {
+    setFilter('');
+    setCreating(false);
+  }, [d.item.id]);
+  const open = d.item.state === 'open';
+  const q = filter.trim().toLowerCase();
+  const shown = q ? r.devices.filter((x) => `${x.label} ${x.text ?? ''} ${x.category ?? ''}`.toLowerCase().includes(q)) : r.devices;
+  const linked = r.linkedTo ? r.devices.find((x) => x.id === r.linkedTo) : null;
+
+  return (
+    <>
+      <Text style={styles.panelTitle}>Punch item without a device — {r.levelCode}</Text>
+      <Text style={styles.value}>{r.punch}</Text>
+      <View style={styles.side}>
+        <Text style={styles.sub}>Device, as the master wrote it</Text>
+        <Text style={styles.value}>{r.master || '(blank)'}</Text>
+      </View>
+      {!open ? (
+        <Text style={styles.sub}>
+          This item is {d.item.state}
+          {linked ? `: linked to ${linked.label}${linked.text ? ` · ${linked.text}` : ''}` : ''}.
+        </Text>
+      ) : creating ? (
+        <View style={styles.form}>
+          <AddDevicePanel
+            store={props.store}
+            editor={props.editor}
+            projectId={props.projectId}
+            levelId={r.levelId}
+            levelCode={r.levelCode}
+            sheetId={null}
+            at={null}
+            title="Create device for this punch item"
+            defaults={{ drawingPosition: null, room: roomOf(r.master) || null }}
+            onCancel={() => setCreating(false)}
+            onCategory={() => {}}
+            onAdded={(id) => {
+              setCreating(false);
+              props.onLink(id, `${r.levelCode}-? (new)`, false);
+            }}
+          />
+        </View>
+      ) : (
+        <>
+          <Text style={styles.sub}>
+            Link it to the device it is about, or create that device. Once linked, its Device text follows the device (renames included). A row
+            that is really about a room or several devices can stay unlinked: the export then keeps the master&apos;s text.
+          </Text>
+          <View style={styles.btnRow}>
+            <Btn label="Create device ▸" onPress={() => setCreating(true)} />
+          </View>
+          <Text style={styles.sideTitle}>Link to a device on {r.levelCode}</Text>
+          <TextInput style={styles.input} value={filter} onChangeText={setFilter} placeholder="Filter: ID, model, room" autoCorrect={false} autoCapitalize="none" />
+          {shown.length === 0 ? <Text style={styles.sub}>No device matches.</Text> : null}
+          {shown.map((x) => (
+            <Pressable key={x.id} onPress={() => props.onLink(x.id, x.label, true)} style={styles.pick} accessibilityRole="button">
+              <Text style={styles.pickId}>{x.label}</Text>
+              <Text style={styles.pickText} numberOfLines={1}>
+                {x.text ?? x.category ?? ''}
+              </Text>
+            </Pressable>
+          ))}
+        </>
+      )}
+    </>
+  );
+}
+
 function Side(props: { letter: string; title: string; side: ReviewDetail['a']; values: [string, string][]; solid?: boolean }) {
   return (
     <View style={[styles.side, !props.solid && styles.sideB]}>
@@ -320,4 +447,8 @@ const styles = StyleSheet.create({
   btnText: { color: 'white', fontSize: 15, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, padding: 10, fontSize: 16, minHeight: 44 },
   note: { color: '#0a5', fontSize: 14 },
+  form: { height: 620, borderWidth: 1, borderColor: '#e1e4e8', borderRadius: 8, overflow: 'hidden' },
+  pick: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
+  pickId: { fontSize: 15, fontWeight: '700', minWidth: 72, fontVariant: ['tabular-nums'] },
+  pickText: { fontSize: 15, flex: 1 },
 });

@@ -290,18 +290,35 @@ def number_refs(numbers: list[int]) -> str:
     return ", ".join(parts)
 
 
+# D136, D151: named by their device alone (no room); so is any device with a panel name
+NAME_ONLY_CATEGORIES = ("Relay panel", "Equipment rack", "NSPS")
+
+
 def default_device_text(dev: Device | None) -> str | None:
-    """The Device text for a punch item that has none stored: `PI1002 S3 - Corridor …` for a
-    tagged device, `CTB2LCPB` for a panel."""
+    """The Device text of a punch item linked to `dev` (D136 format, D148, D151): `PI1002 S3 -
+    Corridor …` for a station or sensor (model, tag, room), `UFMP4 - BH OBS RM 47 …` for a
+    Foundry panel without a panel name; `CTB2LCPB` for a named panel, `EBDK (CTB2LCPB)` for an
+    EBDK, the model alone for a rack or NSPS. Mirrored by `defaultDeviceText` in packages/core."""
     if dev is None:
         return None
     name = dev.device or dev.type or dev.category or ""
+    if dev.category == "EBDK":
+        return f"EBDK ({dev.panel_name})" if dev.panel_name else (name or None)
+    if dev.category in NAME_ONLY_CATEGORIES or dev.panel_name:
+        return name or None
     tail = dev.display_id.split("-", 1)[1] if dev.display_id and "-" in dev.display_id else ""
     if re.fullmatch(r"[SD]\d+", tail):
         name = f"{name} {tail}".strip()
     if dev.room_location:
         name = f"{name} - {dev.room_location}" if name else dev.room_location
     return name or None
+
+
+def punch_device_text(p: PunchItem, dev: Device | None) -> str | None:
+    """The Punch List's Device column (D148, D150): derived from the linked device, so a rename
+    follows with no op on the punch item; an item linked to no device keeps the master's text
+    (`device_text`, e.g. the room or `All devices`)."""
+    return default_device_text(dev) if dev is not None else p.device_text
 
 
 def load(
@@ -481,7 +498,7 @@ def load(
         [
             code[p.level_id],
             p.number,
-            p.device_text or default_device_text(dev_by_id.get(p.device_id)),
+            punch_device_text(p, dev_by_id.get(p.device_id)),
             p.item,
             p.type,
             join_numbers(punch_photos.get(p.id, [])),

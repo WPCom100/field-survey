@@ -3,7 +3,7 @@
 How the project's records become the master workbook (PLAN §7.6), the job around it (PLAN §8
 `/exports`) and the TP-4 round-trip check. Normative: PLAN §7.6 (every format detail),
 §2.2 (which columns are generated at export), §8 (routes). Decisions: D16, D17, D25, D32, D33,
-D50, D51, D67, D94, D110, D128, D136–D139.
+D50, D51, D67, D94, D110, D128, D136–D139, D148–D151.
 
 ## Files
 
@@ -69,7 +69,7 @@ The file lands in R2 as any export, so the nightly dump + weekly bucket copy car
 | Summary | title (`project.settings.export_title`, default `ETC Lighting Controls Survey`), `Levels <first>-<last>`, `Surveyed <min> to <max>` of the levels' Surveyed dates, the disclaimer (`settings.disclaimer`, default the master's); four tables with `SUMPRODUCT` formulas over rows 4–2000 (or to the last data row when longer) **with the computed counts as cached values**, so Excel shows numbers before it recalculates; a stacked column chart per table right of it (none for a table without rows) | Surveyed / Updated as ISO **text** (T02 follow-up) |
 | Devices | by floor order, then ID (`06M-01` < `06M-S1` < `06M-D1`, numeric) | Status empty → `Unsurveyed` (D110); **Photo** = numbers of the photos whose `device_id` or `photo_link` is the device, ascending, `, `-joined, stored as text; Floor Order |
 | Connections | one row per numbered `cable_end` on the exported levels, by floor then `C-nn` | From/To verbatim (D32); Cable and Qty from the cable; Status empty → `Unsurveyed` (D138) |
-| Punch List | by floor, then (`sort_last`, #) | **Device** = `device_text` (D136), else from the linked device (`PI1002 S3 - Corridor …` / `CTB2LCPB`); **Photo** from `punch_item_id` + links; Date closed as a date cell `yyyy-mm-dd` |
+| Punch List | by floor, then (`sort_last`, #) | **Device** derived from the linked device (D148, D151: `PI1002 S3 - Corridor …` for stations, sensors and other field devices, `UFMP4 - <room>` for a Foundry panel without a panel name, `CTB2LCPB` for a named panel, `EBDK (CTB2LCPB)`, the model alone for a rack or NSPS), so a rename shows with no punch op; an item linked to no device writes the master's `device_text` (D150: the room, `All devices`); **Photo** from `punch_item_id` + links; Date closed as a date cell `yyyy-mm-dd` |
 | Missing Parts | by floor, then # | **Source** from `part_source`: `Punch #8-14, #19; Devices 06-S3; Connections C-06` (runs of ≥ 3 collapse) |
 | Photo Log | by floor, then Photo | **Device ID** = the photo's device, then its linked devices (D128); the picture in H at its pixel size (320×240 for seed and T21 thumbnails), markup flattened, row height `px × 0.75 + 6` |
 | Lists | the four fixed lists | |
@@ -103,8 +103,19 @@ refs and colours, anchor, size) and pictures (anchor, size, media SHA-256). The 
 | allow (master quirk) | 1 | Devices!Photo of 03-01 names photo 2, whose Photo Log row names 03-02 only; the import links the photo to 03-02 |
 | allow (master quirk) | 1 | Connections!Qty of B1 C-05: the master set Qty on B2 C-06 and left this end blank; Qty is the cable's |
 | D110 / D138 | 0 on the master | an empty status → `Unsurveyed` |
+| D148 | 87 | Punch List!Device of a linked item is derived from its device, not the master's spelling (below) |
 
-Row heights are reported, not failed (≤ 3 % of rows differ). Run it by hand:
+The 87 D148 cells, by kind: the device's Room / Location is fuller than the master's shorthand
+(`PI1002 S3 - Corridor XXB1-C005, north` for `… XXB1-C005 north`, `UFMP4 - BH OBS RM 47 WT01-2027`
+for `UFMP4 - BH OBS RM 47`, a room the master left off or shortened); the rack and NSPS are named by
+their model (`Equipment Rack 18U` for `Equipment rack`, `P-NSPS-D-KIT` for `P-NSPS-D`); `UFMP4 #1` /
+`#2` read `UFMP4 - <room>`; level 06's `PI1002 #2 – …` reads `PI1002 S2 - …`. Renaming a device on
+the iPad changes these rows; no punch op is needed. The 13 rows the import could not link to one
+device (a room, `Stations & sensors`, `S8-S12`, several devices) wait on Needs review and export
+the master's text until linked (D150); the eight Neuron ID rows (`All devices`) are not raised.
+
+Row heights are reported, not failed (≤ 3 % of rows differ), on rows whose values match (a row
+whose text differs, as D148's do, wraps differently by design). Run it by hand:
 
 ```
 uv run python tests/xlsx_diff.py ../fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx export.xlsx

@@ -1253,7 +1253,8 @@ export function PlanScreen(props: PlanScreenProps) {
               names={props.names ?? NO_NAMES}
               resolveBlobUri={props.resolveBlobUri ?? noBlob}
               decider={NOT_WIRED}
-              canMovePin={!!deviceById.get(selectedId)?.pin}
+              canMovePin={!!deviceById.get(selectedId)?.pin || !deviceById.get(selectedId)?.pinElsewhere}
+              unplaced={!deviceById.get(selectedId)?.pin && !deviceById.get(selectedId)?.pinElsewhere}
               canOpenLevels={!!onOpenLevel}
               onEdited={onEdited}
               onClose={() => setCardOpen(false)}

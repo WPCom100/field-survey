@@ -16,6 +16,7 @@ Every difference is listed; the ones the export is *meant* to produce are tagged
 | D51 | no Change Log tab |
 | D50 | a Unison bus spelling in Connections!From exported as `Stations & Sensors` |
 | D110 / D138 | an empty device or connection status exported as `Unsurveyed` |
+| D148 | Punch List!Device of a linked item: derived from its device, not the master text |
 | photo list spacing | `12,13` in the master, `12, 13` in the export |
 | device ID range | `01-S8 to 01-S12` in the master, the IDs listed in the export |
 | Source parenthetical | master `Connections C-06 (fiber to Level 01)`, export `Connections C-06` |
@@ -335,6 +336,8 @@ def classify(tab: str, header: str | None, key: tuple, a: Any, b: Any, allow: di
         return allow[(tab, header, key)]
     if tab == "Connections" and header == "From" and _bus_spelling(a) and b == BUS_LABEL:
         return "D50"
+    if tab == "Punch List" and header == "Device" and isinstance(a, str) and isinstance(b, str):
+        return "D148"  # only a linked item's text can differ: an unlinked one is written as stored
     if header == "Status" and a is None and b == UNSURVEYED:
         return "D110" if tab == "Devices" else "D138"
     if (
@@ -514,9 +517,17 @@ def diff(
             if x != y:
                 add(f"chart {i + 1}", "chart", x, y)
 
-        # row heights (reported)
+        # row heights (reported), on rows whose values match: a row whose text differs (D148's
+        # derived Device text) wraps differently by design
+        texts_differ = {
+            int(m_.group(1))
+            for d in res.differences
+            if d.tab == tab and d.kind == "value" and (m_ := re.fullmatch(r"[A-Z]+(\d+)", d.where))
+        }
         off = 0
         for r in range(1, nrows + 1):
+            if r in texts_differ:
+                continue
             mh = mw.row_dimensions[r].height if r in mw.row_dimensions else None
             eh = ew.row_dimensions[r].height if r in ew.row_dimensions else None
             if (mh or 15) != (eh or 15):

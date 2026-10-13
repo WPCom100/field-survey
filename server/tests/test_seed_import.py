@@ -261,7 +261,8 @@ def test_master_seed_import(session, store, factory, client):
     assert v.device("B2-02").panel_name == "CTB2LCPB"  # EBDK: panel from its Type
     assert v.device("06M-04").category == "Foundry panel"
     assert v.count(Device, Device.status.is_(None)) == 0
-    assert v.reviews("lint") == []  # every value in the master is in its list
+    # every value in the master is in its list: the only lint items are D148's unlinked punch rows
+    assert {r.subject["lint_id"] for r in v.reviews("lint")} == {seed_import.PUNCH_DEVICE_LINT}
 
     # --- connections: single-row cables
     a = v.end("B2", "C-02")  # 0-10V
@@ -363,6 +364,38 @@ def test_master_seed_import(session, store, factory, client):
     closed = v.punch("01", 2)
     assert closed.tracking_status == "Closed" and closed.date_closed == date(2026, 10, 8)
     assert v.punch("04", 22).device_id is None  # a room, not a device
+    # D148: every row linked to no device waits on Needs review with the master's text, the
+    # Neuron ID rows (one per group, D49) left out
+    unlinked = {
+        (r.subject["level_id"], r.subject["entity_id"]): r.candidates[0]["value"]
+        for r in v.reviews("lint")
+        if r.subject["lint_id"] == seed_import.PUNCH_DEVICE_LINT
+    }
+    assert sorted(unlinked.values()) == [
+        "Conf XX04-3108A/B",
+        "Elec XX04-1E01",
+        "Elec XX04-1E01",
+        "PI1002 S15, S16 - Corridor XX03-C014",
+        "PI1002 stations",
+        "PI1004 S18, PI1104 S20",
+        "PI1104 S3, P-DOC-SM2 D6, P-LS D7",
+        "PI1104 S8-S12 - BH OBS passageway",
+        "Stations & sensors",
+        "Stations & sensors",
+        "Stations & sensors",
+        "UFMP4 #1, #2",
+        "Walter Tower east wing",
+    ]
+    assert len(unlinked) == stats["punch_device_unmatched"] == 13
+    assert (str(v.levels["04"].id), str(v.punch("04", 22).id)) in unlinked
+    assert unlinked[(str(v.levels["04"].id), str(v.punch("04", 22).id))] == "Elec XX04-1E01"
+    assert all(
+        r.state == "open"
+        and r.subject["field"] == "device_id"
+        and r.subject["entity_kind"] == "punch_item"
+        for r in v.reviews("lint")
+    )
+    assert str(neuron.id) not in {e for _, e in unlinked}
     assert v.punch("01", 37).device_id is None  # two stations named
 
     # --- missing parts and part_source

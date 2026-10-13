@@ -59,6 +59,15 @@ export {
   type ResolveResult,
 } from './review';
 export {
+  PUNCH_DEVICE_LINT,
+  defaultDeviceText,
+  punchDeviceText,
+  isPunchDeviceItem,
+  linkPunchDevice,
+  type DeviceForText,
+  type LinkPunchResult,
+} from './punch';
+export {
   Store,
   StoreError,
   type LocalOutcome,

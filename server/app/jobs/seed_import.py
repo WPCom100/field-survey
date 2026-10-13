@@ -13,7 +13,8 @@ images to put in the object store, and stats. Nothing here touches the database;
   that names an out-of-scope level or a seed placeholder gets that placeholder. From/To are kept
   verbatim (D32); the Unison bus spellings become `Stations & Sensors` by a recorded ruling (D50).
 - Punch List → `punch_item`; the device is matched from the Device text (tag, panel, model +
-  room); the Neuron ID row is `sort_last`.
+  room); a row it links to no device raises a `review_item(lint)` for Needs review (D148); the
+  Neuron ID row is `sort_last`.
 - Missing Parts → `missing_part` + `part_source` links parsed from Source; unparsed → `finding`.
 - Photo Log → `photo` with the 320×240 image as `thumb_blob`, `seed_thumbnail_only` (D40),
   linked to the first Device ID and to the first punch item that lists the number.
@@ -43,6 +44,8 @@ IMPORT_USER_NAME = "import"
 IMPORT_CHANGE_TYPE = "Master edit"
 
 NEURON_ITEM = "Missing all Device Neuron IDs"
+# `review_item(lint)` for a punch row linked to no device (D148); the iPad offers Link / Create
+PUNCH_DEVICE_LINT = "import.punch_device_unmatched"
 UNSURVEYED = "Unsurveyed"
 BUS_LABEL = "Stations & Sensors"
 POWER_LABEL = "120v Power"
@@ -896,7 +899,9 @@ class Builder:
                     "level_id": lv.level_id,
                     "number": number,
                     "device_id": dev.id if dev else None,
-                    "device_text": row.get("device"),  # verbatim, exported as stored (D136)
+                    # the master's spelling: Needs review shows it; exported only while no
+                    # device is linked (D148, D150)
+                    "device_text": row.get("device"),
                     "item": item,
                     "type": self.enum(
                         vocab.PUNCH_TYPE,
@@ -928,11 +933,29 @@ class Builder:
                 },
             )
             self.punch_by_key[(lv.numbering_group_id, number)] = pid
-            if dev is None and row.get("device") and looks_like_device(row.get("device")):
-                self.count("punch_device_unmatched")
+            if dev is None and row.get("device") and item != NEURON_ITEM:
+                self.punch_device_review(pid, lv, row.get("device"))
             for n in photo_numbers(row.get("photo")):
                 self.punch_photo_refs.setdefault((lv.numbering_group_id, n), []).append(pid)
             self.count("punch_items")
+
+    def punch_device_review(self, pid: uuid.UUID, lv: LevelRef, text: str) -> None:
+        """D148: a Punch List row whose Device text links to no single device (no match, a room,
+        `All devices`, `S3-S9`) waits on Needs review, where a person links it to a device or
+        creates one. The Neuron ID row is left out: it names every device by design (D49)."""
+        self.count("punch_device_unmatched")
+        self.review(
+            "lint",
+            lv.level_id,
+            {
+                "entity_kind": "punch_item",
+                "entity_id": str(pid),
+                "field": "device_id",
+                "level_id": str(lv.level_id),
+                "lint_id": PUNCH_DEVICE_LINT,
+            },
+            [{"side": "import", "value": text}],
+        )
 
     # ---------------------------------------------------------------- parts
 
@@ -1271,10 +1294,6 @@ def number_refs(text: str) -> list[int] | None:
 def single_number(ref: str) -> int | None:
     m = re.fullmatch(r"\s*#?\s*(\d+)\s*", ref)
     return int(m.group(1)) if m else None
-
-
-def looks_like_device(text: str) -> bool:
-    return bool(PANEL_RE.search(text) or TAG_RE.search(text) or HASH_TAG_RE.match(text))
 
 
 def pair_score(a: End, b: End) -> float:

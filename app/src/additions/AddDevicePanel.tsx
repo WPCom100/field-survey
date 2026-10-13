@@ -19,8 +19,11 @@ export type AddDeviceProps = {
   projectId: string;
   levelId: string;
   levelCode: string;
-  sheetId: string;
-  at: { x: number; y: number };
+  /** Where the surveyor long-pressed; null from Needs review (T81): created unplaced. */
+  sheetId: string | null;
+  at: { x: number; y: number } | null;
+  /** Header line; default "Add device (field addition)". */
+  title?: string;
   /** Defaults from the sheet's grid calibration and text pass at `at` (T45): editable. */
   defaults?: { drawingPosition: string | null; room: string | null };
   onCancel: () => void;
@@ -80,8 +83,8 @@ export function AddDevicePanel(props: AddDeviceProps) {
         <Pressable onPress={props.onCancel} hitSlop={8} disabled={saving}>
           <Text style={styles.back}>◀ Cancel</Text>
         </Pressable>
-        <Text style={styles.title}>Add device (field addition)</Text>
-        <Text style={styles.muted}>Placed where you pressed (the grey + pin).</Text>
+        <Text style={styles.title}>{props.title ?? 'Add device (field addition)'}</Text>
+        <Text style={styles.muted}>{props.at ? 'Placed where you pressed (the grey + pin).' : 'Not on the plan yet: place its pin from the plan later.'}</Text>
       </View>
       <ScrollView style={styles.flex} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         {error ? <Text style={styles.error}>{error}</Text> : null}

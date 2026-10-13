@@ -72,7 +72,7 @@ Bold = master column (name kept verbatim for export). `*` = server-assigned.
 | `cable` | id, project, **Cable**, **Qty** (nullable), origin ∈ {riser, library, import, manual}, single_row, riser_ref{sheet, bbox}, riser_to_label, vertical (grouping key), end_a, end_b, endpoint_confirmed (D6), version, deleted_* | One physical cable (D2) |
 | `cable_end` | id, cable, side ∈ {A, B}, endpoint_kind ∈ {device, placeholder}, device, placeholder, level, **ID** (`C-nn`*, null until numbered), **From**, **To**, **Status**, **Note**, surveyed_by, surveyed_at, status_source ∈ {surveyed, copied, derived} | From/To generated once from templates then stored/editable (D32) |
 | `placeholder` | id, project, label, kind ∈ {fixtures, power, station_bus, level_not_in_scope, external, fixture_run, spare, unknown, custom}, level? | Project vocabulary (D26); seed list §7.5 |
-| `punch_item` | id, level, **#***, device, cable_end, device_text (the **Device** column text, kept by the import, generated from the device when empty — D136), **Item**, **Type**, **Owner**, **Tracking status**, **Date closed**, **Notes**, rule_id, proposal_id, sort_last, version, deleted_* | **Photo** column generated at export; **Device** written from `device_text` |
+| `punch_item` | id, level, **#***, device, cable_end, device_text (the master's **Device** column text, kept by the import for reference and for an item linked to no device — D136, D148, D150), **Item**, **Type**, **Owner**, **Tracking status**, **Date closed**, **Notes**, rule_id, proposal_id, sort_last, version, deleted_* | **Photo** column generated at export; **Device** derived from the linked device (D148, D151), else `device_text` (D150) |
 | `missing_part` | id, level, **#***, device, **Device / Location**, **Part**, **Part no.**, **Qty**, **Owner**, **Part status**, **Notes**, rule_id, proposal_id, version, deleted_* | **Source** generated at export from `part_source` |
 | `part_source` | missing_part, target_kind ∈ {punch, device, cable_end}, target_id | |
 | `photo_link` | photo, target_kind ∈ {device, cable_end, punch}, target_id (D128) | |
@@ -257,7 +257,7 @@ Per level: one display sheet (composite) + N source sheets (D29). pdfplumber wor
 |---|---|
 | Devices | → `device` (`origin=import`, ID kept, panel_name parsed) |
 | Connections | → `cable_end`s paired into cables by (code, level cross-reference, labels) with a confidence, paired at ≥ 0.8 (D126); single-row codes → one cable; a To text naming an out-of-scope level or a seed placeholder → that placeholder far end; otherwise unpaired → own cable with an unresolved far end + `import_pair` review listing the candidates (D126); From/To verbatim; the four Unison spellings → rename ruling to `Stations & Sensors` recorded at import (D50) |
-| Punch List | → `punch_item`; Device text matched by ID prefix; Neuron ID row → `sort_last` |
+| Punch List | → `punch_item`; Device text matched by ID prefix; a row linked to no device → `review_item(lint)` `import.punch_device_unmatched` for Needs review (D148); Neuron ID row → `sort_last` |
 | Missing Parts | Source parsed (`Punch #8-14`, `#15, #19`, `Devices 06-S3`, `Connections C-06`) → `part_source`; unparsed → finding |
 | Photo Log | → `photo` with the 320×240 image, `seed_thumbnail_only` (D40) |
 | Change Log | → historical ops (`user="import"`, state `superseded`: recorded, shown in History, never materialised — D124), not re-logged; never exported (D51) |

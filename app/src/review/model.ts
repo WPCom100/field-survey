@@ -11,7 +11,9 @@
 import {
   choicesFor,
   combineText,
+  defaultDeviceText,
   displayNumber,
+  isPunchDeviceItem,
   sideOf,
   type Candidate,
   type ChoiceName,
@@ -175,13 +177,16 @@ export async function loadReviewList(store: Store, projectId: string, q: ReviewQ
     const d = await describeSubject(store, subj.entity_kind, subj.entity_id, codes);
     const levelId = item.level_id ?? subj.level_id ?? d.levelId;
     const fields = itemFields(item);
+    const master = isPunchDeviceItem(item) ? masterText(item) : null;
     all.push({
       id: item.id,
       kind: item.kind,
       levelId,
       levelCode: levelId ? (codes.get(levelId) ?? null) : null,
       subject: d.label,
-      field: fields.map(fieldLabel).join(fields.includes('deleted_at') && fields.length === 2 ? ' vs ' : ' + '),
+      field: master !== null
+        ? `Device "${master}" → link`
+        : fields.map(fieldLabel).join(fields.includes('deleted_at') && fields.length === 2 ? ' vs ' : ' + '),
       at: uuidTime(item.id),
       ruling: !!item.ruling,
       pin: subj.entity_kind === 'device' && fields.length === 1 && fields[0] === 'pin',
@@ -202,7 +207,61 @@ export async function loadReviewList(store: Store, projectId: string, q: ReviewQ
   return { rows, tabs, levels };
 }
 
+/** The master's Device text an unlinked imported punch row carried (the import's candidate). */
+function masterText(item: ReviewItem): string {
+  const c = (item.candidates ?? [])[0] as { value?: unknown } | undefined;
+  return typeof c?.value === 'string' ? c.value : '';
+}
+
 // ------------------------------------------------------------------- detail
+
+/** A device the punch item can be linked to: `01-S10 · PI1002 S10 - Walter Tower`. */
+export type LinkChoice = { id: string; label: string; text: string | null; category: string | null };
+
+/**
+ * An imported punch row linked to no device (D148): the master's text, the item, and the devices
+ * of its level to link it to (or a new one from the + Device form).
+ */
+export type PunchDeviceReview = {
+  punchId: string;
+  /** `Punch #27 Gain access; survey…`. */
+  punch: string;
+  /** The master's Device column, e.g. `Walter Tower east wing`. */
+  master: string;
+  levelId: string;
+  levelCode: string;
+  /** The level's devices, by ID; field additions without an ID (`01-?`) last. */
+  devices: LinkChoice[];
+  /** The device the item is linked to now (after Link, while the item is still shown). */
+  linkedTo: string | null;
+};
+
+async function punchDeviceReview(store: Store, item: ReviewItem, codes: ReadonlyMap<string, string>): Promise<PunchDeviceReview | null> {
+  if (!isPunchDeviceItem(item)) return null;
+  const punch = await store.get<Row>('punch_item', item.subject.entity_id);
+  if (!punch) return null;
+  const levelId = String(punch.level_id);
+  const levelCode = codes.get(levelId) ?? '?';
+  const devs = await store.list<Row>('device', { where: 'level_id = ?', params: [levelId] });
+  const devices = devs
+    .map((d): LinkChoice => ({
+      id: String(d.id),
+      label: displayNumber('device', d, levelCode),
+      text: defaultDeviceText(d),
+      category: typeof d.category === 'string' ? d.category : null,
+    }))
+    .sort((a, b) => Number(a.label.endsWith('-?')) - Number(b.label.endsWith('-?')) || a.label.localeCompare(b.label, 'en', { numeric: true }));
+  const item_ = typeof punch.item === 'string' && punch.item.trim() ? ` ${punch.item.trim()}` : '';
+  return {
+    punchId: String(punch.id),
+    punch: `Punch #${displayNumber('punch_item', punch)}${item_}`,
+    master: masterText(item) || (typeof punch.device_text === 'string' ? punch.device_text : ''),
+    levelId,
+    levelCode,
+    devices,
+    linkedTo: typeof punch.device_id === 'string' ? punch.device_id : null,
+  };
+}
 
 export type ReviewSide = {
   /** "Landry", or "user …abc123" when the team list does not know the id. */
@@ -235,8 +294,10 @@ export type ReviewDetail = {
   combine: string | null;
   /** The A/B pins of a pin conflict, in sheet coordinates. */
   pins: { a: { sheet: string | null; x: number; y: number } | null; b: { sheet: string | null; x: number; y: number } | null } | null;
-  /** Only sync conflicts are resolved here (D98: and never dismissed). */
+  /** Only sync conflicts are resolved with A/B here (D98: and never dismissed). */
   resolvable: boolean;
+  /** An imported punch row waiting for its device (D148): Link to device / Create device. */
+  punchDevice: PunchDeviceReview | null;
 };
 
 function side(c: Candidate | undefined, names: ReadonlyMap<string, string>, installId: string): ReviewSide | null {
@@ -323,6 +384,7 @@ export async function loadReviewDetail(
     combine: choices.includes('combine') ? combineText(item) : null,
     pins: isPin ? { a: asPin(as[0]?.value ?? current?.pin), b: asPin(bs[0]?.value) } : null,
     resolvable,
+    punchDevice: await punchDeviceReview(store, item, codes),
   };
 }
 

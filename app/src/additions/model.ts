@@ -66,9 +66,10 @@ export function matchModel(choices: readonly LibraryChoice[], typed: string): Li
 export type FieldDeviceInput = {
   projectId: string;
   levelId: string;
-  sheetId: string;
-  /** Sheet coordinates of the long-press (D92). */
-  at: { x: number; y: number };
+  /** Sheet and sheet coordinates of the long-press (D92); left out from Needs review (T81): the
+   * device is created unplaced and placed on the plan later. */
+  sheetId?: string | null;
+  at?: { x: number; y: number } | null;
   category: string;
   /** A library type picked from the list… */
   libraryTypeId?: string | null;
@@ -142,7 +143,7 @@ export async function addFieldDevice(editor: Editor, store: Store, input: FieldD
       device: model,
       room_location: str(input.room),
       drawing_position: str(input.drawingPosition),
-      pin: { sheet: input.sheetId, x: round(input.at.x), y: round(input.at.y) },
+      ...(input.sheetId && input.at ? { pin: { sheet: input.sheetId, x: round(input.at.x), y: round(input.at.y) } } : {}),
       origin: 'field_addition',
       found_on_site: true,
       library_type_id: libraryTypeId,

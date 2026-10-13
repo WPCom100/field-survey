@@ -10,7 +10,7 @@
  * connection. Rows without a device match only when Category is not being filtered.
  */
 
-import { displayNumber, isNew, type Store } from '@field-survey/core';
+import { displayNumber, isNew, punchDeviceText, type Store } from '@field-survey/core';
 
 import type { PlanDevice } from './data';
 import { ownerMatches, statusKey, type PlanFilter } from './filters';
@@ -160,16 +160,22 @@ export async function loadLevelLists(
   });
 
   // --- punch items and missing parts
+  // A punch item's Device text follows its device (D148); an unlinked one shows the master's (D150).
+  const deviceRows = new Map(
+    (await store.list<Row>('device', { where: 'level_id = ?', params: [levelId], includeDeleted: true })).map((d) => [String(d.id), d]),
+  );
   const punch = (await store.list<Row>('punch_item', { where: 'level_id = ?', params: [levelId], includeDeleted })).map((p): ListRow => {
     const id = String(p.id);
     const { deviceLabel, ...inherited } = inherit(str(p.device_id));
+    const linked = str(p.device_id) ? deviceRows.get(String(p.device_id)) : undefined;
+    const deviceText = punchDeviceText(p, linked && !linked.deleted_at ? linked : null);
     return withText(
       {
         id,
         tab: 'punch',
         label: displayNumber('punch_item', p),
         title: str(p.item) ?? '(no text)',
-        sub: [deviceLabel, str(p.type), str(p.owner), str(p.tracking_status) ?? 'Open'].filter(Boolean).join(' · '),
+        sub: [deviceLabel, deviceText, str(p.type), str(p.owner), str(p.tracking_status) ?? 'Open'].filter(Boolean).join(' · '),
         ...inherited,
         badges: badgesOf(id, isNew('punch_item', p), !!p.deleted_at),
         cable: null,

@@ -25,7 +25,7 @@ from app.blobs import object_key
 from app.config import settings
 from app.ids import uuid7
 from app.jobs import export_xlsx, exports, markup
-from app.models import Blob, Device, Export, Level
+from app.models import Blob, Device, Export, Level, PunchItem
 
 # Master quirks TP-4 documents: cells whose master value cannot come back from the records.
 ALLOW = {
@@ -39,6 +39,10 @@ ALLOW = {
 EXPECTED_DOCUMENTED = {
     "D51": 1,  # no Change Log tab
     "D50": 7,  # the four bus spellings in seven From cells
+    # Punch List!Device of a linked item is derived from its device: the device's fuller Room /
+    # Location, the rack's and NSPS's model (`Equipment Rack 18U`, `P-NSPS-D-KIT`), `UFMP4` for
+    # the master's `UFMP4 #1` (server/docs/exports.md lists them)
+    "D148": 87,
     "photo list spacing": 2,  # `1,5` and `12,13`
     "device ID range": 1,  # `01-S8 to 01-S12`
     "Source parenthetical": 3,  # `Connections C-06 (fiber to Level 01)` on three parts
@@ -106,6 +110,7 @@ def test_tp4_master_round_trip(session, store, factory, client, tmp_path):
     assert tp5_precheck.check(out) == []
     result = xlsx_diff.diff(FIXTURE, out, allow=ALLOW)
     assert result.unexpected() == [], result.report()
+    print("\n".join(str(d) for d in result.differences if d.reason == "D148"))
     assert dict(result.documented()) == EXPECTED_DOCUMENTED, result.report()
     # Row heights are estimated (Excel has no autofit on write): nearly all match the master's.
     for tab, (off, rows) in result.row_heights.items():
@@ -182,6 +187,44 @@ def test_second_export_reports_the_diff_and_a_levels_filter(session, store, fact
     assert wb["Summary"]["A3"].value == "Surveyed 2026-10-09"
     assert wb["Summary"]["A9"].value == "Total"
     assert len(wb["Summary"]._charts) == 4
+
+
+@needs_fixture
+def test_punch_device_text_follows_the_device(session, store, factory, client):
+    """D148: a linked punch item's Device column is derived from its device, so a rename shows
+    with no op on the punch item; D150: an unlinked one keeps the master's text."""
+    project_id, _ = import_file(session, store, factory, FIXTURE)
+    b1, l04 = (
+        session.scalars(select(Level).where(Level.project_id == project_id, Level.level == c)).one()
+        for c in ("B1", "04")
+    )
+    dev = session.scalars(
+        select(Device).where(Device.level_id == b1.id, Device.display_id == "B1-S3")
+    ).one()
+    item = session.scalars(
+        select(PunchItem).where(PunchItem.level_id == b1.id, PunchItem.number == 8)
+    ).one()
+    assert item.device_id == dev.id
+    assert item.device_text == "PI1002 S3 - Corridor XXB1-C005 north"  # the master's spelling
+    # rename the device's room and model (a direct table write stands in for synced ops)
+    session.execute(
+        update(Device)
+        .where(Device.id == dev.id)
+        .values(device="PI1004", room_location="Corridor XXB1-C005 north end")
+    )
+    session.commit()
+
+    got = run_export_via_api(client, factory, store, project_id)
+    ws = openpyxl.load_workbook(io.BytesIO(store.read(object_key(got["blob"]))))["Punch List"]
+    device_of = {(r[0].value, r[1].value): r[2].value for r in ws.iter_rows(min_row=4)}
+    assert device_of[("B1", 8)] == "PI1004 S3 - Corridor XXB1-C005 north end"
+    assert session.get(PunchItem, item.id).device_text == "PI1002 S3 - Corridor XXB1-C005 north"
+    unlinked = session.scalars(
+        select(PunchItem).where(PunchItem.level_id == l04.id, PunchItem.number == 22)
+    ).one()
+    assert unlinked.device_id is None
+    assert device_of[("04", 22)] == "Elec XX04-1E01"  # the room, as the master wrote it
+    assert device_of[("B2", 9)] == "All devices"  # the Neuron ID row
 
 
 # ------------------------------------------------------------- empty project
@@ -507,3 +550,33 @@ def test_export_helpers():
         export_xlsx.default_device_text(Device(display_id="B2-01", device="CTB2LCPB")) == "CTB2LCPB"
     )
     assert export_xlsx.default_device_text(None) is None
+    # D151: named panels, racks and NSPS by name alone, an EBDK by its panel, a Foundry panel
+    # without a panel name with its room
+    room = "Elec XXB1-2E02"
+    named = Device(
+        display_id="B1-01",
+        category="Relay panel",
+        device="CTB1LCPB",
+        panel_name="CTB1LCPB",
+        room_location=room,
+    )
+    assert export_xlsx.default_device_text(named) == "CTB1LCPB"
+    ebdk = Device(
+        display_id="B1-02",
+        category="EBDK",
+        device="EBDK",
+        panel_name="CTB1LCPB",
+        room_location=room,
+    )
+    assert export_xlsx.default_device_text(ebdk) == "EBDK (CTB1LCPB)"
+    rack = Device(
+        display_id="01-05",
+        category="Equipment rack",
+        device="Equipment Rack 18U",
+        room_location=room,
+    )
+    assert export_xlsx.default_device_text(rack) == "Equipment Rack 18U"
+    ufmp = Device(
+        display_id="01-08", category="Foundry panel", device="UFMP4", room_location="BH OBS RM 47"
+    )
+    assert export_xlsx.default_device_text(ufmp) == "UFMP4 - BH OBS RM 47"

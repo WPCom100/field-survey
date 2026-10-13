@@ -45,8 +45,10 @@ export type DeviceCardProps = {
   /** A `file://` URI for a cached blob, or null. */
   resolveBlobUri: (sha: string, kind: 'thumb' | 'image') => string | null;
   decider: ProposalDecider;
-  /** The device has a pin on the sheet shown, so "Move pin" can work. */
+  /** The device has a pin on the sheet shown, or none at all, so "Move pin" / "Place pin" can work. */
   canMovePin: boolean;
+  /** No pin anywhere yet (a device created from Needs review, T81): the menu offers "Place pin…". */
+  unplaced?: boolean;
   /** Another level can be opened (false on the demo level, which has none). */
   canOpenLevels: boolean;
   onEdited: () => void;
@@ -148,7 +150,7 @@ export function DeviceCard(props: DeviceCardProps) {
       {menu ? (
         <View style={styles.menu}>
           {props.canMovePin && !d.deleted ? (
-            <MenuButton label="Move pin…" onPress={() => (setMenu(false), setPending({ kind: 'move', reason: '' }))} />
+            <MenuButton label={props.unplaced ? 'Place pin…' : 'Move pin…'} onPress={() => (setMenu(false), setPending({ kind: 'move', reason: '' }))} />
           ) : null}
           {d.deleted ? (
             <MenuButton label="Restore…" onPress={() => (setMenu(false), setPending({ kind: 'restore', reason: '' }))} />
@@ -299,7 +301,7 @@ export function DeviceCard(props: DeviceCardProps) {
                 </Text>
               </View>
               <Text style={styles.itemSub} numberOfLines={2}>
-                {[p.type, p.owner, p.tracking, p.notes].filter(Boolean).join(' · ')}
+                {[p.deviceText, p.type, p.owner, p.tracking, p.notes].filter(Boolean).join(' · ')}
               </Text>
             </View>
           ))}
