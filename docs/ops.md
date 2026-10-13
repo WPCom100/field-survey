@@ -186,6 +186,10 @@ Two row types. A **build** row has the profile, the EAS build id and the build n
 | 2026-10-10 | development | `19e26a75-0635-4624-acbe-f062b37e5291` | 1 | internal (ad hoc), SDK 57, commit `0e188fc`; installed on Landry's iPad (UDID `00008122-001070500251801C`), Developer Mode on; `npx expo start --dev-client --lan` bundled 1268 modules, IdentityGate shown |
 | 2026-10-10 | production | `833be746-0079-4511-a0d6-ca0281475c0a` | 2 | store; `eas submit --latest` uploaded to ASC app `6821263690`; TestFlight internal group `LTP team` (auto-distribute), Zach invited |
 | 2026-10-10 | development | `b146b497-c5c0-493c-9618-d69fc3797b48` | 2 | internal (ad hoc); EAS shows commit `d8c30e9` because the T07 tree was uploaded before it was committed (content = `cb23a55`); development and production profiles keep separate build counters; adds `expo-sqlite` + `expo-crypto` (T07); installed on Landry's iPad over build 1; first launch logged `[store] open: search=fts5 install=01a124c1-95f1-70d4-bf84-e9568f1399b9` (A21 confirmed on device). Note: since RN 0.77 app logs show in React Native DevTools (press `j` in Metro, Console tab, then `r`), not in the terminal |
+| 2026-10-13 | development | `eb79ee85-4646-42e1-8d65-e039521624cf` | 10 | T84, commit `0bf4507`: **errored** in *Configure expo-updates*, runtime version mismatch (PC `9099e69e`, EAS `78875d8a`); fixed in `bb75d8f` (§5.5 "Keep the fingerprint the same everywhere") |
+| 2026-10-13 | production | `64602bf5-2fc4-4e41-9acf-8e8cd834c308` | 11 | T84, commit `0bf4507`: errored the same way, never submitted |
+| 2026-10-13 | development | `eb4162d7-1894-4cd2-8345-b28c2371d505` | 12 | T84, commit `bb75d8f`: first dev build with `expo-updates`, channel `development`, runtime `d28d6fee` = PC fingerprint (`eas fingerprint:compare` ✅) |
+| 2026-10-13 | production | `0d2a6ba6-052b-45b7-a7c9-595ccd11d88d` | 13 | T84, commit `bb75d8f`: first TestFlight build with `expo-updates`, channel `production`, runtime `d28d6fee73a968bab537ea58be2093f7b41861bc` = PC fingerprint; `eas submit` (submission `59658f1e`) uploaded to ASC app `6821263690`. No update published yet; the first one is part of the T84 on-device checks |
 
 ### 5.5 JS updates (T84, D153, D157)
 
@@ -199,6 +203,8 @@ A TestFlight build runs its embedded JS until an **update** is published to its 
 | A native module, `app.json`, `eas.json` build settings, a config plugin, a package patch, an Expo SDK bump | a new build (§5.2 and §5.3), then updates again |
 
 Check before publishing: `cd app && npx expo-updates fingerprint:generate --platform ios` prints the hash the update will carry. If it is not the runtime version of the current TestFlight build (`eas build:list --platform ios --profile production --limit 1`), the change needs a build; an update published anyway reaches nobody.
+
+**Keep the fingerprint the same everywhere.** EAS fails a build when the runtime version it computes on its Mac differs from the one `eas build` computed on the PC ("Runtime version mismatch" in the *Configure expo-updates* phase). T84 hit this and fixed three causes; keep them fixed: `virtualStoreDirMaxLength: 60` in `pnpm-workspace.yaml` (pnpm's Windows default; macOS and Linux default to 120, which changes every native module's path); `/ios` and `/android` in `app/.gitignore` (the builder has no `.git` and reads only that file, so a prebuilt `ios/` would otherwise count as a bare project); and LF line endings for the raw-hashed `app/.gitignore`, `app/eas.json`, `app/app.json`, `app/package.json` (`.gitattributes`). `app.json` lists `platforms: ["ios"]` because the local CLI otherwise adds `web` and EAS does not. To check without a build: `eas fingerprint:compare --build-id <id> --environment production` against a finished build.
 
 **Publish** (manual fallback; CI does this after the server deploy once T85 lands). From `app/`, in Git Bash, with the tree committed:
 
