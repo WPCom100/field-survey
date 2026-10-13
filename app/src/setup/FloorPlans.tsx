@@ -8,6 +8,7 @@ import { useIdentity } from '../identity/IdentityGate';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { getImport, isFinished, type FilePart, type ImportBatch } from './imports';
+import { nativeUploadPart } from './upload-native';
 import { loadLevelSheets, sheetJobLine, startSheetImport, type LevelSheets, type SheetKind } from './sheets';
 import { Btn, Notice, Section } from './widgets';
 
@@ -54,7 +55,7 @@ export function FloorPlans({ projectId }: { projectId: string }) {
       const part: FilePart = { uri: a.uri, name: a.name, type: a.mimeType ?? PDF };
       setBusy(`Uploading ${a.name} for ${code}…`);
       try {
-        const batch = await startSheetImport(identity, projectId, levelId, kind, part);
+        const batch = await startSheetImport(identity, projectId, levelId, kind, nativeUploadPart(part));
         if (!live.current) return;
         setJobs((j) => [{ levelId, kind, name: a.name, batch }, ...j.filter((o) => o.batch.id !== batch.id)]);
       } catch (e) {

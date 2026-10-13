@@ -9,11 +9,19 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 3. **Logs.** In the Metro terminal press `j` to open React Native DevTools; app logs appear there, not in the terminal.
 4. **Mark results as you go.** Tick `[x]` for pass. For a fail, leave it `[ ]` and write what you saw after "→ saw:". Then paste this file back to Claude.
 
-Pending round started: **2026-10-12 (second)**. The M3 round of 2026-10-12 stopped at the seed import (archived in [on-device-log.md](on-device-log.md)); every step below is still untested. **Uploads fail until T80 lands** ("Unsupported FormDataPart implementation"): the T28 import steps and the T45 upload steps wait for it; everything that needs imported data or a plan sheet waits with them. Decisions D101–D107, D124, D126, D131–D133, D135 and D137 were approved on 2026-10-12; D136 and D139 were changed (D148, D149); D138 is still open. New tasks add their checks below.
+Pending round started: **2026-10-12 (second)**. The M3 round of 2026-10-12 stopped at the seed import (archived in [on-device-log.md](on-device-log.md)); every step below is still untested. **T80 fixed the upload error** (JS only, no new build): start with the T80 section below, then resume the M3 round sheet at A-2. Decisions D101–D107, D124, D126, D131–D133, D135 and D137 were approved on 2026-10-12; D136 and D139 were changed (D148, D149); D138 was approved after an explanation; D150 answers how a punch item naming a room exports. New tasks add their checks below.
 
 **This round's build:** dev build `ddf99272` (T69 + T70), install from https://expo.dev/accounts/wpcom/projects/field-survey/builds/ddf99272-0e81-474c-8af7-2392c0232e81 before step 2. Every dev build reads `1.0.0 (6)` on the Sync screen, so check Metro instead: opening a plan must log `[plan] pdf native patch: t70 ink,longpress-move`. **Server:** the Droplet runs `2444a69` with migration 0005 (deployed 2026-10-12 evening, pre-migration dump `backups/pg/survey-2026-10-12T231434Z.dump`), so T29/T31/T59 exports, T75 and T45 plan sheets all have their server side. **TestFlight:** production build 8 (`41d313ab`, from `2444a69`) was submitted the same evening.
 
 ---
+
+## T80 — Uploads work again ("Unsupported FormDataPart implementation")  ·  Needs: no new build (JS only)
+
+**Why it matters:** the seed import and the plan sheet upload are how a project gets its devices and its floor plan; both stopped at A-2/A-3 of the M3 round with this error.
+
+- [ ] **Seed import reads the workbook.** Setup → 3 Sources → Seed import → Choose workbook…, pick `Lighting_Control_Survey_Master_B2-06_4.xlsx`: "Reading the workbook…", then Checks and Column mapping appear. No "Unsupported FormDataPart implementation". Then continue with the T28 steps above. → saw:
+- [ ] **Re-check sends the file again.** Change one mapping and tap Re-check with this mapping: the Checks refresh without an error (the file is read from the iPad a second time). → saw:
+- [ ] **Plan sheet uploads.** Floor plans → 06M → Choose…, pick `Level_06M_-_Lighting_Composite_vector.pdf`: the job line reads Queued → Reading the sheet…, no error. Then continue with the T45 steps. → saw:
 
 ## T28 — Seed import from the iPad  ·  Needs: **new dev build** (adds `expo-document-picker`); the server must run this task's code (`POST /imports/preview`)
 

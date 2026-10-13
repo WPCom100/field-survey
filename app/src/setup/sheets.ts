@@ -8,7 +8,8 @@
 import { HttpClient, gridSummary, parseGridSets, type Store } from '@field-survey/core';
 
 import type { Identity } from '../identity/api';
-import type { FilePart, ImportBatch } from './imports';
+import type { ImportBatch } from './imports';
+import { uploadForm, type UploadPart } from './upload';
 
 export type SheetKind = 'display' | 'source';
 
@@ -56,14 +57,9 @@ function client(identity: Identity): HttpClient {
 }
 
 /** Upload one PDF for a level; the server analyses it and the sheet arrives with the next sync. */
-export async function startSheetImport(identity: Identity, projectId: string, levelId: string, kind: SheetKind, file: FilePart): Promise<ImportBatch> {
+export async function startSheetImport(identity: Identity, projectId: string, levelId: string, kind: SheetKind, file: UploadPart): Promise<ImportBatch> {
   const c = client(identity);
-  const body = new FormData();
-  body.append('project_id', projectId);
-  body.append('kind', 'plans');
-  body.append('level_id', levelId);
-  body.append('sheet_kind', kind);
-  body.append('file', file as unknown as Blob);
+  const body = uploadForm(file, { project_id: projectId, kind: 'plans', level_id: levelId, sheet_kind: kind });
   const res = await c.send('POST', '/imports', { headers: c.headers(), body });
   return (await res.json()) as ImportBatch;
 }

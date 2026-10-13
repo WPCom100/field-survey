@@ -7,6 +7,9 @@
 import { HttpClient } from '@field-survey/core';
 
 import type { Identity } from '../identity/api';
+import { uploadForm, type UploadPart } from './upload';
+
+export type { FilePart } from './upload';
 
 export type ImportKind = 'master_xlsx' | 'floor_xlsx';
 export const KIND_LABEL: Record<ImportKind, string> = { master_xlsx: 'Master workbook', floor_xlsx: 'Floor workbook' };
@@ -32,9 +35,6 @@ export type ImportBatch = {
     [k: string]: unknown;
   } | null;
 };
-
-/** A file as React Native's FormData takes it (a picked document). */
-export type FilePart = { uri: string; name: string; type: string };
 
 /** The mapping the picker starts from: each field's matched header, or '' where none matched. */
 export function initialMapping(p: ImportPreview): Mapping {
@@ -94,27 +94,20 @@ function client(identity: Identity): HttpClient {
   return new HttpClient({ serverUrl: identity.serverUrl, token: identity.token, userName: identity.user?.name, timeoutMs: 120_000 });
 }
 
-function form(file: FilePart, fields: Record<string, string | undefined>): FormData {
-  const body = new FormData();
-  for (const [k, v] of Object.entries(fields)) if (v !== undefined) body.append(k, v);
-  body.append('file', file as unknown as Blob);
-  return body;
-}
-
-export async function previewWorkbook(identity: Identity, file: FilePart, mapping?: Mapping): Promise<ImportPreview> {
+export async function previewWorkbook(identity: Identity, file: UploadPart, mapping?: Mapping): Promise<ImportPreview> {
   const c = client(identity);
   const res = await c.send('POST', '/imports/preview', {
     headers: c.headers(),
-    body: form(file, { mapping: mapping && Object.keys(mapping).length ? JSON.stringify(mapping) : undefined }),
+    body: uploadForm(file, { mapping: mapping && Object.keys(mapping).length ? JSON.stringify(mapping) : undefined }),
   });
   return (await res.json()) as ImportPreview;
 }
 
-export async function startImport(identity: Identity, projectId: string, kind: ImportKind, file: FilePart, mapping: Mapping): Promise<ImportBatch> {
+export async function startImport(identity: Identity, projectId: string, kind: ImportKind, file: UploadPart, mapping: Mapping): Promise<ImportBatch> {
   const c = client(identity);
   const res = await c.send('POST', '/imports', {
     headers: c.headers(),
-    body: form(file, { project_id: projectId, kind, mapping: Object.keys(mapping).length ? JSON.stringify(mapping) : undefined }),
+    body: uploadForm(file, { project_id: projectId, kind, mapping: Object.keys(mapping).length ? JSON.stringify(mapping) : undefined }),
   });
   return (await res.json()) as ImportBatch;
 }

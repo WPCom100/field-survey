@@ -23,6 +23,7 @@ import {
   type ImportPreview,
   type Mapping,
 } from './imports';
+import { nativeUploadPart } from './upload-native';
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const NO_PREVIEW: ImportPreview = { name: '', tabs: [], levels: [], images: 0, checks: [] };
@@ -63,7 +64,7 @@ export function SourcesStep({ projectId }: { projectId: string }) {
     setBatch(null);
     setBusy('Reading the workbook…');
     try {
-      const p = await previewWorkbook(identity, part);
+      const p = await previewWorkbook(identity, nativeUploadPart(part));
       if (!live.current) return;
       setPreview(p);
       setMapping(initialMapping(p));
@@ -80,7 +81,7 @@ export function SourcesStep({ projectId }: { projectId: string }) {
     setError(null);
     setBusy('Checking…');
     try {
-      const p = await previewWorkbook(identity, file, overrides(preview, mapping));
+      const p = await previewWorkbook(identity, nativeUploadPart(file), overrides(preview, mapping));
       if (!live.current) return;
       setPreview(p);
       setMapping(initialMapping(p));
@@ -96,7 +97,7 @@ export function SourcesStep({ projectId }: { projectId: string }) {
     setError(null);
     setBusy('Uploading…');
     try {
-      setBatch(await startImport(identity, projectId, kind, file, overrides(preview, mapping)));
+      setBatch(await startImport(identity, projectId, kind, nativeUploadPart(file), overrides(preview, mapping)));
     } catch (e) {
       fail(e);
     } finally {
