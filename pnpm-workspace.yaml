@@ -1,6 +1,9 @@
 packages:
   - app
   - packages/*
+# Same virtual-store folder names on Windows (default 60) and on the EAS/CI builders (default 120),
+# so the expo-updates fingerprint (runtime version) is identical everywhere (T84, D157).
+virtualStoreDirMaxLength: 60
 allowBuilds:
   better-sqlite3: true
   esbuild: true

@@ -55,7 +55,7 @@ export function describeRunning(r: RunningInfo, formatDate: (d: Date) => string 
   if (!r.enabled) {
     return {
       runtime: `runtime ${short(r.runtimeVersion)} · updates off in this build`,
-      running: 'JS from the development server (Metro)',
+      running: 'from the development server (Metro)',
     };
   }
   const runtime = `runtime ${short(r.runtimeVersion)} · channel ${r.channel || '—'}`;

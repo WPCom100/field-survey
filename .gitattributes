@@ -1,2 +1,7 @@
 *.sh text eol=lf
 *.patch text eol=lf
+# The app is fingerprinted byte for byte (expo-updates runtime version, T84): these files are hashed raw, so they are LF on every OS and the PC, EAS and Linux CI agree.
+app/.gitignore text eol=lf
+app/eas.json text eol=lf
+app/app.json text eol=lf
+app/package.json text eol=lf

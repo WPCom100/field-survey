@@ -41,7 +41,7 @@ describe('describeRunning', () => {
   it('names Metro in a development build', () => {
     const r = describeRunning({ ...embedded, enabled: false, channel: null });
     expect(r.runtime).toBe('runtime 9099e69e · updates off in this build');
-    expect(r.running).toBe('JS from the development server (Metro)');
+    expect(r.running).toBe('from the development server (Metro)');
   });
 
   it('flags an emergency launch', () => {

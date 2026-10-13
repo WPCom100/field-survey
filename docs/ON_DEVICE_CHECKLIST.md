@@ -6,6 +6,7 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 
 1. **Which build?** Check each task's "Needs" line. If any pending task says *new dev build*, run `eas build --profile development --platform ios` and install it first. Otherwise the dev build already on the iPad works.
 2. **Load the latest JS.** On the PC: `git pull`, then `cd app && npx expo start --dev-client`. Open the app on the iPad and let it load from Metro (same Wi-Fi).
+   **TestFlight iPads** (from build PRODNO on, T84) get the latest published JS by **launching the app twice**: open it, swipe it away from the app switcher, open it again. The Sync screen's Install section then shows `update <id> · <date> · T<nn>: …` instead of `embedded`.
 3. **Logs.** In the Metro terminal press `j` to open React Native DevTools; app logs appear there, not in the terminal.
 4. **Mark results as you go.** Tick `[x]` for pass. For a fail, leave it `[ ]` and write what you saw after "→ saw:". Then paste this file back to Claude.
 
@@ -258,6 +259,23 @@ Decision D152 recorded from your answer (skip unchanged, keep six months): no an
 - [ ] **From Projects and Setup.** Projects → Open the test project → Needs review: same items. Setup → Sources after an import → "Open Needs review": that project's items. → saw:
 - [ ] **From Sync.** With the test project on the home, Sync → "Open Needs review": the test project's items; "← Levels" from Sync returns to the test project. → saw:
 - [ ] **Then redo T81 from "Review items arrive"** (the A-4 that failed). → saw:
+
+## T84 — Over-the-air JS updates  ·  Needs: **new dev build** `eb79ee85` (adds `expo-updates`) and **TestFlight build PRODNO** (`64602bf5`), the first binaries with `expo-updates`
+
+**Why it matters:** from now on a JS-only fix reaches every TestFlight iPad without a new build, and nothing about it may slow a launch or need a connection.
+
+Install the dev build from https://expo.dev/accounts/wpcom/projects/field-survey/builds/eb79ee85-4646-42e1-8d65-e039521624cf and TestFlight build PRODNO on the iPad that tests TestFlight. The update checks below need Claude (or you, `docs/ops.md` §5.5) to publish a small update to the `production` channel while you watch; say "publish a test update" in a new session.
+
+- [ ] **Dev build says Metro.** Dev build loaded from Metro → Sync → Install: "JS from the development server (Metro) · runtime … · updates off in this build"; **Check for update** is greyed out. Metro shows `[update] launch {"runtime":…,"enabled":false,…}`. → saw:
+- [ ] **Embedded line.** TestFlight build PRODNO, first launch → Sync → Install: "JS embedded (the JS this build shipped with) · runtime xxxxxxxx · channel production". Note the 8-character runtime. → saw:
+- [ ] **Check for update, online.** Tap **Check for update** with no update published: "Checking for an update…" then "Up to date". → saw:
+- [ ] **Check for update, offline.** Airplane mode on, tap it: one plain red line "Could not check for an update: …", no crash, the rest of the screen unchanged. Airplane mode off. → saw:
+- [ ] **Airplane-mode launch is instant.** Airplane mode on, swipe the app away, open it: the Levels home appears as fast as before T84 (no spinner, no wait for a network timeout), editing works. Airplane mode off. → saw:
+- [ ] **A trivial update arrives after two launches.** After a test update is published: launch the app (it still shows "embedded"; Sync → Check for update may now read "Update ready — restarts next launch"), swipe it away, launch again: Install shows "update <id> · <date> · <message>" with the published message, and the app never restarted by itself. → saw:
+- [ ] **An iPad offline for a day catches up.** Leave one TestFlight iPad in airplane mode (or off) while an update is published; the next day turn the network on and launch twice: it shows the new update. Nothing typed offline is lost (Sync → Pending edits drains). → saw:
+- [ ] **Rollback.** After a second test update, Claude runs `eas update:republish` of the first one: two launches later Install shows a **new** update id with the **first** update's message. → saw:
+
+Decision D157: the update message is baked into the bundle at publish time (`EXPO_PUBLIC_UPDATE_MESSAGE`, with `--clear-cache`), because the EAS manifest does not carry it; `app.json` lists `platforms: ["ios"]` so the PC and EAS compute the same runtime version; `eas update` needs `--environment production`. Status **Default** → approve or say otherwise:
 
 ---
 
