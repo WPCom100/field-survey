@@ -2,6 +2,38 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## 2026-10-12 — M3 round, stopped early (Droplet `2444a69` / migration 0005, new dev build with `expo-document-picker`)
+
+Landry ran the M3 round sheet (sections A–H) after deploying `main` to the Droplet and installing a new dev build on both iPads. Stopped at A-2 because both uploads failed. 1 pass, 2 fail, 49 not done. All 15 pending decisions were answered: 12 Accept, 2 Change (D136, D139), 1 Discuss (D138).
+
+| Step | Result | Saw | Finding |
+|---|---|---|---|
+| 0-1 … 0-6 | done | | Before-the-round steps: T74/T75, T45, T30/T31/T59/T32 on `main`; Droplet deployed and migrated; new dev build on both iPads; decisions answered |
+| A-1 Fresh project | pass | | |
+| A-2 Seed import | **fail** | "Unsupported FormDataPart implementation" | Expo 57 installs `expo/fetch` as the global `fetch`; its FormData encoder (`expo/src/winter/fetch/convertFormData.ts`) accepts strings, `Blob`s and objects with `bytes()`, and throws on React Native's `{uri, name, type}` file part, which `app/src/setup/imports.ts` sends. The picker itself worked. **T80** |
+| A-3 Plan sheet (T45) | **fail** | "Unsupported FormDataPart implementation" | Same cause: `app/src/setup/sheets.ts` sends the same file part. **T80** |
+| A-4 … A-6 | not done | | blocked by A-2/A-3 |
+| B-1 … B-10 | not done | | |
+| C-1 … C-6 | not done | | |
+| D-1 … D-4 | not done | | |
+| E-1 … E-7 | not done | | |
+| F-1 … F-5 | not done | | |
+| G-1 T25-4, T25-6 … T25-9 | not done | | carried over |
+| G-2 T26-1 … T26-8 | not done | | carried over |
+| G-3 P-10 (second iPad) | not done | | carried over |
+| H Record | not filled | | |
+
+Decisions as answered:
+
+| Decision | Answer | Recorded |
+|---|---|---|
+| D101, D102, D103, D106, D107 | Accept | Approved |
+| D124, D126 | Accept | Approved (were Default) |
+| D131, D132, D133, D135, D137 | Accept | Approved |
+| D136 Punch List "Device" text is stored | Change: "Overall, the devices with no name or non matching names would reach the unresolved tab and need to be sorted or created from new by a human. Name changes of devices should propagate through the app, including the punch." | **D148** (amends D136) → **T81** |
+| D138 Export conventions the plan left open | Discuss: "I do not understand what your asking" | Stays Proposed; explained in plain words in the session reply |
+| D139 Weekly master export runs on its own | Change: "Let's do an export backup every day instead of every week." | **D149** (amends D139) → **T82** |
+
 ## 2026-10-12 — round of 2026-10-11 completed (dev build `5975c04e`, `main` d9b4d91)
 
 Landry ran the sheet (https://claude.ai/artifact/Bu78oW1sECp53FYguBJMAe) after the T41 deploy and the Tower seed import. 54 pass, 1 fail, 17 skip, 0 not done. No Decision line was answered, so D127, D123 and D111–D115 stay Proposed. Most skips have one cause: a level without a display sheet does not open from the Levels screen, so no real level could be opened (T71); plan-dependent steps wait for T45.

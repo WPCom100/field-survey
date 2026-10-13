@@ -9,7 +9,7 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 3. **Logs.** In the Metro terminal press `j` to open React Native DevTools; app logs appear there, not in the terminal.
 4. **Mark results as you go.** Tick `[x]` for pass. For a fail, leave it `[ ]` and write what you saw after "→ saw:". Then paste this file back to Claude.
 
-Pending round started: **2026-10-12**. Items: carried over from the 2026-10-11 round (archived in [on-device-log.md](on-device-log.md)): steps skipped there. Decisions D111–D115, D123 and D127 were answered on 2026-10-12 (D128–D130). Most need **T71** (open a level without a plan sheet) or **T45** (plan sheets); each step says which. New tasks add their checks below.
+Pending round started: **2026-10-12 (second)**. The M3 round of 2026-10-12 stopped at the seed import (archived in [on-device-log.md](on-device-log.md)); every step below is still untested. **Uploads fail until T80 lands** ("Unsupported FormDataPart implementation"): the T28 import steps and the T45 upload steps wait for it; everything that needs imported data or a plan sheet waits with them. Decisions D101–D107, D124, D126, D131–D133, D135 and D137 were approved on 2026-10-12; D136 and D139 were changed (D148, D149); D138 is still open. New tasks add their checks below.
 
 **This round's build:** dev build `ddf99272` (T69 + T70), install from https://expo.dev/accounts/wpcom/projects/field-survey/builds/ddf99272-0e81-474c-8af7-2392c0232e81 before step 2. Every dev build reads `1.0.0 (6)` on the Sync screen, so check Metro instead: opening a plan must log `[plan] pdf native patch: t70 ink,longpress-move`. **Server:** the Droplet runs `2444a69` with migration 0005 (deployed 2026-10-12 evening, pre-migration dump `backups/pg/survey-2026-10-12T231434Z.dump`), so T29/T31/T59 exports, T75 and T45 plan sheets all have their server side. **TestFlight:** production build 8 (`41d313ab`, from `2444a69`) was submitted the same evening.
 
@@ -28,7 +28,7 @@ Pending round started: **2026-10-12**. Items: carried over from the 2026-10-11 r
 - [ ] **Floor workbook.** Choose Floor workbook and pick one floor's workbook: "Floors in this file" names its floor(s) and the import completes the same way. Skip if none is at hand. → saw:
 - [ ] **Offline.** Airplane mode on, Choose workbook…: a plain error line (no crash), the rest of the app unaffected. → saw:
 
-Decision D135: `expo-document-picker` is added as a native module (see DECISIONS.md). Approve or ask for another way to get the file onto the iPad. → answer:
+Decision D135: answered 2026-10-12, **Approved**.
 
 ## T67 — Sync every 5 seconds  ·  Needs: no new build (JS only)
 
@@ -48,7 +48,7 @@ Decision D135: `expo-document-picker` is added as a native module (see DECISIONS
 - [ ] **Unlink.** Open the photo again, untick one device, Save: it disappears from that device's card only; the others keep it. On a second iPad (or after a sync) the same. → saw:
 - [ ] **Imported multi-device photos.** On the Tower project, if a photo shows several devices in the master (`B1-01, B1-02`): note whether only the first device shows it (expected for data imported before T65; see TASKS follow-ups). → saw:
 
-Decision D131 (how "nearby" is measured — two inches of drawing around the photo's device pin — and old single links read as links): approve / change →
+Decision D131: answered 2026-10-12, **Approved**.
 
 ## T66 — Setup and card form polish  ·  Needs: no new build (JS only)
 
@@ -70,7 +70,7 @@ Decision D131 (how "nearby" is measured — two inches of drawing around the pho
 - [ ] **No taps while drawing.** In Ink, tap a pin: no card opens (a dot or nothing is drawn); double-tap: no zoom; long-press: no add-here menu. Tap Done: tapping a pin opens its card again, double-tap and long-press work again. → saw:
 - [ ] **Eraser and Note still work.** ⌫ Erase removes your stroke under the finger; T Note: tap the plan, type, Place. → saw:
 
-Decision D132 (a second finger cancels the stroke; taps, double tap and long press are off while drawing): approve / change →
+Decision D132: answered 2026-10-12, **Approved**.
 
 ## T70 — Long-press feel  ·  Needs: **new dev build** (same build as T69)
 
@@ -93,7 +93,7 @@ Before these steps, in the Metro DevTools console after opening a plan: the line
 - [ ] **Both at once, online.** Ann draws new strokes while Bob erases one of Ann's older strokes, within a few seconds of each other: after both sync, Ann's new strokes are there and the erased one is gone, on both iPads. → saw:
 - [ ] **Both offline.** Both iPads in airplane mode: Ann erases stroke X of her own layer, Bob recolours stroke Y of Ann's layer. Airplane mode off on both, wait ~10 s (two sync cycles): on both iPads X is gone and Y has the new colour (Metro may log `ink: merged 1 concurrent write(s)`). → saw:
 
-Decision D133 (🎨 Recolour tool; erase beats recolour; offline writes merged after the pull, named in the merge's reason): approve / change →
+Decision D133: answered 2026-10-12, **Approved**.
 
 ## T31 — Export screen and history  ·  Needs: no new build (JS only); **the server must run T29 + T31** (deploy and `alembic upgrade head` to 0003 first — until then the Export screen's requests fail)
 
