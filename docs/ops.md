@@ -223,7 +223,7 @@ The build number auto-increments in EAS (`appVersionSource: remote`). Export com
 
 ### 5.4 Build log
 
-Two row types. A **build** row has the profile, the EAS build id and the build number. An **update** row (T84, §5.5) has `update` in the Profile column, the update group id in the id column and the runtime version (first 8 characters) in the Build no. column; its Notes say which commit and message it carries. Builds and updates after 2026-10-10 that are not listed here are noted in `TASKS.md` under their task.
+Two row types. A **build** row has the profile, the EAS build id and the build number. An **update** row (T84, §5.5) has `update` in the Profile column, the update group id in the id column and the runtime version (first 8 characters) in the Build no. column; its Notes say which commit and message it carries. Since T85 a **deploy** row (CI run id, migration) is added for deploys worth noting; routine CI deploys and updates are in GitHub Actions and `eas update:list`. Builds and updates after 2026-10-10 that are not listed here are noted in `TASKS.md` under their task.
 
 | Date | Profile | EAS build / update group id | Build no. / runtime | Notes |
 |---|---|---|---|---|
@@ -234,6 +234,8 @@ Two row types. A **build** row has the profile, the EAS build id and the build n
 | 2026-10-13 | production | `64602bf5-2fc4-4e41-9acf-8e8cd834c308` | 11 | T84, commit `0bf4507`: errored the same way, never submitted |
 | 2026-10-13 | development | `eb4162d7-1894-4cd2-8345-b28c2371d505` | 12 | T84, commit `bb75d8f`: first dev build with `expo-updates`, channel `development`, runtime `d28d6fee` = PC fingerprint (`eas fingerprint:compare` ✅) |
 | 2026-10-13 | production | `0d2a6ba6-052b-45b7-a7c9-595ccd11d88d` | 13 | T84, commit `bb75d8f`: first TestFlight build with `expo-updates`, channel `production`, runtime `d28d6fee73a968bab537ea58be2093f7b41861bc` = PC fingerprint; `eas submit` (submission `59658f1e`) uploaded to ASC app `6821263690`. No update published yet; the first one is part of the T84 on-device checks |
+| 2026-10-13 | deploy | CI run `38339817304` | migration 0005 | T85, first automatic deploy: Droplet `2444a69` → `15f7656` (brings the T81/T82 server code); `deploy.sh` fetch 03:05:21Z → dump `/root/deploys/15f7656….dump` → migrate → up 03:05:34Z → `/health` reported the sha 03:05:59Z; job 44 s |
+| 2026-10-13 | update | `2231ecb1-8b41-4e23-bf85-0bbb366e5ead` | `d28d6fee` | T85, the first update ever and the first from CI (robot `Field Survey`): commit `15f7656` "T85: Fix the ci.yml escapes (YAML did not parse)", carries the JS of T81–T85 to TestFlight build 13 |
 
 ### 5.5 JS updates (T84, D153, D157)
 
