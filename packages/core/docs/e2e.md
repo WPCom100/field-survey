@@ -53,6 +53,7 @@ fresh UUID v7s. Clients open with `backoffMs: 50`, `maxBackoffMs: 200` and no lo
 | TP-11 | A's delete arrives first, then B's edit; A restores | The edit goes to review (set vs existing delete); B's row is deleted by pull but shows his in-review note. **T15:** Bob chooses A (keep deleted): a Reconcile `set` of the official note lands on the deleted record (D91) and B's row converges. The restore brings the device back on both with `create → delete → set(rejected) → set(Reconcile) → restore` in the log, punch items attached, ID kept: the next server-assigned ID on 06M is `06M-03` (D93) |
 | T15 | delete first, B chooses B; a field group | Restore + set as one Reconcile group, B's op `superseded`; then Tracking status + Date closed reviewed as one item, resolved with A on both fields, both members `rejected`; converged |
 | TP-11 | delete vs delete, then restore | Merges without a review item; converges everywhere |
+| T87 | one person's ink layer from two iPads (D160, D162) | Ann on two installs writes one layer offline from the same copy, B syncs first: A's older write is `superseded` on both stores, no review item; `reconcileInkLayer` on A merges it, and after a sync both stores hold every stroke and find nothing left to merge. Both installs creating the layer offline give two rows, each with its strokes, on both |
 
 `expectConverged(a, b, project, {except})` compares every row of `level`, `device`, `punch_item`,
 `missing_part`, `photo`, `cable`, `cable_end`, `review_item` (deleted included), the field heads of

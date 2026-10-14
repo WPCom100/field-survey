@@ -174,6 +174,7 @@ export {
   type Stroke,
   type StrokeList,
 } from './strokes';
+export { INK_MERGE_PREFIX, reconcileInkLayer, type InkReconcile } from './ink';
 export {
   AUTO_RESIDUAL_PT,
   EMPTY_FEATURES,

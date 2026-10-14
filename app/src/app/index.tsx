@@ -13,6 +13,7 @@ import {
 } from '../home/data';
 import { pickProject, rememberProject } from '../home/currentProject';
 import { useCurrentUser } from '../identity/IdentityGate';
+import { homeIdentityLine, loadInstallLabels } from '../sync/install';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { syncDataKey } from '../sync/dataKey';
 
@@ -51,6 +52,7 @@ export default function ProjectHomeScreen() {
   }, [wanted]);
   const [home, setHome] = useState<ProjectHome | null>(null);
   const [mineOnly, setMineOnly] = useState(false);
+  const [who, setWho] = useState(`Signed in as ${user.name}`);
 
   // Reload after each sync: pulls change counts, reviews, assignments and the sheet cache.
   useEffect(() => {
@@ -60,6 +62,7 @@ export default function ProjectHomeScreen() {
       const list = await listProjects(store);
       if (!live) return;
       setProjects(list);
+      setWho(homeIdentityLine(user.name, store.installId, await loadInstallLabels(store)));
       const id = pickProject(
         list.map((p) => p.id),
         projectId,
@@ -71,7 +74,7 @@ export default function ProjectHomeScreen() {
     return () => {
       live = false;
     };
-  }, [projectId, user.id, dataKey, sync.pendingOps]);
+  }, [projectId, user.id, user.name, dataKey, sync.pendingOps]);
 
   const rows = useMemo(() => (home ? filterLevels(home.levels, mineOnly) : []), [home, mineOnly]);
 
@@ -116,6 +119,9 @@ export default function ProjectHomeScreen() {
       </View>
 
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
+        <Text style={styles.who} accessibilityRole="header">
+          {who}
+        </Text>
         {projects.length > 1 ? (
           <View style={styles.chips}>
             {projects.map((p) => (
@@ -200,6 +206,7 @@ const styles = StyleSheet.create({
   navDim: { color: '#9aa0a8' },
   demo: { fontSize: 13, color: '#1565c0', marginBottom: 10 },
   user: { fontSize: 13, color: '#555' },
+  who: { fontSize: 15, fontWeight: '600', color: '#1a2b3c', marginBottom: 8 },
   main: { flex: 1 },
   mainContent: { padding: 20, gap: 6 },
   title: { fontSize: 28, fontWeight: '600' },

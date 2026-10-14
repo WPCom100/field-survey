@@ -300,6 +300,16 @@ Decision D158: how T85 meets D154 (forced-command deploy key, pinned host key in
 
 ---
 
+## T87 — One person's ink from two iPads is merged; the name on the Levels home  ·  Needs: no new build (JS only)
+
+**Why it matters:** in the M3 round both iPads ran as Landry, B synced first, and iPad A's ink on 06M vanished: the server kept B's write and stored A's (older by the iPad clock) as superseded, which the merge after a pull ignored. Nothing drawn may be lost, whoever's iPad drew it. These re-run the M3 round's C-3 … C-5 (the close-out sheet's Part A).
+
+- [ ] **The name is on the home.** Levels home, above the project name: `Signed in as <your name> · This iPad: Field 1`. On an iPad with no label: `This iPad: iPad …` + six characters and "(name it on the Sync screen)". Rename the label on the Sync screen and come back: the line follows. → saw:
+- [ ] **Same name on two iPads: both inks survive.** Both iPads signed in under the **same** name, both cached 06M, airplane mode on both. A draws over the rack area first; a minute later B circles a station. Airplane mode off on B, wait for Synced; then A. Open 06M on A: within a few seconds A's strokes come back next to B's; the Metro log reads `[plan] ink: merged 1 concurrent write(s) into layer …`. Sync B and open 06M: the same strokes. No review item. → saw:
+- [ ] **Two names: exactly three review items, both ink layers.** The close-out sheet's Part A (A-1 … A-10) under two different names, as the M3 round's C-3 … C-5: three review items (06M-03 Status, 06M-02 Notes, the deleted station), both layers visible on both iPads (the other person's faded), then resolve. → saw:
+
+---
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

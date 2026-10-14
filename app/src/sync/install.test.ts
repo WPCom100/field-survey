@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ensureDemoLevel } from '../plan/demo';
 import { listProjects } from '../home/data';
-import { installName, loadInstallLabels, saveInstallLabel } from './install';
+import { homeIdentityLine, installName, loadInstallLabels, saveInstallLabel } from './install';
 
 describe('install label (D155)', () => {
   it('creates, renames and clears the label as ops, and names unlabelled installs by tail', async () => {
@@ -25,5 +25,11 @@ describe('install label (D155)', () => {
     expect(labels.size).toBe(0);
     expect(installName('xxxx-123456', labels)).toBe('iPad …123456');
     expect(installName('xxxx-123456', new Map([['xxxx-123456', 'Field 1']]))).toBe('Field 1');
+  });
+
+  it('the Levels home names the team member and this iPad (T87)', () => {
+    const labels = new Map([['i-111111', 'Field 1']]);
+    expect(homeIdentityLine('Landry', 'i-111111', labels)).toBe('Signed in as Landry · This iPad: Field 1');
+    expect(homeIdentityLine('Landry', 'i-abcdef', labels)).toBe('Signed in as Landry · This iPad: iPad …abcdef (name it on the Sync screen)');
   });
 });

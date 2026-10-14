@@ -42,3 +42,13 @@ export async function saveInstallLabel(
   await editor.setFields('install', store.installId, { label: label || null, user_id: userId, updated_at: now }, ctx);
   return 'saved';
 }
+
+/**
+ * The Levels home's "who is this" line (T87, D160): the signed-in team name and this iPad's label,
+ * so a second iPad running under the same name is obvious before anyone goes offline. Unlabelled
+ * iPads show the id tail and a hint to name them on the Sync screen.
+ */
+export function homeIdentityLine(userName: string, installId: string, labels: ReadonlyMap<string, string>): string {
+  const labelled = labels.has(installId);
+  return `Signed in as ${userName} · This iPad: ${installName(installId, labels)}${labelled ? '' : ' (name it on the Sync screen)'}`;
+}

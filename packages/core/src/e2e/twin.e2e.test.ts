@@ -4,13 +4,17 @@
  * §3.2/§3.3. Opt-in: see ./harness.ts and packages/core/docs/e2e.md.
  */
 
+import { createHash } from 'node:crypto';
+
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { deviceIdFor } from '../device-id';
+import { INK_MERGE_PREFIX, reconcileInkLayer } from '../ink';
 import { HttpTransport } from '../http-transport';
 import type { Op } from '../op';
 import { NUMBERED, displayNumber, isNew, type NumberedKind } from '../numbering';
 import { openReviewItems, reviewFields } from '../review';
+import { emptyStrokeList, makeStroke, serializeStrokeList, withStroke, type StrokeList } from '../strokes';
 import {
   CTX,
   ENABLED,
@@ -20,12 +24,14 @@ import {
   TOKEN,
   URL_,
   drain,
+  openClient,
   expectConverged,
   makeWorld,
   namesOf,
   newDevice,
   outboxBody,
   restartApi,
+  sleep,
   squareWave,
   sync,
   waitForHealth,
@@ -446,6 +452,72 @@ describe.skipIf(!ENABLED)(`twin clients against ${URL_ || 'the Docker server'} (
       expect(server.filter((o) => o.entity_id === d).map((o) => [o.kind, o.state])).toEqual([
         ['create', 'applied'], ['delete', 'applied'], ['delete', 'applied'], ['restore', 'applied'],
       ]);
+    }, 60_000);
+  });
+
+  // ------------------------------------------------------------------ T87
+
+  describe("T87: one person's ink layer from two iPads (D160, D133)", () => {
+    const at = '2026-10-13T23:46:00.000Z';
+    const st = (id: string) => makeStroke({ id, tool: 'pen', color: '#e53935', width: 2, points: [{ x: 10, y: 10, p: 0.5 }], at });
+    const listOf = (...ids: string[]) => ids.reduce((l, id) => withStroke(l, st(id)), emptyStrokeList('sheet', 100, 100));
+    const ids = (l: StrokeList | null) => (l?.strokes ?? []).map((s) => s.id).sort();
+    const blobs = new Map<string, StrokeList>();
+    const put = (l: StrokeList) => {
+      const key = createHash('sha256').update(serializeStrokeList(l)).digest('hex');
+      blobs.set(key, l);
+      return key;
+    };
+    const read = async (key: string) => blobs.get(key) ?? null;
+    const head = async (c: Client, layerId: string) => read(String((await get(c, 'ink_layer', layerId))!.drawing_blob));
+    const write = async (c: Client, layerId: string, list: StrokeList, reason = 'Plan ink') =>
+      (await c.editor.setFields('ink_layer', layerId, { drawing_blob: put(list), updated_at: new Date().toISOString() }, { ...CTX, reason }))!
+        .find((o) => o.field === 'drawing_blob')!;
+
+    it("the M3 round: B syncs first, A's older write is superseded and then merged — both iPads end with every stroke", async () => {
+      const { a, w } = await makeWorld();
+      const a2 = await openClient('Ann', w.projectId); // Ann's second iPad: same team name (the M3 round)
+      await sync(a2);
+      const { id: sheet } = await a.editor.create('sheet', { level_id: w.levels.L06M, kind: 'display', title: '06M' }, CTX);
+      const { id: layerId } = await a.editor.create('ink_layer', { sheet_id: sheet, user_id: a.userId, drawing_blob: put(listOf('s1')), updated_at: at }, CTX);
+      await sync(a, a2);
+      expect(ids(await head(a2, layerId))).toEqual(['s1']);
+
+      // airplane mode: A draws over the rack, then B circles a station a moment later
+      const aWrite = await write(a, layerId, listOf('s1', 'rack1', 'rack2'));
+      await sleep(20);
+      await write(a2, layerId, listOf('s1', 'station1'));
+      await sync(a2, a, a2); // B first, then A
+      expect(await a.store.getOp(aWrite.op_id)).toMatchObject({ state: 'superseded' });
+      expect(await a2.store.getOp(aWrite.op_id)).toMatchObject({ state: 'superseded' });
+      expect(await a.store.list('review_item')).toEqual([]); // same person: never a review item (D37)
+
+      // the plan opens on A: the merge brings A's strokes back for both
+      const r = (await reconcileInkLayer(a.store, layerId, read))!;
+      expect(r.mergedOpIds).toEqual([aWrite.op_id]);
+      await write(a, layerId, r.merged, `${INK_MERGE_PREFIX}${r.mergedOpIds.join(',')}`);
+      await sync(a, a2);
+      for (const c of [a, a2]) {
+        expect(ids(await head(c, layerId))).toEqual(['rack1', 'rack2', 's1', 'station1']);
+        expect(await reconcileInkLayer(c.store, layerId, read)).toBeNull();
+      }
+    }, 60_000);
+
+    it('both iPads create the layer offline: two rows of the same person, both kept with their strokes', async () => {
+      const { a, w } = await makeWorld();
+      const a2 = await openClient('Ann', w.projectId);
+      await sync(a2);
+      const { id: sheet } = await a.editor.create('sheet', { level_id: w.levels.L06M, kind: 'display', title: '06M' }, CTX);
+      await sync(a, a2);
+      const { id: l1 } = await a.editor.create('ink_layer', { sheet_id: sheet, user_id: a.userId, drawing_blob: put(listOf('rack1')), updated_at: at }, CTX);
+      const { id: l2 } = await a2.editor.create('ink_layer', { sheet_id: sheet, user_id: a.userId, drawing_blob: put(listOf('station1')), updated_at: at }, CTX);
+      await sync(a2, a, a2);
+      for (const c of [a, a2]) {
+        const rows = await c.store.list<Row>('ink_layer', { where: 'sheet_id = ?', params: [sheet] });
+        expect(rows.map((x) => x.id).sort()).toEqual([l1, l2].sort());
+        expect(ids(await head(c, l1))).toEqual(['rack1']);
+        expect(ids(await head(c, l2))).toEqual(['station1']);
+      }
     }, 60_000);
   });
 });

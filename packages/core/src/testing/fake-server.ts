@@ -144,6 +144,13 @@ export class FakeServer implements SyncTransport {
       case 'set': {
         const field = op.field!;
         const head = this.head(op.entity_id, field);
+        // D37 / D84, like the server: one person's other iPad set this field since the op's base and
+        // the op is older by client_ts → stored `superseded`, never the head.
+        if (head && head.op_id !== op.base_op_id && head.user_id === op.user_id && op.client_ts < head.client_ts) {
+          stored.state = 'superseded';
+          this.serverOpsFor.set(op.op_id, caused);
+          return { op_id: op.op_id, outcome: 'superseded', server_seq: stored.server_seq ?? null };
+        }
         // Ink layers and photo blobs are last-write-wins (server LAST_WRITE_WINS_*, PLAN §3.3).
         const lastWriteWins = op.entity_kind === 'ink_layer' || (op.entity_kind === 'photo' && field.endsWith('_blob'));
         const conflict =
