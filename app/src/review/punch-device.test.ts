@@ -107,4 +107,32 @@ describe('punch Device text and the unlinked-punch review item', () => {
     const punchOps = await store.db.query<{ n: number }>(`SELECT count(*) AS n FROM op WHERE entity_id = ? AND kind <> 'create'`, [linkedPunch]);
     expect(punchOps[0]!.n).toBe(0);
   });
+
+  it('the Lint tab lists open findings read-only beside the lint review items (T90)', async () => {
+    await remote(store, 'finding', uuidv7(), {
+      project_id: PROJECT, level_id: level, lint_id: 'R1', subject: { entity: 'device', entity_id: station },
+      message: 'Installed, untested with outstanding wiring → Issue (suggested)', state: 'open',
+    });
+    await remote(store, 'finding', uuidv7(), { project_id: PROJECT, lint_id: 'E3', subject: null, message: 'Project-wide finding', state: 'open' });
+    await remote(store, 'finding', uuidv7(), { project_id: PROJECT, level_id: level, lint_id: 'R2', message: 'gone', state: 'dismissed' });
+
+    const list = await loadReviewList(store, PROJECT, { kind: 'lint' });
+    expect(list.tabs.find((t) => t.kind === 'lint')).toMatchObject({ count: 3 }); // 1 review item + 2 findings
+    expect(list.tabs.find((t) => t.kind === 'all')!.count).toBe(1); // findings are not review items
+    expect(list.rows).toHaveLength(1);
+    expect(list.findings.map((f) => [f.lintId, f.subject, f.levelCode, f.message, f.deviceId])).toEqual([
+      ['E3', '—', null, 'Project-wide finding', null],
+      ['R1', 'B1-S3 PI1002', 'B1', 'Installed, untested with outstanding wiring → Issue (suggested)', station],
+    ]);
+    expect((await loadReviewList(store, PROJECT, { levelId: level })).findings.map((f) => f.lintId)).toEqual(['R1']);
+  });
+
+  it('a project with findings but no lint review items still shows the Lint tab', async () => {
+    await linkPunchDevice(editor, itemId, station, { deviceLabel: 'B1-S3' });
+    expect((await loadReviewList(store, PROJECT)).tabs.some((t) => t.kind === 'lint')).toBe(false);
+    await remote(store, 'finding', uuidv7(), { project_id: PROJECT, lint_id: 'R1', message: 'm', state: 'open' });
+    const list = await loadReviewList(store, PROJECT);
+    expect(list.tabs.find((t) => t.kind === 'lint')).toMatchObject({ label: 'Lint', count: 1 });
+    expect(list.rows).toEqual([]);
+  });
 });

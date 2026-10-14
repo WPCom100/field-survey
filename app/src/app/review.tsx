@@ -15,6 +15,7 @@ import {
   loadReviewDetail,
   loadReviewList,
   shortStamp,
+  type FindingRow,
   type PunchDeviceReview,
   type ReviewDetail,
   type ReviewList,
@@ -39,14 +40,14 @@ const CHOICE_LABEL: Record<ResolveChoice['choice'], string> = { A: 'Choose A', B
  * item keeps the master's text in the export (D150).
  */
 export default function NeedsReviewScreen() {
-  const params = useLocalSearchParams<{ item?: string; project?: string }>();
+  const params = useLocalSearchParams<{ item?: string; project?: string; kind?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
   const dataKey = syncDataKey(sync);
   const [store, setStore] = useState<Store | null>(null);
   const names = useTeamNames(store);
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [kind, setKind] = useState('all');
+  const [kind, setKind] = useState(params.kind ?? 'all');
   const [levelId, setLevelId] = useState<string | null>(null);
   const [sort, setSort] = useState<'oldest' | 'newest'>('oldest');
   const [list, setList] = useState<ReviewList | null>(null);
@@ -176,7 +177,19 @@ export default function NeedsReviewScreen() {
           data={list?.rows ?? []}
           keyExtractor={(r) => r.id}
           renderItem={({ item }) => <Row row={item} selected={item.id === selected} onPress={() => setSelected(item.id)} />}
-          ListEmptyComponent={<Text style={styles.empty}>{list ? 'Nothing to review.' : 'Loading…'}</Text>}
+          ListEmptyComponent={
+            list?.findings.length && kind === 'lint' ? null : <Text style={styles.empty}>{list ? 'Nothing to review.' : 'Loading…'}</Text>
+          }
+          ListFooterComponent={
+            kind === 'lint' && list?.findings.length ? (
+              <View>
+                <Text style={styles.sectionHead}>Lint findings ({list.findings.length}) — read-only</Text>
+                {list.findings.map((f) => (
+                  <FindingItem key={f.id} finding={f} />
+                ))}
+              </View>
+            ) : null
+          }
         />
         <ScrollView style={styles.panel} contentContainerStyle={{ padding: 16, gap: 12 }}>
           {detail?.punchDevice && store && editor && projectId ? (
@@ -205,6 +218,28 @@ function Row({ row, selected, onPress }: { row: ReviewRow; selected: boolean; on
         {row.ruling ? ' · ⚑ ruling' : ''}
       </Text>
     </Pressable>
+  );
+}
+
+function FindingItem({ finding: f }: { finding: FindingRow }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowTitle}>
+        <Text style={styles.dot}>● </Text>
+        {f.lintId} · {f.subject}
+      </Text>
+      <Text style={styles.finding}>{f.message}</Text>
+      <Text style={styles.rowSub}>finding · {f.levelCode ?? 'no level'}</Text>
+      {f.levelId ? (
+        <Pressable
+          onPress={() =>
+            router.push({ pathname: '/plan/[levelId]', params: { levelId: f.levelId!, ...(f.deviceId ? { device: f.deviceId } : {}) } })
+          }
+        >
+          <Text style={styles.link}>Open {f.deviceId ? 'the device card' : 'the level'} on the plan ▸</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -436,6 +471,8 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 15, fontWeight: '600' },
   rowSub: { fontSize: 13, color: '#666', marginTop: 2 },
   dot: { color: '#e65100' },
+  sectionHead: { fontSize: 14, fontWeight: '700', color: '#444', padding: 12, backgroundColor: '#f4f5f7' },
+  finding: { fontSize: 14, marginTop: 2 },
   empty: { fontSize: 15, color: '#666', padding: 16 },
   panelTitle: { fontSize: 18, fontWeight: '600' },
   sides: { flexDirection: 'row', gap: 12 },

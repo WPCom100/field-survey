@@ -321,6 +321,17 @@ Decision D163: a term shaped like `c-14`, `c14` or `14` means that connection nu
 
 ---
 
+## T90 — Lint findings can be seen before T36  ·  Needs: no new build (JS only)
+
+**Why it matters:** the Export pre-flight said "4 lint findings" and no screen showed them (M3 round E-1), so there was nothing to act on.
+
+- [ ] **Link from the pre-flight.** Export, a project with open findings (the demo project has one): under the Pre-flight line a blue "See the N lint findings ▸" link. Tap it: Needs review opens on the Lint tab. With no findings the link is absent. → saw:
+- [ ] **Findings are listed.** Lint tab: under any lint review items a "Lint findings (N) — read-only" heading, then one row per finding: rule id and device (`R1 · 06M-02 …`), the message, level. The tab count is review items plus findings; "Needs review (n)" in the title counts review items only. → saw:
+- [ ] **Level filter and context.** Pick a level chip: only that level's findings stay. Tap "Open the device card on the plan ▸" on a finding: the plan opens on its device. → saw:
+- [ ] **Read-only.** Tapping a finding row changes nothing and there is no Dismiss (T36 adds it). → saw:
+
+---
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

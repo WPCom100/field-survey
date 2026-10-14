@@ -253,6 +253,11 @@ export default function ExportScreen() {
 
             <Text style={styles.label}>Pre-flight</Text>
             <Text style={styles.value}>{pre ? preflightLine(pre, sync.pendingOps, blobs.photosWaiting) : '…'}</Text>
+            {!!pre?.lint && !!projectId ? (
+              <Link href={{ pathname: '/review', params: { project: projectId, kind: 'lint' } }} style={styles.back}>
+                See the {pre.lint} lint finding{pre.lint === 1 ? '' : 's'} ▸
+              </Link>
+            ) : null}
             <Text style={[styles.gate, gate.ok ? styles.gateOk : styles.gateNo]}>{gate.reason}</Text>
 
             <View style={styles.row}>
@@ -285,6 +290,11 @@ export default function ExportScreen() {
 
             <Text style={styles.label}>Pre-flight</Text>
             <Text style={styles.value}>{pre ? preflightLine(pre, sync.pendingOps, blobs.photosWaiting) : '…'}</Text>
+            {!!pre?.lint && !!projectId ? (
+              <Link href={{ pathname: '/review', params: { project: projectId, kind: 'lint' } }} style={styles.back}>
+                See the {pre.lint} lint finding{pre.lint === 1 ? '' : 's'} ▸
+              </Link>
+            ) : null}
             <Text style={[styles.gate, gate.ok ? styles.gateOk : styles.gateNo]}>{gate.reason}</Text>
             <View style={styles.row}>
               <Btn title="Sync first" onPress={syncFirst} disabled={sync.state === 'syncing'} />

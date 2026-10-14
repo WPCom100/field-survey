@@ -114,8 +114,24 @@ export type ReviewRow = {
   deviceId: string | null;
 };
 
+/** An open lint `finding` (T90): read-only until T36 adds dismiss-with-reason. */
+export type FindingRow = {
+  id: string;
+  /** The rule or lint that raised it: `R1`, `E3`. */
+  lintId: string;
+  levelId: string | null;
+  levelCode: string | null;
+  /** "06M-02 Echo relay panel"; "—" when the finding names no record. */
+  subject: string;
+  message: string;
+  /** The subject device (or the device of the subject record), for "Open on plan". */
+  deviceId: string | null;
+};
+
 export type ReviewList = {
   rows: ReviewRow[];
+  /** Open findings, filtered by level; listed on the Lint tab beside the `lint` review items. */
+  findings: FindingRow[];
   /** Tabs to show: kind, label, open count. */
   tabs: { kind: string; label: string; count: number }[];
   levels: { id: string; code: string }[];
@@ -197,6 +213,9 @@ export async function loadReviewList(store: Store, projectId: string, q: ReviewQ
   }
   const counts = new Map<string, number>();
   for (const r of all) counts.set(r.kind, (counts.get(r.kind) ?? 0) + 1);
+  const allFindings = await loadFindings(store, projectId, codes);
+  // Findings are lint output: they share the Lint tab (and its count) with `review_item(lint)`.
+  if (allFindings.length) counts.set('lint', (counts.get('lint') ?? 0) + allFindings.length);
   const tabs = [
     { kind: 'all', label: 'All', count: all.length },
     ...REVIEW_KINDS.filter(([k]) => ALWAYS_SHOWN.includes(k) || counts.has(k)).map(([k, label]) => ({ kind: k, label, count: counts.get(k) ?? 0 })),
@@ -204,9 +223,37 @@ export async function loadReviewList(store: Store, projectId: string, q: ReviewQ
   ];
   let rows = all.filter((r) => (!q.kind || q.kind === 'all' || r.kind === q.kind) && (!q.levelId || r.levelId === q.levelId));
   if (q.sort === 'newest') rows = rows.reverse();
-  const used = new Set(all.map((r) => r.levelId).filter(Boolean));
+  const findings = allFindings.filter((f) => !q.levelId || f.levelId === q.levelId);
+  const used = new Set([...all, ...allFindings].map((r) => r.levelId).filter(Boolean));
   const levels = [...codes].filter(([id]) => used.has(id)).map(([id, code]) => ({ id, code }));
-  return { rows, tabs, levels };
+  return { rows, findings, tabs, levels };
+}
+
+/** Open findings of the project, by lint id then record. `subject` is `{entity | entity_kind, entity_id}`. */
+async function loadFindings(store: Store, projectId: string, codes: ReadonlyMap<string, string>): Promise<FindingRow[]> {
+  const found = await store.list<Row>('finding', {
+    where: `state = 'open' AND project_id = ?`,
+    params: [projectId],
+    orderBy: 'lint_id, id',
+  });
+  const out: FindingRow[] = [];
+  for (const f of found) {
+    const s = (f.subject && typeof f.subject === 'object' ? f.subject : {}) as Row;
+    const kind = typeof s.entity_kind === 'string' ? s.entity_kind : typeof s.entity === 'string' ? s.entity : '';
+    const entityId = typeof s.entity_id === 'string' ? s.entity_id : '';
+    const d = kind && entityId ? await describeSubject(store, kind, entityId, codes) : null;
+    const levelId = typeof f.level_id === 'string' ? f.level_id : (d?.levelId ?? null);
+    out.push({
+      id: String(f.id),
+      lintId: String(f.lint_id),
+      levelId,
+      levelCode: levelId ? (codes.get(levelId) ?? null) : null,
+      subject: d?.label ?? '—',
+      message: typeof f.message === 'string' && f.message.trim() ? f.message.trim() : String(f.lint_id),
+      deviceId: d?.deviceId ?? null,
+    });
+  }
+  return out;
 }
 
 /** The master's Device text an unlinked imported punch row carried (the import's candidate). */
