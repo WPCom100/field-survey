@@ -163,6 +163,34 @@ describe('side lists', () => {
     expect(await conns('ng rack')).toEqual(['NG']);
   });
 
+  it('searches connections by their C-nn number, exactly (D163)', async () => {
+    const { store, plan, pid } = await demo();
+    const mk = async (n: number | null, to: string) => {
+      const cable = uuidv7();
+      const id = uuidv7();
+      await store.apply(op('cable', cable, 'create', pid, { project_id: pid, cable: 'N' }));
+      await store.apply(op('cable_end', id, 'create', pid, { cable_id: cable, side: 'A', level_id: DEMO_LEVEL_ID, device_id: plan.devices[0]!.id, to_text: to }));
+      if (n !== null) await store.db.exec('UPDATE cable_end SET display_id = ? WHERE id = ?', ['C-' + String(n).padStart(2, '0'), id]);
+      return id;
+    };
+    const a = await mk(14, 'Rack 1');
+    const b = await mk(140, 'Rack 2');
+    const c = await mk(1, 'Room 14');
+    const fresh = await mk(null, 'Rack 4');
+    const { lists } = await load(store, pid);
+    const found = async (q: string) => {
+      const ids = (await searchIds(store, DEMO_LEVEL_ID, q, lists.connections))!;
+      return lists.connections.filter((x) => ids.has(x.id)).map((x) => x.id).sort();
+    };
+    expect(lists.connections.find((x) => x.id === a)!.label).toBe('C-14');
+    for (const q of ['C-14', 'c-14', 'c14', '14', 'C-014']) expect(await found(q)).toEqual([a]);
+    expect(await found('c-140')).toEqual([b]);
+    expect(await found('n c-14')).toEqual([a]);
+    expect(await found('c-14 rack')).toEqual([a]);
+    expect(await found('rack')).toEqual([a, b, fresh].sort());
+    expect(c).toBeDefined();
+  });
+
   it('handles 2,000 rows per tab and search/filter over them quickly', async () => {
     const { store, plan, pid } = await demo();
     const devs = plan.devices;

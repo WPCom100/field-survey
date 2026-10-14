@@ -252,8 +252,21 @@ export async function searchIds(
   const terms = q.toLowerCase().split(/\s+/);
   // A term that is a cable code ("n", "ng", "0-10v") means that cable type, not the letter anywhere.
   const isCode = (t: string) => CABLE_CODES.some((k) => k.toLowerCase() === t);
+  // A term shaped like a connection number ("c-14", "c14", "14") means that C-nn exactly (D162), so
+  // "14" does not find C-140 or a "14" inside the text. A NEW end has no number and never matches.
+  const connNumber = (t: string) => /^(?:c-?)?(\d+)$/.exec(t)?.[1];
+  const labelNumber = (label: string) => /^C-(\d+)$/.exec(label)?.[1];
   for (const c of connections) {
-    if (terms.every((t) => (isCode(t) ? c.cable?.toLowerCase() === t : c.text.includes(t)))) ids.add(c.id);
+    const ok = terms.every((t) => {
+      if (isCode(t)) return c.cable?.toLowerCase() === t;
+      const n = connNumber(t);
+      if (n !== undefined) {
+        const own = labelNumber(c.label);
+        return own !== undefined && Number(own) === Number(n);
+      }
+      return c.text.includes(t);
+    });
+    if (ok) ids.add(c.id);
   }
   return ids;
 }

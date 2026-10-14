@@ -310,6 +310,17 @@ Decision D158: how T85 meets D154 (forced-command deploy key, pinned host key in
 
 ---
 
+## T88 — Side-list search finds a connection by its number  ·  Needs: no new build (JS only)
+
+**Why it matters:** in the M3 round, searching `C-14` on the Conns tab found nothing useful; the number is how the contractor and the master name a connection.
+
+- [ ] **By number.** Open 06M, Conns tab, search `C-14` (then `c14`, then `14`): the list shows the end numbered C-14 and not C-140, C-114 or an end whose text merely contains "14". → saw:
+- [ ] **Combined.** Search `n c-14` or `c-14 rack`: still that one end (type or text narrows, never widens). A lone `n` still lists the `N` cables only. → saw:
+
+Decision D163: a term shaped like `c-14`, `c14` or `14` means that connection number exactly on the Conns tab. Status **Proposed** → approve or say otherwise:
+
+---
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".
