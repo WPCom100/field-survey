@@ -2,6 +2,53 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## 2026-10-13 — M3 round completed (dev build `ddf99272`, Droplet `15f7656` / migration 0005, `main` d145902)
+
+Landry ran the M3 round sheet (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy) on two iPads after T80. Offline 18:28–18:51 (about 25 min; the sheet asked for 2–3 h), battery A 98→95 %, B 54→51 %. 26 pass, 9 fail, 14 skip, 0 not done. The decisions pasted back are the answers the sheet still held from 2026-10-12 (D136 Change, D138 Discuss, D139 Change, the other twelve Accept); all were recorded that day (D148, D149; D138 approved after the explanation), so nothing new is recorded. No checklist Decision line (D140–D143, D145–D147, D151, D157, D158, the TP-3 yes/no) was answered; they stay.
+
+| Step | Result | Saw | Finding |
+|---|---|---|---|
+| 0-1 … 0-6 | done | | |
+| A-1 Fresh project | pass | | |
+| A-2 Seed import | pass | Needs review count 8 | the 8 `import_pair` items D126 predicts |
+| A-3 Plan sheet (T45) | pass | | |
+| A-4 Place the 06M devices | pass, with a note | "I see them unplaced, but this should be in the review section. Otherwise I do not see any other way of knowing what is not placed other than scrolling the whole list. I was able to place them once in the plan view." | The unplaced list per level is **T46** (M5); Landry's note is attached to it in TASKS |
+| A-5 Lock 06M | **fail** | Lock baseline is greyed out | Not built: the Lock / Unlock dialog is **T47** (M5); the sheet asked for it early. Follow-up in TASKS: pull T47 forward |
+| A-6 Second iPad joins | pass | | also covers P-10 (G-3) |
+| B-1, B-2, B-4 … B-9 | pass | B-9: A 30 ops / 5 photos, B 23 ops / 4 photos | |
+| B-3 Connections | pass, with a note | "Used C-12 because C-03 is not for device 06M-02. Tested jumping to another floor. Works." | Sheet error (C-03 is not on 06M-02), not a defect |
+| B-10 Search and lists | **fail** | "Cable code search (C-14) shows no results on 6M even though both the ERP24 and Equipment rack have both ends of that connection." | `app/src/plan/lists.ts` matches cable *codes* (`X`, `N`…, D109) and the row's text; a connection's number `C-14` is only its label and is not searched. **T88** |
+| C-1 Outbox drains | pass | A: under 1 min | |
+| C-2 Numbers assigned | pass | | |
+| C-3 Merges without review | **fail** | "Ink from only iPad B is showing. Ink from A is gone." | **T87** |
+| C-4 Exactly three review items | **fail** | "No sync conflicts listed." | Three deliberate same-field conflicts raised nothing. The server skips review when `head.user_id == op.user_id` (`server/app/sync.py`, D37), and ink is one layer per (sheet, user) (D53) — both iPads under one team name would show exactly C-3 and C-4; that is the first thing T87 checks on the Droplet. **T87** |
+| C-5 Resolve | skip | no conflicts to resolve | re-run with T87 |
+| C-6 Quarantine (F2) | skip | "Come back to this later." | stays on the T75 checklist section |
+| D-1 Import pairs | **fail** | "Unable to complete this in the setup tab. I do not believe those tabs exist." | Not built: the [Pair] / [Not a pair → placeholder] panels are **T44** (M5); `import_pair` items are listed read-only in Needs review (T26 follow-up) |
+| D-2 Library draft | **fail** | Library is greyed out | Not built: **T48 / T61** (M5) |
+| D-3 History, D-4 Sync screen | pass | | |
+| E-1 Pre-flight | **fail** | "I was able to generate the workbook with 4 lint findings. I could not view those findings because lint is grayed out." | The 4 are the import's `import.endpoint` `finding` rows; the Needs review Lint tab lists `review_item(lint)` only and no screen shows `finding` rows before T36 (T31 → T36 note). **T90** |
+| E-2 … E-4, E-7 | pass | | |
+| E-5 Your edits are in it | pass, partly | "I can confirm new stations/sensor, photos are in." | the Combined Notes could not be checked (C-5 skipped) |
+| E-6 Floor PDF (T59) | **fail** | No survey date | The levels were created on the iPad in A-1, so the import skipped them (`seed_import.levels()`: `ref.exists`) and never wrote the Summary's Surveyed date; the header printed "Surveyed —". **T89**, decision **D159** (Proposed) |
+| F-1 … F-5 | skip | "No project with this amount of devices exists on the server." | The synthetic project waits on the TP-3 "yes" (T32 Decision line); carried over |
+| G-1 T25-4, T25-6 … T25-9 | skip | "I am not sure what is being asked here." | The "Carried over: T25" section of the checklist (downloads with a plan); explained in the reset checklist; carried over |
+| G-2 T26-1 … T26-8 | skip | same | The "Carried over: T26" section; covered by C-4 / C-5, which failed → T87; carried over |
+| G-3 P-10 (second iPad) | skip | same | Covered by A-6, which passed: **pass** |
+
+Record (H), filled from the results:
+
+| Measure | Value |
+|---|---|
+| Offline hours (B) | 0.4 h (18:28–18:51) |
+| Edits / photos / ink strokes made offline (from B-9) | A 30 ops / 5 photos, B 23 ops / 4 photos; ink strokes not counted |
+| Lost after sync (target 0) | iPad A's ink layer on 06M (C-3) |
+| Review items raised vs the 3 expected | 0 of 3 (C-4) |
+| Excel edits needed after export (target 0) | not reported |
+| Moments you reached for the spreadsheet | not reported |
+| Crashes (target 0) | none reported |
+| TP-3 numbers (F-1 … F-4) | not run |
+
 ## 2026-10-12 — M3 round, stopped early (Droplet `2444a69` / migration 0005, new dev build with `expo-document-picker`)
 
 Landry ran the M3 round sheet (sections A–H) after deploying `main` to the Droplet and installing a new dev build on both iPads. Stopped at A-2 because both uploads failed. 1 pass, 2 fail, 49 not done. All 15 pending decisions were answered: 12 Accept, 2 Change (D136, D139), 1 Discuss (D138).
