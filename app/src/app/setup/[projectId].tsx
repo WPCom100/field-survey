@@ -7,24 +7,29 @@ import { useCurrentUser } from '../../identity/IdentityGate';
 import { SetupActions, SetupError, loadProjectSetup, type ProjectSetup, type SetupLevel } from '../../setup/model';
 import { Btn, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
 import { SourcesStep } from '../../setup/SourcesStep';
+import { BaselineDialog } from '../../setup/BaselineDialog';
+import { loadLockTable, lockWarnings, type LockLevel } from '../../setup/lock';
 import { useSyncStatus } from '../../sync/useSyncStatus';
 import { syncDataKey } from '../../sync/dataKey';
 
-type Step = 'project' | 'levels' | 'sources';
+type Step = 'project' | 'levels' | 'sources' | 'lock';
 
 /**
  * Setup of an existing project (Phase 3 §3.1 steps 1–2): the project's fields and the levels
  * table. Every change is an op (`SetupActions`), so this works offline; the later steps
- * (Review drafts, Place devices, Lock baseline) light up with T44, T46 and T47; Sources is the seed import (T28).
+ * (Review drafts, Place devices) light up with T44 and T46; Sources is the seed import (T28);
+ * Lock baseline is the Phase 3 §3.5 table (T47), whose Lock / Unlock is also on each Levels row.
  */
 export default function ProjectSetupScreen() {
   const { projectId, step: stepParam } = useLocalSearchParams<{ projectId: string; step?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
   const dataKey = syncDataKey(sync);
-  const [step, setStep] = useState<Step>(stepParam === 'project' || stepParam === 'sources' ? stepParam : 'levels');
+  const [step, setStep] = useState<Step>(stepParam === 'project' || stepParam === 'sources' || stepParam === 'lock' ? stepParam : 'levels');
   const [setup, setSetup] = useState<ProjectSetup | null>(null);
   const [actions, setActions] = useState<SetupActions | null>(null);
+  const [locks, setLocks] = useState<Map<string, LockLevel>>(new Map());
+  const [dialog, setDialog] = useState<LockLevel | null>(null);
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -37,8 +42,10 @@ export default function ProjectSetupScreen() {
     (async () => {
       const store = await openAppStore();
       const s = await loadProjectSetup(store, projectId);
+      const table = await loadLockTable(store, projectId);
       if (!live) return;
       setSetup(s);
+      setLocks(new Map(table.map((l) => [l.id, l])));
       setActions((a) => a ?? new SetupActions(store, projectId, user.id));
     })().catch((e: unknown) => console.warn('[setup] load', e));
     return () => {
@@ -89,11 +96,14 @@ export default function ProjectSetupScreen() {
         <Pressable onPress={() => setStep('sources')} style={[styles.step, step === 'sources' && styles.stepOn]}>
           <Text style={styles.stepText}>3 Sources</Text>
         </Pressable>
-        {['4 Review drafts', '5 Place devices', '6 Lock baseline'].map((s) => (
+        {['4 Review drafts', '5 Place devices'].map((s) => (
           <View key={s} style={styles.step}>
             <Text style={[styles.stepText, styles.stepDim]}>{s}</Text>
           </View>
         ))}
+        <Pressable onPress={() => setStep('lock')} style={[styles.step, step === 'lock' && styles.stepOn]}>
+          <Text style={styles.stepText}>6 Lock baseline</Text>
+        </Pressable>
         <View style={{ flex: 1 }} />
         <Pressable onPress={() => router.push({ pathname: '/', params: { project: projectId } })}>
           <Text style={styles.back}>Open the levels screen ▸</Text>
@@ -107,10 +117,25 @@ export default function ProjectSetupScreen() {
           <ProjectStep setup={setup} run={run} />
         ) : step === 'sources' ? (
           <SourcesStep projectId={projectId} />
+        ) : step === 'lock' ? (
+          <LockStep levels={setup.levels.map((l) => locks.get(l.id)).filter((l): l is LockLevel => !!l)} onLock={setDialog} />
         ) : (
-          <LevelsStep setup={setup} run={run} toBottom={toBottom} />
+          <LevelsStep setup={setup} locks={locks} run={run} toBottom={toBottom} onLock={setDialog} />
         )}
       </ScrollView>
+      <BaselineDialog
+        projectId={projectId}
+        userId={user.id}
+        level={dialog}
+        onClose={(done) => {
+          setDialog(null);
+          if (done) {
+            setError(null);
+            setNotice(done);
+            setReload((n) => n + 1);
+          }
+        }}
+      />
     </View>
   );
 }
@@ -148,7 +173,65 @@ function ProjectStep({ setup, run }: { setup: ProjectSetup; run: Run }) {
   );
 }
 
-function LevelsStep({ setup, run, toBottom }: { setup: ProjectSetup; run: Run; toBottom: () => void }) {
+/** Phase 3 §3.5: per level what a lock would leave open, and Lock / Unlock. Drafts and flags come with T44/T46. */
+function LockStep({ levels, onLock }: { levels: LockLevel[]; onLock: (l: LockLevel) => void }) {
+  return (
+    <Section title="Lock baseline">
+      <Text style={styles.hint}>
+        Locking a level starts change logging: every later edit shows who, when, was → now and why in History. Lock is allowed with
+        warnings; Unlock asks why.
+      </Text>
+      <View style={styles.head}>
+        <Text style={[styles.cCode, w.label]}>Level</Text>
+        <Text style={[styles.cLockNum, w.label]}>Placed</Text>
+        <Text style={[styles.cLockNum, w.label]}>In review</Text>
+        <Text style={[styles.cLockState, w.label]}>State</Text>
+        <Text style={[styles.cActions, w.label]}> </Text>
+      </View>
+      {levels.map((l) => (
+        <View key={l.id} style={[styles.row, !l.inScope && styles.rowDim]}>
+          <Text style={[styles.cCode, styles.code]}>{l.code}</Text>
+          {l.inScope ? (
+            <>
+              <Text style={styles.cLockNum}>
+                {l.placed}/{l.devices}
+                {l.devices > 0 && l.placed === l.devices ? ' ✓' : ''}
+              </Text>
+              <Text style={styles.cLockNum}>{l.inReview}</Text>
+              <Text style={styles.cLockState}>{l.locked ? `🔒 Locked${l.lockedAt ? ` ${l.lockedAt.slice(0, 10)}` : ''}` : 'Setup'}</Text>
+              <View style={[styles.cActions, styles.actions]}>
+                <LockButton level={l} onLock={onLock} />
+              </View>
+            </>
+          ) : (
+            <Text style={styles.cFar}>out of scope — far-end only</Text>
+          )}
+        </View>
+      ))}
+      {levels.length === 0 ? <Text style={styles.empty}>No levels yet.</Text> : null}
+    </Section>
+  );
+}
+
+function LockButton({ level: l, onLock }: { level: LockLevel; onLock: (l: LockLevel) => void }) {
+  if (!l.inScope) return null;
+  if (l.locked) return <Btn title="Unlock…" small onPress={() => onLock(l)} />;
+  return <Btn title={lockWarnings(l).length ? `Lock ${l.code} ⚠` : `Lock ${l.code}`} small primary onPress={() => onLock(l)} />;
+}
+
+function LevelsStep({
+  setup,
+  locks,
+  run,
+  toBottom,
+  onLock,
+}: {
+  setup: ProjectSetup;
+  locks: ReadonlyMap<string, LockLevel>;
+  run: Run;
+  toBottom: () => void;
+  onLock: (l: LockLevel) => void;
+}) {
   const [newCode, setNewCode] = useState('');
   const [newShare, setNewShare] = useState<string | null>(null);
   const [newSplit, setNewSplit] = useState<string | null>(null);
@@ -180,7 +263,7 @@ function LevelsStep({ setup, run, toBottom }: { setup: ProjectSetup; run: Run; t
         <Text style={[styles.cActions, w.label]}> </Text>
       </View>
       {setup.levels.map((l, i) => (
-        <LevelRow key={l.id} level={l} index={i} count={setup.levels.length} options={options} run={run} />
+        <LevelRow key={l.id} level={l} lock={locks.get(l.id) ?? null} index={i} count={setup.levels.length} options={options} run={run} onLock={onLock} />
       ))}
       {setup.levels.length === 0 ? <Text style={styles.empty}>No levels yet.</Text> : null}
 
@@ -232,12 +315,16 @@ function LevelsStep({ setup, run, toBottom }: { setup: ProjectSetup; run: Run; t
 
 function LevelRow({
   level: l,
+  lock,
   index,
   count,
   options,
   run,
+  onLock,
 }: {
   level: SetupLevel;
+  lock: LockLevel | null;
+  onLock: (l: LockLevel) => void;
   index: number;
   count: number;
   options: { id: string; label: string }[];
@@ -251,7 +338,7 @@ function LevelRow({
       <Text style={styles.cN}>{l.floorOrder}</Text>
       <View style={styles.cCode}>
         <Text style={styles.code}>{l.code}</Text>
-        {l.state === 'baseline_locked' ? <Text style={styles.small}>locked</Text> : null}
+        {l.state === 'baseline_locked' ? <Text style={styles.small}>🔒 locked</Text> : null}
         {l.records ? <Text style={styles.small}>{l.records} records</Text> : null}
       </View>
       <View style={styles.cScope}>
@@ -284,6 +371,7 @@ function LevelRow({
       </View>
       <Text style={styles.cSheet}>{l.sheet ?? '(none yet)'}</Text>
       <View style={[styles.cActions, styles.actions]}>
+        {lock ? <LockButton level={lock} onLock={onLock} /> : null}
         <Btn title="↑" small disabled={index === 0} onPress={() => void run((a) => a.move(l.id, -1))()} />
         <Btn title="↓" small disabled={index === count - 1} onPress={() => void run((a) => a.move(l.id, 1))()} />
       </View>
@@ -317,5 +405,8 @@ const styles = StyleSheet.create({
   cPick: { width: 130 },
   cSheet: { width: 140, fontSize: 13, color: '#555' },
   cActions: { flex: 1 },
+  cLockNum: { width: 90, fontSize: 15 },
+  cLockState: { width: 170, fontSize: 14 },
+  cFar: { flex: 1, fontSize: 14, color: '#777' },
   actions: { flexDirection: 'row', gap: 6, justifyContent: 'flex-end' },
 });

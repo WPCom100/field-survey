@@ -13,6 +13,8 @@ import {
 } from '../home/data';
 import { pickProject, rememberProject } from '../home/currentProject';
 import { useCurrentUser } from '../identity/IdentityGate';
+import { BaselineDialog } from '../setup/BaselineDialog';
+import { loadLockTable, type LockLevel } from '../setup/lock';
 import { homeIdentityLine, loadInstallLabels } from '../sync/install';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { syncDataKey } from '../sync/dataKey';
@@ -53,6 +55,10 @@ export default function ProjectHomeScreen() {
   const [home, setHome] = useState<ProjectHome | null>(null);
   const [mineOnly, setMineOnly] = useState(false);
   const [who, setWho] = useState(`Signed in as ${user.name}`);
+  const [locks, setLocks] = useState<Map<string, LockLevel>>(new Map());
+  const [dialog, setDialog] = useState<LockLevel | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
 
   // Reload after each sync: pulls change counts, reviews, assignments and the sheet cache.
   useEffect(() => {
@@ -69,12 +75,16 @@ export default function ProjectHomeScreen() {
       );
       if (id !== projectId) setProjectId(id);
       rememberProject(id);
-      setHome(id ? await loadProjectHome(store, id, user.id) : null);
+      const next = id ? await loadProjectHome(store, id, user.id) : null;
+      const table = id ? await loadLockTable(store, id) : [];
+      if (!live) return;
+      setHome(next);
+      setLocks(new Map(table.map((l) => [l.id, l])));
     })().catch((e: unknown) => console.warn('[home] load', e));
     return () => {
       live = false;
     };
-  }, [projectId, user.id, user.name, dataKey, sync.pendingOps]);
+  }, [projectId, user.id, user.name, dataKey, sync.pendingOps, reload]);
 
   const rows = useMemo(() => (home ? filterLevels(home.levels, mineOnly) : []), [home, mineOnly]);
 
@@ -143,6 +153,7 @@ export default function ProjectHomeScreen() {
           <>
             <Text style={styles.title}>{home.project.name}</Text>
             {home.project.site ? <Text style={styles.sub}>{home.project.site}</Text> : null}
+            {notice ? <Text style={styles.notice}>{notice}</Text> : null}
             <View style={styles.filterRow}>
               <Text style={styles.filterLabel}>Assigned to me</Text>
               <Switch value={mineOnly} onValueChange={setMineOnly} />
@@ -158,7 +169,7 @@ export default function ProjectHomeScreen() {
               <Text style={[styles.cCache, styles.thText]}>Plan</Text>
             </View>
             {rows.map((l) => (
-              <LevelRow key={l.id} level={l} />
+              <LevelRow key={l.id} level={l} lock={locks.get(l.id) ?? null} onLock={setDialog} />
             ))}
             {rows.length === 0 ? (
               <Text style={styles.empty}>{mineOnly ? 'No levels are assigned to you.' : 'This project has no levels yet.'}</Text>
@@ -166,11 +177,25 @@ export default function ProjectHomeScreen() {
           </>
         )}
       </ScrollView>
+      {projectId ? (
+        <BaselineDialog
+          projectId={projectId}
+          userId={user.id}
+          level={dialog}
+          onClose={(done) => {
+            setDialog(null);
+            if (done) {
+              setNotice(done);
+              setReload((n) => n + 1);
+            }
+          }}
+        />
+      ) : null}
     </View>
   );
 }
 
-function LevelRow({ level: l }: { level: HomeLevel }) {
+function LevelRow({ level: l, lock, onLock }: { level: HomeLevel; lock: LockLevel | null; onLock: (l: LockLevel) => void }) {
   const cells = (
     <View style={[styles.tr, !l.inScope && styles.outOfScope]}>
       <View style={styles.cLevel}>
@@ -180,7 +205,15 @@ function LevelRow({ level: l }: { level: HomeLevel }) {
         </Text>
         {!l.inScope ? <Text style={styles.small}>out of scope</Text> : null}
       </View>
-      <Text style={styles.cState}>{l.state === 'baseline_locked' ? 'Baseline locked' : 'Setup'}</Text>
+      <View style={[styles.cState, styles.stateCell]}>
+        <Text style={styles.stateText}>{l.state === 'baseline_locked' ? '🔒 Locked' : 'Setup'}</Text>
+        {/* Lock / Unlock (T47): its own touch target inside the row, which opens the plan. */}
+        {lock && l.inScope ? (
+          <Pressable onPress={() => onLock(lock)} hitSlop={8} style={styles.lockBtn}>
+            <Text style={styles.lockBtnText}>{lock.locked ? 'Unlock…' : 'Lock…'}</Text>
+          </Pressable>
+        ) : null}
+      </View>
       <Text style={styles.cNum}>{l.devices}</Text>
       <Text style={[styles.cNum, l.issueOrNi > 0 && styles.red]}>{l.issueOrNi}</Text>
       <Text style={styles.cNum}>{l.openItems}</Text>
@@ -223,7 +256,12 @@ const styles = StyleSheet.create({
   thText: { fontSize: 12, fontWeight: '700', color: '#555', textTransform: 'uppercase' },
   outOfScope: { opacity: 0.55 },
   cLevel: { width: 110 },
-  cState: { width: 140, fontSize: 14 },
+  cState: { width: 170, fontSize: 14 },
+  stateCell: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stateText: { fontSize: 14 },
+  lockBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0' },
+  lockBtnText: { fontSize: 13, color: '#1565c0' },
+  notice: { fontSize: 14, color: '#2e7d32' },
   cNum: { width: 100, fontSize: 15, textAlign: 'right' },
   cCache: { flex: 1, fontSize: 14, paddingLeft: 20 },
   levelCode: { fontSize: 17, fontWeight: '600' },

@@ -7,6 +7,7 @@
 import { defaultDeviceText, displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
 
 import { photoStrip } from '../photo/links';
+import { baselineEvents, type BaselineEvent } from '../setup/lock';
 
 /** Seed of the device-note chips until T40 puts the project's `vocab` lists on the iPad (CLAUDE.md §3). */
 export const STANDARD_PHRASES: readonly string[] = [
@@ -252,6 +253,31 @@ export function historyEntry(op: StoredOp): HistoryEntry {
   }
 }
 
+/**
+ * The level's baseline lock and unlock events as History lines (T47, D164), each placed before the
+ * first older entry: what follows a "Baseline locked" line is the change log R6 asks for.
+ */
+export function withBaselineEvents(history: HistoryEntry[], events: BaselineEvent[], levelCode: string): HistoryEntry[] {
+  const out = [...history];
+  for (const e of events) {
+    const line: HistoryEntry = {
+      opId: e.opId,
+      at: e.at,
+      userId: e.userId,
+      what: `${e.locked ? 'Baseline locked' : 'Baseline unlocked'} (${levelCode})`,
+      was: null,
+      now: null,
+      changeType: 'Master edit',
+      reason: e.reason,
+      pending: e.pending,
+      inReview: false,
+    };
+    const i = out.findIndex((h) => h.at < e.at);
+    out.splice(i < 0 ? out.length : i, 0, line);
+  }
+  return out;
+}
+
 /** Everything the card shows for one device; null when the device is not on this iPad. */
 export async function loadDeviceCard(store: Store, deviceId: string): Promise<DeviceCard | null> {
   const d = await store.get<Row>('device', deviceId);
@@ -447,7 +473,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
 
   // --- history (newest first), review and unsynced marks per field
   const ops = await store.opsFor(deviceId);
-  const history = ops.map(historyEntry).reverse();
+  const history = withBaselineEvents(ops.map(historyEntry).reverse(), await baselineEvents(store, device.levelId), levelCode);
   const pending = new Set(ops.filter((o) => o.state === 'pending' && o.field).map((o) => o.field!));
   const inReview = new Set(Object.keys(await reviewFields(store, deviceId)));
 

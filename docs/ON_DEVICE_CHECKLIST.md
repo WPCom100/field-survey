@@ -342,6 +342,21 @@ Decision D163: a term shaped like `c-14`, `c14` or `14` means that connection nu
 
 ---
 
+## T47 — Lock / unlock baseline  ·  Needs: no new build (JS only)
+
+**Why it matters:** the lock is where a level stops being setup and every edit becomes a logged change (R6); the M3 round could not prove change logging without it (A-5). Unlock must be possible but never silent (D57).
+
+- [ ] **Setup → 6 Lock baseline.** The step is live (no longer grey). One row per level: Placed `n/m` (✓ when all), In review, State, and `Lock 06M` (or `Lock 06M ⚠` when something is open); out-of-scope levels read "out of scope — far-end only" with no button. → saw:
+- [ ] **Lock with warnings.** On a level with an unplaced device or an open review item tap `Lock … ⚠`: the dialog asks "Lock 06M with 1 device not placed and 1 item in review?" and offers **Lock anyway** / Cancel. Cancel changes nothing. Lock anyway: the notice "06M baseline locked: changes are logged from now on", State `🔒 Locked <today>`, the button becomes `Unlock…`. A clean level's dialog reads "Lock 06M?" with a `Lock 06M` button. → saw:
+- [ ] **Levels screen and Setup → Levels.** The Levels home's State column reads `🔒 Locked` with an `Unlock…` button (other levels `Setup` + `Lock…`); tapping that button opens the same dialog, tapping elsewhere on the row still opens the plan. Setup → 2 Levels shows `🔒 locked` under the code and the same Lock/Unlock button in the row. → saw:
+- [ ] **History shows where logging starts.** After the lock, change a device's status on that level. Its card → History (newest first): `Status`, then `Baseline locked (06M)` with your name, time and "Master edit · "Lock baseline"", then the older setup lines. → saw:
+- [ ] **Unlock asks why.** Tap `Unlock…`: Unlock stays disabled until you type a reason. Type "Re-import revised riser", Unlock: State back to `Setup`; the device's History gains `Baseline unlocked (06M)` with that reason. → saw:
+- [ ] **Offline and the other iPad.** Airplane mode on, lock a level (works, ↑ on the History line); airplane off, Synced. On the second iPad (different name) after its sync the level reads `🔒 Locked` on the Levels screen and the History line names who locked it. → saw:
+
+Decision D164: lock = one `Master edit` group (state, `baseline_locked_at`, `baseline_locked_by_id`, reason "Lock baseline"), allowed with warnings; unlock = `Master edit` with the typed reason, clears both fields; out-of-scope levels are not locked; the device History shows each lock/unlock of its level as a line. Status **Proposed** → approve or say otherwise:
+
+---
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

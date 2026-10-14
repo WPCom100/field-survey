@@ -677,9 +677,7 @@ def test_install_label_create_then_set_is_materialised(client, w, session):
         install=str(inst),
         payload={"id": str(inst), "label": "Field 1", "user_id": str(w.ann.id)},
     )
-    r = client.post(
-        "/ops", headers=HDR, json={"project_id": str(w.project.id), "ops": [create]}
-    )
+    r = client.post("/ops", headers=HDR, json={"project_id": str(w.project.id), "ops": [create]})
     assert r.status_code == 200, r.text
     rename = w.op(
         w.ann,
@@ -692,10 +690,63 @@ def test_install_label_create_then_set_is_materialised(client, w, session):
         now="Field 2",
         base_op_id=create["op_id"],
     )
-    r = client.post(
-        "/ops", headers=HDR, json={"project_id": str(w.project.id), "ops": [rename]}
-    )
+    r = client.post("/ops", headers=HDR, json={"project_id": str(w.project.id), "ops": [rename]})
     assert r.status_code == 200, r.text
     session.expire_all()
     row = session.get(Install, inst)
     assert row.label == "Field 2" and row.version == 2
+
+
+def test_baseline_lock_and_unlock_materialise_on_the_level(client, w):
+    """T47 (D164): the lock is one group setting state, time and who; unlock clears them."""
+    lid = str(w.l06m.id)
+    at = (w.clock + timedelta(minutes=5)).isoformat()
+    gid = str(uuid7())
+    lock = [
+        w.set(
+            w.ann,
+            "level",
+            lid,
+            f,
+            v,
+            None,
+            group_id=gid,
+            change_type="Master edit",
+            reason="Lock baseline",
+        )
+        for f, v in (
+            ("state", "baseline_locked"),
+            ("baseline_locked_at", at),
+            ("baseline_locked_by_id", str(w.ann.id)),
+        )
+    ]
+    assert outcomes(w.push(client, lock)) == ["applied"] * 3
+    w.session.expire_all()
+    lvl = w.session.get(Level, w.l06m.id)
+    assert (lvl.state, lvl.baseline_locked_by_id) == ("baseline_locked", w.ann.id)
+    assert lvl.baseline_locked_at == datetime.fromisoformat(at)
+
+    gid = str(uuid7())
+    unlock = [
+        w.set(
+            w.ann,
+            "level",
+            lid,
+            f,
+            v,
+            op["op_id"],
+            group_id=gid,
+            change_type="Master edit",
+            reason="Re-import riser",
+        )
+        for (f, v), op in zip(
+            (("state", "setup"), ("baseline_locked_at", None), ("baseline_locked_by_id", None)),
+            lock,
+            strict=True,
+        )
+    ]
+    assert outcomes(w.push(client, unlock)) == ["applied"] * 3
+    w.session.expire_all()
+    lvl = w.session.get(Level, w.l06m.id)
+    assert (lvl.state, lvl.baseline_locked_at, lvl.baseline_locked_by_id) == ("setup", None, None)
+    assert w.stored(unlock[0]["op_id"]).reason == "Re-import riser"
