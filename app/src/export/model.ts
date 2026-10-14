@@ -66,7 +66,13 @@ export function startGate(s: SyncStatus): Gate {
 
 // ------------------------------------------------------------------ pre-flight
 
-export type ExportLevel = { id: string; code: string; surveyed: string | null };
+export type ExportLevel = {
+  id: string;
+  code: string;
+  surveyed: string | null;
+  /** Date of the newest field-survey op on the level, when `surveyed` is empty (D159). */
+  lastSurvey?: string | null;
+};
 export type Preflight = {
   /** In-scope levels in floor order (what "All in scope" exports). */
   levels: ExportLevel[];
@@ -89,8 +95,24 @@ export async function loadPreflight(store: Store, projectId: string): Promise<Pr
     `SELECT count(*) AS n FROM finding WHERE project_id = ? AND state = 'open' AND deleted_at IS NULL`,
     [projectId],
   );
+  const newest = await store.db.query<{ level_id: string; ts: string }>(
+    `SELECT e.level_id AS level_id, max(coalesce(o.server_ts, o.client_ts)) AS ts
+       FROM op o
+       JOIN (SELECT id, level_id FROM device
+             UNION ALL SELECT id, level_id FROM punch_item
+             UNION ALL SELECT id, level_id FROM missing_part) e ON e.id = o.entity_id
+      WHERE o.change_type = 'Field survey' AND o.project_id = ?
+      GROUP BY e.level_id`,
+    [projectId],
+  );
+  const lastSurvey = new Map(newest.map((r) => [String(r.level_id), String(r.ts).slice(0, 10)]));
   return {
-    levels: levels.map((l) => ({ id: String(l.id), code: String(l.level), surveyed: typeof l.surveyed === 'string' ? l.surveyed : null })),
+    levels: levels.map((l) => ({
+      id: String(l.id),
+      code: String(l.level),
+      surveyed: typeof l.surveyed === 'string' ? l.surveyed : null,
+      lastSurvey: lastSurvey.get(String(l.id)) ?? null,
+    })),
     lint: Number(lint?.n ?? 0),
     reviews: (await openReviewItems(store, projectId)).length,
   };
@@ -149,9 +171,10 @@ export function floorBody(projectId: string, level: string, sections: FloorSecti
 }
 
 /** The report's header: the survey date only, never a company name (R7). */
-export function floorHeader(level: ExportLevel | undefined, title = 'ETC Lighting Controls Survey'): string {
+export function floorHeader(level: ExportLevel | undefined, title = 'ETC Lighting Controls Survey', today = new Date().toISOString().slice(0, 10)): string {
   if (!level) return title;
-  return `${title} — Level ${level.code} · Surveyed ${level.surveyed ?? '—'}`;
+  // D159: the level's date, else its newest field-survey op, else the export date; never undated
+  return `${title} — Level ${level.code} · Surveyed ${level.surveyed ?? level.lastSurvey ?? today}`;
 }
 
 // ------------------------------------------------------------------ history

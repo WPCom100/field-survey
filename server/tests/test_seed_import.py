@@ -911,3 +911,42 @@ def test_imports_preview(client, tmp_path):
         ).status_code
         == 422
     )
+
+
+def test_import_fills_an_existing_levels_empty_dates_never_a_set_one(
+    session, store, factory, tmp_path
+):
+    """D159 (1): a level made on the iPad before the import takes the Summary's dates only where
+    its own are empty."""
+    path = tmp_path / "Floor_B2.xlsx"
+    write_workbook(path)
+    project_id = new_project(session, "Existing level")
+    level = Level(
+        id=uuid.uuid4(),
+        project_id=project_id,
+        level="B2",
+        floor_order=0,
+        numbering_group_id=session.scalars(
+            select(NumberingGroup.id).where(NumberingGroup.project_id == project_id)
+        ).first()
+        or _group(session, project_id),
+        in_scope=True,
+        state="setup",
+        updated=date(2026, 10, 1),
+    )
+    session.add(level)
+    session.commit()
+    _, batch = import_file(session, store, factory, path, project_id=project_id)
+    assert batch.job_state == "done", batch.stats
+    assert batch.stats["level_dates"] == 1
+    session.expire_all()
+    lv = session.get(Level, level.id)
+    assert lv.surveyed == date(2026, 10, 9)
+    assert lv.updated == date(2026, 10, 1)  # a value someone set stays
+
+
+def _group(session, project_id):
+    g = NumberingGroup(id=uuid.uuid4(), project_id=project_id, label="B2")
+    session.add(g)
+    session.flush()
+    return g.id

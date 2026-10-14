@@ -210,3 +210,38 @@ def test_floor_pdf_renders_dense_and_exports_as_a_job(session, store, factory, c
     got2 = client.get(f"/exports/{r2.json()['id']}", headers=HDR).json()
     assert got2["filename"] == "ETC_Lighting_Controls_Survey_Level_06M_2.pdf"
     assert got2["stats"]["sections"] == ["plan", "punch"]
+
+
+@needs_sheet
+def test_header_date_falls_back_to_the_newest_field_survey_op_then_today(session, store):
+    """D159 (2): a level with no `surveyed` is never printed undated."""
+    from datetime import date, datetime
+
+    from app.models import Op
+
+    pid = make_project(session, store)
+    lv = session.scalars(select(Level).where(Level.project_id == pid, Level.level == "06M")).one()
+    lv.surveyed = None
+    session.commit()
+    assert floor_pdf.load(session, store, pid, "06M").surveyed == date.today()
+    dev = session.scalars(select(Device).where(Device.level_id == lv.id)).first()
+    session.add(
+        Op(
+            op_id=uuid.uuid4(),
+            project_id=pid,
+            user_id=session.scalars(select(User)).first().id,
+            install_id=uuid.uuid4(),
+            client_ts=datetime(2026, 10, 11, 9, 0),
+            entity_kind="device",
+            entity_id=dev.id,
+            kind="set",
+            field="status",
+            now="Issue",
+            change_type="Field survey",
+        )
+    )
+    session.commit()
+    assert floor_pdf.load(session, store, pid, "06M").surveyed == date(2026, 10, 11)
+    lv.surveyed = date(2026, 10, 8)
+    session.commit()
+    assert floor_pdf.load(session, store, pid, "06M").surveyed == date(2026, 10, 8)

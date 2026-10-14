@@ -107,7 +107,8 @@ describe('floor PDF', () => {
     });
     expect(floorBody('p', '06M', ['punch', 'plan'])).toEqual({ project_id: 'p', kind: 'floor_pdf', params: { level: '06M', sections: ['plan', 'punch'] } });
     expect(floorHeader({ id: 'x', code: '06M', surveyed: '2026-10-08' })).toBe('ETC Lighting Controls Survey — Level 06M · Surveyed 2026-10-08');
-    expect(floorHeader({ id: 'x', code: '07', surveyed: null })).toBe('ETC Lighting Controls Survey — Level 07 · Surveyed —');
+    expect(floorHeader({ id: 'x', code: '07', surveyed: null, lastSurvey: '2026-10-12' })).toBe('ETC Lighting Controls Survey — Level 07 · Surveyed 2026-10-12');
+    expect(floorHeader({ id: 'x', code: '07', surveyed: null }, undefined, '2026-10-13')).toBe('ETC Lighting Controls Survey — Level 07 · Surveyed 2026-10-13');
     const pdf = row({ kind: 'floor_pdf', filename: 'ETC_Lighting_Controls_Survey_Level_06M_1.pdf', stats: { levels: ['06M'] }, params: { level: '06M', sections: ['plan', 'photos'] } });
     expect(scopeLine(pdf)).toBe('Level 06M · Plan snapshot with pins, Photo appendix');
     expect(diffLine(pdf)).toBeNull();

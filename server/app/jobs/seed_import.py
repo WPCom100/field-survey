@@ -138,6 +138,9 @@ class LevelRef:
     exists: bool  # already in the project (no create op)
     surveyed: date | None = None
     updated: date | None = None
+    # the Summary's dates for a level that already exists with them empty (D159 (1))
+    fill_surveyed: date | None = None
+    fill_updated: date | None = None
 
 
 @dataclass
@@ -459,6 +462,12 @@ class Builder:
     def levels(self) -> None:
         for code, ref in self.t.levels.items():
             if ref.exists:
+                fills = (("surveyed", ref.fill_surveyed), ("updated", ref.fill_updated))
+                for fld, value in fills:
+                    if value is not None:
+                        now = value.isoformat()
+                        self.op("set", "level", ref.level_id, field=fld, was=None, now=now)
+                        self.count("level_dates")
                 continue
             self.create(
                 "level",

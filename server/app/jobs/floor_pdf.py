@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.blobs import object_key
@@ -42,6 +42,7 @@ from app.models import (
     InkLayer,
     Level,
     MissingPart,
+    Op,
     Photo,
     PhotoLink,
     Project,
@@ -139,6 +140,20 @@ def _read(store: ObjectStore | None, sha: str | None) -> bytes | None:
         return None
 
 
+def _last_survey_date(session: Session, project_id: uuid.UUID, ids: list[uuid.UUID]) -> date:
+    """D159: with no `surveyed` on the level, the date of its newest field-survey op, else today."""
+    newest = None
+    if ids:
+        newest = session.scalar(
+            select(func.max(func.coalesce(Op.server_ts, Op.client_ts))).where(
+                Op.project_id == project_id,
+                Op.change_type == "Field survey",
+                Op.entity_id.in_(ids),
+            )
+        )
+    return newest.date() if newest else date.today()
+
+
 def load(
     session: Session,
     store: ObjectStore | None,
@@ -160,7 +175,7 @@ def load(
     data = FloorData(
         title=settings.get("export_title") or export_xlsx.DEFAULT_TITLE,
         level=level.level,
-        surveyed=level.surveyed,
+        surveyed=level.surveyed,  # D159 fallback is applied below, once the rows are loaded
         sections=tuple(s for s in SECTIONS if s in sections),
         devices=[],
         counts={},
@@ -174,6 +189,9 @@ def load(
     devices = live(Device)
     punches = live(PunchItem)
     parts = live(MissingPart)
+    if data.surveyed is None:
+        ids = [r.id for r in (*devices, *punches, *parts)]
+        data.surveyed = _last_survey_date(session, project_id, ids)
     photos = sorted(live(Photo), key=lambda p: (p.number is None, p.number or 0))
 
     owners: dict[uuid.UUID, set[str]] = {}

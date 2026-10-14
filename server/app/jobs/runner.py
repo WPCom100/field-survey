@@ -262,6 +262,8 @@ def _levels(session: Session, project_id: uuid.UUID, wb) -> dict[str, seed_impor
                 exists=True,
                 surveyed=lv.surveyed,
                 updated=lv.updated,
+                fill_surveyed=row.surveyed if lv.surveyed is None else None,
+                fill_updated=row.updated if lv.updated is None else None,
             )
             continue
         fam = seed_import.family(code)

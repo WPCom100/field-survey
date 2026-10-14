@@ -332,6 +332,16 @@ Decision D163: a term shaped like `c-14`, `c14` or `14` means that connection nu
 
 ---
 
+## T89 — Floor PDF shows a survey date  ·  Needs: no new build (JS only); the server must run this task's code
+
+**Why it matters:** the M3 round's 06M report printed "Surveyed —" (E-6); a report that goes to the EC and GC must carry a date.
+
+- [ ] **Export screen header line.** Export, Floor PDF, a level with no Surveyed date (06M in the M3 round project): the line reads `… — Level 06M · Surveyed <date>` (the day of the newest survey edit on it, else today), never a dash. → saw:
+- [ ] **PDF header.** Generate that level's floor PDF and open it: the running header carries the same date, no company name. → saw:
+- [ ] **A set date wins.** On a level whose Surveyed date is set (Setup → Levels), the header shows that date. → saw:
+
+---
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".
