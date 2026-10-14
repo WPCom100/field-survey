@@ -236,6 +236,7 @@ Two row types. A **build** row has the profile, the EAS build id and the build n
 | 2026-10-13 | production | `0d2a6ba6-052b-45b7-a7c9-595ccd11d88d` | 13 | T84, commit `bb75d8f`: first TestFlight build with `expo-updates`, channel `production`, runtime `d28d6fee73a968bab537ea58be2093f7b41861bc` = PC fingerprint; `eas submit` (submission `59658f1e`) uploaded to ASC app `6821263690`. No update published yet; the first one is part of the T84 on-device checks |
 | 2026-10-13 | deploy | CI run `38339817304` | migration 0005 | T85, first automatic deploy: Droplet `2444a69` → `15f7656` (brings the T81/T82 server code); `deploy.sh` fetch 03:05:21Z → dump `/root/deploys/15f7656….dump` → migrate → up 03:05:34Z → `/health` reported the sha 03:05:59Z; job 44 s |
 | 2026-10-13 | update | `2231ecb1-8b41-4e23-bf85-0bbb366e5ead` | `d28d6fee` | T85, the first update ever and the first from CI (robot `Field Survey`): commit `15f7656` "T85: Fix the ci.yml escapes (YAML did not parse)", carries the JS of T81–T85 to TestFlight build 13 |
+| 2026-10-14 | data | project `01a13851-9b1d-71d9-8444-45acae2867f2` | server `d145902` | TP-3 synthetic project (T32, D142, D161): composite `scp`'d to `/root/06M.pdf`, `docker compose cp` into the worker, `docker compose exec -T worker python -m app.jobs.synthetic --name "TP-3 synthetic" --sheet /tmp/06M.pdf`; 02:50–03:49Z (thumbnails 55 min, ops 4 min); 31,089 ops, 2,000 devices, 10,000 photos, ≈ 110 MB in R2; both PDF copies deleted. Permanent until projects can be deleted |
 
 ### 5.5 JS updates (T84, D153, D157)
 

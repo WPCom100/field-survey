@@ -92,11 +92,27 @@ cd server && S3_ENDPOINT=http://localhost:9000 uv run python -m app.jobs.exports
 
 No client hot spot showed on the PC. The iPad numbers may add some (§3).
 
+### On the Droplet (2026-10-14)
+
+Generated on production (D161) with `python -m app.jobs.synthetic --name "TP-3 synthetic" --sheet /tmp/06M.pdf`,
+project `01a13851-9b1d-71d9-8444-45acae2867f2`: 8 levels (06M 1,000 devices, the rest 142–143), 2,000 devices,
+997 cables / 1,994 ends, 1,000 punch items, 286 parts, 10,000 photos, 16,293 creates + 1,500 edits = 31,089 ops
+(`server_seq` up to 31,089 in the project). Checked in Postgres afterwards: 31,089 ops, 2,000 devices, 10,000 photos.
+
+| Step | Droplet | PC |
+|---|---|---|
+| Thumbnails written to storage (10,001 objects, one PUT each to R2) | 3,284 s (≈ 55 min, ≈ 3 per second) | seconds (MinIO on localhost) |
+| Creates + edits applied through `Push` (31,089 ops) | 225 s | 264 s (16,293 creates) |
+| Total | 3,521 s | — |
+
+The R2 round trip per thumbnail dominates; it only matters for this generator and for a seed import with
+thousands of pictures (T27 writes thumbnails the same way). Not a field-path cost: iPads upload their own
+photos in the background. No task filed; revisit if a tower-size seed import is slow.
+
 ## 3. On the iPad (pending)
 
-Needs the synthetic project on a server the iPad reaches. The Droplet is the realistic one
-(R2 behind the API, real Wi-Fi), but the project stays there for good (no project delete yet);
-Landry decides (DECISIONS "Open now"). Steps are in `docs/ON_DEVICE_CHECKLIST.md` under T32.
+The synthetic project is on the Droplet (above). Steps are in `docs/ON_DEVICE_CHECKLIST.md` under T32
+and on the M3 close-out sheet, Part G.
 
 | What | Target | iPad Air result | Pass? |
 |---|---|---|---|
