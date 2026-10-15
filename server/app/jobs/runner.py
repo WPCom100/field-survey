@@ -47,6 +47,8 @@ log = logging.getLogger("jobs")
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 SEED_KINDS = ("master_xlsx", "floor_xlsx")
+# Other batch kinds with their own job: plan sheets (T45) and the BOM (T42).
+FILE_KINDS = ("plans", "bom")
 STATES = ("queued", "running", "done", "failed", "skipped")
 
 
@@ -88,8 +90,8 @@ def create_batch(
 ) -> ImportBatch:
     """Store the file and queue the job. Commits. `extra` goes into the file entry (the plans
     job keeps `level_id` / `sheet_kind` there, T45)."""
-    if kind not in SEED_KINDS and kind != "plans":
-        raise ImportError_(f"kind must be one of {', '.join((*SEED_KINDS, 'plans'))}")
+    if kind not in SEED_KINDS and kind not in FILE_KINDS:
+        raise ImportError_(f"kind must be one of {', '.join((*SEED_KINDS, *FILE_KINDS))}")
     if session.get(Project, project_id) is None:
         raise ImportError_(f"unknown project {project_id}")
     if not data:
