@@ -12,7 +12,9 @@ credentials and bucket in `.env` work (docs/ops.md, provisioning step).
 import sys
 import threading
 import uuid
-from collections.abc import Iterator
+from collections import deque
+from collections.abc import Callable, Iterable, Iterator
+from concurrent.futures import Future, ThreadPoolExecutor
 from functools import lru_cache
 from typing import BinaryIO, Protocol
 
@@ -23,6 +25,11 @@ from botocore.exceptions import ClientError
 from app.config import settings
 
 READ_CHUNK = 256 * 1024
+# Reads in flight at once for `read_ordered` (T94): one R2 GET costs ≈ 0.1 s from the Droplet, so
+# 10,000 Photo Log pictures read one at a time took 18–23 min. The pool keeps a connection each.
+READ_WORKERS = 16
+POOL_CONNECTIONS = 32
+_END = object()
 
 
 def client(fail_fast: bool = False):
@@ -34,8 +41,42 @@ def client(fail_fast: bool = False):
         aws_access_key_id=settings.s3_access_key,
         aws_secret_access_key=settings.s3_secret_key,
         region_name=settings.s3_region,
-        config=Config(signature_version="s3v4", s3={"addressing_style": "path"}, **extra),
+        config=Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "path"},
+            max_pool_connections=POOL_CONNECTIONS,
+            **extra,
+        ),
     )
+
+
+def read_ordered[T, R](
+    fn: Callable[[T], R], items: Iterable[T], workers: int = READ_WORKERS
+) -> Iterator[tuple[T, R | None, Exception | None]]:
+    """`fn(item)` for each item on `workers` threads, yielded in the items' order as
+    `(item, result, None)` or `(item, None, error)` (T94). At most `workers * 4` calls are ahead of
+    the consumer; closing the generator (the job was cancelled) drops the ones not started."""
+    ahead = max(1, workers) * 4
+    pending: deque[tuple[T, Future[R]]] = deque()
+    pool = ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix="read")
+    try:
+        it = iter(items)
+        for item in it:
+            pending.append((item, pool.submit(fn, item)))
+            if len(pending) >= ahead:
+                break
+        while pending:
+            item, fut = pending.popleft()
+            nxt = next(it, _END)
+            if nxt is not _END:
+                pending.append((nxt, pool.submit(fn, nxt)))
+            try:
+                out = (item, fut.result(), None)
+            except Exception as e:  # noqa: BLE001 — handed to the caller with its item
+                out = (item, None, e)
+            yield out
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 class ObjectMissing(KeyError):

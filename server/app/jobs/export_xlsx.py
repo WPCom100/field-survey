@@ -21,6 +21,7 @@ import math
 import re
 import uuid
 from collections.abc import Callable
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, BinaryIO
@@ -45,7 +46,7 @@ from app.models import (
     Project,
     PunchItem,
 )
-from app.storage import ObjectMissing, ObjectStore
+from app.storage import ObjectMissing, ObjectStore, read_ordered
 
 DEFAULT_TITLE = "ETC Lighting Controls Survey"
 
@@ -547,47 +548,58 @@ def load(
     photos.sort(key=lambda p: (order[p.level_id], p.number or 0))
     rows: list[list[Any]] = []
     flattened = skipped = missing = 0
-    for i, ph in enumerate(photos):
-        if store is not None:
-            progress("Photo Log", i, len(photos), "pictures")
-        ids = [dev_by_id[d].display_id for d in photo_devices[ph.id] if d in dev_by_id]
-        first, rest = ids[:1], sorted(set(ids[1:]) - set(ids[:1]), key=id_sort_key)
-        rows.append(
-            [
-                code[ph.level_id],
-                ph.number,
-                ph.location,
-                ph.subject,
-                ph.what_it_shows,
-                ", ".join(first + rest) or None,
-                order[ph.level_id],
-                None,
-            ]
-        )
-        image: ImageOut | None = None
-        if store is not None and ph.thumb_blob:
-            try:
-                raw = store.read(object_key(ph.thumb_blob))
-                strokes = store.read(object_key(ph.markup_blob)) if ph.markup_blob else None
-                out, dropped = markup.flatten(raw, strokes)
-                if strokes is not None:
-                    flattened += 1
-                    skipped += dropped
-                w, h = _image_size(out)
-                image = ImageOut(out, w, h, _sha(out))
-            except (ObjectMissing, KeyError):
+
+    def fetch(ph: Photo) -> tuple[bytes, bytes | None] | None:
+        if store is None or not ph.thumb_blob:
+            return None
+        raw = store.read(object_key(ph.thumb_blob))
+        return raw, store.read(object_key(ph.markup_blob)) if ph.markup_blob else None
+
+    # T94: the pictures are read READ_WORKERS at a time and handed back in Photo Log order
+    reads = read_ordered(fetch, photos) if store is not None else ((p, None, None) for p in photos)
+    with closing(reads):
+        for i, (ph, got, error) in enumerate(reads):
+            if store is not None:
+                progress("Photo Log", i, len(photos), "pictures")
+            ids = [dev_by_id[d].display_id for d in photo_devices[ph.id] if d in dev_by_id]
+            first, rest = ids[:1], sorted(set(ids[1:]) - set(ids[:1]), key=id_sort_key)
+            rows.append(
+                [
+                    code[ph.level_id],
+                    ph.number,
+                    ph.location,
+                    ph.subject,
+                    ph.what_it_shows,
+                    ", ".join(first + rest) or None,
+                    order[ph.level_id],
+                    None,
+                ]
+            )
+            image: ImageOut | None = None
+            if isinstance(error, (ObjectMissing, KeyError)):
                 missing += 1
                 data.checks.append(
                     f"Photo Log {code[ph.level_id]} #{ph.number}: picture not in storage"
                 )
-            except (markup.MarkupError, ValueError) as e:
-                data.checks.append(f"Photo Log {code[ph.level_id]} #{ph.number}: {e}")
+            elif error is not None:
+                raise error  # storage down: the export fails, as before
+            elif got is not None:
+                raw, strokes = got
                 try:
-                    w, h = _image_size(raw)
-                    image = ImageOut(raw, w, h, _sha(raw))
-                except ValueError:
-                    missing += 1
-        data.images[i] = image
+                    out, dropped = markup.flatten(raw, strokes)
+                    if strokes is not None:
+                        flattened += 1
+                        skipped += dropped
+                    w, h = _image_size(out)
+                    image = ImageOut(out, w, h, _sha(out))
+                except (markup.MarkupError, ValueError) as e:
+                    data.checks.append(f"Photo Log {code[ph.level_id]} #{ph.number}: {e}")
+                    try:
+                        w, h = _image_size(raw)
+                        image = ImageOut(raw, w, h, _sha(raw))
+                    except ValueError:
+                        missing += 1
+            data.images[i] = image
     data.rows["Photo Log"] = rows
     data.stats = {
         "levels": data.levels,

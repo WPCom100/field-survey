@@ -60,11 +60,12 @@ Failed 2026-10-14 (close-out B-3): "I did not see a surveyed date field anywhere
 
 Decision D166 (already answered by you: one at a time per project and kind, anyone may Cancel) — nothing to approve.
 
-## T32 — TP-3 export  ·  Needs: no new build; re-run after T93 and T94
+## T32 / T94 — TP-3 export under 5 minutes  ·  Needs: no new build (server deploy; push T93 + T94 first)
 
-Failed 2026-10-14 (close-out G-4): over 5 minutes, no status, the card lost on leaving the screen. Every other TP-3 step passed (`docs/perf/tp3.md` §3).
+Failed 2026-10-14 (close-out G-4): over 5 minutes (the server logs say 18–23 min), no status, the card lost on leaving the screen. Every other TP-3 step passed (`docs/perf/tp3.md` §3). **Why it matters:** T94 makes the server read the 10,000 Photo Log pictures 16 at a time instead of one by one; on the PC with the Droplet's storage delay imitated the whole workbook took 80 s. This proves it on the real server.
 
-- [ ] **Export.** "TP-3 synthetic" → Export → Generate workbook (all levels, all tabs): time from Generate until Ready under 5 minutes? Open it in Excel from the share sheet. → saw:
+- [ ] **Export.** "TP-3 synthetic" → Export → Generate workbook (all levels, all tabs): time from Generate until Ready under 5 minutes? (Expect about 2.) The `Photo Log … pictures` count on the card should climb by hundreds a second, not a few. Open it in Excel from the share sheet: pictures in the Photo Log, no repair prompt. → saw:
+- [ ] **Floor PDF still fine.** Generate floor PDF for 06M on the same project: Ready, opens. (Unchanged by T94; its photos are still read one at a time, so note the minutes.) → saw:
 
 ## T81 — Punch List Device text follows the device  ·  Needs: no new build
 

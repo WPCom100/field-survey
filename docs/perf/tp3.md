@@ -132,3 +132,24 @@ second for the generator's PUTs, §2) over 10,000 Photo Log pictures is the firs
 **T93** (stage and counts on the card, re-attach to a running export, one per project and kind) and
 **T94** (measure on the Droplet, then bring it under 5 min). The flash-list question (T19 follow-up) is
 closed: the plain lists scrolled smoothly at 1,000 rows.
+
+### Export speed (T94, 2026-10-14)
+
+**Measured.** The Droplet's three TP-3 workbooks (`GET /exports`, T93 → ops note) took 1,367 s, 1,156 s and
+1,085 s: ≈ 0.11 s per Photo Log picture, which is one R2 GET each in a sequential loop
+(`export_xlsx.load`); everything else is ≈ 30 s (the PC's whole export). A direct timing of R2 reads on
+the Droplet was not run (the session could not read production).
+
+**Fix.** The Photo Log reads its pictures through `app.storage.read_ordered`: 16 at a time, in Photo Log
+order (`server/docs/exports.md`, "Pictures in parallel").
+
+| Workbook export of TP-3 (10,000 pictures, 34.0 MB) | Photo Log | Total | Target |
+|---|---|---|---|
+| Droplet before (one read at a time) | ≈ 1,100 s | 1,085–1,367 s | < 5 min |
+| PC, local "TP-3 synthetic 2026-10-12", 0.11 s added to every read, 16 at a time | 72 s | **80 s** (writing 7.5 s) | < 5 min |
+| Droplet after (Generate → Ready on the iPad, `stats.stage_seconds`) | | *after the push* | < 5 min |
+
+Run the PC number again: a scratch script wrapping `S3ObjectStore` with `time.sleep(0.11)` per `read`
+around `export_xlsx.export_bytes` (S3_ENDPOINT=http://localhost:9000). The Droplet row is filled from the
+on-device checklist's T32 / T94 step and the export row's `stats.stage_seconds`. Floor PDF photos are still
+read one at a time → T98.

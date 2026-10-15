@@ -67,6 +67,13 @@ one, so the iPad shows that card instead. Stages: workbook `Starting` → `Readi
 runs again from the start. The daily backup skips a project whose workbook is queued or running
 and tries again the next minute.
 
+**Pictures in parallel (T94).** The Photo Log reads its thumbnails (and markup) through
+`app.storage.read_ordered`: `READ_WORKERS` (16) reads at once, at most 64 ahead, handed back in
+Photo Log order; a picture not in storage is still a `checks` line, any other storage error fails
+the export as before, and Cancel drops the reads not started. One R2 GET from the Droplet costs
+≈ 0.1 s, so 10,000 pictures one at a time took 18–23 min; 16 at a time is ≈ 70 s
+(`docs/perf/tp3.md` §3). The boto3 client keeps `POOL_CONNECTIONS` (32) connections for it.
+
 Filename: `Lighting_Control_Survey_Master_<first>-<last>_<n>.xlsx` — Landry's convention for the
 fixture (`…_B2-06_4.xlsx`): first and last level by floor order (`06M` folds into `06`, D33), `n`
 the project's count of finished xlsx exports.
