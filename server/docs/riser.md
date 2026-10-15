@@ -11,7 +11,7 @@ Claude API is asked. Normative references: PLAN §7.3, §2.2 (`draft_device` / `
 |---|---|
 | `app/claude.py` | The Claude API client: key from the server `.env` only (`ANTHROPIC_API_KEY`), model `CLAUDE_MODEL` (Opus 5.5), one structured-output call per crop (`messages.create` with `output_config.format`, effort high, the system prompt cached), tokens and USD per call (`claude_call` events) and per job (`totals()`), and the `Recorder` the tests replay. |
 | `app/jobs/riser_extract.py` | Pure functions: pages → bands → devices, bubbles, rack output labels (`analyse`); band crops, the column overview and the prompt for the model (`band_crop`, `column_overview`, `band_prompt`); the model's answer folded back (`apply_answer`); drafts, BOM edits, deletions, placeholders, cables, source conflicts and findings (`build`). No database, no network. |
-| `app/jobs/riser_endpoints.schema.json` | The committed structured-output schema (`additionalProperties: false` throughout): `level_code`, `devices[]`, `cables[]`, `notes`. |
+| `app/jobs/riser_endpoints.schema.json` | The committed structured-output schema (`additionalProperties: false` throughout): `level_code`, `devices[]`, `cables[]`, `unlabelled_lines[]` (T108), `notes`. |
 | `app/jobs/riser.py` | The job: `create_riser_batch` (PDF → object store, batch queued), `target_of` (levels, placeholders, the BOM's drafts, the project's devices, the BOM normalisation target), `resolve_with_claude`, `import_riser` (one transaction: ops through `Push`), `run_queued`, CLI. |
 | `app/api/imports.py` | `POST /imports` with `kind=riser` (multipart `project_id`, `file`); `GET /imports/{id}` for `job_state` and `stats`. |
 | `app/worker.py` | Polls queued riser batches with the other jobs. |
@@ -73,6 +73,20 @@ R2e makes the bus rows.
 **Rack output labels.** Text printed right beside a bubble (`DMX TO B3A CANYON`, `SPARE DMX OUT`,
 `TO ERn4 LEVEL 16`, `TO EQUIP RACK LEVEL 06`) names that run's far end outright.
 
+**Lines with no bubble (T108, D192, D194).** Every connecting line drawn without a wire bubble
+is asked about, so nothing on the drawing goes unaccounted for. On a text sheet they are found
+by geometry (`lines_of`): every straight piece of ink (`segments_of`: lines, rectangle edges,
+each step of a curve) joined end to end within 2 pt; a line counts when it touches the outline
+drawn round a device (`symbol_boxes` / `symbol_box`), reaches out of it and carries no bubble
+(`U` links included). Trunks between bands are not followed: a line that reaches one is marked
+`leaves_band` and the model reads its far end. The text block at the free end is the line's
+label; a device's arrows ending at one label are one line (the triple feed arrow). Sheet 001:
+**99 lines** — per band the `TO LOAD CKTS` / `TO LOAD` arrows, the `(2)#16 AWG … TO 0-10V
+CONTROL` leaders, the panels' and UFMPs' feed arrows, the EBDK sense feeds, the NSPS / rack 120V
+feeds and the NSPS runs up the trunk. Each gets a guess from its own text (`0-10V` → `0-10V`,
+`120V` / `100-277V` → `120V`, 0.5) that the model's `code_guess` replaces; on sheet 002 the
+model lists the lines itself.
+
 ## The Claude API pass (PLAN §7.3, D21, D189, D190 (4))
 
 One call per band, in band order: the band crop (≤ 2000 px on its long edge, PNG), the whole
@@ -107,13 +121,22 @@ Everything as trusted ops by the uploading user (`Master edit`, reason `Riser ex
 | `draft_device` set | the merge (D28): a BOM draft of the same model family on the level gets `source_ref.riser` (`shared_with` when several BOM lines share one symbol), `name` from the panel tag (D10), `conflicts` (`qty:bom≠riser`, `cards:bom≠riser`, `pairing:ebdk≠erp`, `network:no_N_run`), `confidence` raised only when the counts agree |
 | `draft_device` delete | a pooled BOM line whose riser placements add up (option cards summed per venue): reason `Placed by the riser: n drafts on levels …` |
 | `draft_cable` create | one per run bubble: `code`, `qty 1`, `origin riser`, `from_label` / `to_label` / `to_level_id`, `candidates[]` (`{side: from\|to, kind: draft_device\|placeholder, id, label, confidence}`), `source_ref = {kind: riser_bubble, file, page, sheet, band, bbox, label, bubble, note, level_code}`, `extraction`, `confidence`, `conflicts` |
+| `draft_cable` create (line) | one per line with no bubble (D192): `code` **null**, conflict `code:unknown`, `candidates` with the guess as `{side: code, value, confidence, source: label\|model}` (never the code) and, for a guessed `0-10V` / `120V`, the library's placeholder (`Fixtures` / `120v Power`, D194) as the To; `source_ref = {kind: riser_line, …, bbox, line, label, note}` |
 | `review_item` create | `source_conflict` (D30): the riser's count per (level, model family) against the project's live devices on a surveyed floor, `subject = {entity_kind: draft_device, entity_id, field: qty, level_code, model}`, `candidates = [{side: riser}, {side: bom}, {side: master}]` |
 
 Conflicts the reviewer sees on a draft (D11 — anything flagged or under 0.7 waits in Needs
 review): `model:SR/LR` (from the BOM), `level:06/06M` (a panel-class device on a floor the
 project splits, as the BOM job flags), `qty:bom≠riser`, `cards:bom≠riser`, `source:riser_only`,
 `pairing:ebdk≠erp`, `network:no_N_run`, `confidence:low`, `endpoint:low_confidence`,
-`endpoint:unresolved`. `stats.findings` lists the checks behind them with their numbers.
+`endpoint:unresolved`, `code:unknown` (a line with no bubble: "What is this cable?").
+`stats.findings` lists the checks behind them with their numbers; `stats.cables_unknown_code`
+and `stats.code_guesses` count the lines (`cables_by_code` counts coded drafts only).
+
+On the iPad (T44 / T108) a line lists first on its level's Cables tab with the guess, a code
+picker (every CLAUDE.md §3 code) and Accept / Reject. Accept writes the picked code and clears
+`code:unknown`; a `0-10V` line from a Relay panel or a `120V` line from an NSPS or rack becomes
+that device's library row — linked to the cable it already has, else made with R2c / R2d's texts
+— so R2c / R2d offer nothing more for it (D194).
 
 ### Levels the project lacks
 

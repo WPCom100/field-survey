@@ -90,7 +90,13 @@ export type CableDraftRow = {
   waiting: boolean;
   sourceRef: Record<string, unknown> | null;
   importBatchId: string | null;
+  /** A riser line with no wire bubble (T108, D192): the reviewer says what it is. */
+  unknownCode: boolean;
+  /** The extraction's guess at its code (`candidates` side `code`); never written as the code. */
+  codeGuess: CodeGuess | null;
 };
+
+export type CodeGuess = { value: string; confidence: number | null; source: 'label' | 'model' | null };
 
 export type Mismatch = { draftId: string; kind: 'device' | 'cable'; text: string };
 
@@ -152,7 +158,7 @@ export function cropBox(ref: Record<string, unknown> | null | undefined): [numbe
   return d! > 0 && e! > 0 ? [a!, c!, d!, e!] : null;
 }
 
-const RISER_KINDS = new Set(['riser_symbol', 'riser_bubble', 'riser_text']);
+export const RISER_KINDS: ReadonlySet<string> = new Set(['riser_symbol', 'riser_bubble', 'riser_text', 'riser_line']);
 
 function sourceOf(ref: Record<string, unknown>, batchId: string | null): DraftSource | null {
   const page = num(ref.page);
@@ -165,7 +171,8 @@ function sourceOf(ref: Record<string, unknown>, batchId: string | null): DraftSo
   if (RISER_KINDS.has(String(ref.kind))) {
     const sheet = str(ref.sheet) ?? `p.${page}`;
     const lvl = str(ref.level_code);
-    return { kind: 'riser', label: `Riser ${sheet}${lvl ? ` · level ${lvl}` : ''}${ref.bubble ? ` · bubble ${String(ref.bubble)}` : ''}`, file: str(ref.file), batchId, page, bbox: cropBox(ref) };
+    const mark = ref.bubble ? ` · bubble ${String(ref.bubble)}` : ref.line ? ` · line ${String(ref.line)}` : '';
+    return { kind: 'riser', label: `Riser ${sheet}${lvl ? ` · level ${lvl}` : ''}${mark}`, file: str(ref.file), batchId, page, bbox: cropBox(ref) };
   }
   return null;
 }
@@ -270,6 +277,14 @@ export function cableEnds(raw: unknown): Pick<CableDraftRow, 'candidates' | 'end
   return { candidates, ends, chosen, handPicked, confirmed };
 }
 
+/** The `{side: code, value, confidence, source}` candidate the riser job writes for a line with no bubble (D192). */
+export function codeGuessOf(raw: unknown): CodeGuess | null {
+  const g = (json<unknown[]>(raw) ?? []).find((v): v is Record<string, unknown> => !!v && typeof v === 'object' && (v as Record<string, unknown>).side === 'code');
+  const value = str(g?.value);
+  if (!g || !value) return null;
+  return { value, confidence: num(g.confidence), source: g.source === 'label' || g.source === 'model' ? g.source : null };
+}
+
 /** The candidates list with `pick` as the side's chosen endpoint (added when it was not a candidate); null clears the choice. */
 export function withChosen(raw: unknown, side: Side, pick: Endpoint | null, confirmed = false): Record<string, unknown>[] {
   const list = (json<unknown[]>(raw) ?? []).filter((v): v is Record<string, unknown> => !!v && typeof v === 'object');
@@ -315,7 +330,10 @@ export function cableMismatches(c: CableDraftRow): string[] {
   for (const k of c.conflicts) {
     if (k === 'endpoint:unresolved') out.push(`${what}: far end not found — pick it`);
     else if (k === 'endpoint:low_confidence') out.push(`${what}: far end "${c.toLabel ?? '?'}" is a guess (${pct(c.confidence)}) — check the crop`);
-    else if (k === 'code:unknown' && c.code == null) out.push(`A riser line with no wire code from ${c.fromLabel ?? '?'} — what is it?`);
+    else if (k === 'code:unknown' && c.state === 'proposed') {
+      const guess = c.codeGuess ? ` (guess: ${c.codeGuess.value})` : '';
+      out.push(`A riser line with no wire code from ${c.fromLabel ?? '?'}${c.toLabel ? ` → "${c.toLabel}"` : ''} — what is it?${guess}`);
+    }
   }
   return out;
 }
@@ -458,6 +476,8 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
       waiting: decided && !committed,
       sourceRef: ref,
       importBatchId: str(c.import_batch_id),
+      unknownCode: conflicts.includes('code:unknown'),
+      codeGuess: codeGuessOf(c.candidates),
     };
     // a draft-device endpoint shows that draft's current label
     for (const side of ['from', 'to'] as const) {
@@ -541,8 +561,9 @@ export function devicesOn(data: DraftReviewData, key: LevelKey, f: DraftFilter, 
 
 export function cablesOn(data: DraftReviewData, key: LevelKey, f: DraftFilter, sort: SortKey = 'confidence'): CableDraftRow[] {
   const rows = data.cables.filter((c) => levelKeyOf(c.levelId, c.sourceRef) === key && matchesFilter(c, f));
-  // unknown-code lines first (T108's question), then by the sort
-  return sortRows(rows, sort, (c) => `${c.code ?? ''} ${c.fromLabel ?? ''}`).sort((a, b) => Number(a.code != null) - Number(b.code != null));
+  // open lines with no wire code first (T108: "What is this cable?"), then by the sort
+  const asking = (c: CableDraftRow) => c.state === 'proposed' && c.unknownCode;
+  return sortRows(rows, sort, (c) => `${c.code ?? ''} ${c.fromLabel ?? ''}`).sort((a, b) => Number(asking(b)) - Number(asking(a)));
 }
 
 const STATE_ORDER: Record<DraftState, number> = { proposed: 0, edited: 1, accepted: 1, rejected: 2 };

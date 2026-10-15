@@ -309,8 +309,10 @@ def test_build_without_a_bom_or_endpoints(analysed):
     assert "network:no_N_run" in nsps.conflicts
     assert {f["check"] for f in res.findings} == {"network_run"}
     # cables: one per run bubble; the labelled outputs resolved, the rest unresolved
-    assert len(res.cables) == 71 and Counter(c.code for c in res.cables)["X"] == 46
-    labelled = [c for c in res.cables if c.source_ref["label"]]
+    runs = [c for c in res.cables if c.source_ref["kind"] == "riser_bubble"]
+    assert len(runs) == 71 and Counter(c.code for c in runs)["X"] == 46
+    assert all(c.code is None for c in res.cables if c not in runs)  # the lines (D192)
+    labelled = [c for c in runs if c.source_ref["label"]]
     assert len(labelled) == 13 and all(c.confidence == rx.LABEL_CONFIDENCE for c in labelled)
     canyon = next(c for c in labelled if c.source_ref["label"] == "DMX TO B3A CANYON")
     assert canyon.to_label == "B3A Canyon" and canyon.level_id == t.levels["01"]
@@ -325,9 +327,11 @@ def test_build_without_a_bom_or_endpoints(analysed):
     assert to06.candidates[0]["kind"] == "draft_device"  # the rack draft on band 06
     to16 = next(c for c in labelled if c.source_ref["label"] == "TO ERn4 LEVEL 16")
     assert to16.to_level_id is None and to16.candidates[0]["label"] == "Level 16"
-    rest = [c for c in res.cables if not c.source_ref["label"]]
+    rest = [c for c in runs if not c.source_ref["label"]]
     assert all("endpoint:unresolved" in c.conflicts and c.confidence == 0 for c in rest)
     assert {p.label for p in res.placeholders} == {
+        "Fixtures",  # a 0-10V line's far end (D194)
+        "120v Power",  # a 120V feed's
         "B3A Canyon",
         "C13A Oculus",
         "D1 ED Column Capital",
@@ -346,11 +350,77 @@ def test_build_without_a_bom_or_endpoints(analysed):
         and crow["source_ref"]["kind"] == "riser_bubble"
     )
     stats = res.stats()
-    assert (
-        stats["cable_drafts"] == 71
-        and stats["endpoints_unresolved"] == 58
-        and stats["placeholders_added"] == 9
+    assert stats["cable_drafts"] == 71 + LINES_001 and stats["placeholders_added"] == 11
+    assert sum(1 for c in runs if "endpoint:unresolved" in c.conflicts) == 58
+    assert stats["cables_unknown_code"] == LINES_001
+    assert "None" not in stats["cables_by_code"] and sum(stats["cables_by_code"].values()) == 71
+
+
+LINES_001 = 99
+"""Lines with no bubble on sheet 001 (D192): per band the load arrows, the 0-10V leaders, the
+feed arrows, the EBDK sense feeds, the NSPS / rack feeds and the trunk runs out of the band."""
+
+
+@needs_fixture
+def test_lines_with_no_bubble(analysed):
+    """T108: every connecting line the riser draws without a bubble is found on the text sheet,
+    with the text at its free end and a guess from that text; none of them carries a bubble."""
+    s1 = analysed.sheets[0]
+    assert len(s1.lines) == LINES_001 and not analysed.sheets[1].lines  # 002: the model's
+    assert all(ln.extraction == "text" and ln.endpoint_source == "geometry" for ln in s1.lines)
+    l03 = {ln.id: ln for ln in s1.band_lines(band(analysed, "03"))}
+    names = {d.id: d.name or d.label for d in devs(analysed, "03")}
+    ascii_ = lambda s: "".join(ch for ch in s or "" if ch.isascii())[:12]  # noqa: E731 (1Ø)
+    got = Counter((names[ln.from_device], ascii_(ln.label), ln.leaves_band) for ln in l03.values())
+    assert got == Counter(
+        {
+            ("CT03LCPB", "TO LOAD CKTS", False): 1,
+            ("CT03LCPA", "TO LOAD CKTS", False): 1,
+            ("CT03LCPB", "(2)#16 AWG S", False): 1,
+            ("CT03LCPA", "(2)#16 AWG S", False): 1,
+            ("CT03LCPB", "(24) 20A. 12", False): 1,  # the triple feed arrow is one line
+            ("CT03LCPA", "(24) 20A. 12", False): 1,
+            ("UFMP4", "TO LOAD", False): 1,
+            ("UFMP4", "1, 2 WIRE + ", False): 1,
+            ("EBDK", "4-WIRE 20A M", False): 2,
+            ("PARADIGM P-NSPS-DIN", "1, 2 WIRE + ", False): 1,
+            ("PARADIGM P-NSPS-DIN", "", True): 1,  # up the trunk to level 04
+        }
     )
+    guesses = Counter(ln.guess for ln in s1.lines)
+    assert guesses == {"0-10V": 14, "120V": GUESS_120V, None: LINES_001 - 14 - GUESS_120V}
+    assert all(ln.guess_confidence == rx.LABEL_GUESS_CONFIDENCE for ln in s1.lines if ln.guess)
+    # the prompt lists them for the model
+    crop = rx.band_crop(FIXTURE.read_bytes(), s1, band(analysed, "03"))
+    prompt = rx.band_prompt(s1, band(analysed, "03"), crop, list(TOWER_LEVELS))
+    assert "Lines with no bubble" in prompt and "text 'TO LOAD CKTS'" in prompt
+    assert ", leaves the band" in prompt
+    # as drafts: no code, `code:unknown`, the guess a candidate and the library's far end
+    t = tower_target()
+    res = rx.build(analysed, t)
+    lines = [c for c in res.cables if c.source_ref["kind"] == "riser_line"]
+    assert len(lines) == LINES_001
+    assert all(c.code is None and "code:unknown" in c.conflicts for c in lines)
+    ctl = next(
+        c for c in lines if c.from_label == "CT03LCPB" and "0-10V" in (c.source_ref["label"] or "")
+    )
+    row = ctl.row()
+    json.dumps(row, default=str)
+    assert row["code"] is None and row["level_id"] == t.levels["03"]
+    assert {"side": "code", "value": "0-10V", "confidence": 0.5, "source": "label"} in row[
+        "candidates"
+    ]
+    to = next(c for c in row["candidates"] if c["side"] == "to")
+    assert to["kind"] == "placeholder" and to["label"] == "Fixtures"
+    assert row["source_ref"]["line"] and row["source_ref"]["bbox"][2] > 0
+    load = next(c for c in lines if (c.source_ref["label"] or "") == "TO LOAD CKTS")
+    assert not any(c["side"] == "code" for c in load.candidates)
+    assert "endpoint:unresolved" not in load.conflicts and load.to_label == "TO LOAD CKTS"
+    assert res.stats()["code_guesses"]["0-10V"] == 14
+
+
+GUESS_120V = 35
+"""Feed arrows under the panels, the UFMP 100-277V and the NSPS / rack 120V feeds."""
 
 
 def _no_ocr(_pdf: bytes, _page: int, **_kw) -> list[ocr.Word]:
@@ -587,8 +657,9 @@ def test_riser_job_without_a_claude_key(session, store, factory):
     assert batch.job_state == "done", batch.stats
     s = batch.stats
     assert s["claude"].startswith("unavailable") and s["claude_bands"] is None
-    assert s["levels"] == SHEET_001_LEVELS and s["device_drafts"] == 93 and s["cable_drafts"] == 71
-    assert s["endpoints_unresolved"] == 58 and s["placeholders_added"] == 9
+    assert s["levels"] == SHEET_001_LEVELS and s["device_drafts"] == 93
+    assert s["cable_drafts"] == 71 + LINES_001 and s["cables_unknown_code"] == LINES_001
+    assert s["placeholders_added"] == 11 and s["sheets"][0]["unlabelled_lines"] == LINES_001
     rows = session.scalars(select(DraftDevice).where(DraftDevice.project_id == project_id)).all()
     assert len(rows) == 93 and all(
         r.state == "proposed" and r.import_batch_id == batch.id for r in rows
@@ -598,10 +669,18 @@ def test_riser_job_without_a_claude_key(session, store, factory):
     )
     assert {r.level_id for r in rows if r.source_ref["level_code"] == "01"} == {levels["01"].id}
     cables = session.scalars(select(DraftCable).where(DraftCable.project_id == project_id)).all()
-    assert len(cables) == 71 and all(c.origin == "riser" and c.state == "proposed" for c in cables)
+    assert len(cables) == 71 + LINES_001 and all(
+        c.origin == "riser" and c.state == "proposed" for c in cables
+    )
+    unknown = [c for c in cables if c.code is None]
+    assert len(unknown) == LINES_001 and all(
+        c.conflicts and "code:unknown" in c.conflicts for c in unknown
+    )
     canyon = next(c for c in cables if c.source_ref.get("label") == "DMX TO B3A CANYON")
     ph = session.scalars(select(Placeholder).where(Placeholder.project_id == project_id)).all()
-    assert {p.label: p.kind for p in ph}["B3A Canyon"] == "fixture_run" and len(ph) == 9
+    kinds = {p.label: p.kind for p in ph}
+    assert kinds["B3A Canyon"] == "fixture_run" and len(ph) == 11
+    assert kinds["Fixtures"] == "fixtures" and kinds["120v Power"] == "power"
     assert canyon.candidates[0]["id"] == str(next(p.id for p in ph if p.label == "B3A Canyon"))
     assert canyon.level_id == levels["01"].id and canyon.to_label == "B3A Canyon"
     blob = session.get(Blob, s["blob"])
@@ -612,7 +691,7 @@ def test_riser_job_without_a_claude_key(session, store, factory):
             Op.entity_kind.in_(("draft_device", "draft_cable", "placeholder")),
         )
     ).all()
-    assert len(ops) == 93 + 71 + 9 == s["ops"] and all(
+    assert len(ops) == 93 + 71 + LINES_001 + 11 == s["ops"] and all(
         o.state == "applied" and o.kind == "create" for o in ops
     )
     assert all(
@@ -658,8 +737,25 @@ def test_riser_job_with_claude_endpoints(session, store, factory):
         ("EBDK", 1),
         ("ERN4-RM-120", 1),
     }
+    # lines with no bubble (T108, D192): the Tower's count, each asked about with a guess
+    every = session.scalars(select(DraftCable).where(DraftCable.project_id == project_id)).all()
+    unknown = [c for c in every if c.code is None]
+    assert len(unknown) == s["cables_unknown_code"] == TOWER_UNKNOWN_CODE, len(unknown)
+    assert all(
+        "code:unknown" in c.conflicts and c.source_ref["kind"] == "riser_line" for c in unknown
+    )
+    assert (
+        sheet2["unlabelled_lines"] >= 20
+        and sum(1 for c in unknown if c.source_ref["sheet"] == "002") == sheet2["unlabelled_lines"]
+    )
+    guessed = [x for c in unknown for x in c.candidates or [] if x["side"] == "code"]
+    assert len(guessed) >= len(unknown) * 2 // 3
+    assert {x["value"] for x in guessed} <= set(rx.GUESS_CODES)
+    assert all(x["confidence"] <= rx.MODEL_CONFIDENCE_CAP for x in guessed)
+    assert {"0-10V", "120V"} <= {x["value"] for x in guessed}
+    assert sum(s["code_guesses"].values()) == len(unknown)
     # cables: every run has endpoints now; the guesses are flagged
-    cables = session.scalars(select(DraftCable).where(DraftCable.project_id == project_id)).all()
+    cables = [c for c in every if c.code is not None]
     assert len(cables) >= 71 + 20
     unresolved = [c for c in cables if "endpoint:unresolved" in (c.conflicts or [])]
     assert len(unresolved) < len(cables) // 4, len(unresolved)
@@ -807,3 +903,7 @@ def test_claude_cost_and_recording(tmp_path):
         c.extract(system="s", prompt="other", schema={"type": "object"}, images=[], label="y")
     rec.save()
     assert json.loads((tmp_path / "rec.json").read_text())[key]["data"] == {"ok": True}
+
+
+TOWER_UNKNOWN_CODE = 0
+"""Lines with no bubble on the Tower's riser, both sheets, with the recorded answers (T108)."""

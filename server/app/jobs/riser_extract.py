@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -87,6 +88,39 @@ BUBBLE_FRAGMENT_MAX_PT = 25.0
 CODES = ("X", "N", "NG", "U", "F", "P", "UV")
 RUN_CODES = ("X", "N", "NG", "F", "P", "UV")
 """Bubble codes that are cable runs; `U` is a chain link (see the module docstring)."""
+
+GUESS_CODES = ("X", "N", "NG", "U", "F", "P", "UV", "0-10V", "120V")
+"""What a line with no bubble may be guessed as: every cable code (CLAUDE.md §3), D192."""
+
+LINE_TOUCH_PT = 2.0
+"""Segment ends this close join one line; a line end this close to a symbol box touches it."""
+
+LINE_MIN_PT = 8.0
+"""A line shorter than this in total (symbol detail, arrowhead slivers) is not a connection."""
+
+LINE_LABEL_PT = 24.0
+"""Text this close to a line's free end is what the line is labelled (`TO LOAD CKTS`)."""
+
+LINE_TRUNK_SHARE = 0.6
+"""A vertical segment longer than this share of the band's height is a trunk between bands."""
+
+SYMBOL_MIN_PT = 20.0
+"""The smallest box drawn round a device symbol."""
+
+LABEL_GUESS_CONFIDENCE = 0.5
+"""A code guessed from the line's printed text alone (`0-10V CONTROL`, `120V`), no model."""
+
+LABEL_GUESSES: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"0-10V"), "0-10V"),
+    (re.compile(r"\b120V\b|\b1[02]0-277V\b"), "120V"),
+]
+
+GUESS_PLACEHOLDERS: dict[str, tuple[str, str]] = {
+    "0-10V": ("Fixtures", "fixtures"),
+    "120V": ("120v Power", "power"),
+}
+"""The library's far end for a guessed code (R2c / R2d, D52): offered as the To candidate so an
+accepted line meets the library's row for the same device (D194)."""
 
 ROW_GAP_PT = 2.5
 RUN_GAP_PT = 14.0
@@ -171,8 +205,18 @@ LEVEL 06 or TO ERn4 LEVEL 16 name the far end outright. The rack's output stack 
 outputs (DMX TO B3A CANYON), spares (SPARE DMX OUT) and fibre / network runs to other racks.
 
 U bubbles are chain links between the device types of one level's Unison bus, not runs: never
-list them as cables. Answer only in the JSON schema you were given; coordinates are pixels of
-the band image; confidence is your own estimate from 0 to 1, below 0.7 when you are guessing."""
+list them as cables.
+
+Some lines connect to a device with no bubble at all: the last Unison link into an NSPS
+enclosure or the rack, a trunk whose only mark is a label at its end (TO RELAY PANEL LEVEL 20,
+TO UNISON STATIONS LEVEL 24), a line that just leaves the band, and the feed and note arrows
+(TO LOAD CKTS, the (2)#16 AWG ... TO 0-10V CONTROL leader, the 120V feed arrows under panels and
+NSPS enclosures, the EBDK sense feed). List each as an unlabelled line with your best guess at
+its code (0-10V for control leaders, 120V for power feeds, U for a Unison link, X / N / F for a
+data trunk) or null when you cannot tell; a reviewer decides what it is.
+
+Answer only in the JSON schema you were given; coordinates are pixels of the band image;
+confidence is your own estimate from 0 to 1, below 0.7 when you are guessing."""
 
 # ------------------------------------------------------------------- types
 
@@ -278,6 +322,33 @@ class Bubble:
 
 
 @dataclass
+class Line:
+    """A connecting line with no wire bubble (D192): the last Unison link into an enclosure, a
+    trunk marked only by a label at its end, a feed or note arrow. Its code is unknown; the
+    reviewer says what it is."""
+
+    id: str
+    band: Band
+    bbox: list[float]  # page points, grown so a straight line has an area
+    extraction: str  # text (geometry) | model
+    label: str | None = None  # the text printed at its free end
+    leaves_band: bool = False  # reaches a trunk or the band's edge
+    from_device: str | None = None
+    from_label: str | None = None
+    to_device: str | None = None
+    to_label: str | None = None
+    to_level_code: str | None = None
+    guess: str | None = None  # a code from GUESS_CODES, never written as the code
+    guess_confidence: float = 0.0
+    guess_source: str | None = None  # label | model
+    confidence: float = 0.0
+    endpoint_source: str | None = None  # geometry | model
+    note: str | None = None
+    code: str | None = None  # always None; lets `_Build.cable` read a line as a bubble
+    output_label: str | None = None
+
+
+@dataclass
 class Sheet:
     page: int
     drawing: str  # "001", "002" (the title block's DRAWING number), else the page number
@@ -289,12 +360,16 @@ class Sheet:
     bubbles: list[Bubble]
     unison_links: int
     columns: int
+    lines: list[Line] = field(default_factory=list)
 
     def band_devices(self, band: Band) -> list[Device]:
         return [d for d in self.devices if d.band is band]
 
     def band_bubbles(self, band: Band) -> list[Bubble]:
         return [b for b in self.bubbles if b.band is band]
+
+    def band_lines(self, band: Band) -> list[Line]:
+        return [ln for ln in self.lines if ln.band is band]
 
 
 @dataclass
@@ -323,6 +398,7 @@ class Riser:
                     "devices": len(s.devices),
                     "bubbles": len(s.bubbles),
                     "unison_links": s.unison_links,
+                    "unlabelled_lines": len(s.lines),
                 }
                 for s in self.sheets
             ]
@@ -405,6 +481,32 @@ def small_curves(pdf_bytes: bytes, page_index: int) -> list[tuple[float, float, 
             if w <= BUBBLE_FRAGMENT_MAX_PT and h <= BUBBLE_FRAGMENT_MAX_PT:
                 out.append((float(c["x0"]), float(c["top"]), float(c["x1"]), float(c["bottom"])))
     return out
+
+
+Seg = tuple[tuple[float, float], tuple[float, float]]
+
+
+def segments_of(pdf_bytes: bytes, page_index: int) -> list[Seg]:
+    """Every straight piece of vector ink: lines, rectangle edges and each step of a curve's
+    point list (the riser draws connectors both ways). Top-left origin, points."""
+    out: list[Seg] = []
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        page = pdf.pages[page_index]
+        for ln in page.lines:
+            out.append(
+                ((float(ln["x0"]), float(ln["top"])), (float(ln["x1"]), float(ln["bottom"])))
+            )
+        for c in page.curves + page.rects:
+            pts = c.get("pts") or [
+                (c["x0"], c["top"]),
+                (c["x1"], c["top"]),
+                (c["x1"], c["bottom"]),
+                (c["x0"], c["bottom"]),
+                (c["x0"], c["top"]),
+            ]
+            ps = [(float(x), float(y)) for x, y in pts]
+            out.extend(zip(ps, ps[1:], strict=False))
+    return [(a, b) for a, b in out if abs(a[0] - b[0]) + abs(a[1] - b[1]) > 0.3]
 
 
 def drawing_number(words: list[Tok]) -> str | None:
@@ -861,19 +963,17 @@ def devices_of(band: Band, words: list[Tok]) -> list[Device]:
 # ----------------------------------------------------------------- bubbles
 
 
-def bubbles_of(
-    band: Band, words: list[Tok], curves: list[tuple[float, float, float, float]], start: int
-) -> tuple[list[Bubble], int]:
-    """Lone code tokens ringed by curve fragments; `U` links are counted, not returned."""
+def _bubble_tokens(
+    band: Band, words: list[Tok], curves: list[tuple[float, float, float, float]]
+) -> list[tuple[Tok, int]]:
+    """Every code token of the band ringed by enough curve fragments to be a bubble (`U` too)."""
     toks = [t for t in words if band.contains(t) and t.text in CODES]
     in_band = [
         c
         for c in curves
         if band.top - BUBBLE_REACH_PT <= c[1] and c[3] <= band.bottom + BUBBLE_REACH_PT
     ]
-    out: list[Bubble] = []
-    links = 0
-    n = start
+    out = []
     for t in sorted(toks, key=lambda t: (t.top, t.x0)):
         x0, y0, x1, y1 = (
             t.x0 - BUBBLE_REACH_PT,
@@ -882,8 +982,19 @@ def bubbles_of(
             t.bottom + BUBBLE_REACH_PT,
         )
         frags = sum(1 for c in in_band if c[0] <= x1 and c[2] >= x0 and c[1] <= y1 and c[3] >= y0)
-        if frags < BUBBLE_MIN_FRAGMENTS:
-            continue
+        if frags >= BUBBLE_MIN_FRAGMENTS:
+            out.append((t, frags))
+    return out
+
+
+def bubbles_of(
+    band: Band, words: list[Tok], curves: list[tuple[float, float, float, float]], start: int
+) -> tuple[list[Bubble], int]:
+    """Lone code tokens ringed by curve fragments; `U` links are counted, not returned."""
+    out: list[Bubble] = []
+    links = 0
+    n = start
+    for t, frags in _bubble_tokens(band, words, curves):
         if t.text == "U":
             links += 1
             continue
@@ -921,6 +1032,313 @@ def output_labels(band: Band, words: list[Tok], bubbles: list[Bubble]) -> None:
                     break
 
 
+# ------------------------------------------------------------------- lines
+
+Box = tuple[float, float, float, float]  # x0, top, x1, bottom
+
+
+def _seg_len(s: Seg) -> float:
+    (a, b) = s
+    return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+def _in_box(p: tuple[float, float], b: Box, tol: float) -> bool:
+    return b[0] - tol <= p[0] <= b[2] + tol and b[1] - tol <= p[1] <= b[3] + tol
+
+
+def _on_edge(p: tuple[float, float], b: Box, tol: float = LINE_TOUCH_PT) -> bool:
+    return _in_box(p, b, tol) and (
+        abs(p[0] - b[0]) <= tol
+        or abs(p[0] - b[2]) <= tol
+        or abs(p[1] - b[1]) <= tol
+        or abs(p[1] - b[3]) <= tol
+    )
+
+
+def symbol_boxes(segs: list[Seg], max_w: float, max_h: float) -> list[Box]:
+    """Closed axis-aligned rectangles (symbol outlines) from horizontal and vertical pieces,
+    collinear pieces joined first (a panel's outline is drawn in parts)."""
+    hs: dict[float, list[tuple[float, float]]] = defaultdict(list)
+    vs: dict[float, list[tuple[float, float]]] = defaultdict(list)
+    for a, b in segs:
+        if abs(a[1] - b[1]) < 0.5 and abs(a[0] - b[0]) >= 1:
+            hs[round(a[1] * 2) / 2].append((min(a[0], b[0]), max(a[0], b[0])))
+        elif abs(a[0] - b[0]) < 0.5 and abs(a[1] - b[1]) >= 1:
+            vs[round(a[0] * 2) / 2].append((min(a[1], b[1]), max(a[1], b[1])))
+
+    def join(d: dict[float, list[tuple[float, float]]]) -> list[tuple[float, float, float]]:
+        out = []
+        for k, spans in d.items():
+            spans.sort()
+            lo, hi = spans[0]
+            for s0, s1 in spans[1:]:
+                if s0 <= hi + 1.0:
+                    hi = max(hi, s1)
+                else:
+                    out.append((k, lo, hi))
+                    lo, hi = s0, s1
+            out.append((k, lo, hi))
+        return [s for s in out if s[2] - s[1] >= SYMBOL_MIN_PT / 2]
+
+    horizontal, vertical = join(hs), join(vs)
+    boxes: set[Box] = set()
+    for y, hx0, hx1 in horizontal:
+        downs = [v for v in vertical if hx0 - 1 <= v[0] <= hx1 + 1 and abs(v[1] - y) <= 1]
+        for vl in downs:
+            for vr in downs:
+                w = vr[0] - vl[0]
+                if w < SYMBOL_MIN_PT or w > max_w:
+                    continue
+                reach = min(vl[2], vr[2])
+                for y2, bx0, bx1 in horizontal:
+                    if (
+                        SYMBOL_MIN_PT <= y2 - y <= max_h
+                        and y2 <= reach + 1
+                        and bx0 <= vl[0] + 1
+                        and bx1 >= vr[0] - 1
+                    ):
+                        boxes.add((vl[0], y, vr[0], y2))
+    return sorted(boxes)
+
+
+def symbol_box(d: Device, boxes: list[Box]) -> Box:
+    """The outline drawn round a device: the largest box holding its label's centre, else the
+    box just under its label (stations, NSPS, EBDK), else the label's own box."""
+    lx, ly, lw, lh = d.bbox
+    cx, cy = lx + lw / 2, ly + lh / 2
+    area = lambda b: (b[2] - b[0]) * (b[3] - b[1])  # noqa: E731
+    holding = [b for b in boxes if b[0] <= cx <= b[2] and b[1] <= cy <= b[3]]
+    if holding:
+        return max(holding, key=area)
+    under = [b for b in boxes if -6 <= b[1] - (ly + lh) <= 25 and b[0] - 5 <= cx <= b[2] + 5]
+    if under:
+        return max(under, key=area)
+    # the label box, widened by the boxes drawn inside it (the EBDK's breaker module)
+    own: Box = (lx, ly, lx + lw, ly + lh)
+    parts = [own] + [b for b in boxes if _in_box(((b[0] + b[2]) / 2, (b[1] + b[3]) / 2), own, 2)]
+    return (
+        min(b[0] for b in parts),
+        min(b[1] for b in parts),
+        max(b[2] for b in parts),
+        max(b[3] for b in parts),
+    )
+
+
+def _label_runs(band: Band, words: list[Tok], skip: set[int], boxes: list[Box]) -> list[list[Tok]]:
+    toks = [
+        t
+        for t in words
+        if band.contains(t)
+        and id(t) not in skip
+        and t.size < LEVEL_LABEL_MIN_SIZE  # not the band's LEVEL nn
+        and not any(_in_box((t.cx, t.cy), b, 0) for b in boxes)
+    ]
+    runs = [r for row in rows_of(toks) for r in runs_of(row)]
+    # not a symbol's QTY: callout, not a glyph (the `~` of a sense feed)
+    return [r for r in runs if not QTY_RE.match(r[0].text) and any(ch.isalnum() for ch in _text(r))]
+
+
+def _run_box(r: list[Tok]) -> Box:
+    return (
+        min(t.x0 for t in r),
+        min(t.top for t in r),
+        max(t.x1 for t in r),
+        max(t.bottom for t in r),
+    )
+
+
+def _label_at(points: list[tuple[float, float]], runs: list[list[Tok]]) -> str | None:
+    """The text block nearest the line's free end (within `LINE_LABEL_PT`), all its lines."""
+    best, dist = None, LINE_LABEL_PT
+    for r in runs:
+        x0, y0, x1, y1 = _run_box(r)
+        for px, py in points:
+            d = math.hypot(max(x0 - px, 0, px - x1), max(y0 - py, 0, py - y1))
+            if d < dist:
+                best, dist = r, d
+    if best is None:
+        return None
+    block = [best]
+    grew = True
+    while grew:
+        grew = False
+        bx0 = min(_run_box(r)[0] for r in block)
+        by0 = min(_run_box(r)[1] for r in block)
+        bx1 = max(_run_box(r)[2] for r in block)
+        by1 = max(_run_box(r)[3] for r in block)
+        for r in runs:
+            if any(r is b for b in block):
+                continue
+            x0, y0, x1, y1 = _run_box(r)
+            if x0 <= bx1 and x1 >= bx0 and (0 <= y0 - by1 <= 2.5 or 0 <= by0 - y1 <= 2.5):
+                block.append(r)
+                grew = True
+    block.sort(key=lambda r: (_run_box(r)[1], _run_box(r)[0]))
+    return " ".join(_text(r) for r in block)
+
+
+def label_guess(label: str | None) -> str | None:
+    """A code the line's own text names (`TO 0-10V CONTROL`, `120V`), else None."""
+    t = (label or "").upper()
+    return next((code for pat, code in LABEL_GUESSES if pat.search(t)), None)
+
+
+def lines_of(
+    band: Band,
+    words: list[Tok],
+    segs: list[Seg],
+    curves: list[tuple[float, float, float, float]],
+    devices: list[Device],
+    start: int,
+) -> list[Line]:
+    """Connecting lines with no bubble on a text sheet (D192): pieces of ink joined end to end
+    (`LINE_TOUCH_PT`) that touch a device's outline, reach out of it, and carry no wire bubble
+    (`U` links included). A device's arrows that end at one label are one line (the triple
+    feed arrow). Trunks between bands are not followed: a line that reaches one `leaves_band`
+    and the model reads where it goes."""
+    height = band.bottom - band.top
+    near = [
+        s
+        for s in segs
+        if all(
+            band.x0 - 5 <= p[0] <= band.x1 + 5 and band.top - 2 <= p[1] <= band.bottom + 2
+            for p in s
+        )
+    ]
+    trunks = [
+        (s[0][0], min(s[0][1], s[1][1]), max(s[0][1], s[1][1]))
+        for s in segs
+        if abs(s[0][0] - s[1][0]) < 0.5
+        and _seg_len(s) > height * LINE_TRUNK_SHARE
+        and band.x0 <= s[0][0] <= band.x1
+        and (min(s[0][1], s[1][1]) <= band.top + 3 or max(s[0][1], s[1][1]) >= band.bottom - 3)
+        and min(s[0][1], s[1][1]) < band.bottom
+        and max(s[0][1], s[1][1]) > band.top
+    ]  # a tall panel's side is not a trunk: a trunk reaches the band's edge
+    boxes = symbol_boxes(near, max_w=250.0, max_h=height * 0.8)
+    dbox = {d.id: symbol_box(d, boxes) for d in devices}
+    bubble_toks = _bubble_tokens(band, words, curves)
+    bubbles: list[Box] = []
+    for t, _ in bubble_toks:
+        x, y, w, h = _grow(_bbox([t]), 9, 3)
+        bubbles.append((x, y, x + w, y + h))
+    free = [
+        s
+        for s in near
+        if _seg_len(s) <= height * LINE_TRUNK_SHARE
+        and not any(_in_box(s[0], b, 0.5) and _in_box(s[1], b, 0.5) for b in dbox.values())
+    ]
+    # pieces whose ends meet are one line
+    parent = list(range(len(free)))
+
+    def root(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    cell = 4.0
+    grid: dict[tuple[int, int], list[tuple[int, tuple[float, float]]]] = defaultdict(list)
+    for i, s in enumerate(free):
+        for p in s:
+            grid[(round(p[0] / cell), round(p[1] / cell))].append((i, p))
+    for i, s in enumerate(free):
+        for p in s:
+            gx, gy = round(p[0] / cell), round(p[1] / cell)
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for j, q in grid[(gx + dx, gy + dy)]:
+                        if (
+                            j != i
+                            and abs(p[0] - q[0]) <= LINE_TOUCH_PT
+                            and abs(p[1] - q[1]) <= LINE_TOUCH_PT
+                        ):
+                            parent[root(i)] = root(j)
+    comps: dict[int, list[Seg]] = defaultdict(list)
+    for i, s in enumerate(free):
+        comps[root(i)].append(s)
+
+    runs = _label_runs(band, words, {id(t) for t, _ in bubble_toks}, list(dbox.values()))
+    by_key: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for n, comp in enumerate(comps.values()):
+        if sum(_seg_len(s) for s in comp) < LINE_MIN_PT:
+            continue
+        pts = [p for s in comp for p in s]
+        touched = [d.id for d in devices if any(_on_edge(p, dbox[d.id]) for p in pts)]
+        if not touched:
+            continue
+        if any(_in_box(p, b, LINE_TOUCH_PT) for p in pts for b in bubbles):
+            continue  # a run with a bubble (T43) or a Unison link
+        if all(any(_in_box(p, b, 3.0) for b in dbox.values()) for p in pts):
+            continue  # detail inside a symbol
+        leaves = any(
+            abs(p[0] - x) <= LINE_TOUCH_PT and y0 - 1 <= p[1] <= y1 + 1
+            for p in pts
+            for x, y0, y1 in trunks
+        ) or any(p[1] <= band.top + 3 or p[1] >= band.bottom - 3 for p in pts)
+        # the label sits at the free end: the points farthest from the device it leaves
+        home = dbox[touched[0]]
+        reach = [
+            (
+                math.hypot(
+                    max(home[0] - p[0], 0, p[0] - home[2]), max(home[1] - p[1], 0, p[1] - home[3])
+                ),
+                p,
+            )
+            for p in pts
+        ]
+        far = max(r for r, _ in reach)
+        ends = [p for r, p in reach if r >= far * 0.6 and r > LINE_TOUCH_PT]
+        label = None if leaves else _label_at(ends, runs)
+        if label is None and not leaves and len(touched) < 2:
+            continue  # nothing at its end: a drawing detail, not a connection
+        key = (touched[0], label) if label else ("comp", n)
+        entry = by_key.setdefault(key, {"pts": [], "touched": [], "label": label, "leaves": False})
+        entry["pts"].extend(pts)
+        entry["touched"].extend(t for t in touched if t not in entry["touched"])
+        entry["leaves"] = entry["leaves"] or leaves
+
+    names = {d.id: d for d in devices}
+    out: list[Line] = []
+    for e in sorted(
+        by_key.values(), key=lambda e: (min(p[1] for p in e["pts"]), min(p[0] for p in e["pts"]))
+    ):
+        xs = [p[0] for p in e["pts"]]
+        ys = [p[1] for p in e["pts"]]
+        frm = names[e["touched"][0]]
+        to = names[e["touched"][1]] if len(e["touched"]) > 1 else None
+        guess = label_guess(e["label"])
+        out.append(
+            Line(
+                id=f"l{start + len(out) + 1}",
+                band=band,
+                bbox=_grow(
+                    [
+                        round(min(xs), 1),
+                        round(min(ys), 1),
+                        round(max(xs) - min(xs), 1),
+                        round(max(ys) - min(ys), 1),
+                    ],
+                    4,
+                    4,
+                ),
+                extraction="text",
+                label=e["label"],
+                leaves_band=e["leaves"],
+                from_device=frm.id,
+                from_label=frm.name or frm.label,
+                to_device=to.id if to else None,
+                to_label=e["label"] if to is None else None,
+                guess=guess,
+                guess_confidence=LABEL_GUESS_CONFIDENCE if guess else 0.0,
+                guess_source="label" if guess else None,
+                confidence=TEXT_CONFIDENCE if to else LABEL_GUESS_CONFIDENCE,
+                endpoint_source="geometry",
+            )
+        )
+    return out
+
+
 # ----------------------------------------------------------------- analyse
 
 
@@ -937,18 +1355,22 @@ def analyse(pdf_bytes: bytes) -> Riser:
         has_text = len(in_bands) >= 50
         devices: list[Device] = []
         bubbles: list[Bubble] = []
+        lines: list[Line] = []
         links = 0
         if has_text:
             label_levels(bands, words)
             curves = small_curves(pdf_bytes, i)
+            segs = segments_of(pdf_bytes, i)
             n = 0
             for b in bands:
-                devices.extend(devices_of(b, words))
+                band_devices = devices_of(b, words)
+                devices.extend(band_devices)
                 bb, lk = bubbles_of(b, words, curves, n)
                 n += len(bb)
                 links += lk
                 output_labels(b, words, bb)
                 bubbles.extend(bb)
+                lines.extend(lines_of(b, words, segs, curves, band_devices, len(lines)))
         sheets.append(
             Sheet(
                 page=i + 1,
@@ -961,6 +1383,7 @@ def analyse(pdf_bytes: bytes) -> Riser:
                 bubbles=bubbles,
                 unison_links=links,
                 columns=ncols,
+                lines=lines,
             )
         )
     return Riser(sheets)
@@ -1060,20 +1483,37 @@ def band_prompt(sheet: Sheet, band: Band, crop: Crop, levels_known: list[str]) -
                 + (f", label '{b.output_label}'" if b.output_label else "")
             )
         lines.append(
+            "\nLines with no bubble on this band (id: the device it leaves, [x, y, w, h] px, "
+            "text at its free end if any):"
+        )
+        for ln in sheet.band_lines(band):
+            lines.append(
+                f"- {ln.id}: from {ln.from_device}"
+                + (f" to {ln.to_device}" if ln.to_device else "")
+                + f", {crop.to_px(ln.bbox)}"
+                + (f", text '{ln.label}'" if ln.label else "")
+                + (", leaves the band" if ln.leaves_band else "")
+            )
+        lines.append(
             "\nReturn devices as an empty list (they are known). For every bubble above return "
             "one cable: from_device = the listed device whose line the bubble sits on; to_device "
             "when the other end is a device on this band; otherwise to_label (the printed far-end "
             "text, or Equipment rack / Relay panel / NSPS) with to_level_code read from the "
             "overview — trunk lines run between bands and are labelled at their ends. A bubble "
             "beside a rack output label goes from the rack to that label. Add a cable for any run "
-            "bubble you see that is not listed (new ids), never for U bubbles."
+            "bubble you see that is not listed (new ids), never for U bubbles. For every line "
+            "with no bubble above return one unlabelled_lines entry with its endpoints read the "
+            "same way and your code_guess; add one for any such line you see that is not listed "
+            "(new-l1, new-l2 …)."
         )
     else:
         lines.append(
             "\nThis sheet has no text layer. Read the band: level_code from its LEVEL label; "
             "every device symbol with its printed label, model, panel tag, QTY: count and box in "
             "pixels; every wire bubble (X, N, NG, F, P, UV — not U) with its box and endpoints as "
-            "above. Use new-1, new-2 … as device ids and new-b1, new-b2 … as bubble ids."
+            "above; every line that connects to a device with no bubble as an unlabelled_lines "
+            "entry with your code_guess. Use new-1, new-2 … as device ids, new-b1, new-b2 … as "
+            "bubble ids and new-l1, new-l2 … as line ids."
         )
     return "\n".join(lines)
 
@@ -1159,6 +1599,51 @@ def apply_answer(sheet: Sheet, band: Band, crop: Crop, data: dict[str, Any]) -> 
         else:
             b.confidence = conf
             b.endpoint_source = "model"
+    apply_lines(sheet, band, crop, data, device_ids)
+
+
+def _overlaps(a: list[float], b: list[float]) -> bool:
+    return (
+        a[0] <= b[0] + b[2] and b[0] <= a[0] + a[2] and a[1] <= b[1] + b[3] and b[1] <= a[1] + a[3]
+    )
+
+
+def apply_lines(
+    sheet: Sheet, band: Band, crop: Crop, data: dict[str, Any], device_ids: set[str]
+) -> None:
+    """The model's reading of the lines with no bubble (D192): far ends and a code guess on the
+    lines the geometry found (its near end stands), and the lines it saw that were not listed —
+    every one on a sheet with no text layer."""
+    known = {ln.id: ln for ln in sheet.band_lines(band)}
+    for item in data.get("unlabelled_lines") or []:
+        lid = str(item.get("line_id") or "")
+        frm = item.get("from_device")
+        ln = known.get(lid)
+        if ln is None:
+            box = _grow(crop.to_pt(list(item.get("bbox") or [])), 4, 4)
+            if any(o.from_device == frm and _overlaps(o.bbox, box) for o in known.values()):
+                continue  # a listed line under a new id
+            ln = Line(id=f"new-l{len(sheet.lines) + 1}", band=band, bbox=box, extraction="model")
+            sheet.lines.append(ln)
+            known[ln.id] = ln
+        conf = min(float(item.get("confidence") or 0.0), MODEL_CONFIDENCE_CAP)
+        to = item.get("to_device")
+        if ln.from_device is None:
+            ln.from_device = frm if frm in device_ids else None
+            ln.from_label = item.get("from_label") or (None if ln.from_device else frm)
+        if to in device_ids and to != ln.from_device:
+            ln.to_device, ln.to_label = to, None
+        elif item.get("to_label") and ln.to_device is None:
+            ln.to_label = item["to_label"]
+        if item.get("to_level_code"):
+            ln.to_level_code = bx.norm_level(str(item["to_level_code"]))
+        ln.label = ln.label or item.get("label") or None
+        guess = item.get("code_guess")
+        if guess in GUESS_CODES:
+            ln.guess, ln.guess_confidence, ln.guess_source = guess, conf, "model"
+        ln.confidence = conf
+        ln.endpoint_source = "model"
+        ln.note = item.get("note") or None
 
 
 # -------------------------------------------------------------------- build
@@ -1308,7 +1793,7 @@ class CableDraft:
     id: Any
     level_id: Any
     level_code: str | None
-    code: str
+    code: str | None  # None: a line with no bubble, the reviewer says what it is (D192)
     from_label: str | None
     to_label: str | None
     to_level_id: Any
@@ -1375,7 +1860,19 @@ class Result:
             "bom_deleted": len(self.deletions),
             "placeholders_added": len(self.placeholders),
             "cable_drafts": len(self.cables),
-            "cables_by_code": dict(sorted(_count(c.code for c in self.cables).items())),
+            "cables_by_code": dict(
+                sorted(_count(c.code for c in self.cables if c.code is not None).items())
+            ),
+            "cables_unknown_code": sum(1 for c in self.cables if c.code is None),
+            "code_guesses": dict(
+                sorted(
+                    _count(
+                        next((x["value"] for x in c.candidates if x["side"] == "code"), "none")
+                        for c in self.cables
+                        if c.code is None
+                    ).items()
+                )
+            ),
             "endpoints_low_confidence": sum(
                 1 for c in self.cables if c.confidence < LOW_CONFIDENCE
             ),
@@ -1765,6 +2262,8 @@ class _Build:
                 devs = {d.id: d for d in sheet.band_devices(band)}
                 for b in sheet.band_bubbles(band):
                     self.cable(sheet, band, level_id, code, devs, b)
+                for ln in sheet.band_lines(band):
+                    self.cable(sheet, band, level_id, code, devs, ln)
 
     def cable(
         self,
@@ -1773,8 +2272,11 @@ class _Build:
         level_id: Any,
         code: str | None,
         devs: dict[str, Device],
-        b: Bubble,
+        b: Bubble | Line,
     ) -> None:
+        """One `draft_cable` per run bubble, and per line with no bubble (D192): `code` null,
+        conflict `code:unknown`, the guess as a `{side: code}` candidate — never the code."""
+        line = isinstance(b, Line)
         conflicts: list[str] = []
         candidates: list[dict[str, Any]] = []
         from_label = b.from_label
@@ -1837,12 +2339,51 @@ class _Build:
                         "confidence": round(confidence, 3),
                     }
                 )
+        if isinstance(b, Line):
+            conflicts.append("code:unknown")
+            if b.guess:
+                candidates.append(
+                    {
+                        "side": "code",
+                        "value": b.guess,
+                        "confidence": round(b.guess_confidence, 3),
+                        "source": b.guess_source,
+                    }
+                )
+                # the library's far end for that code (D194): an accepted line meets R2c / R2d
+                far_end = GUESS_PLACEHOLDERS.get(b.guess)
+                if far_end and frm is not None and not any(c["side"] == "to" for c in candidates):
+                    candidates.append(
+                        {
+                            "side": "to",
+                            "kind": "placeholder",
+                            "id": str(self.placeholder(*far_end)),
+                            "label": far_end[0],
+                            "confidence": round(b.guess_confidence, 3),
+                        }
+                    )
+                    to_label = to_label or far_end[0]
         if frm is None or (to is None and not to_label):
             conflicts.append("endpoint:unresolved")
         if confidence < LOW_CONFIDENCE:
             conflicts.append("endpoint:low_confidence")
         if b.endpoint_source is None and not b.output_label:
             conflicts.append("endpoint:unresolved")
+        ref = (
+            self.source_ref(
+                sheet, band, b.bbox, "riser_line", label=b.label, line=b.id, note=b.note
+            )
+            if line
+            else self.source_ref(
+                sheet,
+                band,
+                b.bbox,
+                "riser_bubble",
+                label=b.output_label,
+                bubble=b.id,
+                note=b.note,
+            )
+        )
         self.cables.append(
             CableDraft(
                 id=uuid7(),
@@ -1853,15 +2394,7 @@ class _Build:
                 to_label=to_label,
                 to_level_id=to_level_id,
                 candidates=candidates,
-                source_ref=self.source_ref(
-                    sheet,
-                    band,
-                    b.bbox,
-                    "riser_bubble",
-                    label=b.output_label,
-                    bubble=b.id,
-                    note=b.note,
-                ),
+                source_ref=ref,
                 extraction=extraction,
                 confidence=confidence,
                 conflicts=conflicts,

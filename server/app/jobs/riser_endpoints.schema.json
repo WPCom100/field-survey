@@ -58,8 +58,36 @@
         "additionalProperties": false
       }
     },
+    "unlabelled_lines": {
+      "type": "array",
+      "description": "One entry per line that connects to a device but carries no wire bubble: the last Unison link into an NSPS enclosure or the rack, a trunk marked only by a label at its end, a feed or note arrow (TO LOAD CKTS, 0-10V CONTROL, 120V feed). Never a line that has a bubble.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "line_id": {"type": "string", "description": "The line id from the prompt, or a new id (new-l1, …) for a line the prompt did not list."},
+          "bbox": {"type": "array", "items": {"type": "number"}, "description": "[x, y, width, height] in pixels of the band image."},
+          "from_device": {"type": ["string", "null"], "description": "The device id the line leaves."},
+          "from_label": {"type": ["string", "null"], "description": "When from_device is null: the text at that end."},
+          "to_device": {"type": ["string", "null"], "description": "The device id at the other end when it is on this band."},
+          "to_label": {"type": ["string", "null"], "description": "Otherwise: the text at the far end, or 'Equipment rack' / 'Relay panel' / 'NSPS' with to_level_code when the line leaves the band through the trunk."},
+          "to_level_code": {"type": ["string", "null"]},
+          "label": {"type": ["string", "null"], "description": "The text printed at or along the line, verbatim."},
+          "code_guess": {
+            "anyOf": [
+              {"type": "string", "enum": ["X", "N", "NG", "U", "F", "P", "UV", "0-10V", "120V"]},
+              {"type": "null"}
+            ],
+            "description": "Your best guess at the wire code, or null when you cannot tell. A reviewer decides; it is never written as the code."
+          },
+          "confidence": {"type": "number", "description": "Your confidence in code_guess, 0 to 1."},
+          "note": {"type": ["string", "null"]}
+        },
+        "required": ["line_id", "bbox", "from_device", "from_label", "to_device", "to_label", "to_level_code", "label", "code_guess", "confidence", "note"],
+        "additionalProperties": false
+      }
+    },
     "notes": {"type": "string", "description": "Anything the reviewer should know about this band."}
   },
-  "required": ["level_code", "devices", "cables", "notes"],
+  "required": ["level_code", "devices", "cables", "unlabelled_lines", "notes"],
   "additionalProperties": false
 }

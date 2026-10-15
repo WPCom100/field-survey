@@ -337,6 +337,20 @@ Decision D186 (Proposed): an optional run is offered once the runs before it of 
 
 Decision D193 (Proposed): Accept on a device draft only marks it reviewed; its devices are made when placed (step 5, T46), so a level seeded from the master is never duplicated. Accept on a cable draft makes the cable once both ends are real records; if the baseline already has that cable, it is linked instead. A cable whose end is a not-yet-placed draft device waits until that device is placed. **Confirm endpoint** = Accept plus "endpoints confirmed"; Accept all leaves cables unconfirmed. A source conflict is settled by Accept (the drafts' count) or Reject (the baseline's). Flagged drafts get no Needs review items: Needs review counts them and links to step 4. → Approve / change:
 
+## T108 — Riser lines with no bubble: "What is this cable?"  ·  Needs: no new build (JS update; server deploy first, then upload the riser again to a **new scratch project**)
+
+**Why it matters:** the riser draws some cables with no code bubble (feed and note arrows, the last Unison link into an NSPS, trunks marked only by a label). You asked to be asked about each one, so nothing on the drawing goes unaccounted for. Use a fresh scratch project: a riser already extracted for a project is skipped the second time.
+
+- [ ] **They are proposed.** After the riser job finishes, its line in Setup → 3 Sources still reads "Done: … cable drafts …". On **4 Review drafts → Cables** for 03, the first rows have Code **?**: two `TO LOAD CKTS`, two 0-10V control leaders, two feed arrows, the UFMP4's `TO LOAD` and feed, two EBDK sense feeds, the NSPS feed and the NSPS line up the trunk. That is 12 lines on 03; the model may add one it saw. → saw:
+- [ ] **The question and the crop.** Tap the CT03LCPB 0-10V leader. The panel reads **What is this cable? Pick its code**, then "Guess: 0-10V (…)", with the **0-10V ?** chip marked and the To already set to **Fixtures (placeholder)**. The riser crop outlines the leader line, not a bubble, and is labelled "Riser 001 · level 03 · line l…". → saw:
+- [ ] **Nothing is taken for you.** Before you pick a code, Accept stays greyed with "Pick the cable code." **Accept all ≥ 0.9** never takes these lines. → saw:
+- [ ] **Accept → the library row, once.** Pick **0-10V**, then Confirm endpoint. The note says the cable is made. Open the panel's device card once it is placed: Connections shows one 0-10V row, `CT03LCPB → Fixtures`, and **no** R2c draft offering another. Do the same on a panel that **already** had its 0-10V row (accepted from the R2c draft first). The note says the baseline already had it, and the card still shows a single 0-10V row. → saw:
+- [ ] **A 120V feed.** On an NSPS feed line (guess 120V, To **120v Power**): pick 120V → Confirm. The NSPS card's row reads `120v Power → P-NSPS-D Power Supply`, and R2d no longer offers one. → saw:
+- [ ] **Not a cable.** On a `TO LOAD CKTS` line (no guess, To "— pick"), Reject with a reason such as "Load circuits, by others". It reads ✗ rejected and no cable is made. → saw:
+- [ ] **Needs review.** Needs review → Extraction counts these lines among the flagged drafts, and the mismatch list under the table reads "A riser line with no wire code from CT03LCPB → "TO LOAD CKTS" — what is it?". → saw:
+
+Decision D194 (Proposed): a line with no bubble is found by the geometry on text sheets (touching a device's outline, reaching out of it, no bubble) and by the model on sheet 002; its guess comes from the model, else from its own text, and is never the code. Nothing is excluded: you reject what is not a surveyed cable. An accepted 0-10V line (Relay panel) or 120V line (NSPS / rack) **becomes the device's library row**: it is linked to the row the device already has, or made with the library's wording, so R2c / R2d stop offering one. → Approve / change:
+
 ---
 
 ## Rules for this file

@@ -17,6 +17,7 @@ import { CABLE_CODES, DEVICE_CATEGORIES, hashUuid } from '@field-survey/rules';
 
 import {
   BULK_MIN,
+  RISER_KINDS,
   bulkCables,
   bulkDevices,
   deviceForDraft,
@@ -260,7 +261,7 @@ const SIGNAL_TO: Readonly<Record<string, string>> = {
 const SINGLE_ROW = new Set(['P', '0-10V', '120V']);
 
 /** An endpoint as a record: a device or a placeholder, with the From text it reads as. */
-export type RealEnd = { kind: 'device' | 'placeholder'; id: string; levelId: string | null; levelCode: string | null; text: string };
+export type RealEnd = { kind: 'device' | 'placeholder'; id: string; levelId: string | null; levelCode: string | null; text: string; category?: string | null };
 
 /** A device reads as its panel tag, a rack as "Equipment rack", else its Device text (the master's From column). */
 function deviceText(d: DraftReviewData['devicesLive'][number]): string {
@@ -282,7 +283,32 @@ export function realEnd(data: DraftReviewData, e: Endpoint | null): RealEnd | nu
     const dd = data.devices.find((x) => x.id === e.id);
     dev = dd ? deviceForDraft(data, dd) : null;
   }
-  return dev ? { kind: 'device', id: dev.id, levelId: dev.levelId, levelCode: code(dev.levelId), text: deviceText(dev) } : null;
+  return dev ? { kind: 'device', id: dev.id, levelId: dev.levelId, levelCode: code(dev.levelId), text: deviceText(dev), category: dev.category } : null;
+}
+
+/**
+ * The library's one row per device for a riser line accepted as `0-10V` or `120V` (D194, R2c /
+ * R2d, D52): a Relay panel's 0-10V run to its far end (`Fixtures`), an NSPS's or rack's 120V row
+ * `120v Power` → `P-NSPS-D Power Supply` / `Equipment rack`. Null when the code, the device's
+ * category or the ends (one device, one placeholder) do not fit the table.
+ */
+export function libraryRow(code: string, a: RealEnd, b: RealEnd): { device: RealEnd; far: RealEnd; from: string; to: string } | null {
+  const [device, far] = a.kind === 'device' && b.kind === 'placeholder' ? [a, b] : b.kind === 'device' && a.kind === 'placeholder' ? [b, a] : [null, null];
+  if (!device || !far) return null;
+  if (code === '0-10V' && device.category === 'Relay panel') return { device, far, from: device.text, to: far.text };
+  if (code === '120V' && device.category === 'NSPS') return { device, far, from: '120v Power', to: 'P-NSPS-D Power Supply' };
+  if (code === '120V' && device.category === 'Equipment rack') return { device, far, from: '120v Power', to: 'Equipment rack' };
+  return null;
+}
+
+/** A live cable of this code with an end on this device (the library's row R2c / R2d look for). */
+async function deviceCableOfCode(store: Store, projectId: string, code: string, deviceId: string): Promise<Record<string, unknown> | null> {
+  const rows = await store.db.query<Record<string, unknown>>(
+    `SELECT c.* FROM cable c JOIN cable_end e ON e.cable_id = c.id
+     WHERE c.project_id = ? AND c.cable = ? AND e.device_id = ? AND c.deleted_at IS NULL AND e.deleted_at IS NULL ORDER BY c.id LIMIT 1`,
+    [projectId, code, deviceId],
+  );
+  return rows[0] ?? null;
 }
 
 /**
@@ -310,7 +336,7 @@ export function cablePayload(
       ? { side, endpoint_kind: 'device', device_id: me.id, level_id: me.levelId ?? fallbackLevel, from_text: me.text, to_text: far(me, other) }
       : { side, endpoint_kind: 'placeholder', placeholder_id: me.id, level_id: me.levelId ?? fallbackLevel, from_text: me.text, to_text: null };
   const ref = c.sourceRef;
-  const riser = ref && (ref.kind === 'riser_bubble' || ref.kind === 'riser_text' || ref.kind === 'riser_symbol') && Array.isArray(ref.bbox);
+  const riser = ref && RISER_KINDS.has(String(ref.kind)) && Array.isArray(ref.bbox);
   return {
     cable: {
       cable: code,
@@ -323,6 +349,18 @@ export function cablePayload(
     },
     ends: [end('A', a, b, c.levelId), end('B', b, a, c.toLevelId ?? c.levelId)],
   };
+}
+
+/** `cablePayload` with the library's texts (R2c / R2d's): the device end A, the placeholder B reading its own label. */
+export function libraryPayload(
+  c: Parameters<typeof cablePayload>[0],
+  lib: NonNullable<ReturnType<typeof libraryRow>>,
+  opts: { confirm: boolean; riserBlob?: string | null },
+): ReturnType<typeof cablePayload> {
+  const p = cablePayload(c, lib.device, lib.far, opts);
+  p.ends[0] = { ...p.ends[0], from_text: lib.from, to_text: lib.to };
+  p.ends[1] = { ...p.ends[1], from_text: lib.far.text, to_text: null };
+  return p;
 }
 
 /** A live cable of this code whose two ends are exactly these records (either way round): the baseline already has it (D30). */
@@ -356,8 +394,10 @@ async function writeCable(
   b: RealEnd,
   opts: { confirm: boolean; riserBlob?: string | null },
 ): Promise<{ cableId: string; linked: boolean }> {
-  const existing = await matchingCable(store, projectId, c.code!, a, b);
-  const p = cablePayload(c, a, b, opts);
+  // a 0-10V / 120V line meets the library's row for its device: one cable, not two (D194)
+  const lib = libraryRow(c.code!, a, b);
+  const existing = lib ? await deviceCableOfCode(store, projectId, c.code!, lib.device.id) : await matchingCable(store, projectId, c.code!, a, b);
+  const p = lib ? libraryPayload(c, lib, opts) : cablePayload(c, a, b, opts);
   if (existing) {
     const id = String(existing.id);
     if (existing.riser_ref == null && p.cable.riser_ref) await g.setField('cable', id, 'riser_ref', p.cable.riser_ref);
@@ -412,6 +452,8 @@ export async function acceptCable(
   const ops = await editor.group(ctx(reason), async (g) => {
     const fixed = withChosen(withChosen(raw.candidates, 'from', c.ends.from, opts.confirm), 'to', c.ends.to, opts.confirm);
     await g.setField('draft_cable', c.id, 'candidates', fixed);
+    // the reviewer said what the line is: its question is answered (T108)
+    if (c.conflicts.includes('code:unknown')) await g.setField('draft_cable', c.id, 'conflicts', c.conflicts.filter((k) => k !== 'code:unknown'));
     await g.setField('draft_cable', c.id, 'state', edited ? 'edited' : 'accepted');
     if (a && b) result = await writeCable(g, store, projectId, c, a, b, opts);
   });

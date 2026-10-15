@@ -540,11 +540,17 @@ function CablePanel({
       {!c.code || (open && c.conflicts.includes('code:unknown')) ? (
         <View>
           <Text style={w.label}>What is this cable? Pick its code</Text>
+          {c.codeGuess ? (
+            <Text style={styles.dim}>
+              Guess: {c.codeGuess.value} ({pct(c.codeGuess.confidence)}, {c.codeGuess.source === 'label' ? 'from the text at the line’s end' : 'the model’s reading'}) — not applied until you pick it.
+            </Text>
+          ) : null}
           <View style={styles.chips}>
             {CABLE_CODES.map((k) => (
-              <Chip key={k} label={k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, c.id, k))} />
+              <Chip key={k} label={k === c.codeGuess?.value && c.code !== k ? `${k} ?` : k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, c.id, k))} />
             ))}
           </View>
+          <Text style={styles.dim}>Not a cable to survey (a load or sense feed)? Reject it with a reason. A 0-10V or 120V line becomes the device’s library row, never a second one.</Text>
         </View>
       ) : null}
       <Text style={styles.dim}>
