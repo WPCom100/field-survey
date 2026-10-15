@@ -117,7 +117,7 @@ EXPO_PUBLIC_UPDATE_MESSAGE="T<nn>: <title>" eas update --channel production --en
 bash /opt/field-survey/server/deploy/deploy.sh <sha>   # on the Droplet: what CI's deploy job runs on a push to main (D154, docs/ops.md §2)
 ```
 
-Workstation: Windows 11, Claude Code (native Windows), Git, Node 24, pnpm, Docker Desktop, `uv`, EAS CLI (`npm i -g eas-cli`), the Expo development build installed on each team iPad. No WSL required; if a tool misbehaves on Windows, WSL 2 is the fallback, not a Mac.
+Workstation: Windows 11, Claude Code (native Windows), Git, Node 24, pnpm, Docker Desktop, `uv`, EAS CLI (`npm i -g eas-cli`), Tesseract (UB-Mannheim build at `C:\Program Files\Tesseract-OCR`, for the BOM/riser OCR tests — installed by hand, the installer needs a UAC prompt; `docs/ops.md` §4.1), the Expo development build installed on each team iPad. No WSL required; if a tool misbehaves on Windows, WSL 2 is the fallback, not a Mac.
 
 Golden tests read `fixtures/`; if a fixture is missing the test is skipped with a clear message, never silently passed.
 

@@ -189,8 +189,15 @@ DigitalOcean → Droplet → Power off → Resize → **CPU and RAM only** (keep
 | Prune old images | `docker image prune -f` after an update |
 | Rotate the shared token | new `SURVEY_SHARED_TOKEN` in `.env`, `docker compose up -d api`, then re-enter it on each iPad |
 | Add a team name | `TEAM_NAMES_CSV` in `.env` or `POST /team` |
+| Rotate the Claude API key (D189) | new key in the Anthropic Console → `ANTHROPIC_API_KEY` in `server/.env.production` on the PC (and `server/.env` for local runs) → `scp` as in §1.6 → `docker compose up -d worker`; revoke the old key last. `CLAUDE_MODEL` sits beside it (`claude-opus-5-5`; `claude-fable-5-1` to step up) |
+| OCR (tesseract) | in the image via `apt-get install tesseract-ocr` (Dockerfile) and in CI; `docker compose exec worker tesseract --version` to check. On the PC: the UB-Mannheim build at `C:\Program Files\Tesseract-OCR` (or `TESSERACT_CMD`), see §4.1 |
 
 Monitoring: an external uptime monitor pings `https://survey.wpcom.cloud/health` (PLAN §8). The worker heartbeat row arrives with the job runner.
+
+### 4.1 Pending actions (2026-10-15)
+
+- **Replace the temporary Claude API key.** The key now in `server/.env` and `server/.env.production` was pasted into a Claude Code chat on 2026-10-15 (so it has been through a transcript) and is marked `TEMPORARY` in both files. Rotate it per the runbook row above once T43 is deployed and working; it has not been copied to the Droplet yet (do that with the §1.6 `scp` + `docker compose up -d worker` when T43 ships).
+- **Install Tesseract on the PC.** `server/app/ocr.py` looks for `C:\Program Files\Tesseract-OCR\tesseract.exe` (or `TESSERACT_CMD`). The installer is already downloaded — `winget install UB-Mannheim.TesseractOCR` or https://github.com/UB-Mannheim/tesseract/wiki — but it needs a UAC prompt the Claude Code shell cannot show, so run it by hand. Until then the 4 OCR tests in `server/tests/test_bom.py` skip with that reason on the PC; they pass in the api container (`docker compose build api`, then run pytest inside it with `fixtures/`, `app/` and `tests/` mounted) and in CI.
 
 ## 5. iOS builds and TestFlight (T06b, D59, D70)
 
