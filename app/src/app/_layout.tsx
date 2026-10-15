@@ -7,6 +7,7 @@ import { GlobalStatusBar } from '../components/StatusBar';
 import { openAppStore } from '../db';
 import { IdentityGate } from '../identity/IdentityGate';
 import { logTo } from '../log';
+import { RulesRunner } from '../rules/RulesRunner';
 import { SyncRunner } from '../sync/SyncRunner';
 import { useUpdateLog } from '../sync/useAppUpdates';
 
@@ -25,6 +26,7 @@ export default function RootLayout() {
   return (
     <IdentityGate>
       <SyncRunner />
+      <RulesRunner />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <GlobalStatusBar />
         <View style={{ flex: 1 }}>

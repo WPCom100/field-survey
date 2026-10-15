@@ -137,6 +137,18 @@ Decision D145: answered 2026-10-14, **Approved**. Whether you want a **Discard**
 - [ ] **Bad date refused.** Type `13/10/2026` (or `2026-02-30`): red border and a message at the top; nothing saved, the old date returns after the next save elsewhere. Clear the box and tap away: the date empties. → saw:
 - [ ] **Header follows.** Export screen's Floor PDF header line for 06M reads `Surveyed 2026-10-13`; a level with an empty box still shows its newest survey date (D159). → saw:
 
+## T33 — Rule drafts: Accept / Edit / Reject on the card  ·  Needs: no new build (JS update; server deploy first)
+
+**Why it matters:** the rule engine core is in; T34's rules will raise real proposals through this path. The demo level has two seeded drafts, so the buttons can be tried today.
+
+- [ ] **Accept.** Open **Demo plan (06M composite)** → tap **06M-01** → the Punch items section shows `DRAFT ⚑ R3a Run Unison to Stations & Sensors` and `DRAFT ⚑ R4b DMX termination kit…`. Tap **why?** on R3a: a line of text appears (the demo's reason; the rule text comes with T34). Tap **Accept**: the draft disappears and a new punch item `NEW · Run Unison to Stations & Sensors · Cable not run · EC · Open` is listed. → saw:
+- [ ] **Edit.** On R4b tap **Edit**: small fields (part, owner, part status) appear; change the part text, tap **Save & accept**: the Missing parts section lists the edited text with `Needed`. → saw:
+- [ ] **Reject.** The demo database keeps decisions, so Reject needs a draft still open: on another team iPad (or after deleting and reinstalling the app) tap **Reject** on R4b: the draft disappears and does not come back after leaving and reopening the card. → saw:
+- [ ] **Nothing on a real project.** Open the Tower M3 round project's 06M plan and a device card: no drafts, no errors; DevTools shows `[rules] run` with `rules: 0` and `ops: 0` once after launch and once about half a second after each edit or sync that brought ops. Why: the trigger is live; with no rules registered it must write nothing. → saw:
+- [ ] **Sync still clean.** After the demo decisions, the Sync screen on a real project shows nothing pending from the demo (the demo database never syncs) and no "need attention" ops. → saw:
+
+Decision D169: proposals and findings are synced records with ids derived from their key (the same on every iPad); a second create of the same row keeps the first one's heads; decisions ride on the records they create. → Approve / change:
+
 ---
 
 ## Rules for this file

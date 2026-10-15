@@ -36,6 +36,7 @@ export class FakeServer implements SyncTransport {
   readonly pulls: { project: string; since: number; limit: number }[] = [];
   private readonly heads = new Map<string, Op>();
   private readonly byId = new Map<string, Op>();
+  private readonly created = new Set<string>();
   private readonly serverOpsFor = new Map<string, Op[]>();
   private counters = new Map<string, number>();
   private faults: Fault[] = [];
@@ -117,6 +118,10 @@ export class FakeServer implements SyncTransport {
     const caused: Op[] = [];
     switch (op.kind) {
       case 'create': {
+        // A second create of an existing row (a deterministic id made on two iPads, D169) is
+        // applied but changes nothing: the first-arrived create keeps the heads and the number.
+        if (this.created.has(op.entity_id)) break;
+        this.created.add(op.entity_id);
         for (const f of Object.keys(op.payload ?? {})) if (f !== 'id') this.setHead(op.entity_id, f, stored);
         const field = NUMBERED[op.entity_kind];
         // Like the server, a create without a level stays unnumbered (`assign_skipped`, D84).
@@ -153,10 +158,15 @@ export class FakeServer implements SyncTransport {
         }
         // Ink layers and photo blobs are last-write-wins (server LAST_WRITE_WINS_*, PLAN §3.3).
         const lastWriteWins = op.entity_kind === 'ink_layer' || (op.entity_kind === 'photo' && field.endsWith('_blob'));
+        // Like the server (D169): a set based on *a* create of the record, while the head is
+        // another create of it, is based on the same event (deterministic ids), so no conflict.
+        const base = op.base_op_id ? this.byId.get(op.base_op_id) : undefined;
+        const sameCreate = !!head && head.kind === 'create' && base?.kind === 'create' && base.entity_id === op.entity_id;
         const conflict =
           !lastWriteWins &&
           head &&
           head.op_id !== op.base_op_id &&
+          !sameCreate &&
           head.user_id !== op.user_id &&
           JSON.stringify(valueOf(head, field)) !== JSON.stringify(op.now);
         if (conflict) {

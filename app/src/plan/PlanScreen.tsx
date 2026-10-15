@@ -83,6 +83,8 @@ import { loadPinConflict, type PinConflict } from '../review/model';
 import { useInkLayers } from '../ink/useInkLayers';
 import type { JumpTarget } from '../card/model';
 import { NOT_WIRED } from '../card/proposals';
+import { ruleDecider } from '../rules/engine';
+import { useRulesVersion } from '../rules/useRulesVersion';
 import type { PhotoTarget } from '../photo/model';
 import { PhotoFlow, pickFromLibrary, type PhotoRequest } from '../photo/PhotoFlow';
 
@@ -322,6 +324,10 @@ export function PlanScreen(props: PlanScreenProps) {
     [store, projectId, userId],
   );
   const onEdited = useCallback(() => setEdits((n) => n + 1), []);
+  // Accept / Edit / Reject of rule drafts on the card (T33); read-only without an editor.
+  const decider = useMemo(() => (editor ? ruleDecider(store, editor.projectId, editor.userId) : NOT_WIRED), [store, editor]);
+  // The rule engine wrote or decided proposal rows: the card reloads its drafts.
+  const rulesVersion = useRulesVersion();
 
   /**
    * Choose A / Choose B on the pin conflict: confirmed with the auto-filled reason (D123), one
@@ -1249,10 +1255,10 @@ export function PlanScreen(props: PlanScreenProps) {
               editor={editor}
               deviceId={selectedId}
               badges={lists?.deviceBadges.get(selectedId) ?? NO_BADGES}
-              reloadKey={`${String(reloadKey)}|${edits}`}
+              reloadKey={`${String(reloadKey)}|${edits}|${rulesVersion}`}
               names={props.names ?? NO_NAMES}
               resolveBlobUri={props.resolveBlobUri ?? noBlob}
-              decider={NOT_WIRED}
+              decider={decider}
               canMovePin={!!deviceById.get(selectedId)?.pin || !deviceById.get(selectedId)?.pinElsewhere}
               unplaced={!deviceById.get(selectedId)?.pin && !deviceById.get(selectedId)?.pinElsewhere}
               canOpenLevels={!!onOpenLevel}

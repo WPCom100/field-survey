@@ -26,7 +26,7 @@ One transaction: validate → insert into `op` (`state = pending`, no `server_se
 
 | Kind | Effect on the entity table | `field_head` |
 |---|---|---|
-| `create` | `INSERT` the payload (`id` = `entity_id`), `version = 1`, `head_seq = server_seq` (null locally). Replays never overwrite (`ON CONFLICT DO NOTHING`). | one row per payload column → this op |
+| `create` | `INSERT` the payload (`id` = `entity_id`), `version = 1`, `head_seq = server_seq` (null locally). Replays never overwrite (`ON CONFLICT DO NOTHING`); a second create of a row that exists (a deterministic id made on two iPads, D169) changes nothing and leaves the heads with the first. | one row per payload column → this op (first create only) |
 | `set` | `field = now`, `version + 1`, `head_seq = max(head_seq, server_seq)` | `(entity, field)` → this op |
 | `delete` | `deleted_at = ts`, `deleted_by_id = user`, `delete_reason = reason`, `version + 1` | `(entity, deleted_at)` → this op |
 | `restore` | clears the three, `version + 1` | same |
@@ -115,3 +115,14 @@ counts both, `quarantined()` / `quarantine()` / `requeueQuarantined()` manage th
 `blob_queue(sha256, direction, kind, priority, state, attempts, next_attempt_at, last_error,
 created_at)` (T12), `sync_state(key, value)` with `install_id`, `search_mode`, `last_server_seq:<project_id>` (pull
 cursor) and `will_review:<project_id>` (pending ops the server will review).
+
+## Change notifications and the rule trigger (T33)
+
+`store.onChange(listener)` is called after every transaction that applied ops: `{ source:
+'local' | 'remote', projectIds, kinds }` (duplicates and recorded-only ops announce nothing;
+a throwing listener never breaks the edit). `DebouncedTrigger(store, { delayMs })` collects
+those into one `handler(projectIds, sources)` call per quiet period (default 500 ms), ignoring
+changes that touch only `proposal` / `finding` rows (the engine's own output), runs the handler
+one at a time and once more when a change lands mid-run; `request(ids)` arms it by hand (the
+start-up pass), `flush()` fires now (tests). The app's `RulesRunner` wires it to
+`@field-survey/rules` (`packages/rules/docs/engine.md`).

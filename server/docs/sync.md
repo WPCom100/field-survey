@@ -188,3 +188,14 @@ never numbered (it is not a Connections row), and a `cable_end` created without 
 
 Historical ops (the master's Change Log) bypass `run()` and are written with `Push.store(row,
 "superseded")`: a `server_seq`, no materialisation, no head (D124). See `docs/imports.md`.
+
+## Deterministic ids (D169, T33)
+
+The rule engine names a proposal or finding by a hash of its key, so two iPads evaluating the
+same data push two `create` ops with one `entity_id`. Both are `applied`; the second changes
+nothing (`_create` returns False) and, when the record already has field heads from an earlier
+create, moves no heads and assigns no number (`Push.commit`). A `set` whose `base_op_id` is *a*
+create of its record while the head is *another* create of it is treated as current
+(`based_on_a_create_of`), so a decision taken on the second iPad before it pulled the first's
+create applies without a review item. A row inserted directly (as `POST /projects` does before
+logging its create) has no heads yet and takes them from its create as before.

@@ -750,3 +750,40 @@ def test_baseline_lock_and_unlock_materialise_on_the_level(client, w):
     lvl = w.session.get(Level, w.l06m.id)
     assert (lvl.state, lvl.baseline_locked_at, lvl.baseline_locked_by_id) == ("setup", None, None)
     assert w.stored(unlock[0]["op_id"]).reason == "Re-import riser"
+
+
+# -------------------------------------------------------- deterministic ids (D169)
+
+
+def test_second_create_of_an_existing_row_keeps_the_first_heads_and_number(client, w):
+    """Two iPads make the same proposal (same deterministic id, T33): both creates apply, the
+    row and its heads stay with the first; a set based on either create applies without
+    review; a numbered record is numbered once."""
+    pid = str(uuid7())
+    payload = {
+        "id": pid,
+        "project_id": str(w.project.id),
+        "rule_id": "R3a",
+        "kind": "punch",
+        "state": "proposed",
+    }
+    ann = w.op(w.ann, "create", "proposal", pid, payload=payload)
+    bob = w.op(w.bob, "create", "proposal", pid, payload=dict(payload))
+    res = w.push(client, [ann])
+    assert outcomes(res) == ["applied"]
+    res = w.push(client, [bob])
+    assert outcomes(res) == ["applied"]
+    assert w.head(pid, "state") == ann["op_id"]
+    assert w.stored(bob["op_id"]).state == "applied"
+    # Bob rejects, basing on his own create (he never pulled Ann's): applied, no review item
+    res = w.push(client, [w.set(w.bob, "proposal", pid, "state", "rejected", bob["op_id"])])
+    assert outcomes(res) == ["applied"] and w.review_items() == []
+    # Ann, basing on her create, still sees the head moved to Bob's set → review as usual
+    res = w.push(client, [w.set(w.ann, "proposal", pid, "state", "superseded", ann["op_id"])])
+    assert outcomes(res) == ["review"]
+    # a numbered record created twice gets one number
+    p = w.create(w.ann, "punch_item")
+    again = w.op(w.bob, "create", "punch_item", p["entity_id"], payload=dict(p["payload"]))
+    res = w.push(client, [p, again])
+    assert outcomes(res) == ["applied", "applied"]
+    assert [o["now"] for o in res["server_ops"]] == [1]

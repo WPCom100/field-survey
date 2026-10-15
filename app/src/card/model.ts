@@ -5,6 +5,7 @@
  */
 
 import { defaultDeviceText, displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
+import { editableKeys } from '@field-survey/rules';
 
 import { photoStrip } from '../photo/links';
 import { baselineEvents, type BaselineEvent } from '../setup/lock';
@@ -146,6 +147,9 @@ export type CardDraft = {
   title: string;
   sub: string;
   why: string | null;
+  /** The proposal payload; `editable` names the keys the Edit form offers (T33). */
+  payload: Record<string, unknown>;
+  editable: string[];
 };
 
 export type CardFinding = { id: string; lintId: string; message: string };
@@ -461,6 +465,8 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
       title: str(pl.item) ?? str(pl.part) ?? str(pl.text) ?? str(pl.now) ?? String(p.kind),
       sub: [p.kind === 'part' ? 'part' : str(pl.type), str(pl.owner), str(pl.part_status) ?? str(pl.tracking_status)].filter(Boolean).join(' · '),
       why: str(pl.why),
+      payload: pl,
+      editable: editableKeys(p.kind as Parameters<typeof editableKeys>[0], pl),
     };
   });
   const findings = (

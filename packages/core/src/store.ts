@@ -96,6 +96,14 @@ export interface ListOptions {
   includeDeleted?: boolean;
 }
 
+/** One committed transaction that changed data (T33): what the rule trigger listens for. */
+export interface StoreChange {
+  /** `local` = an edit on this iPad (commit); `remote` = a pull materialised others' ops. */
+  source: 'local' | 'remote';
+  projectIds: string[];
+  kinds: EntityKind[];
+}
+
 const OP_COLUMNS = Object.keys(ENTITIES.op.columns);
 const LINK_KINDS = new Set(['link_add', 'link_remove']);
 /** Review-item states that settle the ops the item held (T15, D91). */
@@ -106,11 +114,45 @@ function nowIso(): string {
 }
 
 export class Store {
+  private readonly changeListeners = new Set<(c: StoreChange) => void>();
+
   private constructor(
     readonly db: SqlDriver,
     readonly installId: string,
     readonly searchMode: SearchMode,
   ) {}
+
+  /**
+   * Be told after each transaction that applied ops (local commits and pulls alike). Listeners
+   * run after the commit, in order, and may not throw into the store (errors are swallowed).
+   * Returns the unsubscribe function.
+   */
+  onChange(listener: (c: StoreChange) => void): () => void {
+    this.changeListeners.add(listener);
+    return () => {
+      this.changeListeners.delete(listener);
+    };
+  }
+
+  private announce(source: StoreChange['source'], ops: readonly Op[], applied: readonly boolean[]): void {
+    if (this.changeListeners.size === 0) return;
+    const projects = new Set<string>();
+    const kinds = new Set<EntityKind>();
+    ops.forEach((op, i) => {
+      if (!applied[i]) return;
+      projects.add(op.project_id);
+      kinds.add(op.entity_kind);
+    });
+    if (projects.size === 0) return;
+    const change: StoreChange = { source, projectIds: [...projects], kinds: [...kinds] };
+    for (const l of this.changeListeners) {
+      try {
+        l(change);
+      } catch {
+        // never let a listener break an edit or a pull
+      }
+    }
+  }
 
   /** Migrate, set up search and the install id, and return a ready store. */
   static async open(db: SqlDriver, opts: OpenOptions = {}): Promise<Store> {
@@ -139,17 +181,25 @@ export class Store {
   /** Apply one local op atomically: op log + outbox + materialised state. */
   async apply(op: Op): Promise<LocalOutcome> {
     validateLocal(op);
-    return this.db.transaction((tx) => this.applyLocalIn(tx, op));
+    const out = await this.db.transaction((tx) => this.applyLocalIn(tx, op));
+    this.announce('local', [op], [out === 'applied']);
+    return out;
   }
 
   /** Apply several local ops in one transaction (grouped edits sharing `group_id`). */
   async applyMany(ops: readonly Op[]): Promise<LocalOutcome[]> {
     for (const op of ops) validateLocal(op);
-    return this.db.transaction(async (tx) => {
+    const out = await this.db.transaction(async (tx) => {
       const out: LocalOutcome[] = [];
       for (const op of ops) out.push(await this.applyLocalIn(tx, op));
       return out;
     });
+    this.announce(
+      'local',
+      ops,
+      out.map((o) => o === 'applied'),
+    );
+    return out;
   }
 
   private async applyLocalIn(tx: SqlDriver, op: Op): Promise<LocalOutcome> {
@@ -172,17 +222,25 @@ export class Store {
   /** Apply one pulled op (already ordered by `server_seq`). */
   async applyRemote(op: Op): Promise<RemoteResult> {
     validateRemote(op);
-    return this.db.transaction((tx) => this.applyRemoteIn(tx, op));
+    const out = await this.db.transaction((tx) => this.applyRemoteIn(tx, op));
+    this.announce('remote', [op], [out.outcome === 'applied']);
+    return out;
   }
 
   /** Apply a page of pulled ops in one transaction. */
   async applyRemoteMany(ops: readonly Op[]): Promise<RemoteResult[]> {
     for (const op of ops) validateRemote(op);
-    return this.db.transaction(async (tx) => {
+    const out = await this.db.transaction(async (tx) => {
       const out: RemoteResult[] = [];
       for (const op of ops) out.push(await this.applyRemoteIn(tx, op));
       return out;
     });
+    this.announce(
+      'remote',
+      ops,
+      out.map((o) => o.outcome === 'applied'),
+    );
+    return out;
   }
 
   private async applyRemoteIn(tx: SqlDriver, op: Op): Promise<RemoteResult> {
@@ -321,11 +379,15 @@ export class Store {
       values.push(1, op.server_seq);
     }
     const placeholders = names.map(() => '?').join(', ');
-    // A replayed create never overwrites later sets.
+    // A replayed create never overwrites later sets, and a second create of a row that exists
+    // (a deterministic id made on two iPads, D169) leaves the first create's heads alone: the
+    // server keeps the first-arrived create as the head too, so later `set`s agree.
+    const existed = await this.exists(tx, spec, op.entity_id);
     await tx.exec(
       `INSERT INTO ${spec.table} (${names.join(', ')}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`,
       values,
     );
+    if (existed) return true;
     for (const name of names) {
       if (PROTECTED_COLUMNS.has(name)) continue;
       await this.setHead(tx, op.entity_id, name, op.op_id);

@@ -1,8 +1,9 @@
 /**
  * Accept / Edit / Reject of rule drafts on the card (Phase 3 §4.3, PLAN §6). The rule engine
- * (`packages/rules`, T33) implements `ProposalDecider`: Accept creates the record with
- * `rule_id`/`proposal_id`, Edit-then-accept marks the proposal `edited`, Reject keeps it rejected
- * until its inputs change. Until then the card uses `NOT_WIRED`, which shows the buttons disabled.
+ * (`packages/rules`, T33) implements `ProposalDecider` through `src/rules/engine.ts`
+ * (`ruleDecider`): Accept creates the record with `rule_id`/`proposal_id`, Edit-then-accept
+ * writes the edited record and marks the proposal `edited`, Reject keeps it rejected until its
+ * inputs change. `NOT_WIRED` is what a read-only card (no editor) gets: buttons shown, disabled.
  */
 
 export type ProposalDecision =
@@ -11,7 +12,7 @@ export type ProposalDecision =
   | { kind: 'reject' };
 
 export interface ProposalDecider {
-  /** False until the rule engine is wired: the card shows the buttons but disables them. */
+  /** False on a read-only card: the buttons are shown but disabled. */
   readonly wired: boolean;
   decide(proposalId: string, decision: ProposalDecision): Promise<void>;
   /** The rule text and the inputs that fired it ("why?"), or null if unknown. */
@@ -20,7 +21,7 @@ export interface ProposalDecider {
 
 export const NOT_WIRED: ProposalDecider = {
   wired: false,
-  decide: () => Promise.reject(new Error('Accept / Edit / Reject arrive with the rule engine (T33).')),
+  decide: () => Promise.reject(new Error('Read-only: open the card with an editor to decide (T33).')),
   explain: () => Promise.resolve(null),
 };
 

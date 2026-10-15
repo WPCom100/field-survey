@@ -339,6 +339,8 @@ class Push:
         # `set_heads`).
         self.head_ids: dict[tuple[uuid.UUID, str], uuid.UUID | None] = {}
         self.heads_loaded: set[uuid.UUID] = set()
+        # Whether the last materialised create inserted its row (False: it already existed).
+        self.last_fresh = True
         # Ops this push wrote, and the rows not yet written to the `op` table: they go out in
         # multi-row INSERTs (`flush_ops`) before anything reads the table and at the end of the
         # push — one statement per hundred ops instead of one ORM flush each (T75).
@@ -435,6 +437,12 @@ class Push:
     def commit(self, row: Op, d: Decision) -> OpResult:
         if d.outcome == "applied":
             self.store(row, "applied")
+            if row.kind == "create" and not self.last_fresh and self.has_heads(row.entity_id):
+                # A second create of a row another create already made (a deterministic id
+                # made on two iPads, D169): applied, but the first-arrived create keeps the
+                # heads and the number. (A row inserted directly, as `POST /projects` does
+                # before logging its create, has no heads yet and takes them as before.)
+                return OpResult(op_id=row.op_id, outcome="applied", server_seq=row.server_seq)
             if row.kind == "create":
                 self.load_heads(row.entity_id)  # one query for every field of the new record
             self.set_heads([(row.entity_id, f, row.op_id) for f in d.heads])
@@ -555,6 +563,10 @@ class Push:
         head = self.head(op.entity_id, field, overlay)
         if head is None or head.op_id == op.base_op_id:
             return Decision("applied", heads=[field])
+        if head.kind == "create" and self.based_on_a_create_of(op):
+            # D169: the head is a create of this record and so is the op's base; two creates of
+            # one deterministic id are the same event, so the set is current, not conflicting.
+            return Decision("applied", heads=[field])
         if head.user_id == op.user_id:  # D37: one person's iPads never review against each other
             if _aware(op.client_ts) >= _aware(head.client_ts):
                 return Decision("applied", heads=[field])
@@ -650,6 +662,18 @@ class Push:
         self.head_ids[key] = None if head is None else head.op_id
         return head
 
+    def has_heads(self, entity_id: uuid.UUID) -> bool:
+        """Does any field head exist for the record (an earlier create op was applied)?"""
+        self.load_heads(entity_id)
+        return any(e == entity_id and op_id is not None for (e, _f), op_id in self.head_ids.items())
+
+    def based_on_a_create_of(self, op: Op) -> bool:
+        """Is the op's `base_op_id` a create of the op's own record?"""
+        if op.base_op_id is None:
+            return False
+        base = self.stored.get(op.base_op_id) or self.session.get(Op, op.base_op_id)
+        return base is not None and base.kind == "create" and base.entity_id == op.entity_id
+
     def head_value(self, entity_id: uuid.UUID, field: str) -> Any:
         head = self.head(entity_id, field, {})
         return None if head is None else value_of(head, field)
@@ -724,6 +748,7 @@ class Push:
             # T10: tables follow the log inside the transaction. A create that inserted its row
             # proves the record is new: no head of it can exist, so none is looked up.
             fresh = materialise(self.session, row)
+            self.last_fresh = fresh
             if fresh and row.kind == "create":
                 self.heads_loaded.add(row.entity_id)
             if row.entity_kind == "device":

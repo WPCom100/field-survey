@@ -5,7 +5,17 @@ export type { SqlDriver, SqlParam, SqlRow } from './sql-driver';
 export type { Op, StoredOp } from './op';
 export { uuidv7, isUuid, setRandomSource, type RandomBytes } from './ids';
 export * as vocab from './vocab';
-export type { ChangeType, OpKind, OpState } from './vocab';
+export type {
+  ChangeType,
+  OpKind,
+  OpState,
+  DeviceStatus,
+  ConnectionStatus,
+  PunchType,
+  Owner,
+  TrackingStatus,
+  PartStatus,
+} from './vocab';
 export {
   ENTITIES,
   ENTITY_KINDS,
@@ -67,9 +77,11 @@ export {
   type DeviceForText,
   type LinkPunchResult,
 } from './punch';
+export { DebouncedTrigger, type TriggerOptions, type TriggerHandler } from './trigger';
 export {
   Store,
   StoreError,
+  type StoreChange,
   type LocalOutcome,
   type RemoteOutcome,
   type RemoteResult,

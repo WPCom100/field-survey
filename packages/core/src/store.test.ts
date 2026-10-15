@@ -353,3 +353,55 @@ describe('validation', () => {
     expect(await store.outboxCount()).toBe(0);
   });
 });
+
+describe('onChange (T33)', () => {
+  it('announces applied local commits and pulls with their projects and kinds, not duplicates or recorded ops', async () => {
+    const seen: { source: string; projectIds: string[]; kinds: string[] }[] = [];
+    const off = store.onChange((c) => seen.push({ source: c.source, projectIds: c.projectIds, kinds: [...c.kinds].sort() }));
+    const id = await newDevice();
+    expect(seen).toEqual([{ source: 'local', projectIds: [PROJECT], kinds: ['device'] }]);
+    const create = (await store.opsFor(id))[0]!;
+    await store.apply(create); // duplicate: nothing applied, nothing announced
+    expect(seen).toHaveLength(1);
+    await store.applyRemoteMany([
+      remote({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'notes', now: 'a' }, 5),
+      remote({ entity_kind: 'punch_item', entity_id: uuidv7(), kind: 'create', payload: { level_id: LEVEL, item: 'x' } }, 6),
+      { ...remote({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'notes', now: 'b' }, 7), state: 'review' as const },
+    ]);
+    expect(seen[1]).toEqual({ source: 'remote', projectIds: [PROJECT], kinds: ['device', 'punch_item'] });
+    // only recorded (review) ops → nothing announced
+    await store.applyRemote({ ...remote({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'notes', now: 'c' }, 8), state: 'review' });
+    expect(seen).toHaveLength(2);
+    // a throwing listener never breaks the edit
+    store.onChange(() => {
+      throw new Error('boom');
+    });
+    await store.apply(op({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'notes', now: 'd' }));
+    expect(seen).toHaveLength(3);
+    off();
+    await store.apply(op({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'notes', now: 'e' }));
+    expect(seen).toHaveLength(3);
+  });
+});
+
+describe('a second create of an existing row (deterministic ids, D169)', () => {
+  it('applies without changing the row or its heads, locally and from a pull', async () => {
+    const id = uuidv7();
+    const first = op({ entity_kind: 'proposal', entity_id: id, kind: 'create', payload: { project_id: PROJECT, rule_id: 'R3a', kind: 'punch', state: 'proposed', inputs_hash: 'h1' } });
+    await store.apply(first);
+    // the same row made on another iPad arrives by pull
+    const r = await store.applyRemote(
+      remote({ entity_kind: 'proposal', entity_id: id, kind: 'create', payload: { project_id: PROJECT, rule_id: 'R3a', kind: 'punch', state: 'proposed', inputs_hash: 'h1' } }, 9),
+    );
+    expect(r.outcome).toBe('applied');
+    expect(await store.get('proposal', id)).toMatchObject({ version: 1, inputs_hash: 'h1' });
+    expect(await store.fieldHead(id, 'state')).toBe(first.op_id);
+    // and a local create over a pulled row (the engine ran before the pull landed) does the same
+    const other = uuidv7();
+    await store.applyRemote(remote({ entity_kind: 'proposal', entity_id: other, kind: 'create', payload: { project_id: PROJECT, rule_id: 'R3a', kind: 'punch', state: 'proposed', inputs_hash: 'h2' } }, 10));
+    const remoteCreate = (await store.opsFor(other))[0]!;
+    await store.apply(op({ entity_kind: 'proposal', entity_id: other, kind: 'create', payload: { project_id: PROJECT, rule_id: 'R3a', kind: 'punch', state: 'proposed', inputs_hash: 'h2' } }));
+    expect(await store.fieldHead(other, 'state')).toBe(remoteCreate.op_id);
+    expect((await store.get('proposal', other))!.version).toBe(1);
+  });
+});

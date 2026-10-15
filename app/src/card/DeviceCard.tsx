@@ -3,8 +3,9 @@
  * Sections scroll and collapse; every tap commits one op (D45, no Save button) through
  * `actions.ts`. Plain taps are `Field survey` (D96); `[⋯]` delete / restore / move pin ask for
  * a reason (`Correction`). Camera / Library and a thumbnail tap hand over to the photo flow
- * (T21); a connection row opens the end editor (T22). Neuron ID scan (T54), rule drafts (T33)
- * and quick actions (T34) are shown with their buttons disabled until those land.
+ * (T21); a connection row opens the end editor (T22); rule drafts are decided through the
+ * `ProposalDecider` (T33). Neuron ID scan (T54) and quick actions (T34) are shown with their
+ * buttons disabled until those land.
  * Render it with `key={deviceId}`: a card instance belongs to one device (its note commits on leave).
  */
 
@@ -306,7 +307,7 @@ export function DeviceCard(props: DeviceCardProps) {
             </View>
           ))}
           {card.drafts.map((dr) => (
-            <DraftRow key={dr.id} draft={dr} decider={props.decider} />
+            <DraftRow key={dr.id} draft={dr} decider={props.decider} readOnly={readOnly} onDecided={onEdited} />
           ))}
         </Section>
 
@@ -498,8 +499,59 @@ function NeuronSection({ card, store, readOnly, run }: { card: Card; store: Stor
   );
 }
 
-function DraftRow({ draft, decider }: { draft: CardDraft; decider: ProposalDecider }) {
-  const [why, setWhy] = useState(false);
+/**
+ * One rule draft (Phase 3 §4.3): Accept, Edit (a small form over the payload's text fields,
+ * then "Save & accept"), Reject, and "why?" from the engine's `explain()` (T33). A decision is
+ * one op group; the card reloads through `onDecided`.
+ */
+function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardDraft; decider: ProposalDecider; readOnly: boolean; onDecided: () => void }) {
+  const [why, setWhy] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Record<string, string> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canAct = decider.wired && !readOnly && !busy;
+
+  const act = (decision: Parameters<ProposalDecider['decide']>[1]) => {
+    setBusy(true);
+    setError(null);
+    decider.decide(draft.id, decision).then(
+      () => {
+        setBusy(false);
+        setEditing(null);
+        onDecided();
+      },
+      (e: unknown) => {
+        setBusy(false);
+        setError(`Not saved: ${String((e as Error)?.message ?? e)}`);
+        console.warn('[rules] decision refused', e);
+      },
+    );
+  };
+  const toggleWhy = () => {
+    if (why !== null) {
+      setWhy(null);
+      return;
+    }
+    decider.explain(draft.id).then(
+      (t) => setWhy(t ?? draft.why ?? `Rule ${draft.ruleId}`),
+      () => setWhy(draft.why ?? `Rule ${draft.ruleId}`),
+    );
+  };
+  const startEdit = () => {
+    const form: Record<string, string> = {};
+    for (const k of draft.editable) form[k] = String(draft.payload[k] ?? '');
+    setEditing(form);
+  };
+  const saveEdit = () => {
+    if (!editing) return;
+    const payload: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(editing)) {
+      const was = draft.payload[k];
+      payload[k] = typeof was === 'number' ? (v.trim() === '' ? null : Number(v)) : v;
+    }
+    act({ kind: 'edit', payload });
+  };
+
   return (
     <View style={[styles.item, styles.draft]}>
       <View style={styles.itemLine}>
@@ -510,16 +562,39 @@ function DraftRow({ draft, decider }: { draft: CardDraft; decider: ProposalDecid
         </Text>
       </View>
       {draft.sub ? <Text style={styles.itemSub}>{draft.sub}</Text> : null}
-      <View style={styles.rowWrap}>
-        <SmallButton label="Accept" disabled={!decider.wired} onPress={() => void decider.decide(draft.id, { kind: 'accept' })} />
-        <SmallButton label="Edit" disabled onPress={() => {}} />
-        <SmallButton label="Reject" disabled={!decider.wired} onPress={() => void decider.decide(draft.id, { kind: 'reject' })} />
-        <Pressable onPress={() => setWhy((w) => !w)} hitSlop={6}>
-          <Text style={styles.jumpText}>why? {why ? '▴' : '▸'}</Text>
-        </Pressable>
-      </View>
-      {why ? <Text style={styles.itemSub}>{draft.why ?? `Rule ${draft.ruleId}; the rule text arrives with the engine (T33).`}</Text> : null}
-      {!decider.wired ? <Text style={styles.muted}>Accept / Reject with the rule engine (T33).</Text> : null}
+      {editing ? (
+        <View style={styles.draftForm}>
+          {Object.keys(editing).map((k) => (
+            <View key={k} style={styles.draftField}>
+              <Text style={styles.draftLabel}>{k.replace(/_/g, ' ')}</Text>
+              <TextInput
+                style={styles.draftInput}
+                value={editing[k]}
+                onChangeText={(v) => setEditing((f) => (f ? { ...f, [k]: v } : f))}
+                multiline={k === 'notes' || k === 'item'}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          ))}
+          <View style={styles.rowWrap}>
+            <SmallButton label="Save & accept" disabled={!canAct} onPress={saveEdit} />
+            <SmallButton label="Cancel" disabled={busy} onPress={() => setEditing(null)} />
+          </View>
+        </View>
+      ) : (
+        <View style={styles.rowWrap}>
+          <SmallButton label="Accept" disabled={!canAct} onPress={() => act({ kind: 'accept' })} />
+          <SmallButton label="Edit" disabled={!canAct || draft.editable.length === 0} onPress={startEdit} />
+          <SmallButton label="Reject" disabled={!canAct} onPress={() => act({ kind: 'reject' })} />
+          <Pressable onPress={toggleWhy} hitSlop={6}>
+            <Text style={styles.jumpText}>why? {why !== null ? '▴' : '▸'}</Text>
+          </Pressable>
+        </View>
+      )}
+      {why !== null ? <Text style={styles.itemSub}>{why}</Text> : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {!decider.wired ? <Text style={styles.muted}>Read-only here; decide from the plan.</Text> : null}
     </View>
   );
 }
@@ -638,6 +713,10 @@ const styles = StyleSheet.create({
   itemSub: { flex: 1, fontSize: 12, color: '#555' },
   closed: { opacity: 0.55 },
   draft: { borderWidth: 1, borderStyle: 'dashed', borderColor: '#6a1b9a', borderRadius: 6, padding: 6 },
+  draftForm: { gap: 4, paddingTop: 4 },
+  draftField: { gap: 2 },
+  draftLabel: { fontSize: 11, color: '#6a1b9a', textTransform: 'capitalize' },
+  draftInput: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 4, fontSize: 13, backgroundColor: '#fff' },
   jump: { paddingHorizontal: 6, paddingVertical: 2 },
   jumpText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
   chev: { fontSize: 20, color: '#999', paddingLeft: 4 },
