@@ -82,6 +82,6 @@ pre-check and TP-4 are re-run, and the failed rows are tested again.
 
 | Environment | Verdict | Date | Excel version |
 |---|---|---|---|
-| Excel Online | | | |
-| Excel for Windows | | | |
+| Excel Online | pass (M3 round E-3, opened with no repair prompt; per-step table not filled) | 2026-10-13 | not recorded |
+| Excel for Windows | pass (M3 round E-4, opened with no repair prompt; per-step table not filled) | 2026-10-13 | not recorded |
 | Excel for Mac | pending — no Mac (D72) | | |

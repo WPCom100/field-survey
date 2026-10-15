@@ -2,6 +2,48 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## 2026-10-14 — M3 close-out round (dev build `ddf99272`, `main` d8724e9 deployed by CI, TP-3 synthetic on the Droplet)
+
+Landry ran the M3 close-out sheet (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy) on two iPads under two names: iPad A Landry, iPad B Zach. Airplane mode 10:05–10:25. 64 pass, 3 fail, 9 skip, 1 not done (C-6). **Part A, the M4 gate that failed on 2026-10-13, passed in full**: three conflicts came back as exactly three review items and nothing was lost (T87 holds). Part B passed except B-3, so T91 is the last gate item. All fourteen decisions on the sheet were accepted and recorded (D140–D147, D151, D157, D158, D162–D164 → Approved 2026-10-14).
+
+| Step | Result | Saw | Finding |
+|---|---|---|---|
+| 0-1 … 0-10 | done | | Before-the-round steps: T87, T88, T90, T89, T47 built; T30 closed (done in TASKS.md this session — it had stayed `doing`); TP-3 synthetic created; pushes green |
+| A-1 … A-11 | pass | | three review items, both ink layers on both iPads, badges, names `Field 1` / `Field 2`, Resolve, context link (also covers the carried-over T26 and T24 checks and T87's two-name check) |
+| A-12 Pin conflict on the plan | pass, with a question | "What is suppose to be dashed vs solid?" | Side A (official, first to arrive) is the solid pin at the device; side B (the other person's move) is a dashed outline with a "B". The line under the plan already reads "A — … (solid) · B — … (dashed)" but was not noticed: follow-up for a clearer legend |
+| B-1 T88 search by connection number | pass, with a note | "Should also show the devices on either end of the connections that are being displayed in the search" | **T95** (decision first) |
+| B-2 T90, B-4 T47, B-5 Combined Notes in the workbook | pass | | |
+| B-3 T89 floor PDF survey date | **fail** | "I did not see a surveyed date field anywhere" | Setup → Levels has no Surveyed / Updated field (no screen edits `level.surveyed`; only the Export header reads it), although D125 / D159 (3) call it a person's field there. **T91** |
+| C-1, C-3, C-4, C-7 … C-17 | pass | | T25, T67, T75, T83, T84, T85, T86 |
+| C-2 T25 download assigned levels | skip | "Can't yet assign labels" [levels] | The step needs no assignment: with none, every in-scope level is fetched (D97); re-run next round. No screen writes an assignment yet: **T97** |
+| C-5 Retry failed uploads | skip | | nothing failed (the step allows a skip) |
+| C-6 T21 upload resume | not done | | carried over |
+| C-18 offline for a day, C-19 rollback | skip | | carried over (C-19 needs a "publish a test update" session) |
+| D-1 … D-5, D-7 … D-14, D-16 … D-18 | pass | | T45, T71, T69, T72 |
+| D-6 three-tap calibration | pass, with a note | "I think when creating a manual grid, it should show the 'added' points in between the calibration points." | **T96** |
+| D-15 T70 long-press feel | **fail** | "The menu does not pop up till the holding finger is moved." | **T92** |
+| E-1 … E-7 | pass | | T65, T66, T28 (the T80 Re-check step too) |
+| E-8 … E-12 T81 | skip | | carried over |
+| F-1 … F-6 | pass | | T31, T59, T82 |
+| G-1 first sync and open | pass | first sync 1 min; open 06M 2 s | `docs/perf/tp3.md` §3 |
+| G-2, G-3, G-5 | pass | | values not recorded; under target |
+| G-4 TP-3 export | **fail** | "Took much longer than 5 mins (but that is expected with the huge size of the document). There is no indication of status for the export. Also leaving the export screen while an export is running, and then coming back looses my export, and i can no longer see the current export. I have to restart and it gets stuck in queue because the export that was already running is still going in the background." | **T93** (status, a running export kept across screens, one per kind) and **T94** (speed, < 5 min) |
+
+Record (H), as filled and from the results:
+
+| Measure | Value |
+|---|---|
+| Lost after sync in Part A (target 0) | not filled; A-7 passed → 0 |
+| Review items raised vs the 3 expected | not filled; A-8 passed → 3 of 3 |
+| Crashes (target 0) | none reported |
+| Moments you reached for the spreadsheet | none reported |
+| Parts A and B all pass? (the M4 gate) | not filled; A all pass, B fails B-3 → **T91** |
+| TP-3 numbers (Part G) | first sync 1 min, open 06M 2 s; export over 5 min |
+
+Decisions as answered: D140, D141, D142, D143, D144, D145, D146, D147, D151, D157, D158, D162, D163, D164 — all **Accept**, recorded as Approved (Landry, 2026-10-14). D145's question about a Discard action got no answer; it stays an open question.
+
+Checklist reset: every section whose checks all passed in this round (or in the M3 round of 2026-10-13) left the file — T80, T28, T67, T66, T69, T72, T31, T59 (its header check moved under T89), T71, T86, T82, T83, T85, T88, T90 and the carried-over T41, T26, T24; the carried-over T23 "real ID after sync" counts as covered by A-3, D-8 and the M3 round's C-2. What stays: T70 and T89 (failed, re-run after T92 / T91), the T32 export (after T93 / T94), T81, the T84 / T87 / T47 / T45 / T65 leftovers, T25's two, T21's upload resume and T75's refused edit.
+
 ## 2026-10-13 — M3 round completed (dev build `ddf99272`, Droplet `15f7656` / migration 0005, `main` d145902)
 
 Landry ran the M3 round sheet (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy) on two iPads after T80. Offline 18:28–18:51 (about 25 min; the sheet asked for 2–3 h), battery A 98→95 %, B 54→51 %. 26 pass, 9 fail, 14 skip, 0 not done. The decisions pasted back are the answers the sheet still held from 2026-10-12 (D136 Change, D138 Discuss, D139 Change, the other twelve Accept); all were recorded that day (D148, D149; D138 approved after the explanation), so nothing new is recorded. No checklist Decision line (D140–D143, D145–D147, D151, D157, D158, the TP-3 yes/no) was answered; they stay.

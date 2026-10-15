@@ -10,231 +10,44 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 3. **Logs.** In the Metro terminal press `j` to open React Native DevTools; app logs appear there, not in the terminal.
 4. **Mark results as you go.** Tick `[x]` for pass. For a fail, leave it `[ ]` and write what you saw after "→ saw:". Then paste this file back to Claude.
 
-Pending round started: **2026-10-13**. The M3 round of 2026-10-13 is complete and archived in [on-device-log.md](on-device-log.md): 26 pass, 9 fail, 14 skip. Its fails became **T87** (no review items and iPad A's ink lost — re-run the M3 sheet's C-3 … C-5 when it is done), **T88** (search `C-14`), **T89** (floor PDF survey date), **T90** (lint findings viewable); A-5, D-1 and D-2 asked for M5 features that are not built yet (T47, T44, T48/T61); F-1 … F-5 wait for the TP-3 "yes" on the T32 Decision line below. **The M3 sheet's G-1 … G-3** meant the "Carried over" sections below: G-1 = *Carried over: T25* (downloads, now that 06M has a plan), G-2 = *Carried over: T26* (the conflict steps — they fail until T87), G-3 = P-10 = your A-6 pass. No per-task section below was ticked by the M3 sheet, so every section stays; the M3 steps covered T80 (ticked below), the T28 import path, the T45 upload, T69's two-finger pan, T31's generate / history and T59's generate in substance — skim those and tick what you saw. No Decision line was answered on 2026-10-13: D140–D143, D145–D147, D151, D157, D158 still wait below. Answered later that day: the M3 round ran both iPads under one team name (D160 → T87 narrows to the ink merge), D159 approved, TP-3 yes, T47 pulled forward (D161). **The M3 close-out sheet** (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy) carries the gate for M4 — the re-run of the conflict steps and the four fixes — plus every check below you can do now and every open decision; it is the sheet to fill for the next round, this file stays the record. **The M3 close-out sheet** (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy) carries the gate for M4 — the re-run of the conflict steps and the four fixes — plus every check below you can do now and every open decision; it is the sheet to fill for the next round, this file stays the record. New tasks add their checks below.
+Pending round started: **2026-10-14**. The M3 close-out round of 2026-10-14 is complete and archived in [on-device-log.md](on-device-log.md): 64 pass, 3 fail, 9 skip, 1 not done. **Part A passed in full** (three review items, nothing lost). Its fails became **T91** (no Surveyed field in Setup → Levels — the last M4 gate item), **T92** (the long-press menu waits for a move) and **T93** / **T94** (export status and speed at TP-3 size); your notes became **T95** (both end devices in a connection search), **T96** (preview the in-between grid bubbles) and **T97** (assign levels). Every decision on the sheet was accepted. What passed has left this file; what is below was skipped, not done, or failed and waits for its fix. New tasks add their checks below.
 
-**This round's build:** dev build `ddf99272` (T69 + T70), install from https://expo.dev/accounts/wpcom/projects/field-survey/builds/ddf99272-0e81-474c-8af7-2392c0232e81 before step 2. Every dev build reads `1.0.0 (6)` on the Sync screen, so check Metro instead: opening a plan must log `[plan] pdf native patch: t70 ink,longpress-move`. **Server:** since T85 every green push to `main` deploys itself; on 2026-10-13 the Droplet went to `15f7656` (migration 0005) and then, if CI's deploy of `d145902` (T86) went green, to migration 0006. `curl -s https://survey.wpcom.cloud/health` shows what runs. **TestFlight iPads** got their first update (`2231ecb1`, T81–T85 JS) from that push. **TestFlight:** production build 8 (`41d313ab`, from `2444a69`) was submitted the same evening.
+**This round's build:** still dev build `ddf99272` (T69 + T70); opening a plan must log `[plan] pdf native patch: t70 ink,longpress-move`. T92 may change the native patch; if it does, its section names the new build. **Server and JS:** every green push to `main` deploys the server and publishes the update (T85); `curl -s https://survey.wpcom.cloud/health` shows what runs.
 
 ---
 
-## T80 — Uploads work again ("Unsupported FormDataPart implementation")  ·  Needs: no new build (JS only)
-
-**Why it matters:** the seed import and the plan sheet upload are how a project gets its devices and its floor plan; both stopped at A-2/A-3 of the M3 round with this error.
-
-- [x] **Seed import reads the workbook.** Setup → 3 Sources → Seed import → Choose workbook…, pick `Lighting_Control_Survey_Master_B2-06_4.xlsx`: "Reading the workbook…", then Checks and Column mapping appear. No "Unsupported FormDataPart implementation". Then continue with the T28 steps above. → saw: covered by M3 round A-2, 2026-10-13 (pass)
-- [ ] **Re-check sends the file again.** Change one mapping and tap Re-check with this mapping: the Checks refresh without an error (the file is read from the iPad a second time). → saw:
-- [x] **Plan sheet uploads.** Floor plans → 06M → Choose…, pick `Level_06M_-_Lighting_Composite_vector.pdf`: the job line reads Queued → Reading the sheet…, no error. Then continue with the T45 steps. → saw: covered by M3 round A-3, 2026-10-13 (pass)
-
-## T28 — Seed import from the iPad  ·  Needs: **new dev build** (adds `expo-document-picker`); the server must run this task's code (`POST /imports/preview`)
-
-**Why it matters:** this is how the Tower's master workbook becomes the project's records without retyping, and the mapping step is what lets a differently-headed floor workbook in.
-
-- [ ] **Open the step.** Projects → the Tower project → Setup → 3 Sources. "Seed import" shows Master workbook / Floor workbook buttons and Choose workbook…. → saw:
-- [ ] **Pick from Files.** Put `Lighting_Control_Survey_Master_B2-06_4.xlsx` in iCloud Drive or On My iPad; Choose workbook… opens Files, only .xlsx can be picked. After picking, "Reading the workbook…" then Checks and Column mapping appear. → saw:
-- [ ] **Pre-matched.** Checks list the floors, the rows per tab (Devices 210, Connections 107, …) and "Every column is matched."; the mapping pickers show the master's own headers. → saw:
-- [ ] **Change a mapping.** Set one Devices field to "not in this workbook" or another header: the field name turns amber, the Checks line counts it unmatched; Re-check with this mapping keeps your choice. → saw:
-- [ ] **Import and follow it.** Import master workbook: the Import card goes Queued → Importing… → Imported with review items, findings and unpaired ends; Open Needs review opens the list. Do this on a throw-away project: the Tower's devices appear after the next sync. → saw:
-- [ ] **Same file twice.** Pick the same file again and import: "Already imported — … nothing changed". → saw:
-- [ ] **Floor workbook.** Choose Floor workbook and pick one floor's workbook: "Floors in this file" names its floor(s) and the import completes the same way. Skip if none is at hand. → saw:
-- [ ] **Offline.** Airplane mode on, Choose workbook…: a plain error line (no crash), the rest of the app unaffected. → saw:
-
-Decision D135: answered 2026-10-12, **Approved**.
-
-## T67 — Sync every 5 seconds  ·  Needs: no new build (JS only)
-
-**Why it matters:** two people on one floor should see each other's changes within seconds, and the faster cycle must not make the plan or lists stutter.
-
-- [ ] **Changes arrive in about 5 seconds.** Two iPads (or the iPad plus a change made on the server) on the Houston Methodist Hospital project: change a device note on one; on the other, open the same device's card. The note updates within about 5–10 seconds without tapping Sync now. → saw:
-- [ ] **No flicker while idle.** Leave the Levels screen (and, once T71 lands, a level's lists) open for a minute with nobody editing. Nothing reloads, jumps or loses its scroll position every 5 seconds. → saw:
-- [ ] **Offline still backs off.** Airplane mode on: the status bar turns Offline and stays calm (no rapid flashing); airplane mode off: it reads Synced again within a few seconds. → saw:
-
-## T65 — A photo linked to several devices and connection ends  ·  Needs: no new build (JS only); the server must be on migration 0002
-
-**Why it matters:** a photo often shows two panels or several cables side by side; it must show up on every one of them, and a photo taken from a connection must really be linked to that connection (the T21-5 fail).
-
-- [ ] **Photo from a connection is linked to it.** Open a device with connections → tap a connection → 📷 Photo, take a picture: in the caption sheet the connection's chip is already ticked (✓). Save; back in the end editor, the end shows "Photos (1)" with the thumbnail; the other end of the cable does not. → saw:
-- [ ] **Link several, nearest first.** Take a photo of a device that has other pins close to it on the plan: under Linked, its own connections come first, then the nearby devices (closest first) each followed by their connections, then its punch items. Tick two devices and one connection, Save. → saw:
-- [ ] **Shown everywhere it is linked.** Open each linked device's card and the linked connection: the photo is in each Photos strip, showing only its number (and ✎ / ↑ marks) — no blue "🔗 …" line under it (D134, T73); its links show in the caption sheet's Linked picker. → saw:
-- [ ] **Unlink.** Open the photo again, untick one device, Save: it disappears from that device's card only; the others keep it. On a second iPad (or after a sync) the same. → saw:
-- [ ] **Imported multi-device photos.** On the Tower project, if a photo shows several devices in the master (`B1-01, B1-02`): note whether only the first device shows it (expected for data imported before T65; see TASKS follow-ups). → saw:
-
-Decision D131: answered 2026-10-12, **Approved**.
-
-## T66 — Setup and card form polish  ·  Needs: no new build (JS only)
-
-**Why it matters:** setting up a project with 20 floors should be quick typing, not fighting the keyboard; the In scope switch must register every tap.
-
-- [ ] **Add levels in a row.** Setup → 2 Levels (and + New project): tap Add level, type `07`, press Return: the level is added, the cursor stays in the field, the page scrolls so the field stays above the keyboard. Type `08`, Return, and so on. → saw:
-- [ ] **No extra text.** No description under the Levels header; on 1 Project no "each field saves when you leave it" note. → saw:
-- [ ] **Column help.** Under In scope, Numbering group (Shares numbering with on New project) and Split of there is one short grey line explaining each. → saw:
-- [ ] **In scope taps.** Tap anywhere in the In scope cell (switch or the space around it) ten times: it flips every time; off shows "out of scope (far ends only)". → saw:
-- [ ] **Neuron ID Save.** On a device card, Neuron ID → Type…: Save and Cancel are on the same line as the field, visible above the keyboard; Return saves a valid ID. → saw:
-
-## T69 — Two-finger pan while drawing ink  ·  Needs: **new dev build** (native patch)
-
-**Why it matters:** marking up a big floor means moving around while drawing; leaving draw mode just to pan was slow.
-
-- [ ] **Draw with one finger and the Pencil.** On a level with a plan, ✎ Ink: a Pencil stroke draws with pressure (lighter = thinner); a finger stroke draws at medium width. There is no ✋ Pan button. → saw:
-- [ ] **Two fingers pan and zoom.** Still in Ink, put two fingers down and drag: the plan pans; pinch: it zooms. Your ink, everyone's ink and the pins stay glued to the drawing during the move. Nothing is drawn by the two fingers. → saw:
-- [ ] **Second finger cancels a stroke.** Start a stroke with one finger, then put a second finger down and pan: the half-drawn stroke disappears (not saved) and the plan pans. → saw:
-- [ ] **No taps while drawing.** In Ink, tap a pin: no card opens (a dot or nothing is drawn); double-tap: no zoom; long-press: no add-here menu. Tap Done: tapping a pin opens its card again, double-tap and long-press work again. → saw:
-- [ ] **Eraser and Note still work.** ⌫ Erase removes your stroke under the finger; T Note: tap the plan, type, Place. → saw:
-
-Decision D132: answered 2026-10-12, **Approved**.
-
-## T70 — Long-press feel  ·  Needs: **new dev build** (same build as T69)
+## T70 — Long-press feel  ·  Needs: the dev build named by T92 (re-run after T92)
 
 **Why it matters:** placing a device or a note exactly on the drawing is the point of the long press; the spot must be adjustable before choosing.
 
-Before these steps, in the Metro DevTools console after opening a plan: the line **`[plan] pdf native patch: t70 ink,longpress-move`** must appear. If it does not, the iPad is running an older build — install the new one from its build link and stop here.
+Failed 2026-10-14 (close-out D-15): "The menu does not pop up till the holding finger is moved." → **T92**. Run these again once T92 is done.
 
-- [ ] **Menu while the finger is down.** Long-press the plan and keep the finger down: the blue dot and the menu appear while the finger is still on the glass (Metro: `[plan] long press: began`). → saw:
+- [ ] **Menu while the finger is down.** Long-press the plan and keep the finger still: the blue dot and the menu appear while the finger is on the glass, without moving it (Metro: `[plan] long press: began`). → saw:
 - [ ] **Dot follows the finger.** Still holding, slide the finger: the dot follows; lift: it stays where you lifted (Metro: `lifted after n move event(s)`, n > 0). → saw:
 - [ ] **Drag the dot after lifting.** With the menu open, drag the blue dot to a nearby spot (or onto a pin): it moves; the menu follows; "+ Photo of <device>" names the device now under the dot. Pick + Device: the grey "+" pin sits where the dot was dropped. → saw:
 - [ ] **Pan still closes the menu.** With the menu open, pan the plan (away from the dot): the menu closes. → saw:
 
-## T72 — Edit other people's ink  ·  Needs: the T69/T70 dev build; a level with a plan (T45) and two iPads or two team names
+## T89 — Floor PDF shows a survey date  ·  Needs: no new build; re-run after T91
 
-**Why it matters:** the floor's markup is shared work; anyone should be able to clean up or correct it without anyone's strokes getting lost when two people change it at once.
+**Why it matters:** a report that goes to the EC and GC must carry a date (R7).
 
-- [ ] **Erase someone else's stroke.** Ann draws, syncs; on Bob's iPad, Ink → ⌫ Erase → touch Ann's stroke: it disappears. After both sync it is gone on Ann's iPad too. → saw:
-- [ ] **Recolour.** Bob: Ink → 🎨 Recolour, pick blue, touch one of Ann's strokes: it turns blue (and stays faded as Ann's). After sync Ann sees it blue. → saw:
-- [ ] **Undo across layers.** Bob: erase one of Ann's strokes and one of his own, then ↶ Undo twice: both come back, in reverse order. → saw:
-- [ ] **Both at once, online.** Ann draws new strokes while Bob erases one of Ann's older strokes, within a few seconds of each other: after both sync, Ann's new strokes are there and the erased one is gone, on both iPads. → saw:
-- [ ] **Both offline.** Both iPads in airplane mode: Ann erases stroke X of her own layer, Bob recolours stroke Y of Ann's layer. Airplane mode off on both, wait ~10 s (two sync cycles): on both iPads X is gone and Y has the new colour (Metro may log `ink: merged 1 concurrent write(s)`). → saw:
+Failed 2026-10-14 (close-out B-3): "I did not see a surveyed date field anywhere" — Setup → Levels has no Surveyed field yet → **T91**, which adds it and its own checks.
 
-Decision D133: answered 2026-10-12, **Approved**.
+- [ ] **Export screen header line.** Export, Floor PDF, a level with no Surveyed date: the line reads `… — Level 06M · Surveyed <date>` (the day of the newest survey edit on it, else today), never a dash. → saw:
+- [ ] **PDF header.** Generate that level's floor PDF and open it: every page after the cover carries the same date, no company name; the Connections, Punch list and Missing parts tables match the workbook for that level. → saw:
+- [ ] **A set date wins.** Set the level's Surveyed date in Setup → Levels (T91): the header shows that date. → saw:
 
-## T31 — Export screen and history  ·  Needs: no new build (JS only); **the server must run T29 + T31** (deploy and `alembic upgrade head` to 0003 first — until then the Export screen's requests fail)
+## T32 — TP-3 export  ·  Needs: no new build; re-run after T93 and T94
 
-**Why it matters:** this is how the master workbook reaches the EC, ETC and GC without anyone touching the PC, and the gate is what guarantees an export never misses an edit still sitting on an iPad (D94).
+Failed 2026-10-14 (close-out G-4): over 5 minutes, no status, the card lost on leaving the screen. Every other TP-3 step passed (`docs/perf/tp3.md` §3).
 
-- [ ] **Open it.** Levels screen sidebar → Export. Three panes on the left: Master workbook, Floor PDF, History; the project name under "Export"; the sync line at the top. → saw:
-- [ ] **Gate while edits are pending.** Airplane mode on, change a device note, open Export → Master workbook: the pre-flight counts "1 unsynced edit on this iPad", an amber line says Offline / Sync first, and Generate workbook is greyed out. → saw:
-- [ ] **Sync first.** Airplane mode off, tap Sync first: the status turns "Synced hh:mm", the amber line turns green ("Synced — the export will include every edit…") and Generate workbook becomes active. → saw:
-- [ ] **Levels and tabs.** Tap one level chip (e.g. 06M): "All in scope" turns off and row 2 reads "Levels 06-06"; tap All in scope again. Untick Photo Log: Summary and Lists stay ticked and cannot be unticked. → saw:
-- [ ] **Generate and follow it.** Generate workbook (all levels, all tabs): the card goes Queued → Building the workbook… → Ready · ~1 MB with the filename `Lighting_Control_Survey_Master_B2-06_<n>.xlsx` and a diff line. → saw:
-- [ ] **Open in Excel / Save to Files.** Tap Open in… / Share / Save to Files: the iOS share sheet shows the workbook; Save to Files saves it; Open in Excel (if installed) opens it with its tabs. "✓ on this iPad" appears on the card. → saw:
-- [ ] **Diff vs previous.** Change one device's status, sync, Generate again: the new card says "Diff vs previous export: 1 changed ▸"; tapping it lists "Devices: +0 −0 ~1 (e.g. …)". → saw:
-- [ ] **History.** History pane: every export newest first, each labelled "Exported <date>, <time>" with its levels/tabs and state; a daily backup (if one ran) says "daily backup". → saw:
-- [ ] **Offline history.** Airplane mode on, History → Refresh: a note says it is showing the last list; an export marked "✓ on this iPad" still opens the share sheet; one not on the iPad shows an error when tapped (needs a connection), no crash. → saw:
+- [ ] **Export.** "TP-3 synthetic" → Export → Generate workbook (all levels, all tabs): time from Generate until Ready under 5 minutes? Open it in Excel from the share sheet. → saw:
 
-Decision D140 (share sheet instead of `expo-sharing`, files kept on the iPad, photos still uploading warn but do not block the export): approve / change →
-Decision D141 (tab choice: Summary and Lists always included, a Summary table dropped with its tab): approve / change →
-
-## T32 — TP-3: a tower-sized project on the iPad  ·  Needs: no new build; **the synthetic project on the Droplet** (see the Decision line: it is created only after you say yes); the T29 + T31 server deploy for the export step
-
-**Why it matters:** the Tower will reach about 2,000 devices and 10,000 photos; the app must still open a crowded floor quickly, scroll its lists and cache every thumbnail over Wi-Fi in reasonable time. Results go in `docs/perf/tp3.md` §3.
-
-- [ ] **First sync.** Projects → Refresh → open "TP-3 synthetic". Time from opening it until the status bar reads "Synced": write the minutes. Editing stays possible meanwhile. → saw:
-- [ ] **Open the crowded floor.** Levels → 06M (1,000 devices). From the tap until the pins are on the plan: under 3 seconds? → saw:
-- [ ] **Scroll the lists.** On 06M, flick the Devices tab from top to bottom, then Conns and Punch: smooth, no blank rows that stay blank, no freeze. → saw:
-- [ ] **Search.** Type `Run` in the search box: the lists narrow within a moment. → saw:
-- [ ] **Prefetch on Wi-Fi.** Sync screen → Download assigned levels; note the time until downloads reach zero (10,000 thumbnails): under 10 minutes? → saw:
-- [ ] **Export.** Export → Generate workbook (all levels, all tabs): time from Generate until Ready: under 5 minutes? Open it in Excel from the share sheet. → saw:
-- [ ] **Memory (dev build only).** Perf Monitor after opening 06M and scrolling: RAM under 600 MB? → saw:
-
-Decision D142 (synthetic project shape: half the devices on 06M, distinct thumbnails, no full-size photo bytes): approve / change →
-Decision (TP-3 on the iPad): create the synthetic project "TP-3 synthetic" on the Droplet — about 110 MB of thumbnails in R2 and a permanent project, since projects cannot be deleted yet? yes / no → **yes** (Landry, 2026-10-13, D161); created in its own session after T89.
-
-## T59 — Floor PDF  ·  Needs: no new build (JS only); **the server rebuilt with T29 + T31 + T59** (`docker compose up -d --build` — the image gains Pango for WeasyPrint — and `alembic upgrade head` to 0003)
-
-**Why it matters:** this is the per-floor report the EC, ETC and GC read; it must be dense (several findings per page), show the plan with everyone's markings, and carry the survey date but no company name.
-
-- [ ] **Open the pane.** Export → Floor PDF: level chips (in-scope levels), six Include boxes all ticked, a header line "ETC Lighting Controls Survey — Level <NN> · Surveyed <date>". → saw:
-- [ ] **Generate.** Pick a level with devices (e.g. 06M on the Tower), Generate PDF: the card goes Queued → Building the PDF… → Ready with `ETC_Lighting_Controls_Survey_Level_06M_1.pdf`. → saw:
-- [ ] **Look at it.** Share sheet → open the PDF (Quick Look or Files): the cover has the status counts and the plan with pins shaped by category, coloured by status and labelled with the device type, and any ink you drew on the plan. → saw:
-- [ ] **Findings are dense.** The Findings pages show about four devices per page, each with status | owner | category, notes, open punch items, thumbnails and a small plan crop with the device ringed. → saw:
-- [ ] **Header and tables.** Every page after the cover has the header with the survey date only (no company name); Connections, Punch list and Missing parts tables match the workbook for that level. → saw:
-- [ ] **Photos.** The appendix shows six photos per page with "Photo n — subject — device IDs", markups drawn on them. → saw:
-- [ ] **Sections.** Untick Photo appendix and Connections, Generate again: the new PDF (`…_06M_2.pdf`) has neither; the History pane lists both PDFs with their sections. → saw:
-
-Decision D143 (floor PDF: plan snapshot as an image with ink and type-labelled pins; findings = every device not Installed, untested, about four per page with a plan crop; photos six per page): approve / change →
-
-## T75 — Refused edits are quarantined, the rest keeps syncing  ·  Needs: no new build (JS only); the Droplet on `alembic upgrade head` (0004, an index only)
-
-**Why it matters:** one edit the server refuses must never stop every other edit on the iPad from syncing, and you must be able to see and retry it.
-
-- [ ] **Nothing changes when all is well.** Sync screen → Pending edits: no "edits the server refused" line and no Retry refused edits button; the status bar reads as before. → saw:
-- [ ] **A refused edit shows and the rest goes.** (Only if one happens: a refused edit cannot be provoked from the iPad on purpose.) If the status bar ever reads "· N need attention": the Sync screen lists each refused edit (what · when · tries · the server's error) with Retry refused edits, other edits made afterwards still reach the other iPad, and Retry sends the listed ones again. → saw:
-
-Decision D145 (quarantine semantics: 422 → the named edit's group, 409 → narrowed by halving, Retry only, refused edits still count as pending so Export stays disabled) and D146 (index + per-push caches on the server): approve / change →
-
-## Carried over: T41 — Projects and levels  ·  Needs: no new build
-
-- [ ] **Second iPad pulls a project.** On a second iPad, or after Sync → Re-sign in with data kept: Projects → Refresh from server → Scratch shows "downloading…", then opens with its levels and disclaimer. → saw:
-
-## Carried over: T25 — Sync & uploads screen  ·  Needs: T71 (a real level that opens); downloads also need T45
-
-- [ ] **Pending edits on a real level.** Airplane mode on, on a Tower level make two edits (a status, a note), open Sync: Pending edits shows 2 or more with an "oldest" time; the top bar reads "Offline · n pending". (T71) → saw:
-- [ ] **Download assigned levels with a plan.** Download assigned levels: the message says how many files were queued; ⬇ → … → ✓ for levels with a plan. (T45) → saw:
-- [ ] **Storage numbers.** Photos / plans / other show non-zero sizes after photos and a cached plan. (T71, T45) → saw:
-- [ ] **Free uploaded photos.** After a photo uploaded (↑ cleared): the button shows MB, confirm → 0; the thumbnail still shows offline, the full image downloads again online. (T71) → saw:
-- [ ] **Retry failed uploads.** Greyed normally; if a red "Upload failed" line appears, Retry clears it. Skip if nothing failed. → saw:
-
-## T71 — Open a level with no plan sheet  ·  Needs: no new build
-
-- [ ] **Tap a Tower level with "No sheet"** on the Levels screen: the plan opens showing "No plan sheet yet…", the device list, cards, end editor and photos work. Why: the imported Tower levels had no way in, so the T21/T25/T26 checks above (marked T71) were skipped. → saw:
-
-## Carried over: T26 — Needs review screen  ·  Needs: T71, two iPads with different team names on a real level
-
-Make a conflict: both iPads in airplane mode, iPad 1 note "Cover plate loose", iPad 2 note "LVD card missing" on the same device; sync iPad 1, iPad 2, iPad 1. For the pin step, repeat with [⋯] → Move pin (needs a plan, T45).
-
-- [ ] **Badges.** Notes amber outline, IN REVIEW on the row, amber ring on the pin; Levels row Review shows IN REVIEW 1. → saw:
-- [ ] **Open the screen.** Sidebar → Needs review: "Needs review (1)", kind tabs, Level chip, Sort; row "<device> · Notes". → saw:
-- [ ] **A/B panel.** A (official) and B with name, time, iPad; "was: …" below. → saw:
-- [ ] **Combine.** Combine ▸ pre-filled "A; B", edit, Save combined, confirmation "Review: combined A (…) and B (…)", Resolve → row gone, note combined. → saw:
-- [ ] **Badges clear on the other iPad** after its sync. → saw:
-- [ ] **No Dismiss** on a sync conflict. → saw:
-- [ ] **Pin conflict on the plan.** Resolve on the plan ▸: A solid, B dashed with "B", never clustered; Choose B → confirm → item gone; pin at B on both after sync. (T45) → saw:
-- [ ] **Context link** opens the level with that device's card. → saw:
-
-## Carried over: T20–T24 — field loop  ·  Needs: as noted per step
-
-- [ ] **T21 · Upload resume.** On a real level take several photos, force-quit while they upload, relaunch: uploads finish, nothing sent twice; Sync shows Photos waiting → 0. (T71) → saw:
-- [ ] **T23 · Real ID after sync.** On a real level with a plan, long-press → + Device, wait for a sync: `06M-?` becomes a real ID (`06M-49`, or `06M-S16` for a station). (T45) → saw:
-- [ ] **T24 · Two people's ink.** Two team names or iPads on a real level with a plan: each draws, both sync; each sees the other's ink faded. (Erasing it is allowed since D129 — see T72.) (T45) → saw:
-
----
-
-## T45 — Plan sheets upload and grid calibration  ·  Needs: no new build (JS only); **the server rebuilt with T45** (`docker compose up -d --build` — the image gains pdfplumber and pypdf — and `alembic upgrade head` to 0005); the iPad's local database migrates to 0006 on first open
-
-**Why it matters:** this is how a level gets its floor plan: the composite goes up once, every iPad downloads it, pins and ink have a sheet to live on, and Drawing Position is read off the grid instead of typed. The 06M composite is the only real sheet we have; on the PC its three grids calibrate automatically — the iPad has to show the same.
-
-- [ ] **Upload the 06M composite.** Projects → Houston Methodist (or a throw-away project with a 06M level) → Setup → 3 Sources → Floor plans: the 06M row shows "—" and Choose…. Put `Level_06M_-_Lighting_Composite_vector.pdf` in Files, Choose…, pick it. The job line reads Queued → Reading the sheet… → "Done: 1 sheet, 3 grid sets (3 auto) — arrives with the next sync" (about 15 s). → saw:
-- [ ] **It arrives.** Within a sync or two the row shows the sheet's title, "(not downloaded yet)" until the blob queue fetches it (Sync screen: plans bytes grow), then the Grid column reads **auto ✓ 3 sets**. Open plan ▸ opens the level with the drawing. → saw:
-- [ ] **No magenta.** On the plan the source-sheet boundaries are drawn by the app as thin dashed magenta lines with the sheet names (Ef.106.5.A…) — not baked into the drawing: Layers ▸ Boundaries (source sheets) off makes every magenta line disappear; on brings them back. (In the demo level the toggle stays disabled: its PDF is the original.) → saw:
-- [ ] **Boundaries follow a pinch.** Pinch and pan: the dashed lines stay exactly on the drawing's sheet edges, same as pins and ink (D95), and stay 1–2 px wide at every zoom. → saw:
-- [ ] **Grid panel.** ⌗ Grid (bottom right) opens Grid calibration — 06M in the side panel: three sets — A–H / 13.5–5 (● auto · residual 0.2 pt), A.–F. / 15.–5. (● auto), R.–K. / 16.–13. (+22°) (● auto · rotated 22°) — each with a name and a Prefix field; the plan shows every grid bubble ringed in the set's colour (blue, green, orange) exactly over the printed bubbles, including the rotated wing's K.–R. and 13.–16. → saw:
-- [ ] **Test a point.** Test: tap a point → its Drawing Position, then tap between columns B and C and rows 9 and 8 of the Centennial grid: the panel reads **Grid B-C / 9-8**. Tap on the C line at row 9: **Grid C / 9**. Tap right of column H (still in the Centennial part): **Grid East of H / …**. Tap in the Walter Tower part: **Grid C.-D. / 7.-6.**-style with the dotted labels. Tap the title block: "Off every grid on this sheet". → saw:
-- [ ] **Prefix.** Set the Walter Tower set's Prefix to `WT`, Save: a test tap there now reads **WT Grid C.-D. / 7.-6.**; after a sync a second iPad shows the same prefix. → saw:
-- [ ] **Three-tap calibration.** Recalibrate: tap three bubbles → tap the A bubble at the top of the Centennial grid: the panel asks "Which bubble…? Printed there: A" with A pre-filled; Use. Tap H (pre-filled H), Use. Tap the 9 bubble at the left edge (pre-filled 9), Use. Finish is enabled; name it `Test` and Finish: a fourth set "Test" (● manual) appears, its bubbles drawn in purple, and a test tap between B and C still reads Grid B-C / 9-8 (the manual set and the auto set agree). Remove the Test set. → saw:
-- [ ] **A wrong label is refused.** Recalibrate again, tap any bubble and type `OF` as its label: "…is not a grid label." Tap three letter bubbles only and Finish: "Tap bubbles of both axes". Cancel. → saw:
-- [ ] **Drawing Position on + Device.** Long-press between B and C / 9 and 8 → + Device: the form's Drawing Position reads **Grid B-C / 9-8** and Room / Location the nearest room (e.g. `Elevator Lobby B (FSAE) XX06M-C003`), both editable. Add: the card shows that Drawing Position. → saw:
-- [ ] **Drawing Position follows a moved pin.** On that device, Move pin (reason) → tap between D and E: Drawing Position becomes Grid D-E / …. Type your own Drawing Position on another device, then move its pin: the typed text stays. → saw:
-- [ ] **Source sheets.** Floor plans → 06M → Source sheets → Add…: pick any multi-page PDF: "Done: N sheets, 0 grid sets"; the row lists `<name> p.1, p.2…`. (Opening source sheets on the plan is T78.) → saw:
-- [ ] **Same file twice.** Choose… the composite again for 06M: "Already uploaded — this exact file was imported for this level before". Replace… with a different PDF: the level now opens that one; the old pins show as "elsewhere" (T77 carries them over). → saw:
-- [ ] **Offline.** Airplane mode on, Choose…: a plain error line, nothing else affected; the Grid panel and Test still work from the local sheet data. → saw:
-
-Decision D147: `sheet.features` beside `grid_sets`; pypdf rewrites the display PDF with the boundary group off; three grid sets on 06M; manual calibration on the plan (⌗ Grid), Drawing Position / Room defaults follow the pin until typed over (see DECISIONS.md). Approve / change → answer:
-
----
-
-## T86 — Per-install label  ·  Needs: no new build (JS only); the server on `alembic upgrade head` to 0006 (a new `install` table — CI's deploy runs it); the iPad's local database migrates to 0007 on first open
-
-**Why it matters:** the Needs review A/B panel names the other side's iPad; "iPad …1a2b3c" means nothing in the field, "Field 2" does.
-
-- [ ] **Set a label.** Sync & uploads → Install: type `Field 1` in "This iPad:" and tap elsewhere. The field keeps `Field 1`; the pending-ops count goes up by one and clears after the next sync. → saw:
-- [ ] **Empty field shows the tail.** On an iPad with no label the field's placeholder reads `iPad …` plus six characters. → saw:
-- [ ] **Label reaches the other iPad.** Label iPad A `Field 1`, iPad B `Field 2`, sync both. Cause a conflict (same field, two values, both offline), sync, open it in Needs review: side A/B read `Field 1` / `Field 2 (this iPad)` instead of install-id tails. → saw:
-- [ ] **Rename and clear.** Change the label to `Field 3`, then clear it: the A/B panel on the other iPad follows after a sync, falling back to the `iPad …` tail when cleared. → saw:
-
----
-
-## T81 — Punch List Device text follows the device  ·  Needs: no new build (JS only); the server rebuilt with T81 (no migration)
+## T81 — Punch List Device text follows the device  ·  Needs: no new build
 
 **Why it matters:** the EC reads the Punch List's Device column to find the device; it must match the device as it is now (renamed, retagged), and a row the import could not link must not vanish into a wrong device.
 
-Use a throw-away project with the master imported **after** the server runs T81 (the Tower was imported earlier and has no review items for this).
+Skipped 2026-10-14 (close-out E-8 … E-12). Use "Tower M3 round" (imported after T81; the Tower itself was imported earlier and has no review items for this). Needs review now opens on the project shown on the home (T83 passed).
 
 - [ ] **Review items arrive.** Needs review → Lint tab: 13 items reading `Punch #… · Device "…" → link` (e.g. B1 #27 `Walter Tower east wing`, 04 #22 `Elec XX04-1E01`, three `Stations & sensors`). No item for the "Missing all Device Neuron IDs" rows. → saw:
 - [ ] **Link to device.** Select B1 #27: the panel shows the punch item and "Device, as the master wrote it: Walter Tower east wing". Type `S1` in the filter: the list narrows to B1 devices with S1 in the ID or text. Tap one → Link: the item leaves the list, the note reads "Linked: Review: linked punch item to B1-S1… (master: "Walter Tower east wing")". → saw:
@@ -245,115 +58,54 @@ Use a throw-away project with the master imported **after** the server runs T81 
 - [ ] **Two iPads.** Link an item on iPad A; after a sync iPad B no longer lists it and shows the same Device text for that punch item. → saw:
 - [ ] **Export.** Export the workbook (Export screen, synced): Punch List row B1 #8 shows the renamed room; 04 #22 shows the new panel's name; an item left unlinked shows the master's text (e.g. `Stations & sensors`). → saw:
 
-Decision D151: the derived Device text format (named panels, racks and NSPS by name, `EBDK (<panel>)`, the rest with tag and room), the Neuron ID rows not raised, Create device unplaced with Place pin… (see DECISIONS.md). Approve / change → answer:
+Decision D151: answered 2026-10-14, **Approved**.
 
----
+## T84 — Over-the-air JS updates (leftovers)  ·  Needs: a TestFlight iPad; the rollback needs a "publish a test update" session with Claude
 
-## T82 — Daily master export backup  ·  Needs: no new build (JS: the history label); the server deployed with T82 (see the TASKS.md deploy note)
+Skipped 2026-10-14 (close-out C-18, C-19). Everything else in T84 passed.
 
-**Why it matters:** if the server or the data is ever lost, the newest master workbook for each project should be at most a day old, without filling the bucket with identical copies.
-
-- [ ] **First backup.** The morning after the deploy (after 08:00 UTC = 03:00 Houston): Export screen → history shows one export per project labelled "daily backup", made overnight. Open/Share it: a normal master workbook. → saw:
-- [ ] **No edit, no backup.** On a day with no edits on a project, the next morning shows no new "daily backup" row for it. → saw:
-- [ ] **An edit makes one.** Change one device's notes, sync; the next morning there is a new "daily backup" row for that project only. → saw:
-
-Decision D152 recorded from your answer (skip unchanged, keep six months): no answer needed.
-
----
-
-## T83 — Needs review opens the project on screen  ·  Needs: no new build (JS only)
-
-**Why it matters:** with more than one project on the iPad, Needs review showed the first project's items (often none), so the test project's review items, and the T81 checks that start from them, could not be reached.
-
-- [ ] **From the home.** Two projects on the iPad. On the Levels home tap the **test** project's chip (not the first), then sidebar → Needs review: the list shows the test project's items (the T81 Lint items, if it was imported after T81), with its levels in the Level filter. → saw:
-- [ ] **Back keeps the project.** In Needs review tap "← Levels": the home still shows the test project, not the first one. → saw:
-- [ ] **From Projects and Setup.** Projects → Open the test project → Needs review: same items. Setup → Sources after an import → "Open Needs review": that project's items. → saw:
-- [ ] **From Sync.** With the test project on the home, Sync → "Open Needs review": the test project's items; "← Levels" from Sync returns to the test project. → saw:
-- [ ] **Then redo T81 from "Review items arrive"** (the A-4 that failed). → saw:
-
-## T84 — Over-the-air JS updates  ·  Needs: **new dev build** `eb4162d7` (adds `expo-updates`) and **TestFlight build 13** (`0d2a6ba6`), the first binaries with `expo-updates`
-
-**Why it matters:** from now on a JS-only fix reaches every TestFlight iPad without a new build, and nothing about it may slow a launch or need a connection.
-
-Install the dev build from https://expo.dev/accounts/wpcom/projects/field-survey/builds/eb4162d7-1894-4cd2-8345-b28c2371d505 and TestFlight build 13 on the iPad that tests TestFlight. The update checks below need Claude (or you, `docs/ops.md` §5.5) to publish a small update to the `production` channel while you watch; say "publish a test update" in a new session.
-
-- [ ] **Dev build says Metro.** Dev build loaded from Metro → Sync → Install: "JS from the development server (Metro) · runtime … · updates off in this build"; **Check for update** is greyed out. Metro shows `[update] launch {"runtime":…,"enabled":false,…}`. → saw:
-- [ ] **Embedded line.** TestFlight build 13, first launch → Sync → Install: "JS embedded (the JS this build shipped with) · runtime xxxxxxxx · channel production". Note the 8-character runtime. → saw:
-- [ ] **Check for update, online.** Tap **Check for update** with no update published: "Checking for an update…" then "Up to date". → saw:
-- [ ] **Check for update, offline.** Airplane mode on, tap it: one plain red line "Could not check for an update: …", no crash, the rest of the screen unchanged. Airplane mode off. → saw:
-- [ ] **Airplane-mode launch is instant.** Airplane mode on, swipe the app away, open it: the Levels home appears as fast as before T84 (no spinner, no wait for a network timeout), editing works. Airplane mode off. → saw:
-- [ ] **A trivial update arrives after two launches.** After a test update is published: launch the app (it still shows "embedded"; Sync → Check for update may now read "Update ready — restarts next launch"), swipe it away, launch again: Install shows "update <id> · <date> · <message>" with the published message, and the app never restarted by itself. → saw:
 - [ ] **An iPad offline for a day catches up.** Leave one TestFlight iPad in airplane mode (or off) while an update is published; the next day turn the network on and launch twice: it shows the new update. Nothing typed offline is lost (Sync → Pending edits drains). → saw:
 - [ ] **Rollback.** After a second test update, Claude runs `eas update:republish` of the first one: two launches later Install shows a **new** update id with the **first** update's message. → saw:
 
-Decision D157: the update message is baked into the bundle at publish time (`EXPO_PUBLIC_UPDATE_MESSAGE`, with `--clear-cache`), because the EAS manifest does not carry it; `app.json` lists `platforms: ["ios"]` so the PC and EAS compute the same runtime version; `eas update` needs `--environment production`. Status **Default** → approve or say otherwise:
+Decision D157: answered 2026-10-14, **Approved**.
 
-## T85 — Delivery pipeline (server commit on the Sync screen)  ·  Needs: no new build (JS only; arrives by the CI update on TestFlight iPads, from Metro on the dev build)
+## T87 — The name on the Levels home; one name on two iPads  ·  Needs: no new build
 
-**Why it matters:** from now on a push to `main` deploys the server and then the JS; the commit beside the server URL is how you see that the iPad and the server are on the same code.
-
-- [ ] **Server commit shown.** Sync → Install: the second line reads "Server https://survey.wpcom.cloud (commit xxxxxxx · migration 0005) · install …", and the 7 characters match the start of `curl -s https://survey.wpcom.cloud/health` (or the commit GitHub shows for the last green *ci* run on `main`). → saw:
-- [ ] **Offline.** Airplane mode on, open Sync: "(commit unknown (not connected))" after a few seconds; nothing else on the screen changes or waits. Airplane mode off: the commit comes back after the next sync. → saw:
-- [ ] **A push reaches the iPad.** After the next task's push to `main` turns green: on a TestFlight iPad launch the app twice; Install shows that task's `T<nn>: …` message, and the server commit equals the pushed commit. → saw:
-
-Decision D158: how T85 meets D154 (forced-command deploy key, pinned host key in the repo, `/health` reads the database's revision, dispatch tests the sha it deploys and never publishes). Status **Default** → approve or say otherwise:
-
----
-
-## T87 — One person's ink from two iPads is merged; the name on the Levels home  ·  Needs: no new build (JS only)
-
-**Why it matters:** in the M3 round both iPads ran as Landry, B synced first, and iPad A's ink on 06M vanished: the server kept B's write and stored A's (older by the iPad clock) as superseded, which the merge after a pull ignored. Nothing drawn may be lost, whoever's iPad drew it. These re-run the M3 round's C-3 … C-5 (the close-out sheet's Part A).
+The two-name check passed in the close-out (Part A). These two were not on the sheet.
 
 - [ ] **The name is on the home.** Levels home, above the project name: `Signed in as <your name> · This iPad: Field 1`. On an iPad with no label: `This iPad: iPad …` + six characters and "(name it on the Sync screen)". Rename the label on the Sync screen and come back: the line follows. → saw:
 - [ ] **Same name on two iPads: both inks survive.** Both iPads signed in under the **same** name, both cached 06M, airplane mode on both. A draws over the rack area first; a minute later B circles a station. Airplane mode off on B, wait for Synced; then A. Open 06M on A: within a few seconds A's strokes come back next to B's; the Metro log reads `[plan] ink: merged 1 concurrent write(s) into layer …`. Sync B and open 06M: the same strokes. No review item. → saw:
-- [ ] **Two names: exactly three review items, both ink layers.** The close-out sheet's Part A (A-1 … A-10) under two different names, as the M3 round's C-3 … C-5: three review items (06M-03 Status, 06M-02 Notes, the deleted station), both layers visible on both iPads (the other person's faded), then resolve. → saw:
 
----
+Decision D162: answered 2026-10-14, **Approved**.
 
-## T88 — Side-list search finds a connection by its number  ·  Needs: no new build (JS only)
+## T47 — Lock / unlock baseline (leftover)  ·  Needs: no new build; two iPads
 
-**Why it matters:** in the M3 round, searching `C-14` on the Conns tab found nothing useful; the number is how the contractor and the master name a connection.
-
-- [ ] **By number.** Open 06M, Conns tab, search `C-14` (then `c14`, then `14`): the list shows the end numbered C-14 and not C-140, C-114 or an end whose text merely contains "14". → saw:
-- [ ] **Combined.** Search `n c-14` or `c-14 rack`: still that one end (type or text narrows, never widens). A lone `n` still lists the `N` cables only. → saw:
-
-Decision D163: a term shaped like `c-14`, `c14` or `14` means that connection number exactly on the Conns tab. Status **Proposed** → approve or say otherwise:
-
----
-
-## T90 — Lint findings can be seen before T36  ·  Needs: no new build (JS only)
-
-**Why it matters:** the Export pre-flight said "4 lint findings" and no screen showed them (M3 round E-1), so there was nothing to act on.
-
-- [ ] **Link from the pre-flight.** Export, a project with open findings (the demo project has one): under the Pre-flight line a blue "See the N lint findings ▸" link. Tap it: Needs review opens on the Lint tab. With no findings the link is absent. → saw:
-- [ ] **Findings are listed.** Lint tab: under any lint review items a "Lint findings (N) — read-only" heading, then one row per finding: rule id and device (`R1 · 06M-02 …`), the message, level. The tab count is review items plus findings; "Needs review (n)" in the title counts review items only. → saw:
-- [ ] **Level filter and context.** Pick a level chip: only that level's findings stay. Tap "Open the device card on the plan ▸" on a finding: the plan opens on its device. → saw:
-- [ ] **Read-only.** Tapping a finding row changes nothing and there is no Dismiss (T36 adds it). → saw:
-
----
-
-## T89 — Floor PDF shows a survey date  ·  Needs: no new build (JS only); the server must run this task's code
-
-**Why it matters:** the M3 round's 06M report printed "Surveyed —" (E-6); a report that goes to the EC and GC must carry a date.
-
-- [ ] **Export screen header line.** Export, Floor PDF, a level with no Surveyed date (06M in the M3 round project): the line reads `… — Level 06M · Surveyed <date>` (the day of the newest survey edit on it, else today), never a dash. → saw:
-- [ ] **PDF header.** Generate that level's floor PDF and open it: the running header carries the same date, no company name. → saw:
-- [ ] **A set date wins.** On a level whose Surveyed date is set (Setup → Levels), the header shows that date. → saw:
-
----
-
-## T47 — Lock / unlock baseline  ·  Needs: no new build (JS only)
-
-**Why it matters:** the lock is where a level stops being setup and every edit becomes a logged change (R6); the M3 round could not prove change logging without it (A-5). Unlock must be possible but never silent (D57).
-
-- [ ] **Setup → 6 Lock baseline.** The step is live (no longer grey). One row per level: Placed `n/m` (✓ when all), In review, State, and `Lock 06M` (or `Lock 06M ⚠` when something is open); out-of-scope levels read "out of scope — far-end only" with no button. → saw:
-- [ ] **Lock with warnings.** On a level with an unplaced device or an open review item tap `Lock … ⚠`: the dialog asks "Lock 06M with 1 device not placed and 1 item in review?" and offers **Lock anyway** / Cancel. Cancel changes nothing. Lock anyway: the notice "06M baseline locked: changes are logged from now on", State `🔒 Locked <today>`, the button becomes `Unlock…`. A clean level's dialog reads "Lock 06M?" with a `Lock 06M` button. → saw:
-- [ ] **Levels screen and Setup → Levels.** The Levels home's State column reads `🔒 Locked` with an `Unlock…` button (other levels `Setup` + `Lock…`); tapping that button opens the same dialog, tapping elsewhere on the row still opens the plan. Setup → 2 Levels shows `🔒 locked` under the code and the same Lock/Unlock button in the row. → saw:
-- [ ] **History shows where logging starts.** After the lock, change a device's status on that level. Its card → History (newest first): `Status`, then `Baseline locked (06M)` with your name, time and "Master edit · "Lock baseline"", then the older setup lines. → saw:
-- [ ] **Unlock asks why.** Tap `Unlock…`: Unlock stays disabled until you type a reason. Type "Re-import revised riser", Unlock: State back to `Setup`; the device's History gains `Baseline unlocked (06M)` with that reason. → saw:
 - [ ] **Offline and the other iPad.** Airplane mode on, lock a level (works, ↑ on the History line); airplane off, Synced. On the second iPad (different name) after its sync the level reads `🔒 Locked` on the Levels screen and the History line names who locked it. → saw:
 
-Decision D164: lock = one `Master edit` group (state, `baseline_locked_at`, `baseline_locked_by_id`, reason "Lock baseline"), allowed with warnings; unlock = `Master edit` with the typed reason, clears both fields; out-of-scope levels are not locked; the device History shows each lock/unlock of its level as a line. Status **Proposed** → approve or say otherwise:
+Decision D164: answered 2026-10-14, **Approved**.
+
+## Carried over: T25 — Sync & uploads screen  ·  Needs: no new build
+
+- [ ] **Download assigned levels with a plan.** Sync → Download assigned levels: the message says how many files were queued; ⬇ → … → ✓ for levels with a plan. **No assignment is needed:** with none, every in-scope level counts as yours (D97); T97 adds assigning. (Skipped 2026-10-14, close-out C-2.) → saw:
+- [ ] **Retry failed uploads.** Greyed normally; if a red "Upload failed" line appears, Retry clears it. Skip if nothing failed. → saw:
+
+## Carried over: T21 — Upload resume  ·  Needs: no new build
+
+- [ ] **Upload resume.** On a real level take several photos, force-quit while they upload, relaunch: uploads finish, nothing sent twice; Sync shows Photos waiting → 0. (Not done 2026-10-14, close-out C-6.) → saw:
+
+## T75 — A refused edit (only if one happens)  ·  Needs: no new build
+
+- [ ] **A refused edit shows and the rest goes.** A refused edit cannot be provoked from the iPad on purpose. If the status bar ever reads "· N need attention": the Sync screen lists each refused edit (what · when · tries · the server's error) with Retry refused edits, other edits made afterwards still reach the other iPad, and Retry sends the listed ones again. → saw:
+
+Decision D145: answered 2026-10-14, **Approved**. Whether you want a **Discard** action for an edit the server will never accept is still open (DECISIONS.md, Open now).
+
+## T45 — Replace a plan sheet (leftover)  ·  Needs: no new build; a throw-away project
+
+- [ ] **Replace.** Floor plans → a level with a sheet → Replace… with a different PDF: the level now opens that one; the old pins show as "elsewhere" (T77 carries them over). → saw:
+
+## T65 — Imported multi-device photos (observation)  ·  Needs: no new build
+
+- [ ] **Imported multi-device photos.** On the Tower project, if a photo shows several devices in the master (`B1-01, B1-02`): note whether only the first device shows it (expected for data imported before T65; see the Tower backfill question in DECISIONS.md). → saw:
 
 ---
 

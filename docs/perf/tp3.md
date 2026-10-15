@@ -109,16 +109,26 @@ The R2 round trip per thumbnail dominates; it only matters for this generator an
 thousands of pictures (T27 writes thumbnails the same way). Not a field-path cost: iPads upload their own
 photos in the background. No task filed; revisit if a tower-size seed import is slow.
 
-## 3. On the iPad (pending)
+## 3. On the iPad (2026-10-14)
 
-The synthetic project is on the Droplet (above). Steps are in `docs/ON_DEVICE_CHECKLIST.md` under T32
-and on the M3 close-out sheet, Part G.
+Run by Landry on the M3 close-out sheet, Part G (steps also in `docs/ON_DEVICE_CHECKLIST.md` under
+T32), against "TP-3 synthetic" on the Droplet. Where only pass/fail was recorded, the number is blank.
 
 | What | Target | iPad Air result | Pass? |
 |---|---|---|---|
-| First sync of the project (Projects → Refresh → open it) | — (record it) | | |
-| Open 06M (1,000 pins) from the Levels list until pins show | < 3 s | | |
-| Scroll the Devices tab of 06M top to bottom, then Conns and Punch | smooth | | |
-| Sync screen "Download assigned levels" until 10,000 thumbnails are cached | < 10 min on Wi-Fi | | |
-| Export screen: Generate workbook until Ready (server time) | < 5 min | | |
-| RAM after opening 06M and scrolling (dev build Perf Monitor) | < 600 MB (TP-6 rule) | | |
+| First sync of the project (Projects → Refresh → open it) | — (record it) | 1 min | — |
+| Open 06M (1,000 pins) from the Levels list until pins show | < 3 s | 2 s | pass |
+| Scroll the Devices tab of 06M top to bottom, then Conns and Punch; search `Run` | smooth | smooth | pass |
+| Sync screen "Download assigned levels" until 10,000 thumbnails are cached | < 10 min on Wi-Fi | under target, time not recorded | pass |
+| Export screen: Generate workbook until Ready (server time) | < 5 min | "much longer than 5 min" | **fail** |
+| RAM after opening 06M and scrolling (dev build Perf Monitor) | < 600 MB (TP-6 rule) | under target, value not recorded | pass |
+
+**Export (G-4).** Landry: "Took much longer than 5 mins (but that is expected with the huge size of the
+document). There is no indication of status for the export. Also leaving the export screen while an
+export is running, and then coming back loses my export, and I can no longer see the current export. I
+have to restart and it gets stuck in queue because the export that was already running is still going in
+the background." The PC took 27.8 s for the same project; the Droplet's R2 round trip per picture (≈ 3 per
+second for the generator's PUTs, §2) over 10,000 Photo Log pictures is the first suspect. Follow-ups:
+**T93** (stage and counts on the card, re-attach to a running export, one per project and kind) and
+**T94** (measure on the Droplet, then bring it under 5 min). The flash-list question (T19 follow-up) is
+closed: the plain lists scrolled smoothly at 1,000 rows.
