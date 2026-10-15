@@ -250,23 +250,25 @@ export async function searchIds(
   const hits = await store.search(q, { levelId, limit: 5000 });
   const ids = new Set(hits.map((h) => h.entity_id));
   const terms = q.toLowerCase().split(/\s+/);
-  // A term that is a cable code ("n", "ng", "0-10v") means that cable type, not the letter anywhere.
-  const isCode = (t: string) => CABLE_CODES.some((k) => k.toLowerCase() === t);
-  // A term shaped like a connection number ("c-14", "c14", "14") means that C-nn exactly (D162), so
-  // "14" does not find C-140 or a "14" inside the text. A NEW end has no number and never matches.
-  const connNumber = (t: string) => /^(?:c-?)?(\d+)$/.exec(t)?.[1];
-  const labelNumber = (label: string) => /^C-(\d+)$/.exec(label)?.[1];
-  for (const c of connections) {
-    const ok = terms.every((t) => {
-      if (isCode(t)) return c.cable?.toLowerCase() === t;
-      const n = connNumber(t);
-      if (n !== undefined) {
-        const own = labelNumber(c.label);
-        return own !== undefined && Number(own) === Number(n);
-      }
-      return c.text.includes(t);
-    });
-    if (ok) ids.add(c.id);
-  }
+  for (const c of connections) if (connectionMatches(terms, c)) ids.add(c.id);
   return ids;
+}
+
+/**
+ * Does a connection row match every search term? Shared by the side lists and the dashboard's
+ * project search (T38). `text` is the row's lower-case searched text.
+ */
+export function connectionMatches(terms: readonly string[], c: { cable: string | null; label: string; text: string }): boolean {
+  return terms.every((t) => {
+    // A term that is a cable code ("n", "ng", "0-10v") means that cable type, not the letter anywhere.
+    if (CABLE_CODES.some((k) => k.toLowerCase() === t)) return c.cable?.toLowerCase() === t;
+    // A term shaped like a connection number ("c-14", "c14", "14") means that C-nn exactly (D163), so
+    // "14" does not find C-140 or a "14" inside the text. A NEW end has no number and never matches.
+    const n = /^(?:c-?)?(\d+)$/.exec(t)?.[1];
+    if (n !== undefined) {
+      const own = /^C-(\d+)$/.exec(c.label)?.[1];
+      return own !== undefined && Number(own) === Number(n);
+    }
+    return c.text.includes(t);
+  });
 }
