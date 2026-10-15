@@ -254,7 +254,7 @@ describe('R3a Cable not run / Termination', () => {
 
   it('R5: waits for the floor\'s survey; an open item with the same text already there means no draft', () => {
     const b = new Build();
-    const { level, panel } = floor(b);
+    const { panel } = floor(b);
     const l03 = b.level('03'); // no Surveyed date
     const far = b.device(l03, 'Relay panel', { display_id: '03-01' });
     const c = b.cable('X', { device: panel, display_id: 'C-01', to_text: 'DMX to Level 03', status: 'Not installed' }, { device: far, to_text: 'DMX to Level 06M', status: 'Not installed' });
