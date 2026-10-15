@@ -33,7 +33,10 @@ export { runQuickAction, appendPhrase, QUICK_ACTION_TEXT, type QuickAction, type
 export {
   CABLE_CODES,
   NO_NEURON_CATEGORIES,
+  cableTitle,
   deviceNeedsNeuronId,
+  libraryCablePayload,
+  placeholderLabelled,
   findDeviceType,
   governingCables,
   needsNeuronId,

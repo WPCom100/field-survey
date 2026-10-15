@@ -5,9 +5,9 @@
  */
 
 import { defaultDeviceText, displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
-import { editableKeys } from '@field-survey/rules';
+import { cableTitle, editableKeys, parseLibraryAccessories, parseLibraryCables, type LibraryCable } from '@field-survey/rules';
 
-import { deviceNeedsNeuron, loadNeuronTypes } from '../library/neuron';
+import { deviceNeedsNeuron, loadNeuronTypes, typeOf } from '../library/neuron';
 import { photoStrip } from '../photo/links';
 import { baselineEvents, type BaselineEvent } from '../setup/lock';
 
@@ -99,6 +99,18 @@ export type CardPhoto = {
   waiting: boolean;
 };
 
+/** An optional cable of the device's type it lacks: the greyed "+ add N → switch" row (T105, Phase 3 §10). */
+export type CardCableOffer = {
+  /** Stable React key: `<code>#<n>`. */
+  key: string;
+  /** `N → switch`. */
+  title: string;
+  cable: LibraryCable;
+};
+
+/** An optional accessory of the device's type it has no row for: "+ add <model>" (T105). */
+export type CardAccessoryOffer = { model: string; expected: number | null };
+
 export type JumpTarget = { deviceId: string; levelId: string; label: string; sameLevel: boolean };
 
 export type CardConnection = {
@@ -177,6 +189,10 @@ export type DeviceCard = {
   photos: CardPhoto[];
   photosWaiting: number;
   connections: CardConnection[];
+  /** The type's optional cables the device lacks (none for a deleted device or a rejected type). */
+  cableOffers: CardCableOffer[];
+  /** The type's optional accessories the device has no row for. */
+  accessoryOffers: CardAccessoryOffer[];
   punch: CardPunch[];
   parts: CardPart[];
   drafts: CardDraft[];
@@ -285,6 +301,48 @@ export function withBaselineEvents(history: HistoryEntry[], events: BaselineEven
   return out;
 }
 
+/** A `cable` draft as the card titles it: `120V → P-NSPS-D Power Supply` (its device end's To, else the far end's text). */
+export function cableDraftTitle(payload: Row): string {
+  const cable = payload.cable && typeof payload.cable === 'object' ? (payload.cable as Row) : {};
+  const ends = Array.isArray(payload.ends) ? (payload.ends as Row[]) : [];
+  return cableTitle(str(cable.cable), str(ends[0]?.to_text), str(ends[1]?.from_text));
+}
+
+const modelKey = (s: string) => s.replace(/\s+/g, '').toUpperCase();
+
+type TypeLists = { state: string; default_cables?: unknown; optional_cables?: unknown; optional_accessories?: unknown };
+
+/**
+ * The optional cables of `type` a device with runs of `codes` lacks, each offered once the runs
+ * before it of its code exist: an accepted type's default cables come first (R2g drafts them, and an
+ * optional 120V added in their place would satisfy that draft with the wrong texts), then the
+ * optional ones in order. A rejected type offers nothing.
+ */
+export function optionalCableOffers(type: TypeLists | null, codes: readonly (string | null)[]): CardCableOffer[] {
+  if (!type || type.state === 'rejected') return [];
+  const have = new Map<string, number>();
+  for (const c of codes) if (c) have.set(c, (have.get(c) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  if (type.state === 'accepted') for (const c of parseLibraryCables(type.default_cables)) seen.set(c.code, (seen.get(c.code) ?? 0) + 1);
+  const out: CardCableOffer[] = [];
+  for (const c of parseLibraryCables(type.optional_cables)) {
+    const n = seen.get(c.code) ?? 0;
+    seen.set(c.code, n + 1);
+    if ((have.get(c.code) ?? 0) !== n) continue; // already there, or an earlier run of the code is missing
+    out.push({ key: `${c.code}#${n + 1}`, title: cableTitle(c.code, c.to, c.far), cable: c });
+  }
+  return out;
+}
+
+/** The optional accessories of `type` with no row among `models` (compared without spaces or case). */
+export function optionalAccessoryOffers(type: TypeLists | null, models: readonly string[]): CardAccessoryOffer[] {
+  if (!type || type.state === 'rejected') return [];
+  const have = new Set(models.map(modelKey));
+  return parseLibraryAccessories(type.optional_accessories)
+    .filter((a) => !have.has(modelKey(a.model)))
+    .map((a) => ({ model: a.model, expected: a.expected_qty }));
+}
+
 /** Everything the card shows for one device; null when the device is not on this iPad. */
 export async function loadDeviceCard(store: Store, deviceId: string): Promise<DeviceCard | null> {
   const d = await store.get<Row>('device', deviceId);
@@ -294,6 +352,8 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
   const levelCode = String(level.level);
   const projectId = String(level.project_id);
   const pinRow = d.pin && typeof d.pin === 'object' ? (d.pin as Row) : null;
+  const types = await loadNeuronTypes(store, projectId);
+  const type = d.deleted_at ? null : typeOf(types, d);
 
   const device: CardDevice = {
     id: deviceId,
@@ -315,7 +375,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
         : null,
     neuronId: str(d.neuron_id),
     neuronMethod: str(d.neuron_method),
-    needsNeuronId: deviceNeedsNeuron(await loadNeuronTypes(store, projectId), d),
+    needsNeuronId: deviceNeedsNeuron(types, d),
     fieldAddition: d.origin === 'field_addition',
     deleted: !!d.deleted_at,
     deleteReason: str(d.delete_reason),
@@ -401,6 +461,9 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     (a, b) => Number(a.label === 'NEW') - Number(b.label === 'NEW') || a.label.localeCompare(b.label, 'en', { numeric: true }) || a.id.localeCompare(b.id),
   );
 
+  const cableOffers = optionalCableOffers(type, connections.map((c) => c.cable));
+  const accessoryOffers = optionalAccessoryOffers(type, accessories.map((a) => a.model));
+
   // --- punch items (sort_last last, then by number) and missing parts with their sources
   const punchRows = await store.list<Row>('punch_item', { where: 'device_id = ?', params: [deviceId] });
   punchRows.sort((a, b) => Number(!!a.sort_last) - Number(!!b.sort_last) || byNumber(a, b));
@@ -468,8 +531,8 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
       id: String(p.id),
       ruleId: String(p.rule_id),
       kind: String(p.kind),
-      title: str(pl.item) ?? str(pl.part) ?? str(pl.text) ?? str(pl.now) ?? String(p.kind),
-      sub: [p.kind === 'part' ? 'part' : str(pl.type), str(pl.owner), str(pl.part_status) ?? str(pl.tracking_status)].filter(Boolean).join(' · '),
+      title: p.kind === 'cable' ? cableDraftTitle(pl) : (str(pl.item) ?? str(pl.part) ?? str(pl.text) ?? str(pl.now) ?? String(p.kind)),
+      sub: [p.kind === 'part' ? 'part' : p.kind === 'cable' ? 'cable' : str(pl.type), str(pl.owner), str(pl.part_status) ?? str(pl.tracking_status)].filter(Boolean).join(' · '),
       why: str(pl.why),
       payload: pl,
       editable: editableKeys(p.kind as Parameters<typeof editableKeys>[0], pl),
@@ -503,6 +566,8 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     photos,
     photosWaiting: photos.filter((p) => p.waiting).length,
     connections,
+    cableOffers,
+    accessoryOffers,
     punch,
     parts,
     drafts,

@@ -130,9 +130,38 @@ export function governingCables(ctx: RuleContext, d: DeviceRow): { type: Library
   return cables.length ? { type, cables } : null;
 }
 
-function placeholderLabelled(ctx: RuleContext, label: string): PlaceholderRow | null {
+/** The first (by id) of `placeholders` labelled `label`, case-insensitively. */
+export function placeholderLabelled<P extends Pick<PlaceholderRow, 'id' | 'label' | 'level_id'>>(placeholders: Iterable<P>, label: string): P | null {
   const k = label.toLowerCase();
-  return [...ctx.index.placeholder.values()].sort((a, b) => a.id.localeCompare(b.id)).find((p) => p.label.toLowerCase() === k) ?? null;
+  return [...placeholders].sort((a, b) => a.id.localeCompare(b.id)).find((p) => p.label.toLowerCase() === k) ?? null;
+}
+
+/**
+ * The `cable` proposal payload of one library run on a device (`decide.ts`): the cable with the
+ * template's code / qty / single row, the device end with its From / To texts, and the far end on
+ * the placeholder labelled `far` (else text only). R2g's drafts and the card's "+ add" (T105) both
+ * build it here.
+ */
+export function libraryCablePayload(
+  d: Pick<DeviceRow, 'id' | 'level_id' | 'panel_name' | 'device' | 'display_id'>,
+  c: LibraryCable,
+  placeholders: Iterable<Pick<PlaceholderRow, 'id' | 'label' | 'level_id'>>,
+): { cable: Record<string, unknown>; ends: Record<string, unknown>[] } {
+  const ph = c.far ? placeholderLabelled(placeholders, c.far) : null;
+  const near: Record<string, unknown> = {
+    side: 'A', endpoint_kind: 'device', device_id: d.id, level_id: d.level_id,
+    from_text: c.from ?? str(d.panel_name) ?? str(d.device) ?? str(d.display_id), to_text: c.to,
+    ...(c.status ? { status: c.status, status_source: 'derived' } : {}),
+  };
+  const far: Record<string, unknown> = ph
+    ? { side: 'B', endpoint_kind: 'placeholder', placeholder_id: ph.id, level_id: ph.level_id, from_text: c.far, to_text: null }
+    : { side: 'B', endpoint_kind: null, level_id: d.level_id, from_text: c.far, to_text: null };
+  return { cable: { cable: c.code, qty: c.qty, single_row: c.single_row, origin: 'library', endpoint_confirmed: true }, ends: [near, far] };
+}
+
+/** `120V → P-NSPS-D Power Supply`: a library run (or a `cable` payload) as the card names it. */
+export function cableTitle(code: string | null, to: string | null, far: string | null): string {
+  return `${code ?? 'cable'} → ${to ?? far ?? 'its far end'}`;
 }
 
 function countCode(ctx: RuleContext, d: DeviceRow, code: string): number {
@@ -153,22 +182,13 @@ export const R2g: Rule = {
         const n = seen.get(c.code) ?? 0;
         seen.set(c.code, n + 1);
         if (countCode(ctx, d, c.code) > n) continue; // the device already has this run
-        const ph = c.far ? placeholderLabelled(ctx, c.far) : null;
-        const near: Record<string, unknown> = {
-          side: 'A', endpoint_kind: 'device', device_id: d.id, level_id: d.level_id,
-          from_text: c.from ?? str(d.panel_name) ?? str(d.device) ?? str(d.display_id), to_text: c.to,
-          ...(c.status ? { status: c.status, status_source: 'derived' } : {}),
-        };
-        const far: Record<string, unknown> = ph
-          ? { side: 'B', endpoint_kind: 'placeholder', placeholder_id: ph.id, level_id: ph.level_id, from_text: c.far, to_text: null }
-          : { side: 'B', endpoint_kind: null, level_id: d.level_id, from_text: c.far, to_text: null };
         ctx.propose({
           subject: { entity_kind: 'device', entity_id: d.id, level_id: d.level_id },
           discriminator: n === 0 ? c.code : `${c.code}#${n + 1}`,
           kind: 'cable',
-          payload: { cable: { cable: c.code, qty: c.qty, single_row: c.single_row, origin: 'library', endpoint_confirmed: true }, ends: [near, far] },
+          payload: libraryCablePayload(d, c, ctx.index.placeholder.values()),
           inputs: { device: d.id, type: gov.type.id, cable: c },
-          why: `${deviceLabel(ctx, d)} is a ${gov.type.model} (library: ${c.code} → ${c.to ?? c.far ?? 'its far end'}).`,
+          why: `${deviceLabel(ctx, d)} is a ${gov.type.model} (library: ${cableTitle(c.code, c.to, c.far)}).`,
         });
       }
     }

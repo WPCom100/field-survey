@@ -98,27 +98,31 @@ export function acceptPlan(row: ProposalRow, payload: Record<string, unknown> = 
       const extra = payload.extra && typeof payload.extra === 'object' ? (payload.extra as Record<string, unknown>) : {};
       return [{ kind: 'set', entity: subject.entity_kind, id: subject.entity_id, fields: { [field]: payload.now, ...extra } }];
     }
-    case 'cable': {
-      const cable = payload.cable && typeof payload.cable === 'object' ? (payload.cable as Record<string, unknown>) : null;
-      const ends = Array.isArray(payload.ends) ? (payload.ends as Record<string, unknown>[]) : [];
-      if (!cable || ends.length === 0 || ends.length > 2) throw new DecideError('A cable proposal needs `cable` and one or two `ends`');
-      const cableId = uuidv7();
-      const endIds = ends.map(() => uuidv7());
-      const plan: RecordPlan[] = [
-        {
-          kind: 'create',
-          entity: 'cable',
-          id: cableId,
-          payload: { ...pick(cable, CABLE_COLUMNS), project_id: row.project_id, end_a_id: endIds[0] ?? null, end_b_id: endIds[1] ?? null },
-        },
-      ];
-      ends.forEach((e, i) => {
-        plan.push({ kind: 'create', entity: 'cable_end', id: endIds[i]!, payload: { ...pick(e, END_COLUMNS), side: e.side ?? (i === 0 ? 'A' : 'B'), cable_id: cableId } });
-      });
-      return plan;
-    }
+    case 'cable':
+      return cablePlan(row.project_id, payload);
   }
   throw new DecideError(`Unknown proposal kind ${String(row.kind)}`);
+}
+
+/** The cable and its ends a `cable` payload (`{cable, ends}`) creates, linked; also the card's "+ add" (T105). */
+export function cablePlan(projectId: string, payload: Record<string, unknown>): RecordPlan[] {
+  const cable = payload.cable && typeof payload.cable === 'object' ? (payload.cable as Record<string, unknown>) : null;
+  const ends = Array.isArray(payload.ends) ? (payload.ends as Record<string, unknown>[]) : [];
+  if (!cable || ends.length === 0 || ends.length > 2) throw new DecideError('A cable proposal needs `cable` and one or two `ends`');
+  const cableId = uuidv7();
+  const endIds = ends.map(() => uuidv7());
+  const plan: RecordPlan[] = [
+    {
+      kind: 'create',
+      entity: 'cable',
+      id: cableId,
+      payload: { ...pick(cable, CABLE_COLUMNS), project_id: projectId, end_a_id: endIds[0] ?? null, end_b_id: endIds[1] ?? null },
+    },
+  ];
+  ends.forEach((e, i) => {
+    plan.push({ kind: 'create', entity: 'cable_end', id: endIds[i]!, payload: { ...pick(e, END_COLUMNS), side: e.side ?? (i === 0 ? 'A' : 'B'), cable_id: cableId } });
+  });
+  return plan;
 }
 
 /**

@@ -6,6 +6,7 @@
  */
 
 import { OpError, displayNumber, vocab, type EditContext, type Editor, type Op, type Store } from '@field-survey/core';
+import { cablePlan, libraryCablePayload, type LibraryCable } from '@field-survey/rules';
 
 /** The context of every plain status / notes / accessory / Neuron ID tap (D96). */
 export const FIELD_SURVEY: EditContext = { change_type: 'Field survey', reason: 'Field survey' };
@@ -36,6 +37,42 @@ export function appendPhrase(notes: string | null, phrase: string): string {
   if (!cur) return phrase;
   if (cur === phrase || cur.endsWith(`; ${phrase}`)) return cur;
   return `${cur}; ${phrase}`;
+}
+
+// ------------------------------------------------------------------ optional cables and accessories (T105)
+
+/**
+ * "+ add N → switch": the type's optional run created on the device with both ends, as R2g's
+ * builder makes it (the template's code, qty, From / To, the far end on its placeholder). One
+ * `Field survey` group.
+ */
+export async function addOptionalCable(editor: Editor, store: Store, deviceId: string, cable: LibraryCable): Promise<Op[]> {
+  const d = await store.get<Record<string, unknown>>('device', deviceId);
+  if (!d || d.deleted_at) throw new OpError('This device is not on this iPad.');
+  const level = await store.get<Record<string, unknown>>('level', String(d.level_id));
+  if (!level) throw new OpError('This device has no level on this iPad.');
+  const projectId = String(level.project_id);
+  const placeholders = await store.list<{ id: string; label: string; level_id: string | null }>('placeholder', {
+    where: 'project_id = ?',
+    params: [projectId],
+  });
+  const device = {
+    id: deviceId,
+    level_id: String(d.level_id),
+    panel_name: (d.panel_name as string | null) ?? null,
+    device: (d.device as string | null) ?? null,
+    display_id: (d.display_id as string | null) ?? null,
+  };
+  const plan = cablePlan(projectId, libraryCablePayload(device, cable, placeholders));
+  return editor.group(FIELD_SURVEY, async (g) => {
+    for (const step of plan) if (step.kind === 'create') await g.create(step.entity, { id: step.id, ...step.payload });
+  });
+}
+
+/** "+ add <model>": an accessory row on the device, expected as the type says, found not yet counted. */
+export async function addOptionalAccessory(editor: Editor, deviceId: string, model: string, expected: number | null): Promise<Op> {
+  const { op } = await editor.create('accessory', { device_id: deviceId, model, expected_qty: expected }, FIELD_SURVEY);
+  return op;
 }
 
 /** Accessory found quantity (expected stays as the BOM said). */

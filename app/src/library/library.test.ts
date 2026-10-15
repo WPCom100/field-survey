@@ -170,10 +170,10 @@ describe('device-type library editor (T48)', () => {
     await engine.run();
     const draftsOf = async () => (await loadDeviceCard(store, nsps.id))!.drafts.map((d) => `${d.ruleId} ${d.title}`).sort();
     // a draft type governs nothing: the category table's R2d draft is offered
-    expect(await draftsOf()).toEqual(['R2d cable']);
+    expect(await draftsOf()).toEqual(['R2d 120V → P-NSPS-D Power Supply']);
     await acceptType(p.editor, id);
     await engine.run();
-    expect(await draftsOf()).toEqual(['R2g cable', 'R2g cable']);
+    expect(await draftsOf()).toEqual(['R2g 120V → NSPS PS', 'R2g N → Network switch']);
     // accepting the 120V draft creates the run with the type's texts
     const card = (await loadDeviceCard(store, nsps.id))!;
     const decider = ruleDecider(store, p.id, userId);
@@ -188,7 +188,7 @@ describe('device-type library editor (T48)', () => {
     const cable = await store.get<Record<string, unknown>>('cable', String(ends[0]!.cable_id));
     expect(cable).toMatchObject({ cable: '120V', origin: 'library', single_row: true, qty: 1 });
     await engine.run();
-    expect(await draftsOf()).toEqual(['R2g cable']);
+    expect(await draftsOf()).toEqual(['R2g N → Network switch']);
   });
 
   it('copies accepted types from another project or the app library, skipping models already there', async () => {

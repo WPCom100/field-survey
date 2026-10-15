@@ -20,6 +20,8 @@ import { UNSURVEYED } from '../plan/filters';
 import type { Badges } from '../plan/lists';
 import { pinStyleFor } from '../plan/pins';
 import {
+  addOptionalAccessory,
+  addOptionalCable,
   appendPhrase,
   checkNeuronId,
   deleteDevice,
@@ -228,7 +230,7 @@ export function DeviceCard(props: DeviceCardProps) {
 
         <NotesSection card={card} readOnly={readOnly} run={run} />
 
-        {card.accessories.length ? (
+        {card.accessories.length || card.accessoryOffers.length ? (
           <Section title="Accessories" marks="">
             {card.accessories.map((a) => {
               const top = Math.max(a.expected ?? 2, a.found ?? 0);
@@ -253,6 +255,15 @@ export function DeviceCard(props: DeviceCardProps) {
                 </View>
               );
             })}
+            {card.accessoryOffers.map((o) => (
+              <OfferRow
+                key={o.model}
+                label={`+ add ${o.model}`}
+                sub={o.expected !== null ? `expected ${o.expected}` : null}
+                disabled={readOnly}
+                onPress={() => run((e) => addOptionalAccessory(e, d.id, o.model, o.expected))}
+              />
+            ))}
           </Section>
         ) : null}
 
@@ -290,6 +301,10 @@ export function DeviceCard(props: DeviceCardProps) {
                 {props.onOpenEnd ? <Text style={styles.chev}>›</Text> : null}
               </View>
             </Pressable>
+          ))}
+          {/* The type's optional cables (Library, T105): greyed until tapped, then a real run with both ends. */}
+          {card.cableOffers.map((o) => (
+            <OfferRow key={o.key} label={`+ add ${o.title}`} sub="optional" disabled={readOnly} onPress={() => run((e) => addOptionalCable(e, store, d.id, o.cable))} />
           ))}
         </Section>
 
@@ -713,6 +728,20 @@ function MenuButton({ label, onPress, danger }: { label: string; onPress: () => 
   );
 }
 
+/** A greyed "+ add …" row: something the device's type offers but the device does not have yet (T105). */
+function OfferRow(props: { label: string; sub: string | null; disabled: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={props.onPress} disabled={props.disabled} style={[styles.item, styles.offer]} hitSlop={4}>
+      <View style={styles.itemLine}>
+        <Text style={styles.offerText} numberOfLines={2}>
+          {props.label}
+        </Text>
+        {props.sub ? <Text style={styles.muted}>{props.sub}</Text> : null}
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
@@ -753,6 +782,8 @@ const styles = StyleSheet.create({
   phraseText: { fontSize: 12, color: '#1f3b63' },
   phraseMore: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
   acc: { gap: 4 },
+  offer: { minHeight: 44, justifyContent: 'center', opacity: 0.6 },
+  offerText: { flex: 1, fontSize: 13, color: '#555', fontStyle: 'italic' },
   accModel: { fontSize: 13, fontWeight: '600' },
   num: { minWidth: 30, paddingVertical: 4, alignItems: 'center', borderRadius: 5, borderWidth: 1, borderColor: '#c9ccd1' },
   numOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },

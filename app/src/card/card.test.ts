@@ -2,10 +2,15 @@ import { Editor, OpError, Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
+import { libraryCablePayload } from '@field-survey/rules';
+
+import { acceptType, createType, rejectType, updateType } from '../library/model';
 import { loadLevelPlan } from '../plan/data';
 import { DEMO_LEVEL_ID, ensureDemoCardExtras, ensureDemoLevel } from '../plan/demo';
 import {
   FIELD_SURVEY,
+  addOptionalAccessory,
+  addOptionalCable,
   appendPhrase,
   checkNeuronId,
   correction,
@@ -19,7 +24,7 @@ import {
   setNotes,
   setStatus,
 } from './actions';
-import { STANDARD_PHRASES, formatValue, loadDeviceCard } from './model';
+import { STANDARD_PHRASES, cableDraftTitle, formatValue, loadDeviceCard, optionalCableOffers } from './model';
 import { NOT_WIRED } from './proposals';
 
 const ME = uuidv7();
@@ -286,5 +291,82 @@ describe('device card edits', () => {
     expect(formatValue('found_on_site', true)).toBe('yes');
     expect(formatValue('pin', { sheet: 's', x: 1.4, y: 2.6 })).toBe('(1, 3)');
     expect(FIELD_SURVEY).toEqual({ change_type: 'Field survey', reason: 'Field survey' });
+  });
+});
+
+describe('optional cables and accessories of the type (T105)', () => {
+  const run = (code: string, to: string | null, far: string | null) => ({ code, from: null, to, far, single_row: false, qty: null, status: null });
+
+  /** A fresh NSPS on 06M of a test type: default 120V, optional 120V + N, optional Back box. */
+  async function withType() {
+    const t = await setup();
+    const { store, editor, pid } = t;
+    await store.applyRemote(pulled('placeholder', uuidv7(), pid, { project_id: pid, label: 'Network switch', kind: 'external', level_id: DEMO_LEVEL_ID }));
+    const typeId = await createType(editor, store, pid, { model: 'T105-NSPS', category: 'NSPS' });
+    await updateType(editor, store, typeId, {
+      defaultCables: [run('120V', 'P-NSPS-D Power Supply', null)],
+      optionalCables: [run('120V', 'Second supply', null), run('N', 'switch', 'network switch')],
+      optionalAccessories: [{ model: 'Back box', expected_qty: 1 }],
+    });
+    await acceptType(editor, typeId);
+    const { id } = await editor.create('device', { level_id: DEMO_LEVEL_ID, category: 'NSPS', device: 'T105-NSPS', library_type_id: typeId, origin: 'field_addition' }, FIELD_SURVEY);
+    return { ...t, typeId, deviceId: id };
+  }
+
+  it('offers the optional runs the device lacks (defaults of a code come first) and the accessories it has no row for', async () => {
+    const { store, deviceId } = await withType();
+    const card = (await loadDeviceCard(store, deviceId))!;
+    expect(card.cableOffers.map((o) => [o.key, o.title])).toEqual([['N#1', 'N → switch']]);
+    expect(card.accessoryOffers).toEqual([{ model: 'Back box', expected: 1 }]);
+    // pure: the default 120V comes first, then the optional ones one at a time
+    const type = { state: 'accepted', default_cables: [run('120V', 'A', null)], optional_cables: [run('120V', 'B', null), run('120V', 'C', null)] };
+    expect(optionalCableOffers(type, []).length).toBe(0);
+    expect(optionalCableOffers(type, ['120V']).map((o) => o.title)).toEqual(['120V → B']);
+    expect(optionalCableOffers(type, ['120V', '120V']).map((o) => o.title)).toEqual(['120V → C']);
+    expect(optionalCableOffers(type, ['120V', '120V', '120V'])).toEqual([]);
+    // a draft type's defaults govern nothing (D183), so its optional run is offered at once
+    expect(optionalCableOffers({ ...type, state: 'draft' }, []).map((o) => o.title)).toEqual(['120V → B']);
+    expect(optionalCableOffers({ ...type, state: 'rejected' }, ['120V'])).toEqual([]);
+    expect(optionalCableOffers(null, [])).toEqual([]);
+  });
+
+  it('"+ add N → switch" creates the run with both ends in one Field survey group; the offer goes', async () => {
+    const { store, editor, deviceId, pid } = await withType();
+    const offer = (await loadDeviceCard(store, deviceId))!.cableOffers[0]!;
+    const ops = await addOptionalCable(editor, store, deviceId, offer.cable);
+    expect(ops.map((o) => [o.entity_kind, o.kind])).toEqual([['cable', 'create'], ['cable_end', 'create'], ['cable_end', 'create']]);
+    expect(new Set(ops.map((o) => o.group_id)).size).toBe(1);
+    expect(ops.every((o) => o.change_type === 'Field survey' && o.reason === 'Field survey')).toBe(true);
+    const cable = (await store.get<Record<string, unknown>>('cable', ops[0]!.entity_id))!;
+    expect(cable).toMatchObject({ project_id: pid, cable: 'N', origin: 'library', end_a_id: ops[1]!.entity_id, end_b_id: ops[2]!.entity_id });
+    const ph = (await store.list<{ id: string }>('placeholder', { where: 'label = ?', params: ['Network switch'] }))[0]!;
+    expect(await store.get('cable_end', ops[1]!.entity_id)).toMatchObject({ side: 'A', device_id: deviceId, from_text: 'T105-NSPS', to_text: 'switch' });
+    expect(await store.get('cable_end', ops[2]!.entity_id)).toMatchObject({ side: 'B', endpoint_kind: 'placeholder', placeholder_id: ph.id, from_text: 'network switch' });
+    const card = (await loadDeviceCard(store, deviceId))!;
+    expect(card.connections.map((c) => [c.label, c.cable, c.to])).toEqual([['NEW', 'N', 'switch']]);
+    expect(card.cableOffers).toEqual([]);
+  });
+
+  it('"+ add Back box" creates the accessory with the expected quantity; a rejected type or deleted device offers nothing', async () => {
+    const { store, editor, deviceId, typeId } = await withType();
+    const op = await addOptionalAccessory(editor, deviceId, 'Back box', 1);
+    expect(op).toMatchObject({ entity_kind: 'accessory', kind: 'create', change_type: 'Field survey' });
+    let card = (await loadDeviceCard(store, deviceId))!;
+    expect(card.accessories.map((a) => [a.model, a.expected, a.found])).toEqual([['Back box', 1, null]]);
+    expect(card.accessoryOffers).toEqual([]);
+    await rejectType(editor, typeId);
+    card = (await loadDeviceCard(store, deviceId))!;
+    expect([card.cableOffers, card.accessoryOffers]).toEqual([[], []]);
+    await acceptType(editor, typeId);
+    await deleteDevice(editor, deviceId, 'test');
+    card = (await loadDeviceCard(store, deviceId))!;
+    expect(card.cableOffers).toEqual([]);
+  });
+
+  it('a cable draft is titled by its code and To, not "cable"', () => {
+    const d = { id: 'd', level_id: 'l', panel_name: null, device: 'P-NSPS-D', display_id: null };
+    expect(cableDraftTitle(libraryCablePayload(d, run('120V', 'P-NSPS-D Power Supply', '120v Power'), []))).toBe('120V → P-NSPS-D Power Supply');
+    expect(cableDraftTitle(libraryCablePayload(d, run('P', null, 'EBDK panic wire'), []))).toBe('P → EBDK panic wire');
+    expect(cableDraftTitle({})).toBe('cable → its far end');
   });
 });

@@ -6,7 +6,14 @@
 import type { Store } from '@field-survey/core';
 import { findDeviceType, needsNeuronId, type TypeLike } from '@field-survey/rules';
 
-type NeuronType = TypeLike & { category: string | null; needs_neuron_id: boolean | null };
+/** The row as stored; the card also reads its optional cables and accessories (T105). */
+type NeuronType = TypeLike & {
+  category: string | null;
+  needs_neuron_id: boolean | null;
+  default_cables?: unknown;
+  optional_cables?: unknown;
+  optional_accessories?: unknown;
+};
 
 export type NeuronTypes = ReadonlyMap<string, NeuronType>;
 
@@ -20,7 +27,11 @@ type DeviceLike = { category?: unknown; device?: unknown; library_type_id?: unkn
 
 const text = (v: unknown): string | null => (typeof v === 'string' && v.length ? v : null);
 
+/** The device's type among `types` (its `library_type_id`, else its Device text), or null. */
+export function typeOf(types: NeuronTypes, d: DeviceLike): NeuronType | null {
+  return findDeviceType(types, { device: text(d.device), library_type_id: text(d.library_type_id) });
+}
+
 export function deviceNeedsNeuron(types: NeuronTypes, d: DeviceLike): boolean {
-  const device = { category: text(d.category), device: text(d.device), library_type_id: text(d.library_type_id) };
-  return needsNeuronId(findDeviceType(types, device), device);
+  return needsNeuronId(typeOf(types, d), { category: text(d.category) });
 }

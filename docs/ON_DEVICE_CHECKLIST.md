@@ -298,6 +298,21 @@ Decision D184 (Proposed (2)–(5)): the library's ops are stored with no project
 
 Decision D185: a type's `needs_neuron_id` is empty by default, meaning "the category decides": **off for Equipment rack and NSPS, on for every other category**. A device with no type follows its own category. The editor's **Needed** / **Not needed** overrides that. A card whose device has a Neuron ID anyway still shows it. → Approve / change:
 
+
+## T105 — Optional cables and accessories on the card  ·  Needs: no new build (JS update)
+
+**Why it matters:** a device type's optional runs (an NSPS's extra 120V, a panel's network drop) and optional accessories (a back box) were stored in the Library but nowhere to be added on site; now one tap on the card adds them with the type's texts, and cable drafts say what they are.
+
+- [ ] **Set up a type.** Library → pick (or add and accept) an NSPS type with a default `120V` and an optional `N` (To `switch`, Far end a placeholder label such as `Network switch`) and an optional accessory `Back box` expected 1 → Save. → saw:
+- [ ] **Greyed rows.** Open a device of that type: under Connections a greyed, italic `+ add N → switch` row marked `optional`; under Accessories `+ add Back box` with `expected 1` (the Accessories section shows even if the device had none). → saw:
+- [ ] **Add the cable.** Tap `+ add N → switch`: a `NEW` connection `N → switch` appears at once and the greyed row is gone; open it in the end editor: the far end is the `Network switch` placeholder. History on the cable shows one `Field survey` change. → saw:
+- [ ] **Add the accessory.** Tap `+ add Back box`: it becomes a normal accessory row `Back box expected 1` with found 0 / 1 buttons, nothing selected. → saw:
+- [ ] **Defaults first.** On a device of the type that still lacks its default 120V, an optional `120V` row is not offered until the 120V run exists (accept the R2g draft first). → saw:
+- [ ] **Draft titles.** On any device with a cable draft (R2c / R2d / R2g), the proposal reads like `120V → P-NSPS-D Power Supply` or `P → EBDK panic wire`, not `cable`. → saw:
+- [ ] **Second iPad.** After a sync, the other iPad's card shows the new connection and accessory, and no longer offers them. → saw:
+
+Decision D186 (Proposed): an optional run is offered once the runs before it of its code exist (an accepted type's defaults first, then the optional ones one at a time); a draft type offers its optional runs at once, a rejected type and a deleted device offer nothing; an accessory is offered while the device has no row of that model; both adds are `Field survey` edits (the cable and its two ends as one group, built by R2g's builder). → Approve / change:
+
 ---
 
 ## Rules for this file

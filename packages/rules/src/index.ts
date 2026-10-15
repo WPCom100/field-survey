@@ -53,7 +53,7 @@ export {
 } from './rule';
 export { evaluate, ownedLintIds, type EvalOutput, type EvalOptions, type EvalProblem } from './evaluate';
 export { reconcileProposals, reconcileFindings, applyChanges, type Change, type Citation, type ReconcileInput, type ReconcileFindingsInput } from './reconcile';
-export { acceptPlan, editableKeys, recordDiffers, DecideError, type RecordPlan } from './decide';
+export { acceptPlan, cablePlan, editableKeys, recordDiffers, DecideError, type RecordPlan } from './decide';
 export { RuleEngine, afterChanges, type RuleEngineOptions, type RuleLog, type RunReport, type Decision, type DecideResult, type ApplyRulingResult } from './engine';
 export {
   RULES,
@@ -109,6 +109,9 @@ export {
   neuronIdDefault,
   deviceNeedsNeuronId,
   NO_NEURON_CATEGORIES,
+  libraryCablePayload,
+  placeholderLabelled,
+  cableTitle,
   type LibraryAccessory,
   type LibraryCable,
   type TypeLike,
