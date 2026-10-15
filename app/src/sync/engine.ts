@@ -13,10 +13,11 @@ let engine: Promise<SyncEngine> | null = null;
 /**
  * The app's one sync engine over the app's one store. Created without a transport; the
  * `SyncRunner` attaches one once the identity (server, token, user) is known and starts it.
+ * It also syncs the app library's stream (`/library/ops`, D184), with or without a project.
  */
 export function getSyncEngine(): Promise<SyncEngine> {
   if (!engine) {
-    engine = openAppStore().then((store) => new SyncEngine(store, null, { log, intervalMs: SYNC_INTERVAL_MS }));
+    engine = openAppStore().then((store) => new SyncEngine(store, null, { log, intervalMs: SYNC_INTERVAL_MS, library: true }));
   }
   return engine;
 }

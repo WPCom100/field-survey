@@ -1,4 +1,4 @@
-import { Editor, linkPunchDevice, resolutionReason, type ResolveChoice, type Store } from '@field-survey/core';
+import { LIBRARY_STREAM, Editor, linkPunchDevice, resolutionReason, type ResolveChoice, type Store } from '@field-survey/core';
 import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -61,7 +61,7 @@ export default function NeedsReviewScreen() {
       async (s) => {
         setStore(s);
         // The project the link names, else the one the home last showed (T83), else the first.
-        setProjectId(pickProject((await listProjects(s)).map((p) => p.id), params.project));
+        setProjectId(params.project === LIBRARY_STREAM ? LIBRARY_STREAM : pickProject((await listProjects(s)).map((p) => p.id), params.project));
       },
       (e: unknown) => setNote(String(e)),
     );
@@ -151,15 +151,21 @@ export default function NeedsReviewScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Text style={styles.title}>Needs review ({total})</Text>
+        <Text style={styles.title}>{projectId === LIBRARY_STREAM ? 'App library — needs review' : 'Needs review'} ({total})</Text>
         <ScrollView horizontal contentContainerStyle={styles.chips} showsHorizontalScrollIndicator={false}>
           {list?.tabs.map((t) => (
             <Chip key={t.kind} label={`${t.label}${t.kind === 'all' ? '' : ` ${t.count}`}`} on={kind === t.kind} onPress={() => setKind(t.kind)} />
           ))}
         </ScrollView>
-        <Link href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.link}>
-          ← Levels
-        </Link>
+        {projectId === LIBRARY_STREAM ? (
+          <Link href={{ pathname: '/library', params: { scope: 'app' } }} style={styles.link}>
+            ← Library
+          </Link>
+        ) : (
+          <Link href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.link}>
+            ← Levels
+          </Link>
+        )}
       </View>
       <View style={styles.filters}>
         <Text style={styles.filterLabel}>Level</Text>

@@ -1,5 +1,5 @@
-import { Editor, type Store } from '@field-survey/core';
-import { Link, useLocalSearchParams } from 'expo-router';
+import { Editor, LIBRARY_STREAM, type Store } from '@field-survey/core';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
@@ -12,9 +12,14 @@ import { LibraryScreen } from '../library/LibraryScreen';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 
-/** The project's device-type library (T48, Phase 3 §10). `?project=` names the project. */
+/**
+ * The device-type library (Phase 3 §10): a project's (T48, `?project=`) or the app library
+ * (T61, D65, `?scope=app`, opened from the Projects list, no project needed). App-library edits
+ * go to the library's own op stream (`/library/ops`, D184).
+ */
 export default function LibraryRoute() {
-  const params = useLocalSearchParams<{ project?: string }>();
+  const params = useLocalSearchParams<{ project?: string; scope?: string }>();
+  const app = params.scope === 'app';
   const user = useCurrentUser();
   const sync = useSyncStatus();
   const [store, setStore] = useState<Store | null>(null);
@@ -26,27 +31,40 @@ export default function LibraryRoute() {
     openAppStore().then(
       async (s) => {
         setStore(s);
-        setProjectId(pickProject((await listProjects(s)).map((p) => p.id), params.project));
+        if (!app) setProjectId(pickProject((await listProjects(s)).map((p) => p.id), params.project));
       },
       (e: unknown) => setError(String(e)),
     );
-  }, [params.project]);
+  }, [params.project, app]);
 
-  const editor = useMemo(() => (store && projectId ? new Editor(store, { projectId, userId: user.id }) : null), [store, projectId, user.id]);
+  const libraryEditor = useMemo(() => (store ? new Editor(store, { projectId: LIBRARY_STREAM, userId: user.id }) : null), [store, user.id]);
+  const editor = useMemo(
+    () => (app ? libraryEditor : store && projectId ? new Editor(store, { projectId, userId: user.id }) : null),
+    [app, libraryEditor, store, projectId, user.id],
+  );
+  const reviewOf = app ? LIBRARY_STREAM : projectId;
 
   return (
     <>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <LibraryScreen
-        store={projectId ? store : null}
+        store={app || projectId ? store : null}
         editor={editor}
-        scope={projectId}
+        libraryEditor={app ? null : libraryEditor}
+        scope={app ? null : projectId}
         dataKey={syncDataKey(sync)}
         names={names}
+        onOpenReview={reviewOf ? () => router.push({ pathname: '/review', params: { project: reviewOf } }) : undefined}
         header={
-          <Link href={{ pathname: '/', params: projectId ? { project: projectId } : {} }} style={styles.link}>
-            ◀ Levels
-          </Link>
+          app ? (
+            <Link href="/projects" style={styles.link}>
+              ◀ Projects
+            </Link>
+          ) : (
+            <Link href={{ pathname: '/', params: projectId ? { project: projectId } : {} }} style={styles.link}>
+              ◀ Levels
+            </Link>
+          )
         }
       />
     </>

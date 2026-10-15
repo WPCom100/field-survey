@@ -8,7 +8,7 @@
  * No React or Expo imports: tested in Node.
  */
 
-import { OpError, type EditContext, type Editor, type Store } from '@field-survey/core';
+import { LIBRARY_STREAM, OpError, type EditContext, type Editor, type Store } from '@field-survey/core';
 import { CABLE_CODES, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
 
 export const LIBRARY_CTX: EditContext = { change_type: 'Master edit', reason: 'Device-type library' };
@@ -41,6 +41,8 @@ export interface LibraryType {
   /** When the type's first op was made (the "added … 10/09" line). */
   createdAt: string | null;
   promotedFromId: string | null;
+  /** A project type already promoted: the app-library type made from it (D65). */
+  promotedAs: string | null;
   /** Live devices of this project of the type (by link, or by model / alias for imported ones). */
   devices: number;
   /** Rules that read this type (Phase 3 §10 "Rules that reference this type"). */
@@ -50,6 +52,8 @@ export interface LibraryType {
 export interface LibraryView {
   types: LibraryType[];
   drafts: number;
+  /** Open sync-conflict items on this library's types (Needs review, D184). */
+  inReview: number;
 }
 
 type Row = Record<string, unknown>;
@@ -93,7 +97,7 @@ function scopeWhere(scope: string | null): { where: string; params: string[] } {
   return scope ? { where: 'project_id = ?', params: [scope] } : { where: 'project_id IS NULL', params: [] };
 }
 
-function toType(r: Row): Omit<LibraryType, 'devices' | 'rules' | 'createdAt'> {
+function toType(r: Row): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | 'promotedAs'> {
   return {
     id: String(r.id),
     projectId: str(r.project_id),
@@ -125,13 +129,19 @@ export async function loadLibrary(store: Store, scope: string | null): Promise<L
         [scope],
       )
     : [];
+  // project types promoted to the app library (its rows' promoted_from_id)
+  const promoted = new Map<string, string>();
+  if (scope) {
+    const app = await store.list<Row>('library_type', { where: 'project_id IS NULL AND promoted_from_id IS NOT NULL' });
+    for (const a of app) promoted.set(String(a.promoted_from_id), String(a.id));
+  }
   const types: LibraryType[] = [];
   for (const r of rows) {
     const t = toType(r);
     const keys = new Set([t.model, ...t.aliases].map(modelKey));
     const count = devices.filter((d) => (d.library_type_id ? d.library_type_id === t.id : !!d.device && keys.has(modelKey(d.device)))).length;
     const first = (await store.opsFor(t.id))[0];
-    types.push({ ...t, createdAt: first?.client_ts ?? null, devices: count, rules: rulesForType(t.category, t.defaultCables) });
+    types.push({ ...t, createdAt: first?.client_ts ?? null, promotedAs: promoted.get(t.id) ?? null, devices: count, rules: rulesForType(t.category, t.defaultCables) });
   }
   const catIndex = (c: string | null) => {
     const i = CATEGORIES.indexOf(c as (typeof CATEGORIES)[number]);
@@ -145,7 +155,12 @@ export async function loadLibrary(store: Store, scope: string | null): Promise<L
       Number(a.state !== 'draft') - Number(b.state !== 'draft') ||
       a.model.localeCompare(b.model, 'en', { numeric: true }),
   );
-  return { types, drafts: types.filter((t) => t.state === 'draft').length };
+  const open = await store.list<{ subject: { entity_kind?: string } | null }>('review_item', {
+    where: `state = 'open' AND project_id = ?`,
+    params: [scope ?? LIBRARY_STREAM],
+  });
+  const inReview = open.filter((i) => i.subject?.entity_kind === 'library_type').length;
+  return { types, drafts: types.filter((t) => t.state === 'draft').length, inReview };
 }
 
 async function assertFreeModel(store: Store, scope: string | null, model: string, exceptId: string | null): Promise<void> {
@@ -250,7 +265,9 @@ export async function copySources(store: Store, scope: string | null): Promise<C
 /**
  * Copy types into `scope` as new accepted rows (they were accepted at the source; the server's
  * copy at project creation does the same, D65). A model the target already has is skipped.
- * One group for the whole copy.
+ * One group for the whole copy. Copying a project's type into the app library (`scope` null) is
+ * a promotion: the copy records `promoted_from_id`. The editor must write to the target's
+ * stream (`libraryEditor` for the app library).
  */
 export async function copyTypes(editor: Editor, store: Store, scope: string | null, typeIds: readonly string[]): Promise<{ copied: number; skipped: string[] }> {
   const have = new Set((await loadLibrary(store, scope)).types.filter((t) => t.state !== 'rejected').flatMap((t) => [t.model, ...t.aliases].map(modelKey)));
@@ -280,11 +297,28 @@ export async function copyTypes(editor: Editor, store: Store, scope: string | nu
         optional_accessories: r.optional_accessories ?? null,
         state: 'accepted',
         created_by_id: editor.userId,
+        ...(scope === null && r.project_id ? { promoted_from_id: r.id } : {}),
       });
       copied++;
     }
   });
   return { copied, skipped };
+}
+
+/**
+ * "Promote to app library" (D65): an accepted project type becomes an app-library type (new row,
+ * `promoted_from_id` = the project type), which every project created afterwards copies. Refused
+ * for a draft, and when the app library already has the model (or an alias of it).
+ */
+export async function promoteType(libraryEditor: Editor, store: Store, typeId: string): Promise<string> {
+  if (libraryEditor.projectId !== LIBRARY_STREAM) throw new OpError('Promotion writes to the app library.');
+  const row = await store.get<Row>('library_type', typeId);
+  if (!row || row.deleted_at || !row.project_id) throw new OpError('Only a project type can be promoted.');
+  if (row.state !== 'accepted') throw new OpError('Accept the type before promoting it.');
+  const out = await copyTypes(libraryEditor, store, null, [typeId]);
+  if (!out.copied) throw new OpError(`The app library already has ${String(row.model)}.`);
+  const made = await store.list<Row>('library_type', { where: 'project_id IS NULL AND promoted_from_id = ?', params: [typeId], orderBy: 'id' });
+  return String(made.at(-1)!.id);
 }
 
 /** A blank cable row for the editor's "+ add". */

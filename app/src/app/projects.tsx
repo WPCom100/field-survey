@@ -83,6 +83,7 @@ export default function ProjectsScreen() {
         </Link>
         <Text style={styles.title}>Projects</Text>
         <View style={{ flex: 1 }} />
+        <Btn title="Device-type library" onPress={() => router.push({ pathname: '/library', params: { scope: 'app' } })} />
         <Btn title={busy ? 'Refreshing…' : 'Refresh from server'} onPress={() => void refresh()} disabled={busy} />
         <Btn title="+ New project" primary onPress={() => router.push('/new-project')} />
       </View>

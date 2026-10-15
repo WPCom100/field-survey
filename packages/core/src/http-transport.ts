@@ -5,6 +5,7 @@
  */
 
 import { HttpClient, type HttpClientOptions } from './http';
+import { LIBRARY_STREAM } from './library-stream';
 import type { PullResponse, PushBody, PushResponse, SyncTransport } from './sync';
 
 export type HttpTransportOptions = HttpClientOptions;
@@ -16,11 +17,17 @@ export class HttpTransport implements SyncTransport {
     this.http = new HttpClient(opts);
   }
 
+  /** The app library's stream goes to `/library/ops` (D184); every project to `/ops`. */
   push(body: PushBody): Promise<PushResponse> {
+    if (body.project_id === LIBRARY_STREAM) return this.http.json<PushResponse>('POST', '/library/ops', { since: body.since, ops: body.ops });
     return this.http.json<PushResponse>('POST', '/ops', body);
   }
 
   pull(projectId: string, since: number, limit: number): Promise<PullResponse> {
+    if (projectId === LIBRARY_STREAM) {
+      const q = new URLSearchParams({ since: String(since), limit: String(limit) });
+      return this.http.json<PullResponse>('GET', `/library/ops?${q.toString()}`);
+    }
     const q = new URLSearchParams({ project_id: projectId, since: String(since), limit: String(limit) });
     return this.http.json<PullResponse>('GET', `/ops?${q.toString()}`);
   }

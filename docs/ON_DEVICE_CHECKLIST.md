@@ -272,6 +272,20 @@ Decision D182 (Proposed): `vocab.state` draft/accepted, seed as a Load button, p
 
 Decision D183 (Proposed): cable templates `{code, from, to, far, single_row, qty, status}`; only an accepted type with default cables governs its devices (R2g drafts; R2c / R2d stand aside; U stays R2e's per level); imported devices match a type by model or alias; Copy from copies accepted types only. → Approve / change:
 
+## T61 — App-level device-type library  ·  Needs: no new build (JS update; server deploy with migration 0009 first)
+
+**Why it matters:** device types added on one job carry into the next: the app library lives apart from any project, syncs between iPads like project data, and every new project starts from it.
+
+- [ ] **Open it from Projects.** Levels home → Projects → **Device-type library**: `App device-type library`, ◀ Projects back. On a fresh iPad with no project it still opens (and syncs). → saw:
+- [ ] **Add and accept without a project.** **+ New type** → `P-TS7-E`, Touchscreen → Add draft → add a default cable (N → `Network switch`) → Save → **Accept draft**. → saw:
+- [ ] **Second iPad.** Within a few seconds the other iPad's app library shows `P-TS7-E` accepted (no project open needed). → saw:
+- [ ] **Promote.** In a project's Library, pick an accepted type → **Promote to app library**: "Promoted: … new projects copy it."; the button becomes `In the app library ✓`. Promoting a draft is not offered; promoting a model the app library already has is refused. The app library lists the type. → saw:
+- [ ] **New project copies it.** Projects → **+ New project** (any name, one level) → open its Library: the promoted type and `P-TS7-E` are there, accepted. → saw:
+- [ ] **Conflict.** Both iPads offline (airplane mode), open the same app-library type, change its Aliases differently, Save on both; back online: the library header reads `1 in review ▸` → **App library — needs review** lists `Device type …` · Aliases with A / B; Choose B → both iPads show B's aliases and the item is gone. → saw:
+- [ ] **Offline.** In airplane mode, add an app-library type: it saves at once; the Sync screen counts it as pending and it uploads when back online. → saw:
+
+Decision D184 (Proposed (2)–(5)): the library's ops are stored with no project and named by a fixed stream id on the iPad; the library syncs first; `promoted_from` is a plain id; Promote and "Copy from…" into the app library record `promoted_from`. → Approve / change:
+
 ---
 
 ## Rules for this file

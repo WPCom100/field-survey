@@ -16,6 +16,7 @@
  * once. The engine is runtime-neutral: timers and the transport are injected.
  */
 
+import { LIBRARY_STREAM } from './library-stream';
 import type { Op, StoredOp } from './op';
 import type { PushAck, RemoteResult, Store } from './store';
 
@@ -136,6 +137,8 @@ export type SyncLog = (
 export interface SyncEngineOptions {
   /** Projects to pull; default: local `project` rows plus anything in the outbox. */
   projects?: () => Promise<string[]>;
+  /** Also sync the app library's stream (`LIBRARY_STREAM`, D184) with the default projects. */
+  library?: boolean;
   /** Ops per push, ≤ 500 (PLAN §3.2). */
   batchSize?: number;
   /** Ops per pull page, ≤ 500. */
@@ -222,6 +225,7 @@ export class SyncEngine {
     this.transport = transport;
     this.opts = {
       projects: opts.projects ?? (() => this.defaultProjects()),
+      library: opts.library ?? false,
       batchSize: Math.max(1, Math.min(opts.batchSize ?? MAX_BATCH, MAX_BATCH)),
       pullLimit: Math.max(1, Math.min(opts.pullLimit ?? MAX_BATCH, MAX_BATCH)),
       intervalMs: opts.intervalMs ?? 60_000,
@@ -600,7 +604,10 @@ export class SyncEngine {
     const ids = new Set(rows.map((r) => r.id));
     for (const p of await this.store.outboxProjects()) ids.add(p);
     for (const p of await knownProjects(this.store)) ids.add(p);
-    return [...ids].sort();
+    ids.delete(LIBRARY_STREAM);
+    // The library goes first: a project's device may name an app-library type made in the same
+    // cycle (deferred FK at the server), while a promotion's link back is a plain id (D184).
+    return [...(this.opts.library ? [LIBRARY_STREAM] : []), ...[...ids].sort()];
   }
 
   private set(patch: Partial<SyncStatus>): void {

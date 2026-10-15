@@ -11,6 +11,7 @@ import {
   copySources,
   copyTypes,
   createType,
+  promoteType,
   describeCable,
   loadLibrary,
   parseAliases,
@@ -34,12 +35,17 @@ type RunFn = (fn: (e: Editor, s: Store) => Promise<unknown>, done?: string | (()
  * flagged), the selected type's editor on the right — model, category, aliases, ID scheme,
  * default cables (the rules offer them to every device of an accepted type, R2g), optional
  * cables and accessories, Accept / Reject — plus "+ New type" and "Copy from…". `scope` is the
- * project id (T61 mounts it with null for the app library).
+ * project id, or null for the app library (T61, D65): then `editor` writes to the library stream
+ * (`/library/ops`, D184). A project's accepted types can be promoted with `libraryEditor`.
  */
 export function LibraryScreen(props: {
   store: Store | null;
   editor: Editor | null;
+  /** Writes to the app library's stream (Promote); null where promotion is not offered. */
+  libraryEditor: Editor | null;
   scope: string | null;
+  /** Opens Needs review for this library's conflicts. */
+  onOpenReview?: () => void;
   /** Changes when a pull brought new ops (reload). */
   dataKey: string;
   names: ReadonlyMap<string, string>;
@@ -89,8 +95,13 @@ export function LibraryScreen(props: {
       <View style={styles.head}>
         {props.header}
         <Text style={styles.title}>
-          Device-type library <Text style={styles.sub}>({types.filter((t) => t.state !== 'rejected').length} types{view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})</Text>
+          {scope ? 'Device-type library' : 'App device-type library'} <Text style={styles.sub}>({types.filter((t) => t.state !== 'rejected').length} types{view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})</Text>
         </Text>
+        {view?.inReview && props.onOpenReview ? (
+          <Pressable onPress={props.onOpenReview}>
+            <Text style={styles.review}>{view.inReview} in review ▸</Text>
+          </Pressable>
+        ) : null}
         <Pressable disabled={!editor} onPress={() => setPane({ kind: 'new' })} style={[styles.btn, !editor && styles.off]}>
           <Text style={styles.btnText}>+ New type</Text>
         </Pressable>
@@ -120,7 +131,13 @@ export function LibraryScreen(props: {
               ))}
             </View>
           ))}
-          {view && !types.length ? <Text style={styles.sub}>No device types yet. Add one, or copy them from another project or the app library.</Text> : null}
+          {view && !types.length ? (
+            <Text style={styles.sub}>
+              {scope
+                ? 'No device types yet. Add one, or copy them from another project or the app library.'
+                : 'The app library is empty. New projects copy its accepted types; add one, copy from a project, or promote a project\'s type.'}
+            </Text>
+          ) : null}
         </ScrollView>
         <ScrollView style={styles.pane} contentContainerStyle={styles.paneBody} keyboardShouldPersistTaps="handled">
           {pane?.kind === 'new' ? (
@@ -128,7 +145,7 @@ export function LibraryScreen(props: {
           ) : pane?.kind === 'copy' && store ? (
             <CopyFrom store={store} scope={scope} run={run} onDone={() => setPane(null)} />
           ) : selected ? (
-            <TypeEditor key={`${selected.id}:${tick}`} type={selected} canEdit={!!editor} run={run} />
+            <TypeEditor key={`${selected.id}:${tick}`} type={selected} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
           ) : (
             <Text style={styles.sub}>Pick a type to see and edit it.</Text>
           )}
@@ -245,7 +262,7 @@ function toggle(set: Set<string>, id: string): Set<string> {
 }
 
 /** The selected type: a form edited locally, saved as one group. */
-function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn }) {
+function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
   const t = props.type;
   const [model, setModel] = useState(t.model);
   const [category, setCategory] = useState<string | null>(t.category);
@@ -359,6 +376,21 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn }) 
               <Text style={styles.link}>Back to draft</Text>
             </Pressable>
           )}
+          {t.projectId && t.state === 'accepted' && props.libraryEditor ? (
+            t.promotedAs ? (
+              <Text style={styles.sub}>In the app library ✓</Text>
+            ) : (
+              <Pressable
+                disabled={dirty}
+                onPress={() => {
+                  const lib = props.libraryEditor!;
+                  void props.run((_e, s) => promoteType(lib, s, t.id), `Promoted: ${t.model} is in the app library; new projects copy it.`);
+                }}
+                style={dirty && styles.off}>
+                <Text style={styles.link}>Promote to app library</Text>
+              </Pressable>
+            )
+          ) : null}
           {dirty && t.state === 'draft' ? <Text style={styles.sub}>Save before accepting.</Text> : null}
         </View>
       ) : null}
@@ -444,6 +476,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '600', flex: 1 },
   link: { color: '#1f6feb', fontSize: 16 },
   danger: { color: '#b3261e', fontSize: 16 },
+  review: { color: '#9a6700', fontSize: 16, fontWeight: '600' },
   note: { paddingHorizontal: 20, paddingBottom: 8, color: '#b3261e', fontSize: 14 },
   noteOk: { color: '#1a7f37' },
   split: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e1e4e8' },

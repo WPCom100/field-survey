@@ -378,13 +378,21 @@ class Op(Base):
         Index(None, "entity_id", "field"),
         # Device-ID assignment scans a project's device creates/sets/assigns (T75, D146).
         Index(None, "project_id", "entity_kind", "kind"),
+        # The app-library log (project_id null, T61/D184) has its own sequence.
+        Index(
+            "uq_op_library_server_seq",
+            "server_seq",
+            unique=True,
+            postgresql_where=text("project_id IS NULL"),
+        ),
         one_of("kind", vocab.OP_KIND),
         one_of("change_type", vocab.CHANGE_TYPE),
         one_of("state", vocab.OP_STATE),
     )
 
     op_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
-    project_id: Mapped[uuid.UUID] = mapped_column(fk("project.id"))
+    # Null = the app-library log (`/library/ops`, D184).
+    project_id: Mapped[uuid.UUID | None] = mapped_column(fk("project.id"))
     user_id: Mapped[uuid.UUID] = mapped_column(fk("app_user.id"))
     install_id: Mapped[uuid.UUID]
     client_ts: Mapped[datetime]
@@ -423,7 +431,8 @@ class ReviewItem(Id, Synced, Base):
         one_of("state", vocab.REVIEW_STATE),
     )
 
-    project_id: Mapped[uuid.UUID] = mapped_column(fk("project.id"), index=True)
+    # Null = a conflict in the app library (D184).
+    project_id: Mapped[uuid.UUID | None] = mapped_column(fk("project.id"), index=True)
     level_id: Mapped[uuid.UUID | None] = mapped_column(fk("level.id"))
     kind: Mapped[str]
     subject: Mapped[dict[str, Any] | None]
@@ -569,7 +578,9 @@ class LibraryType(Id, Synced, Base):
     optional_accessories: Mapped[list[Any] | None]
     state: Mapped[str] = mapped_column(default="draft", server_default="draft")
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(fk("app_user.id"))
-    promoted_from_id: Mapped[uuid.UUID | None] = mapped_column(fk("library_type.id"))
+    # Provenance across op streams (a project type promoted to the app library, D184): a plain
+    # id, no foreign key, so the library push never waits on the project's.
+    promoted_from_id: Mapped[uuid.UUID | None]
 
 
 class Vocab(Id, Synced, Base):

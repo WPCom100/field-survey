@@ -111,6 +111,7 @@ export {
   type ReviewMark,
 } from './sync';
 export { HttpTransport, type HttpTransportOptions } from './http-transport';
+export { LIBRARY_STREAM, isLibraryStream } from './library-stream';
 export { HttpClient, httpFailure, errorCode, failureOf, type HttpClientOptions } from './http';
 export {
   BlobQueue,

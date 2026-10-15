@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HttpTransport } from './http-transport';
+import { LIBRARY_STREAM } from './library-stream';
 import { TransportError } from './sync';
 
 type Call = { url: string; init: RequestInit };
@@ -38,6 +39,15 @@ describe('HttpTransport', () => {
     expect(s.calls[0]!.url).toBe('https://s/ops?project_id=p1&since=42&limit=500');
     expect(s.calls[0]!.init.method).toBe('GET');
     expect(s.calls[0]!.init.headers).not.toHaveProperty('X-Survey-User');
+  });
+
+  it('sends the app library stream to /library/ops, without a project (D184)', async () => {
+    const s = stub([() => json(200, { results: [], server_ops: [], server_seq: 1 }), () => json(200, { ops: [], server_seq: 1, has_more: false })]);
+    const t = new HttpTransport({ serverUrl: 'https://s', token: 'tok', fetch: s.fetch });
+    await t.push({ project_id: LIBRARY_STREAM, since: 0, ops: [] });
+    await t.pull(LIBRARY_STREAM, 1, 500);
+    expect(s.calls.map((c) => `${c.init.method} ${c.url}`)).toEqual(['POST https://s/library/ops', 'GET https://s/library/ops?since=1&limit=500']);
+    expect(JSON.parse(s.calls[0]!.init.body as string)).toEqual({ since: 0, ops: [] });
   });
 
   it('pings GET /health and maps a dead network to a network failure', async () => {

@@ -105,3 +105,13 @@ project the iPad has never seen is pulled on the next cycle: the server wrote th
 numbering groups, levels and copied vocabulary/library/rulings/placeholders as ops at creation,
 and the first pull materialises them, the `project` row included. Nothing is written locally
 outside the pull; `knownProjects(store)` reads the list.
+
+## The app library stream (T61, D184)
+
+`SyncEngine({ library: true })` (the app's engine) also pushes and pulls `LIBRARY_STREAM`, the
+app-level device-type library, **first** in every cycle (a project's device may name an app type
+made in the same cycle). It is an ordinary stream to the store: an `Editor` with
+`projectId: LIBRARY_STREAM` writes app-library ops, the outbox, cursor (`last_server_seq:<stream>`),
+review marks and quarantine work as for a project. `HttpTransport` sends it to `/library/ops`
+(`server/docs/sync.md`). App-library rows keep `project_id` null; their review items carry the
+stream id.

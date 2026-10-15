@@ -152,6 +152,11 @@ export async function describeSubject(
   codes: ReadonlyMap<string, string>,
 ): Promise<{ label: string; levelId: string | null; deviceId: string | null; pin: unknown }> {
   const kinds = ['device', 'cable_end', 'punch_item', 'missing_part', 'photo'] as const;
+  if (kind === 'library_type') {
+    // the app library's conflicts (D184) and a project's own types
+    const t = await store.get<Row>('library_type', id);
+    return { label: t ? `Device type ${String(t.model)}${t.deleted_at ? ' (deleted)' : ''}` : 'Device type (not on this iPad)', levelId: null, deviceId: null, pin: null };
+  }
   if (!(kinds as readonly string[]).includes(kind)) return { label: `${kind.replace(/_/g, ' ')} …${id.slice(-6)}`, levelId: null, deviceId: null, pin: null };
   const row = await store.get<Row>(kind as (typeof kinds)[number], id);
   if (!row) return { label: `${kind.replace(/_/g, ' ')} (not on this iPad)`, levelId: null, deviceId: null, pin: null };

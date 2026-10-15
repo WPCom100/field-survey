@@ -27,7 +27,7 @@ from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import bindparam, func, insert, select
+from sqlalchemy import bindparam, func, insert, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -51,6 +51,15 @@ from app.numbering import (
 log = logging.getLogger("sync")
 
 SERVER_INSTALL_ID = uuid.uuid5(uuid.NAMESPACE_URL, "field-survey:server")
+# The app-library op log (T61, D184): ops pushed to `/library/ops` name this stream id as their
+# `project_id`; they are stored with `project_id` null, numbered on their own and pulled from
+# `/library/ops`. Only `library_type` rows of the app library (project null) live there, plus
+# the review items of their conflicts (stored with project_id null; on the wire and on the iPad
+# both carry LIBRARY_STREAM, whose `review_item.project_id` column is NOT NULL — `op_to_json`).
+LIBRARY_STREAM = uuid.UUID("00000000-0000-7000-8000-00000000a11b")
+LIBRARY_KINDS = frozenset({"library_type", "review_item"})
+# Serialises library pushes as the project row lock serialises a project's (arbitrary key).
+LIBRARY_LOCK = 0x11B0A11B
 MAX_OPS_PER_PUSH = 500
 OP_INSERT_BATCH = 10
 
@@ -159,12 +168,13 @@ class PullOut(BaseModel):
 MAX_OPS_PER_PULL = 500
 
 
-def pull_ops(session: Session, project_id: uuid.UUID, since: int, limit: int) -> PullOut:
+def pull_ops(session: Session, project_id: uuid.UUID | None, since: int, limit: int) -> PullOut:
     """The top sequence is read **before** the page (T74, D144): a push committing between the
     two statements (READ COMMITTED: each sees its own snapshot) can then only add ops to the page,
     never raise the top above a page that misses them. The client treats an empty page under a
-    higher top as a gap and keeps its cursor; this ordering means it never sees one."""
-    if session.get(Project, project_id) is None:
+    higher top as a gap and keeps its cursor; this ordering means it never sees one.
+    `project_id` None = the app-library log (D184)."""
+    if project_id is not None and session.get(Project, project_id) is None:
         raise PushError(404, f"unknown project {project_id}")
     limit = max(1, min(limit, MAX_OPS_PER_PULL))
     top = _pull_top(session, project_id)
@@ -176,15 +186,19 @@ def pull_ops(session: Session, project_id: uuid.UUID, since: int, limit: int) ->
     return PullOut(ops=[op_to_json(o) for o in rows], server_seq=top, has_more=has_more)
 
 
-def _pull_top(session: Session, project_id: uuid.UUID) -> int:
-    return session.scalar(select(func.max(Op.server_seq)).where(Op.project_id == project_id)) or 0
+def _in_stream(project_id: uuid.UUID | None):
+    return Op.project_id.is_(None) if project_id is None else Op.project_id == project_id
 
 
-def _pull_page(session: Session, project_id: uuid.UUID, since: int, n: int) -> list[Op]:
+def _pull_top(session: Session, project_id: uuid.UUID | None) -> int:
+    return session.scalar(select(func.max(Op.server_seq)).where(_in_stream(project_id))) or 0
+
+
+def _pull_page(session: Session, project_id: uuid.UUID | None, since: int, n: int) -> list[Op]:
     return list(
         session.scalars(
             select(Op)
-            .where(Op.project_id == project_id, Op.server_seq > since)
+            .where(_in_stream(project_id), Op.server_seq > since)
             .order_by(Op.server_seq)
             .limit(n)
         )
@@ -200,7 +214,9 @@ def _check_enum(kind: str, column: str, value: Any, where: str) -> None:
         raise ValueError(f"{where}: {kind}.{column} must be one of {' · '.join(allowed)}")
 
 
-def validate_op(op: OpIn, project_id: uuid.UUID, *, trusted: bool = False) -> None:
+def validate_op(
+    op: OpIn, project_id: uuid.UUID, *, trusted: bool = False, library: bool = False
+) -> None:
     """Shape checks the client already made (T07/T08); a failure means a client bug → 422.
 
     A `trusted` producer (the seed import, T27) may carry display numbers in a `create`
@@ -210,6 +226,16 @@ def validate_op(op: OpIn, project_id: uuid.UUID, *, trusted: bool = False) -> No
         raise ValueError("op.project_id differs from the push's project_id")
     if op.entity_kind not in OP_TARGETS:
         raise ValueError(f"unknown entity_kind {op.entity_kind!r}")
+    if library and op.entity_kind not in LIBRARY_KINDS:
+        raise ValueError(f"the app library holds library types only, not {op.entity_kind}")
+    if op.entity_kind == "library_type" and op.kind == "create":
+        owner = (op.payload or {}).get("project_id")
+        if library and owner is not None:
+            raise ValueError("an app-library type has no project_id")
+        if not library and (owner is None or str(owner) != str(project_id)):
+            raise ValueError(
+                "a project's library type names its project; app-library types go to /library/ops"
+            )
     if op.kind not in CLIENT_OP_KINDS:
         raise ValueError(f"bad op kind {op.kind!r} (assign is server-only)")
     if op.change_type not in vocab.CHANGE_TYPE:
@@ -288,7 +314,13 @@ UPSERT_HEAD = _HEAD.on_conflict_do_update(
 
 
 def op_to_json(op: Op) -> dict[str, Any]:
-    return {c: jsonable(getattr(op, c)) for c in OP_COLUMNS}
+    out = {c: jsonable(getattr(op, c)) for c in OP_COLUMNS}
+    if out["project_id"] is None:
+        # The client files library ops under the stream, and its review items with them.
+        out["project_id"] = str(LIBRARY_STREAM)
+        if op.entity_kind == "review_item" and op.kind == "create" and out["payload"]:
+            out["payload"] = {**out["payload"], "project_id": str(LIBRARY_STREAM)}
+    return out
 
 
 def value_of(head: Op, field: str) -> Any:
@@ -319,9 +351,16 @@ Overlay = dict[tuple[uuid.UUID, str], Op]
 
 
 class Push:
-    def __init__(self, session: Session, body: PushIn, *, trusted: bool = False):
+    def __init__(
+        self, session: Session, body: PushIn, *, trusted: bool = False, library: bool = False
+    ):
         self.session = session
         self.project_id = body.project_id
+        # The app-library log (D184): the push names LIBRARY_STREAM; rows store project_id null.
+        self.library = library
+        if library and body.project_id != LIBRARY_STREAM:
+            raise PushError(422, "a library push names the library stream")
+        self.scope: uuid.UUID | None = None if library else body.project_id
         self.since = body.since
         self.now = datetime.now(UTC)
         self.seq = 0
@@ -352,7 +391,7 @@ class Push:
     def run(self, ops: list[OpIn]) -> PushOut:
         for i, op in enumerate(ops):
             try:
-                validate_op(op, self.project_id, trusted=self.trusted)
+                validate_op(op, self.project_id, trusted=self.trusted, library=self.library)
             except ValueError as e:
                 raise PushError(422, {"index": i, "op_id": str(op.op_id), "error": str(e)}) from e
         known = set(
@@ -365,16 +404,16 @@ class Push:
                 )
 
         # Serialises pushes per project: server_seq has no gaps and counters never race.
-        project = self.session.scalars(
-            select(Project).where(Project.id == self.project_id).with_for_update()
-        ).first()
-        if project is None:
-            raise PushError(404, f"unknown project {self.project_id}")
+        if self.library:
+            self.session.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": LIBRARY_LOCK})
+        else:
+            project = self.session.scalars(
+                select(Project).where(Project.id == self.project_id).with_for_update()
+            ).first()
+            if project is None:
+                raise PushError(404, f"unknown project {self.project_id}")
         self.seq = (
-            self.session.scalar(
-                select(func.max(Op.server_seq)).where(Op.project_id == self.project_id)
-            )
-            or 0
+            self.session.scalar(select(func.max(Op.server_seq)).where(_in_stream(self.scope))) or 0
         )
 
         self.known = {
@@ -716,7 +755,7 @@ class Push:
     def build(self, op: OpIn) -> Op:
         return Op(
             op_id=op.op_id,
-            project_id=op.project_id,
+            project_id=self.scope,
             user_id=op.user_id,
             install_id=op.install_id,
             client_ts=_aware(op.client_ts),
@@ -947,7 +986,7 @@ class Push:
         item_id = uuid7()
         payload = {
             "id": item_id,
-            "project_id": self.project_id,
+            "project_id": self.scope,
             "level_id": level_id or None,
             "kind": "sync_conflict",
             "subject": subject,
@@ -1002,6 +1041,6 @@ class Push:
         )
 
 
-def apply_push(session: Session, body: PushIn) -> PushOut:
+def apply_push(session: Session, body: PushIn, *, library: bool = False) -> PushOut:
     """Run the whole push inside the caller's transaction; the caller commits or rolls back."""
-    return Push(session, body).run(body.ops)
+    return Push(session, body, library=library).run(body.ops)

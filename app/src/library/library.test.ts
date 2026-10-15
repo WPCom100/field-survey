@@ -4,11 +4,12 @@
  * cables raising R2g drafts for the devices that already exist (through the real engine).
  */
 
-import { Editor, Store, uuidv7, type EditContext } from '@field-survey/core';
-import { BetterSqliteDriver } from '@field-survey/core/node';
+import { Editor, LIBRARY_STREAM, Store, SyncEngine, uuidv7, type EditContext } from '@field-survey/core';
+import { BetterSqliteDriver, FakeServer } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
-import { addFieldDevice } from '../additions/model';
+import { addFieldDevice, libraryChoices } from '../additions/model';
+import { loadReviewList } from '../review/model';
 import { loadDeviceCard } from '../card/model';
 import { engineFor, ruleDecider } from '../rules/engine';
 import {
@@ -21,6 +22,7 @@ import {
   describeCable,
   loadLibrary,
   parseAliases,
+  promoteType,
   rejectType,
   reopenType,
   rulesForType,
@@ -164,5 +166,86 @@ describe('device-type library editor (T48)', () => {
     const copied = (await loadLibrary(store, b.id)).types.find((t) => t.model === 'PI1002')!;
     expect(copied).toMatchObject({ projectId: b.id, state: 'accepted', idScheme: 'level_tag', aliases: ['PI-1002'] });
     expect(copied.id).not.toBe(one);
+  });
+});
+
+describe('app-level library manager (T61, D65, D184)', () => {
+  it('edits the app library without a project, on its own stream', async () => {
+    const { store, userId, project } = await setup();
+    const lib = new Editor(store, { projectId: LIBRARY_STREAM, userId });
+    const id = await createType(lib, store, null, { model: 'P-TS7-E', category: 'Touchscreen' });
+    await updateType(lib, store, id, { aliases: ['TS7'], defaultCables: [{ ...blankCable('N'), to: 'Network switch' }] });
+    await acceptType(lib, id);
+    expect(await store.get('library_type', id)).toMatchObject({ project_id: null, state: 'accepted' });
+    expect((await store.opsFor(id)).every((o) => o.project_id === LIBRARY_STREAM)).toBe(true);
+    const app = await loadLibrary(store, null);
+    expect(app.types.map((t) => [t.model, t.projectId, t.state])).toEqual([['P-TS7-E', null, 'accepted']]);
+    // a project's library is separate; its pickers see the app type until it has its own copy
+    const p = await project('Tower');
+    expect((await loadLibrary(store, p.id)).types).toEqual([]);
+    expect((await libraryChoices(store, p.id)).map((c) => [c.model, c.projectId])).toEqual([['P-TS7-E', null]]);
+    // "Copy from…" in the app library offers the projects; copying is a promotion
+    const own = await createType(p.editor, store, p.id, { model: 'P-LS', category: 'Sensor' });
+    await acceptType(p.editor, own);
+    expect((await copySources(store, null)).map((s) => [s.id, s.types.map((t) => t.model)])).toEqual([[p.id, ['P-LS']]]);
+    await copyTypes(lib, store, null, [own]);
+    expect((await loadLibrary(store, null)).types.find((t) => t.model === 'P-LS')).toMatchObject({ promotedFromId: own, state: 'accepted' });
+  });
+
+  it('promotes an accepted project type once; the app type reaches another iPad and new projects', async () => {
+    const server = new FakeServer();
+    const { store, userId, project } = await setup();
+    const a = await project('A');
+    const lib = new Editor(store, { projectId: LIBRARY_STREAM, userId });
+    const draft = await createType(a.editor, store, a.id, { model: 'P-TS18-E', category: 'Touchscreen' });
+    await expect(promoteType(lib, store, draft)).rejects.toThrow(/Accept the type/);
+    await updateType(a.editor, store, draft, { idScheme: 'level_number', optionalAccessories: [{ model: 'Back box', expected_qty: 1 }] });
+    await acceptType(a.editor, draft);
+    await expect(promoteType(a.editor, store, draft)).rejects.toThrow(/writes to the app library/);
+    const appId = await promoteType(lib, store, draft);
+    expect(await store.get('library_type', appId)).toMatchObject({
+      project_id: null, model: 'P-TS18-E', promoted_from_id: draft, state: 'accepted', id_scheme: 'level_number',
+      optional_accessories: [{ model: 'Back box', expected_qty: 1 }],
+    });
+    expect((await loadLibrary(store, a.id)).types[0]!.promotedAs).toBe(appId);
+    await expect(promoteType(lib, store, draft)).rejects.toThrow(/already has P-TS18-E/);
+    // the promotion syncs on the library stream: a second iPad with no project gets it
+    const engine = new SyncEngine(store, server, { library: true, log: () => {} });
+    await engine.sync();
+    expect(server.ops(LIBRARY_STREAM).map((o) => [o.entity_kind, o.kind])).toEqual([['library_type', 'create']]);
+    const other = await Store.open(new BetterSqliteDriver(), { installId: 'j', search: 'like' });
+    await new SyncEngine(other, server, { library: true, log: () => {} }).sync();
+    expect((await loadLibrary(other, null)).types.map((t) => [t.model, t.promotedFromId])).toEqual([['P-TS18-E', draft]]);
+    // a project B made later offers it (the server copies it at creation: server test_library.py)
+    const b = await project('B');
+    expect((await libraryChoices(store, b.id)).map((c) => c.model)).toEqual(['P-TS18-E']);
+  });
+
+  it('a clash on an app-library type is listed on Needs review under the library and resolved there', async () => {
+    const server = new FakeServer();
+    const mk = async (install: string) => {
+      const store = await Store.open(new BetterSqliteDriver(), { installId: install, search: 'like' });
+      const userId = uuidv7();
+      return { store, lib: new Editor(store, { projectId: LIBRARY_STREAM, userId }), engine: new SyncEngine(store, server, { library: true, log: () => {} }) };
+    };
+    const a = await mk('a');
+    const b = await mk('b');
+    const id = await createType(a.lib, a.store, null, { model: 'PI1002', category: 'Station' });
+    await a.engine.sync();
+    await b.engine.sync();
+    await updateType(a.lib, a.store, id, { aliases: ['PI-1002'] });
+    await updateType(b.lib, b.store, id, { aliases: ['PI1002-W'] });
+    await a.engine.sync();
+    await b.engine.sync();
+    const list = await loadReviewList(b.store, LIBRARY_STREAM);
+    expect(list.rows.map((r) => [r.kind, r.subject, r.field])).toEqual([['sync_conflict', 'Device type PI1002', 'Aliases']]);
+    expect((await loadLibrary(b.store, null)).inReview).toBe(1);
+    await b.lib.resolve(list.rows[0]!.id, { choice: 'B' }, {});
+    await b.engine.sync();
+    await a.engine.sync();
+    for (const c of [a, b]) {
+      expect((await c.store.get('library_type', id))!.aliases).toEqual(['PI1002-W']);
+      expect((await loadReviewList(c.store, LIBRARY_STREAM)).rows).toEqual([]);
+    }
   });
 });

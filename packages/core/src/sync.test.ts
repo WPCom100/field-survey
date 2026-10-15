@@ -6,6 +6,7 @@ import type { Op } from './op';
 import { Store } from './store';
 import { SyncEngine, TransportError, knownProjects, rememberProjects, type SyncStatus } from './sync';
 import { FakeServer } from './testing/fake-server';
+import { LIBRARY_STREAM } from './library-stream';
 
 const PROJECT = uuidv7();
 const LEVEL = uuidv7();
@@ -509,6 +510,34 @@ describe('known projects (T41, D127)', () => {
     expect((await store.get('numbering_group', group))!.label).toBe('06/06M');
     expect((await store.get('level', LEVEL))!.numbering_group_id).toBe(group);
     expect(engine.status().lastServerSeq[PROJECT]).toBe(3);
+  });
+});
+
+describe('the app library stream (T61, D184)', () => {
+  it('with library on, app-library edits push and pull like a project; a same-field clash is reviewed in the stream', async () => {
+    const a = await client(server, ANN, 'ipad-a', { library: true });
+    const b = await client(server, BOB, 'ipad-b', { library: true });
+    const lib = (c: Client) => new Editor(c.store, { projectId: LIBRARY_STREAM, userId: c === a ? ANN : BOB, now: tsNext });
+    const ctx: EditContext = { change_type: 'Master edit', reason: 'Device-type library' };
+    const { id } = await lib(a).create('library_type', { project_id: null, model: 'P-TS18-E', state: 'draft' }, ctx);
+    expect((await a.engine.sync()).projects).toContain(LIBRARY_STREAM);
+    expect(server.ops(LIBRARY_STREAM).map((o) => o.entity_kind)).toEqual(['library_type']);
+    await b.engine.sync();
+    expect(await b.store.get('library_type', id)).toMatchObject({ project_id: null, model: 'P-TS18-E' });
+    // both rename it offline: first arrived is official, the other is reviewed
+    await lib(a).setField('library_type', id, 'model', 'P-TS18-E2', ctx);
+    await lib(b).setField('library_type', id, 'model', 'P-TS18-E3', ctx);
+    await a.engine.sync();
+    await b.engine.sync();
+    await a.engine.sync();
+    for (const c of [a, b]) {
+      const items = await c.store.list<{ project_id: string | null; subject: { entity_kind: string } }>('review_item');
+      expect(items.map((i) => [i.project_id, i.subject.entity_kind])).toEqual([[LIBRARY_STREAM, 'library_type']]);
+      expect((await c.store.get('library_type', id))!.model).toBe('P-TS18-E2');
+    }
+    // without the option the stream is not synced
+    const plain = await client(server, ANN, 'ipad-c');
+    expect((await plain.engine.sync()).projects).not.toContain(LIBRARY_STREAM);
   });
 });
 

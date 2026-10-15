@@ -199,3 +199,22 @@ create of its record while the head is *another* create of it is treated as curr
 (`based_on_a_create_of`), so a decision taken on the second iPad before it pulled the first's
 create applies without a review item. A row inserted directly (as `POST /projects` does before
 logging its create) has no heads yet and takes them from its create as before.
+
+## The app library's log (T61, D65, D184)
+
+`POST /library/ops` (`{since, ops}`) and `GET /library/ops?since&limit` carry the app-level
+device-type library: the same op format, `Push` loop, field heads, conflict review and history
+as a project's `/ops`, in a log of its own (`app/api/library.py`, `Push(..., library=True)`).
+
+- Ops name `LIBRARY_STREAM` (`00000000-0000-7000-8000-00000000a11b`) as their `project_id` on
+  the wire and on the iPad; Postgres stores them with `project_id` **null** and numbers them on
+  their own (`uq_op_library_server_seq`, a partial unique index); pushes are serialised by an
+  advisory lock instead of the project row lock. `op_to_json` writes the stream id back.
+- Only `library_type` (with `project_id` null) and `review_item` sets (resolutions) are taken;
+  anything else is 422. A project push may not create a `library_type` without its project.
+- A conflict's `review_item` row has `project_id` null; its `create` op's payload carries the
+  stream id on the wire, because the iPad's `review_item.project_id` is NOT NULL. Needs review
+  lists it under the stream (`/review?project=<LIBRARY_STREAM>`).
+- `library_type.promoted_from_id` is a plain id (no foreign key, migration 0009): a promotion
+  names a project's type across logs, and the two commit separately.
+- New projects copy the app library's accepted types at creation (`projects._copy`, D65).
