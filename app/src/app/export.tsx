@@ -301,7 +301,7 @@ export default function ExportScreen() {
             <Text style={styles.label}>Pre-flight</Text>
             <Text style={styles.value}>{pre ? preflightLine(pre, sync.pendingOps, blobs.photosWaiting) : '…'}</Text>
             {!!pre?.lint && !!projectId ? (
-              <Link href={{ pathname: '/review', params: { project: projectId, kind: 'lint' } }} style={styles.back}>
+              <Link href={{ pathname: '/lint', params: { project: projectId } }} style={styles.back}>
                 See the {pre.lint} lint finding{pre.lint === 1 ? '' : 's'} ▸
               </Link>
             ) : null}
@@ -338,7 +338,7 @@ export default function ExportScreen() {
             <Text style={styles.label}>Pre-flight</Text>
             <Text style={styles.value}>{pre ? preflightLine(pre, sync.pendingOps, blobs.photosWaiting) : '…'}</Text>
             {!!pre?.lint && !!projectId ? (
-              <Link href={{ pathname: '/review', params: { project: projectId, kind: 'lint' } }} style={styles.back}>
+              <Link href={{ pathname: '/lint', params: { project: projectId } }} style={styles.back}>
                 See the {pre.lint} lint finding{pre.lint === 1 ? '' : 's'} ▸
               </Link>
             ) : null}

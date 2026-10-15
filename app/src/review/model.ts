@@ -114,7 +114,7 @@ export type ReviewRow = {
   deviceId: string | null;
 };
 
-/** An open lint `finding` (T90): read-only until T36 adds dismiss-with-reason. */
+/** An open lint `finding` (T90), listed on the Lint tab; dismissed and fixed in the Lint view (T36). */
 export type FindingRow = {
   id: string;
   /** The rule or lint that raised it: `R1`, `E3`. */
@@ -139,13 +139,13 @@ export type ReviewList = {
 
 export type ReviewQuery = { kind?: string | null; levelId?: string | null; sort?: 'oldest' | 'newest' };
 
-async function levelCodes(store: Store, projectId: string): Promise<Map<string, string>> {
+export async function levelCodes(store: Store, projectId: string): Promise<Map<string, string>> {
   const rows = await store.list<Row>('level', { where: 'project_id = ?', params: [projectId], orderBy: 'floor_order, level' });
   return new Map(rows.map((r) => [String(r.id), String(r.level)]));
 }
 
 /** The record a review item is about, with what a row needs to name it. */
-async function describeSubject(
+export async function describeSubject(
   store: Store,
   kind: string,
   id: string,

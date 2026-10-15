@@ -15,8 +15,10 @@
  * on every other once the record has synced, even before the proposal row's own ops arrive.
  *
  * Rows whose `rule_id` is not registered are never touched (another app version's, or seeded).
- * Findings: `open` ↔ `resolved` follow the output; `dismissed` rows stay dismissed (T36 adds
- * the reappear-on-input-change rule and the reason).
+ * Findings: `open` ↔ `resolved` follow the output; a `dismissed` row stays dismissed while the
+ * rule says the same thing (its message names the facts) and reopens when the message changes
+ * (T36, D178). A dismissed row whose condition goes away is `resolved` (its reason kept for
+ * History), so the condition coming back raises it again.
  */
 
 import { stableStringify } from './hash';
@@ -197,15 +199,28 @@ export function reconcileFindings(input: ReconcileFindingsInput): Change[] {
         }
         break;
       case 'resolved':
-        changes.push({ kind: 'set', entity: 'finding', id: row.id, fields: { state: 'open', message: out.message, level_id: out.level_id } });
+        changes.push({
+          kind: 'set',
+          entity: 'finding',
+          id: row.id,
+          fields: { state: 'open', message: out.message, level_id: out.level_id, ...(row.dismissed_reason != null ? { dismissed_reason: null } : {}) },
+        });
         break;
       case 'dismissed':
+        // D178: a dismissal holds while the facts hold. The message names those facts and the
+        // row keeps the one the person dismissed, so a different message means the inputs
+        // changed: the finding reopens and the old reason is cleared (History keeps it).
+        if ((row.message ?? '') !== out.message) {
+          changes.push({ kind: 'set', entity: 'finding', id: row.id, fields: { state: 'open', dismissed_reason: null, message: out.message, level_id: out.level_id } });
+        }
         break;
     }
   }
   for (const [key, row] of byKey) {
     if (seen.has(key) || !input.lintIds.has(row.lint_id)) continue;
-    if (row.state === 'open') changes.push({ kind: 'set', entity: 'finding', id: row.id, fields: { state: 'resolved' } });
+    // A dismissed finding whose condition went away resolves too (D178): the dismissal covered
+    // that occurrence; if the condition comes back, it is raised again.
+    if (row.state === 'open' || row.state === 'dismissed') changes.push({ kind: 'set', entity: 'finding', id: row.id, fields: { state: 'resolved' } });
   }
   return changes;
 }

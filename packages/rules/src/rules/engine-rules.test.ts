@@ -62,6 +62,8 @@ describe('RULES over a store', () => {
     const res = await engine.decide(neuron.id, { kind: 'accept' });
     const itemId = res.recordIds[0]!;
     expect(await store.get<Row>('punch_item', itemId)).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', type: 'Information', owner: 'EC', tracking_status: 'Open', sort_last: true, rule_id: 'R3c', proposal_id: neuron.id, notes: '06-01, 06M-01, 06M-S1' });
+    // the lint "no Missing all Device Neuron IDs item" (T36) resolves: one op, then nothing
+    expect((await engine.run()).ops).toBe(1);
     expect((await engine.run()).ops).toBe(0);
     // a capture → Notes rewritten by the engine, one op, naming the rule, carrying the proposal
     await editor.setField('device', ids.panel, 'neuron_id', '00A1B2C3D4E5', CTX);

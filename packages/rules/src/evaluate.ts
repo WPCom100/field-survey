@@ -98,7 +98,7 @@ export function evaluate(snap: Snapshot, rules: readonly Rule[], index: Snapshot
           key,
           lint_id: lintId,
           rule_id: rule.id,
-          subject: { ...f.subject, ...(f.discriminator != null ? { discriminator: f.discriminator } : {}) },
+          subject: { ...f.subject, ...(f.discriminator != null ? { discriminator: f.discriminator } : {}), ...(f.fix ? { fix: { ...f.fix } } : {}) },
           level_id: f.level_id ?? f.subject.level_id ?? null,
           message: f.message,
         });

@@ -472,8 +472,13 @@ describe('the registry', () => {
         'R3c Missing all Device Neuron IDs',
       ].sort(),
     );
-    expect(a.findings.map((f) => f.lint_id).sort()).toEqual(['Acc', 'R1.no_item']);
-    expect(RULES.map((r) => r.id)).toEqual(['R1', 'R2a', 'R2b', 'R2c', 'R2d', 'R2e', 'R2f', 'R3a', 'R3b', 'R3c', 'R3d', 'R3f', 'R4a', 'R4b', 'R4d', 'E5', 'Acc']);
+    // the T36 lints name what the drafts would add: the rack's 120V, the panel's P, the Neuron item
+    expect(a.findings.map((f) => f.lint_id).sort()).toEqual(['Acc', 'R1.no_item', 'lint.neuron_item', 'lint.power_120v', 'lint.relay_cables'].sort());
+    expect(RULES.map((r) => r.id)).toEqual([
+      'R1', 'R2a', 'R2b', 'R2c', 'R2d', 'R2e', 'R2f', 'R3a', 'R3b', 'R3c', 'R3d', 'R3f', 'R4a', 'R4b', 'R4d', 'E5', 'Acc',
+      'lint.power_120v', 'lint.relay_cables', 'lint.item_owner', 'lint.neuron_item', 'lint.vocab', 'lint.far_end', 'lint.end_status',
+      'lint.neuron_dup', 'lint.id_dup', 'lint.deleted_link', 'lint.pin_sheet', 'lint.locked_drafts',
+    ]);
     const empty = run(new Build(), RULES);
     expect(empty).toMatchObject({ proposals: [], findings: [], upkeep: [], problems: [] });
   });

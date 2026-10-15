@@ -167,12 +167,39 @@ export interface VocabRow extends Deletable {
   canonical_of_id: string | null;
 }
 
+/** A plan sheet, for the pin-outside-the-sheet lint (T36): its size in PDF points. */
+export interface SheetRow extends Deletable {
+  id: string;
+  level_id: string;
+  width_pt: number | null;
+  height_pt: number | null;
+}
+
+/**
+ * A photo, reduced to what the deleted-link lint reads (T36). The engine loads only live photos
+ * whose device is deleted (a project holds thousands of photos and no other rule reads them).
+ */
+export interface PhotoRow extends Deletable {
+  id: string;
+  level_id: string;
+  number: number | null;
+  device_id: string | null;
+}
+
+/** An unreviewed setup draft (`draft_device` / `draft_cable` in state `proposed`), for the locked-level lint (T36). */
+export interface DraftRow extends Deletable {
+  id: string;
+  kind: 'device' | 'cable';
+  level_id: string | null;
+  state: string;
+}
+
 export type ProposalState = 'proposed' | 'accepted' | 'edited' | 'rejected' | 'superseded';
 export type ProposalKind = 'punch' | 'part' | 'cable' | 'status' | 'note';
 
 /** What a proposal or finding is about. `level_id` lets screens filter by level. */
 export interface Subject {
-  entity_kind: 'device' | 'cable_end' | 'cable' | 'punch_item' | 'missing_part' | 'accessory' | 'level' | 'numbering_group' | 'project';
+  entity_kind: 'device' | 'cable_end' | 'cable' | 'punch_item' | 'missing_part' | 'accessory' | 'photo' | 'level' | 'numbering_group' | 'project';
   entity_id: string;
   level_id?: string | null;
 }
@@ -198,7 +225,7 @@ export interface FindingRow extends Deletable {
   project_id: string;
   level_id: string | null;
   lint_id: string;
-  subject: (Subject & { discriminator?: string | null }) | null;
+  subject: (Subject & { discriminator?: string | null; fix?: { field: string; from: string; to: string | null } }) | null;
   message: string | null;
   state: FindingState;
   dismissed_reason: string | null;
@@ -221,6 +248,9 @@ export interface Snapshot {
   vocab: VocabRow[];
   proposals: ProposalRow[];
   findings: FindingRow[];
+  sheets: SheetRow[];
+  photos: PhotoRow[];
+  drafts: DraftRow[];
 }
 
 /** An empty snapshot; tests and the engine start from it. */
@@ -242,6 +272,9 @@ export function emptySnapshot(projectId: string): Snapshot {
     vocab: [],
     proposals: [],
     findings: [],
+    sheets: [],
+    photos: [],
+    drafts: [],
   };
 }
 
@@ -284,6 +317,7 @@ export interface SnapshotIndex {
   partsByDevice: Map<string, MissingPartRow[]>;
   sourcesByPart: Map<string, PartSourceRow[]>;
   libraryType: Map<string, LibraryTypeRow>;
+  sheet: Map<string, SheetRow>;
   /** Live punch items and parts by the proposal they were accepted from. */
   recordsByProposal: Map<string, (PunchItemRow | MissingPartRow)[]>;
   /** The other end of a cable end (null when the cable has one end so far). */
@@ -327,6 +361,7 @@ export function indexSnapshot(s: Snapshot): SnapshotIndex {
     partsByDevice: groupBy(parts, (m) => m.device_id),
     sourcesByPart: groupBy(live(s.partSources), (ps) => ps.missing_part_id),
     libraryType: byId(live(s.libraryTypes)),
+    sheet: byId(live(s.sheets ?? [])),
     recordsByProposal,
     otherEnd(end) {
       const pair = endsByCable.get(end.cable_id) ?? [];

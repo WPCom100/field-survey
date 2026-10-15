@@ -183,7 +183,10 @@ export default function NeedsReviewScreen() {
           ListFooterComponent={
             kind === 'lint' && list?.findings.length ? (
               <View>
-                <Text style={styles.sectionHead}>Lint findings ({list.findings.length}) — read-only</Text>
+                <Text style={styles.sectionHead}>Lint findings ({list.findings.length})</Text>
+                <Pressable onPress={() => router.push({ pathname: '/lint', params: projectId ? { project: projectId } : {} })} style={styles.row}>
+                  <Text style={styles.link}>Open the Lint view to dismiss or fix them ▸</Text>
+                </Pressable>
                 {list.findings.map((f) => (
                   <FindingItem key={f.id} finding={f} />
                 ))}

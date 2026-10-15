@@ -112,7 +112,7 @@ describe('reconcileFindings', () => {
     return s;
   };
 
-  it('opens, updates, resolves and reopens findings; dismissed ones stay; others\' lints untouched', () => {
+  it('opens, updates, resolves and reopens findings; others\' lints untouched', () => {
     const out = evaluate(issue(), [ISSUE_RULE]);
     const c1 = reconcileFindings({ projectId: PROJECT, existing: [], output: out.findings, lintIds: LINTS });
     expect(c1[0]).toMatchObject({ kind: 'create', entity: 'finding', payload: { state: 'open', lint_id: 'T.issue.none', message: '06M-01 is Issue with no open punch item' } });
@@ -130,9 +130,35 @@ describe('reconcileFindings', () => {
     expect(reconcileFindings({ projectId: PROJECT, existing, output: reworded, lintIds: LINTS })).toEqual([
       { kind: 'set', entity: 'finding', id: existing[0]!.id, fields: { message: 'new words', level_id: out.findings[0]!.level_id } },
     ]);
-    // dismissed stays dismissed, the import's findings are not ours to resolve
-    existing[0]!.state = 'dismissed';
+    // the import's findings are not ours to resolve
     const imported: FindingRow = { id: 'i1', project_id: PROJECT, level_id: null, lint_id: 'import.endpoint', subject: { entity_kind: 'cable_end', entity_id: END_A }, message: 'x', state: 'open', dismissed_reason: null, deleted_at: null };
-    expect(reconcileFindings({ projectId: PROJECT, existing: [...existing, imported], output: [], lintIds: LINTS })).toEqual([]);
+    expect(reconcileFindings({ projectId: PROJECT, existing: [imported], output: [], lintIds: LINTS })).toEqual([]);
+  });
+
+  it('D178: a dismissed finding stays while its message holds, reopens when the message changes, and resolves when the condition goes', () => {
+    const out = evaluate(issue(), [ISSUE_RULE]);
+    const id = out.findings[0]!.id;
+    const dismissed = (): FindingRow[] =>
+      applyChanges<FindingRow>([], reconcileFindings({ projectId: PROJECT, existing: [], output: out.findings, lintIds: LINTS }), 'finding').map((r) => ({
+        ...r,
+        state: 'dismissed' as const,
+        dismissed_reason: 'EC already told by email',
+      }));
+    // same facts → nothing written, the reason stays
+    expect(reconcileFindings({ projectId: PROJECT, existing: dismissed(), output: out.findings, lintIds: LINTS })).toEqual([]);
+    // the facts changed (the message names them) → open again, reason cleared
+    const changed = [{ ...out.findings[0]!, message: '06M-01 is Issue with no open punch item (2 ends Not installed)' }];
+    expect(reconcileFindings({ projectId: PROJECT, existing: dismissed(), output: changed, lintIds: LINTS })).toEqual([
+      { kind: 'set', entity: 'finding', id, fields: { state: 'open', dismissed_reason: null, message: changed[0]!.message, level_id: out.findings[0]!.level_id } },
+    ]);
+    // the condition went away → resolved (the dismissal covered that occurrence)…
+    const gone = reconcileFindings({ projectId: PROJECT, existing: dismissed(), output: [], lintIds: LINTS });
+    expect(gone).toEqual([{ kind: 'set', entity: 'finding', id, fields: { state: 'resolved' } }]);
+    // …and when it comes back it is raised again, the old reason cleared
+    const resolved = applyChanges(dismissed(), gone, 'finding');
+    expect(resolved[0]).toMatchObject({ state: 'resolved', dismissed_reason: 'EC already told by email' });
+    expect(reconcileFindings({ projectId: PROJECT, existing: resolved, output: out.findings, lintIds: LINTS })).toEqual([
+      { kind: 'set', entity: 'finding', id, fields: { state: 'open', message: out.findings[0]!.message, level_id: out.findings[0]!.level_id, dismissed_reason: null } },
+    ]);
   });
 });

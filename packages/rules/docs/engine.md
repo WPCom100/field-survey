@@ -1,14 +1,15 @@
-# `packages/rules` engine (T33) and rules (T34)
+# `packages/rules` engine (T33), rules (T34) and lint checks (T36)
 
 How rules run on the iPad. Normative references: PLAN §6 (rule engine), CLAUDE.md §4 (rules
 produce proposals and findings, never records except on Accept — with D170's one exception),
-D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34's readings).
+D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34's readings), D178
+(dismissed findings, T36).
 
 ## Files
 
 | File | What |
 |---|---|
-| `src/snapshot.ts` | `Snapshot` (one array per table, client columns, deleted rows included) and `indexSnapshot()` (maps by id, by level, by device, ends per cable, `otherEnd()`, records by proposal). |
+| `src/snapshot.ts` | `Snapshot` (one array per table, client columns, deleted rows included) and `indexSnapshot()` (maps by id, by level, by device, ends per cable, `otherEnd()`, records by proposal). T36 adds `sheets`, `drafts` (unreviewed `draft_device` / `draft_cable` only) and `photos` (only live photos whose device is deleted). |
 | `src/rule.ts` | `Rule { id, title, text, lints?, run(ctx) }`, `RuleContext { snap, index, propose(), find() }`, keys and ids. |
 | `src/evaluate.ts` | `evaluate(snap, rules)`: runs every rule, dedupes by key, hashes inputs; a throwing rule is reported, not fatal. |
 | `src/reconcile.ts` | The state machine as pure diffs: existing rows + this run's output → `create` / `set` changes. |
@@ -18,6 +19,8 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | `src/rules/index.ts` | `RULES`, the registry the app runs, and the rule exports. |
 | `src/rules/shared.ts` | Helpers: signal words, `targetOf` (how item text names the far end), `terminationItem`, `waitsForSurvey` (R5), level / ID ordering. |
 | `src/rules/r1.ts` … `e5.ts` | The rules, one file per family (below). |
+| `src/rules/lint.ts` | The PLAN §6.3 checks the rules above do not raise (T36), `LINT_RULES`, `VOCAB_FIELDS`. |
+| `src/lints.ts` | `LINT_CHECKS` (every lint id under its §6.3 check, with a hint, in the lint view's order), `checkOf`, `rulingSeeds` (the "fix all via ruling" hand-off to T37). |
 | `src/rules/quick.ts` | Quick actions E6 / E7 / E9: `runQuickAction(editor, deviceId, action)` writes the records at once (a person tapped). |
 | `src/testing/sample.ts`, `src/testing/build.ts` | A two-device snapshot with two sample rules, and the snapshot builder the rule tests use. |
 
@@ -43,6 +46,34 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | E5 | `status` draft on the 0-10V end + `punch` draft on the device | ERP-FT-LVD found < expected → end `Issue` with `extra {note: "Not landed", status_source: derived}`; "Land 0-10V control wiring" (`Wiring`, `EC`) unless R3a's Termination branch already raises it. |
 | Acc | finding, discriminator = accessory id | Any accessory found < expected (D52). |
 | E6 / E7 / E9 | quick actions | See `quick.ts`: Spot-check fixed, Non-ETC device (make), Relocated (new room). |
+
+## Lint checks (T36, PLAN §6.3)
+
+| §6.3 check | Lint id | Raised on |
+|---|---|---|
+| NSPS/rack without 120V | `lint.power_120v` | the device (R2d offers the row) |
+| Relay panel without P or 0-10V | `lint.relay_cables` (discriminator = code) | the device (R2c offers the row) |
+| Issue device without open item | `R1.no_item` | the device |
+| Item without Owner | `lint.item_owner` | the punch item |
+| Neuron ID item missing / not last | `lint.neuron_item` | the numbering group (no item while a device lacks an ID) or the item (`sort_last` false) |
+| Value outside vocabulary | `lint.vocab`, `R3f` | the record: an old spelling (`vocab.canonical_of`; `fix` = field, from, canonical), a category outside CLAUDE.md §3 + `vocab(category)`, a cable code outside the master's; R3f for item text |
+| Cable with missing far end | `lint.far_end` | the end that has an endpoint (one end only, or the far end names no device/placeholder) |
+| Ends with different code / incompatible statuses | `lint.end_status` | the `Not installed` end when the other is `Complete` / `Installed, untested`; a code mismatch cannot happen (one cable, one code) |
+| To ≠ riser | `R2b` | the A end |
+| Duplicate Neuron ID | `lint.neuron_dup` | each device (case-insensitive) |
+| — (T13: duplicate device ID, D88) | `lint.id_dup` | each live device |
+| Link to deleted device | `lint.deleted_link` | the punch item, part, end or photo |
+| Pin outside sheet | `lint.pin_sheet` | the device (outside `width_pt` × `height_pt`, or on a deleted sheet) |
+| Level locked with unreviewed drafts | `lint.locked_drafts` | the level |
+| Accessory found < expected | `Acc` | the device (discriminator = accessory) |
+
+A finding may carry `fix: {field, from, to}` (stored in its `subject`): the vocabulary lint's
+rename for "Fix all via ruling"; put `from` in the discriminator so another value is another
+finding. **Messages are the inputs** (D178): name the facts (IDs, values, counts) and nothing
+volatile — a dismissed finding reopens when its message changes.
+
+Over the master (TP-8) the lints raise exactly the 12 `lint.far_end` findings of the cables the
+import left unresolved (D126); `master.test.ts` pins them.
 
 Upkeep (D170) is the one output a rule applies without an Accept: `ctx.maintain({entity, id,
 fields, proposal_id, why})`. The engine writes the changed fields as one group per record,
@@ -116,8 +147,10 @@ upkeep (D170, R3c only so far).
 A live record citing the proposal (`proposal_id`) makes the row `accepted` (`edited` when the
 record's fields differ from the payload) on every iPad, from the record alone.
 
-Findings: `open` ↔ `resolved` follow the output; `dismissed` stays dismissed (T36 adds the
-reason and reappearance on input change).
+Findings: `open` ↔ `resolved` follow the output. `dismissed` (D178, T36: `RuleEngine.dismiss(id,
+reason)`, a reason required; `reopen(id)` undoes it): the same message → stays; a different
+message → `open`, reason cleared; no output → `resolved` (reason kept), so it is raised again if
+it returns.
 
 ## Ids and sync (D169)
 

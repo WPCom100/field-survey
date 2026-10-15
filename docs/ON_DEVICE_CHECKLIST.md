@@ -175,6 +175,23 @@ Decision D175: **approved** (Landry, 2026-10-15) as the defaults; D176 makes eve
 
 Decision D177: answered 2026-10-15, **Approved** — "the start of the run holds the item" (side A in the data). Nothing to answer here.
 
+## T36 — Lint view: findings by check, dismiss with a reason  ·  Needs: no new build (JS update)
+
+**Why it matters:** the rules' findings and the PLAN §6.3 checks now have their own screen; a finding can be dismissed with a reason and comes back when its facts change, so nothing is silenced for good by mistake.
+
+- [ ] **Open it.** On the Levels home tap **Lint** in the sidebar (the Tower round project): the title reads `Lint (<n> open · 0 dismissed)`; groups are listed by check, starting with the PLAN §6.3 ones (e.g. `Issue device without open punch item (…)`, `Cable with missing far end (…)`). Note the open count here. → saw:
+- [ ] **The master's unresolved far ends.** `Cable with missing far end` lists the runs whose far end the import could not pair (the UFMP4 #1/#2 and (7) runs on 01, 03 and 04, and a few DMX/network runs on 01–04: 12 on a fresh import of the master). Each also sits in Needs review → Import pair. → saw:
+- [ ] **Filter and group.** Tap a level chip: only that level's findings stay. Tap **Group by → Level**: one group per level, each row naming its check. Tap a group header: it folds and unfolds. → saw:
+- [ ] **Open card.** Select a finding on a device, tap **Open card ▸**: the plan opens on that level with the device's card. Back returns to Lint. → saw:
+- [ ] **Dismiss with a reason.** Select an `Issue device without open punch item` finding → **Dismiss…** → the **Dismiss** button stays disabled until a reason is picked or typed; pick `Checked on site: correct as is` → **Dismiss**: the row leaves the list, the title counts one more dismissed, **Show → Dismissed** lists it with the reason. → saw:
+- [ ] **It comes back when the facts change.** On that device's card set the status to anything but Issue, wait a second, then set it back to **Issue**: the finding is open again in Lint (the dismissal covered the earlier occurrence). For a message that names facts (e.g. `Duplicate Neuron ID … also on 02-S2`), changing those facts reopens it too. → saw:
+- [ ] **Reopen.** In **Show → Dismissed** select a dismissed finding → **Reopen**: it is back under Open. → saw:
+- [ ] **Two iPads.** Dismiss a finding on iPad A, sync both: iPad B's Lint shows it dismissed with A's reason; Needs review stays empty. → saw:
+- [ ] **Fix all via ruling.** If a `Value outside vocabulary` group exists (a category outside the list, or an old spelling once T40 seeds the vocabulary), its header lists `"<value>" ×n` with **Fix all via ruling ▸**: tapping it explains what the ruling will do and that the editor arrives with T37. Nothing is changed. → saw:
+- [ ] **Links into Lint.** Needs review → **Lint** tab → `Open the Lint view to dismiss or fix them ▸` opens Lint; Export's pre-flight `See the <n> lint findings ▸` opens Lint too. → saw:
+
+Decision D178 (Proposed): a dismissed finding stays dismissed while it says the same thing, comes back when its message (the facts it names) changes, and is raised again if its condition clears and returns. → Approve / change:
+
 ---
 
 ## Rules for this file

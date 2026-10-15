@@ -32,7 +32,23 @@ export interface FindingInput {
   /** Defaults to the rule's id; a rule that raises several lints names each (`R1.untested`). */
   lint_id?: string;
   level_id?: string | null;
+  /**
+   * What message the finding shows. It names the facts the finding follows from: a dismissed
+   * finding reopens when its message changes (D178).
+   */
   message: string;
+  /**
+   * A vocabulary fix the lint view can hand to a ruling (T36 → T37): set `field` from `from` to
+   * `to` (null: the ruling picks the value). Stored on the row's `subject`; put `from` in the
+   * discriminator so a different value is a different finding.
+   */
+  fix?: FindingFix;
+}
+
+export interface FindingFix {
+  field: string;
+  from: string;
+  to: string | null;
 }
 
 /**
@@ -89,7 +105,7 @@ export interface FindingOutput {
   key: string;
   lint_id: string;
   rule_id: string;
-  subject: Subject & { discriminator?: string | null };
+  subject: Subject & { discriminator?: string | null; fix?: FindingFix };
   level_id: string | null;
   message: string;
 }

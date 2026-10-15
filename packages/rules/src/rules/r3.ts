@@ -132,7 +132,7 @@ export const R3b: Rule = {
 
 // ------------------------------------------------------------------ R3c
 
-function isNeuronItem(p: PunchItemRow): boolean {
+export function isNeuronItem(p: PunchItemRow): boolean {
   return p.rule_id === 'R3c' || p.item === NEURON_ITEM;
 }
 

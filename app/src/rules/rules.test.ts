@@ -33,7 +33,8 @@ describe('the rules over the demo card', () => {
     expect(card.drafts.map((d) => `${d.ruleId} ${d.title}`).sort()).toEqual(
       ['R2c cable', 'R3a Land 0-10V control wiring', 'R3a Run Unison to Stations & Sensors', 'R3b Terminate DMX to 06M-03'].sort(),
     );
-    expect(card.findings.map((f) => f.lintId).sort()).toEqual(['Acc', 'R1.untested']);
+    // T36: the panel has no P row, so the lint names what the R2c draft would add
+    expect(card.findings.map((f) => f.lintId).sort()).toEqual(['Acc', 'R1.untested', 'lint.relay_cables']);
     const decider = ruleDecider(store, pid, ME);
     expect(decider.wired).toBe(true);
     const r3b = card.drafts.find((d) => d.ruleId === 'R3b')!;

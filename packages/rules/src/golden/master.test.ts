@@ -257,11 +257,34 @@ const IMPORT_FINDINGS = [
   "03 C-14: From 'UFMP4 #1, #2' matches no device or placeholder",
 ];
 
-/** Open findings the rules raised (the import's `import.*` ones set aside, and checked to be the four known). */
-async function ruleFindings(m: Master) {
+/**
+ * The lint view's "Cable with missing far end" over the master (T36): the twelve cables whose far
+ * end the import left unresolved (D126; the import lists them as `import_pair` reviews and
+ * findings), as `<end> <message>`. A real finding over the master, not a rule difference.
+ */
+const FAR_END_FINDINGS: readonly string[] = [
+  '01/C-05 C-05: DMX cable, the far end names no device or placeholder',
+  '01/C-12 C-12: DMX cable, the far end "UFMP4 (7)" names no device or placeholder',
+  '02/C-01 C-01: DMX cable, the far end names no device or placeholder',
+  '02/C-02 C-02: DMX cable, the far end names no device or placeholder',
+  '02/C-05 C-05: DMX cable, the far end names no device or placeholder',
+  '03/C-01 C-01: DMX cable, the far end "UFMP4 #1, #2" names no device or placeholder',
+  '03/C-02 C-02: DMX cable, the far end names no device or placeholder',
+  '03/C-05 C-05: network cable, the far end names no device or placeholder',
+  '03/C-07 C-07: DMX cable, the far end names no device or placeholder',
+  '04/C-02 C-02: DMX cable, the far end "UFMP4 #1, #2" names no device or placeholder',
+  '04/C-12 C-12: network cable, the far end names no device or placeholder',
+  '(unnumbered) NEW: DMX cable, the far end "UFMP4 #1, #2" names no device or placeholder',
+];
+
+/** Open findings the rules raised (the import's `import.*` ones set aside, and checked to be the four known; the twelve far ends checked and set aside too). */
+async function ruleFindings(m: Master, labels?: Labels) {
   const all = await m.engine.openFindings();
   expect(all.filter((f) => f.lint_id.startsWith('import.')).map((f) => f.message).sort()).toEqual(IMPORT_FINDINGS);
-  return all.filter((f) => !f.lint_id.startsWith('import.'));
+  const far = all.filter((f) => f.lint_id === 'lint.far_end');
+  if (labels) expect(far.map((f) => `${labels.endById.get(f.subject!.entity_id) ?? '(unnumbered)'} ${f.message}`).sort()).toEqual([...FAR_END_FINDINGS].sort());
+  else expect(far).toHaveLength(FAR_END_FINDINGS.length);
+  return all.filter((f) => !f.lint_id.startsWith('import.') && f.lint_id !== 'lint.far_end');
 }
 
 // ------------------------------------------------------------------- tests
@@ -289,7 +312,7 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
     for (const d of KNOWN_DIFFERENCES) if (d.master) labels.punch(d.master);
     const r1 = await m.engine.run();
     expect(r1.problems).toBe(0);
-    expect(r1.findings).toBe(0);
+    expect(r1.findings).toBe(FAR_END_FINDINGS.length);
     const rows = await openProposals(m);
     const got = rows.map((p) => key({ rule: p.rule_id, where: labels.whereOf(p), item: String(p.payload?.item) }));
     expect(sorted(got)).toEqual(sorted(KNOWN_DIFFERENCES.map(key)));
@@ -301,7 +324,7 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
       else if (p.discriminator === 'terminate') expect(p.payload).toMatchObject({ type: 'Termination' });
       else expect(p.payload).toMatchObject({ type: 'Cable not run', owner: 'EC' });
     }
-    expect(await ruleFindings(m)).toEqual([]);
+    expect(await ruleFindings(m, labels)).toEqual([]);
     // R3c: the master's Neuron items get their Notes (empty in the workbook) — one "Rule engine R3c" op each, nothing else touched
     expect(r1.upkeep).toBe(7);
     const snap = await m.engine.loadSnapshot();
@@ -326,7 +349,8 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
     const { out } = await m.engine.plan(d171View(snap, labels));
     const got = out.proposals.map((p) => key({ rule: p.rule_id, where: labels.whereOf(p), item: String(p.payload.item) }));
     expect(sorted(got)).toEqual(sorted(KNOWN_DIFFERENCES.filter((d) => !d.copied).map(key)));
-    expect(out.findings).toEqual([]);
+    expect(out.findings.filter((f) => f.lint_id !== 'lint.far_end')).toEqual([]);
+    expect(out.findings.filter((f) => f.lint_id === 'lint.far_end')).toHaveLength(FAR_END_FINDINGS.length);
   });
 
   it('R3c: without the master\'s Neuron ID items the engine proposes one per numbering group, on its first level, listing the IDs still missing', async () => {
@@ -439,7 +463,7 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
     expect((await ruleFindings(m)).map((f) => [f.lint_id, labels.deviceById.get(f.subject!.entity_id), f.message]).sort()).toEqual(
       panels.map((p) => ['Acc', p.device, `ERP-FT-LVD: found ${p.found} of ${p.expected}`]).sort(),
     );
-    expect(r1.findings).toBe(3);
+    expect(r1.findings).toBe(3 + FAR_END_FINDINGS.length);
     // before the survey found them: the Land items gone and the 0-10V ends not yet Issue → E5 proposes both
     await m.editor.group(CTX, async (g) => {
       for (const p of panels) {

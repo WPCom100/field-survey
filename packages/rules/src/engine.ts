@@ -129,6 +129,36 @@ export class RuleEngine {
       list<Snapshot['proposals'][number]>('proposal', 'project_id = ?'),
       list<Snapshot['findings'][number]>('finding', 'project_id = ?'),
     ]);
+    // T36 lints: sheets (pin outside the sheet), unreviewed drafts (locked level), and only the
+    // live photos whose device is deleted (deleted link) — not the project's thousands of photos.
+    const [sheets, draftDevices, draftCables, photos] = await Promise.all([
+      list<Row>('sheet', levels),
+      this.store.list<Row>('draft_device', { where: `project_id = ? AND state = 'proposed'`, params: [p] }),
+      this.store.list<Row>('draft_cable', { where: `project_id = ? AND state = 'proposed'`, params: [p] }),
+      this.store.list<Row>('photo', {
+        where: `${levels} AND device_id IN (SELECT id FROM device WHERE deleted_at IS NOT NULL)`,
+        params: [p],
+        orderBy: 'id',
+      }),
+    ]);
+    s.sheets = sheets.map((r) => ({
+      id: String(r.id),
+      level_id: String(r.level_id),
+      width_pt: typeof r.width_pt === 'number' ? r.width_pt : null,
+      height_pt: typeof r.height_pt === 'number' ? r.height_pt : null,
+      deleted_at: (r.deleted_at as string | null) ?? null,
+    }));
+    s.drafts = [
+      ...draftDevices.map((r) => ({ id: String(r.id), kind: 'device' as const, level_id: (r.level_id as string | null) ?? null, state: String(r.state), deleted_at: null })),
+      ...draftCables.map((r) => ({ id: String(r.id), kind: 'cable' as const, level_id: (r.level_id as string | null) ?? null, state: String(r.state), deleted_at: null })),
+    ];
+    s.photos = photos.map((r) => ({
+      id: String(r.id),
+      level_id: String(r.level_id),
+      number: typeof r.number === 'number' ? r.number : null,
+      device_id: (r.device_id as string | null) ?? null,
+      deleted_at: null,
+    }));
     return s;
   }
 
@@ -279,6 +309,38 @@ export class RuleEngine {
     });
     this.log('info', decision.kind, { proposal: row.id, rule: row.rule_id, records: recordIds.length, known_rule: !!rule });
     return { state, recordIds, ops: ops.length };
+  }
+
+  // -------------------------------------------------------------- findings (T36)
+
+  /**
+   * Dismiss a finding with a reason (Phase 3 §9). One `Field survey` group, reason `Dismiss
+   * <lint>: <reason>`. It stays dismissed while the rule says the same thing and reopens when
+   * the message changes or the condition clears and returns (D178, `reconcile.ts`).
+   */
+  async dismiss(findingId: string, reason: string): Promise<number> {
+    const text = reason.trim();
+    if (!text) throw new DecideError('A dismissal needs a reason');
+    const row = await this.store.get<FindingRow>('finding', findingId);
+    if (!row || row.deleted_at) throw new DecideError(`Unknown finding ${findingId}`);
+    if (row.state !== 'open') throw new DecideError(`This finding is ${row.state}`);
+    const ops = await this.editor.group({ change_type: 'Field survey', reason: `Dismiss ${row.lint_id}: ${text}`.slice(0, 500) }, (g) =>
+      g.setFields('finding', row.id, { state: 'dismissed', dismissed_reason: text }),
+    );
+    this.log('info', 'dismiss', { finding: row.id, lint: row.lint_id });
+    return ops.length;
+  }
+
+  /** Undo a dismissal: the finding is open again (the next run resolves it if the condition is gone). */
+  async reopen(findingId: string): Promise<number> {
+    const row = await this.store.get<FindingRow>('finding', findingId);
+    if (!row || row.deleted_at) throw new DecideError(`Unknown finding ${findingId}`);
+    if (row.state !== 'dismissed') throw new DecideError(`This finding is ${row.state}`);
+    const ops = await this.editor.group({ change_type: 'Field survey', reason: `Reopen ${row.lint_id}` }, (g) =>
+      g.setFields('finding', row.id, { state: 'open', dismissed_reason: null }),
+    );
+    this.log('info', 'reopen', { finding: row.id, lint: row.lint_id });
+    return ops.length;
   }
 
   /**
