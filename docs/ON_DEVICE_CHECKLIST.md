@@ -147,7 +147,7 @@ Decision D145: answered 2026-10-14, **Approved**. Whether you want a **Discard**
 - [ ] **Nothing on a real project.** Open the Tower M3 round project's 06M plan and a device card: no drafts, no errors; DevTools shows `[rules] run` with `rules: 0` and `ops: 0` once after launch and once about half a second after each edit or sync that brought ops. Why: the trigger is live; with no rules registered it must write nothing. → saw:
 - [ ] **Sync still clean.** After the demo decisions, the Sync screen on a real project shows nothing pending from the demo (the demo database never syncs) and no "need attention" ops. → saw:
 
-Decision D169: proposals and findings are synced records with ids derived from their key (the same on every iPad); a second create of the same row keeps the first one's heads; decisions ride on the records they create. → Approve / change:
+Decision D169: **approved** (Landry, 2026-10-15); nothing to answer here.
 
 ---
 

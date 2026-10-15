@@ -198,10 +198,10 @@ Pure TypeScript over an in-memory project snapshot (no DB, no React; the same pa
 | Rule | Trigger | Output |
 |---|---|---|
 | R1 | Device status or its ends/items change | Findings: "Installed, untested with outstanding wiring/termination" (suggest Issue); "Issue device with no open punch item"; "Complete used" while `completion_phase=false` |
-| R2a | End status set | Default Note "Not run" (Not installed) / "Run, not terminated" (+ "; no term kit" when X) if Note empty; lint on mismatch |
+| R2a | End status set | No auto-filled Note (D172): "Not run" (Not installed) / "Run, not terminated" (+ "; no term kit" when X) are offered as chips; lint on mismatch |
 | R2b | End endpoint ≠ `riser_to_label` | Finding "To does not match the riser" |
 | R2c/R2d/R2e | Library | 0-10V single row To `Fixtures`; P single row To `EBDK panic wire`, default `Installed, untested`; 120V single row (NSPS `P-NSPS-D Power Supply`, rack `Equipment rack` — D52); one Unison pair per level `Stations & Sensors` ↔ NSPS (or rack where no NSPS) |
-| R2f | Other end surveyed, this end not | `status_source=copied`, Note "(per Level NN)"; none known → `No access` "Not surveyed"; far level out of scope → `Not started` |
+| R2f | Other end surveyed, this end not | Nothing is copied (D171): the end stays empty (`Unsurveyed`, D110/D138) until someone surveys it; far level out of scope → `Not started` |
 | R3a | End `Not installed` | Punch "Run <signal> to <other end>", `Cable not run`, `EC`, surveyed end only (E3); → Termination item when the end becomes Issue |
 | R3b | DMX end Issue "no term kit" | Device item `Missing part`, `EC/ETC`, "Waiting on DMX Termination Kits" |
 | R3c | Numbering group exists | "Missing all Device Neuron IDs", `Information`, `EC`, `sort_last`; Notes = IDs with null `neuron_id`; auto-close when empty, reopen on a new device without ID (D49) |
