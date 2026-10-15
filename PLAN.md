@@ -183,7 +183,7 @@ Capture → JPEG + 320-px thumb → SHA-256 → `photo` record syncs at once, by
 | Rulings (§8) | Reason, scope, filter builder, action (set / rename phrase / append note / generate item), standing toggle, preview table with untick, apply → Ruling ops |
 | Lint (§9) | Findings grouped by check; dismiss with reason; "fix all via ruling" |
 | Library (§10) | Two scopes (D65): the **app library** (opened from the Projects list, no project needed) and the **project library**. Types with aliases, ID scheme, default/optional cables, optional accessories; drafts usable immediately, flagged until accepted (D48); free-typed field-addition models create project drafts (D55); "Promote to app library" on accepted project types; new projects copy from the app library. The app library syncs on its own op log, `/library/ops` (D184): same op format, review and history as a project, offline too |
-| Setup (§3) | Create project → Levels (with "Add range") → Sources (BOM, riser, per-level display + source sheets, seed import, extraction job) → Review drafts per level with source crops and mismatch list → Place devices from the unplaced list with ID/tag/Drawing Position/Room confirm → Lock baseline per level |
+| Setup (§3) | Create project → Levels (with "Add range") → Sources (BOM, riser, per-level display + source sheets, seed import, extraction job) → Review drafts per level with source crops and mismatch list → Place devices from the unplaced list with ID/tag/Drawing Position/Room confirm → Lock baseline per level. Review (T44, D193): Accept marks a device draft reviewed — its devices are made when placed; a cable draft becomes its cable once both ends are records (or links the one the baseline has); **Confirm endpoint** = Accept with `endpoint_confirmed` (D6) |
 | Export (§11) | Workbook: levels, tabs, pre-flight (lint, review, unsynced); server job; history with diff vs previous. Floor PDF: options per §8.7 |
 | Sync & uploads (§12) | Connection, last sync seq, pending edits, photos waiting, cached levels, storage, install/app version, re-sign-in, export local log |
 
@@ -301,7 +301,7 @@ Cover: "ETC Lighting Controls Survey — Level NN", "Surveyed <date>" only (R7),
 | `POST /ops` · `GET /ops?project&since` | push / pull (§3.2) |
 | `POST /blobs/{sha}` · `PUT …/chunks/{n}` · `GET /blobs/{sha}` · `POST …/complete` · `GET …/content` | resumable blobs |
 | `GET /projects` · `POST /projects` (+ levels, copy-from) | project list and creation (server-side so numbering groups exist before any op); the project, its groups, levels and copies are written as ops so an iPad pulls them (D127) |
-| `POST /imports` · `GET /imports/{id}` | setup and seed jobs; drafts delivered as ops |
+| `POST /imports` · `GET /imports/{id}` · `GET /imports/{id}/crop` | setup and seed jobs; drafts delivered as ops; a draft's source crop as PNG (T44) |
 | `POST /exports` · `GET /exports/{id}` · `GET /exports?project` · `POST /exports/{id}/cancel` | workbook / floor PDF jobs and history; one queued or running per project and kind, stage and counts in `stats`, Cancel (D166) |
 | `GET /me` | user upsert from JWT |
 | `GET /health` | |

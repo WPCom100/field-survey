@@ -313,6 +313,30 @@ Decision D185: a type's `needs_neuron_id` is empty by default, meaning "the cate
 
 Decision D186 (Proposed): an optional run is offered once the runs before it of its code exist (an accepted type's defaults first, then the optional ones one at a time); a draft type offers its optional runs at once, a rejected type and a deleted device offer nothing; an accessory is offered while the device has no row of that model; both adds are `Field survey` edits (the cable and its two ends as one group, built by R2g's builder). → Approve / change:
 
+
+## T44 — Review drafts (devices, cables)  ·  Needs: no new build (JS update; server deploy first — the crop route is new)
+
+**Why it matters:** the BOM and the riser become reviewed drafts per level, with the paper next to each one, before anything is placed or locked. Nothing is accepted for you, and every Accept is recorded under your name. Use a **scratch project** with levels B2–06M (not the Tower round project), so nothing duplicates the seeded master.
+
+- [ ] **Upload.** Setup → **3 Sources** → **BOM and riser** → BOM **Choose PDF…** → `BOM.pdf`. The line reads Queued, then "Done: 108 device drafts, 17 excluded lines…". Then Riser → `riser.pdf`. About 12 minutes later it reads "Done: … cable drafts … Claude $…". → saw:
+- [ ] **Step 4 opens.** After a sync, **4 Review drafts** is live. Level chips show B2…06M plus **Pool** and the floors the project lacks (09, 10…). Each chip shows its open count, and the header reads "Devices n · Cables n · Needs review n". → saw:
+- [ ] **Source crops.** Tap a device row with Src **R+B**. The panel shows two crops: the BOM line and the riser symbol, each outlined in red. Tap a crop: it gets larger with more of the sheet around it. → saw:
+- [ ] **SR / LR.** On 01, a `P-DOC-C-?` row. Accept stays greyed with "Pick the model…". Pick LR → Accept. The row reads ✓ edited. → saw:
+- [ ] **BOM ≠ riser.** On 01, PI1004. The panel offers BOM 1 / Riser 2 radio buttons. Pick one → Accept. Needs review no longer lists that level's source conflict. → saw:
+- [ ] **Accept all ≥ 0.9.** On a level, tap **Accept all ✓ ≥ 0.9 (n)**. The dialog names you; confirm. Only clean rows turn ✓ accepted; flagged and conflict rows stay open. Open a device draft's History if shown, or check the Sync screen's pending count: one change per draft. → saw:
+- [ ] **Edit / Reject / Reopen.** Edit… a draft: change qty and level → **Save & accept** → ✓ edited. Reject another with a reason chip → ✗ rejected, and the **Rejected** filter lists it. **Reopen** → back to Open. → saw:
+- [ ] **Mismatch list.** Under the table, sentences like "BOM qty 1 ≠ riser 2 (PI1004)" and "Riser device not in the BOM: …". Tap one: its draft is selected. → saw:
+- [ ] **Excluded lines.** Devices tab → **Excluded BOM lines ▸** lists service lines, brackets and similar items with their reason. **Promote…** one → it appears as a draft with Src **BOM↑** and asks for a category before Accept. → saw:
+- [ ] **Cables tab.** Switch to Cables on 06M. Rows show Code · From · To · To-lvl; unresolved far ends read "— pick" in orange. The panel shows the riser crop with the **bubble** outlined. → saw:
+- [ ] **Endpoint picker.** On a cable whose To is unresolved, tap **Change…**. Candidates come first, a draft device that is already a device reads "(in the baseline)", and placeholders follow. Search finds devices on other levels. Pick one → the To line updates. → saw:
+- [ ] **Confirm endpoint.** Tap **Confirm endpoint ✓**. The note says the cable is made, or that it waits for its device to be placed. Open **Cable / riser**: the new cable is listed **without ⚑**, and its ends read like `DMX to Level 02 UFMP4`. A cable accepted with **Accept unconfirmed** shows ⚑. → saw:
+- [ ] **Hand drafts (K12).** **+ Draft device** → PI1002 · Station · qty 4 on 02 → Add. It lists with Src **hand** and can be accepted. **+ Draft cable** → NG, From `Equipment rack`, To `P-TS7-E` → Add, then pick both ends and Confirm. → saw:
+- [ ] **Needs review link.** Needs review → **Extraction** tab: a line counts the flagged drafts → **Open Setup → Review drafts ▸** opens step 4. A **Source conflict** item has **Open in Review drafts ▸**, which opens that draft selected. → saw:
+- [ ] **Offline.** Airplane mode: Accept, Reject and endpoint picks still save; crops and excluded lines say they need a connection. Back online, the edits sync. → saw:
+- [ ] **Second iPad.** After a sync, the other iPad shows the same states, and an accepted cable appears once in Cable / riser. → saw:
+
+Decision D193 (Proposed): Accept on a device draft only marks it reviewed; its devices are made when placed (step 5, T46), so a level seeded from the master is never duplicated. Accept on a cable draft makes the cable once both ends are real records; if the baseline already has that cable, it is linked instead. A cable whose end is a not-yet-placed draft device waits until that device is placed. **Confirm endpoint** = Accept plus "endpoints confirmed"; Accept all leaves cables unconfirmed. A source conflict is settled by Accept (the drafts' count) or Reject (the baseline's). Flagged drafts get no Needs review items: Needs review counts them and links to step 4. → Approve / change:
+
 ---
 
 ## Rules for this file

@@ -139,9 +139,18 @@ granularity"); the two known quantity conflicts come out as `qty:bom≠riser` on
 - A cable draft's far end on another level names the device by kind (`Equipment Rack 18U
   Level 06`) and links the rack draft when the riser has it; a relay panel named only by level
   (`Relay panel`, level 02) is text until the reviewer picks (T44's endpoint pickers, D6).
-- `cable.riser_ref` (T39's crop) needs a `sheet` row to point at; the riser PDF is a blob
-  (`stats.blob`) and `draft_cable.source_ref` carries `{page, bbox}` — T44 decides the sheet
-  row (a `riser` sheet kind without a level, or a blob-based `riser_ref`).
+- `cable.riser_ref` names the riser blob, not a `sheet` row (D191): T44's Accept on a riser
+  cable draft writes `{blob, file, page, bbox, draft}` (D193 (5)); the cable view renders it
+  in T106.
+
+## Review on the iPad (T44)
+
+Setup → 4 Review drafts reads these rows per level (D193). Its source crops come from
+`GET /imports/{id}/crop?page&bbox=x,y,w,h&pad&px` (`app/jobs/crops.py`): the stored PDF around
+the box with the box outlined in red, PNG, cacheable. Accept on a device draft only marks it
+reviewed (devices are made at placement, T46); Accept / **Confirm endpoint** on a cable draft
+makes the cable with both ends once both endpoints are records, or links the matching cable a
+seeded master already has.
 - The model's trunk-line reading is a judgement (0.5–0.85 on the Tower's inter-level DMX runs);
   line tracing over the vector segments would make it deterministic for text sheets.
 - OCR (tesseract) is not used on sheet 002; the model reads it. A scanned riser would go the

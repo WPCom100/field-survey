@@ -5,6 +5,7 @@ import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 
 import { AddDevicePanel } from '../additions/AddDevicePanel';
 import { openAppStore } from '../db';
+import { flaggedDraftCounts } from '../drafts/model';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
 import { useCurrentUser } from '../identity/IdentityGate';
@@ -86,6 +87,20 @@ export default function NeedsReviewScreen() {
     };
   }, [store, projectId, kind, levelId, sort, tick, dataKey]);
 
+  // Flagged extraction drafts (D11) wait in Setup → Review drafts; the Extraction tab links there (T44).
+  const [drafts, setDrafts] = useState<{ devices: number; cables: number } | null>(null);
+  useEffect(() => {
+    if (!store || !projectId || projectId === LIBRARY_STREAM) return setDrafts(null);
+    let active = true;
+    flaggedDraftCounts(store, projectId).then(
+      (d) => active && setDrafts(d),
+      () => undefined,
+    );
+    return () => {
+      active = false;
+    };
+  }, [store, projectId, tick, dataKey]);
+
   useEffect(() => {
     if (!store || !selected) return setDetail(null);
     let active = true;
@@ -147,6 +162,15 @@ export default function NeedsReviewScreen() {
   );
 
   const total = list?.tabs.find((t) => t.kind === 'all')?.count ?? 0;
+  const draftLine =
+    drafts && drafts.devices + drafts.cables > 0 && (kind === 'all' || kind === 'extraction') && projectId && projectId !== LIBRARY_STREAM ? (
+      <Pressable onPress={() => router.push({ pathname: '/setup/[projectId]', params: { projectId, step: 'drafts' } })} style={styles.row}>
+        <Text style={styles.rowTitle}>
+          Extraction drafts: {drafts.devices} device{drafts.devices === 1 ? '' : 's'} and {drafts.cables} cable{drafts.cables === 1 ? '' : 's'} under 0.7 or in conflict
+        </Text>
+        <Text style={styles.link}>Open Setup → Review drafts ▸</Text>
+      </Pressable>
+    ) : null;
 
   return (
     <View style={styles.root}>
@@ -183,8 +207,9 @@ export default function NeedsReviewScreen() {
           data={list?.rows ?? []}
           keyExtractor={(r) => r.id}
           renderItem={({ item }) => <Row row={item} selected={item.id === selected} onPress={() => setSelected(item.id)} />}
+          ListHeaderComponent={draftLine}
           ListEmptyComponent={
-            list?.findings.length && kind === 'lint' ? null : <Text style={styles.empty}>{list ? 'Nothing to review.' : 'Loading…'}</Text>
+            (list?.findings.length && kind === 'lint') || draftLine ? null : <Text style={styles.empty}>{list ? 'Nothing to review.' : 'Loading…'}</Text>
           }
           ListFooterComponent={
             kind === 'lint' && list?.findings.length ? (
@@ -266,12 +291,21 @@ function Panel({ detail: d, canEdit, onResolve }: { detail: ReviewDetail; canEdi
     </Text>
   );
   if (d.item.kind !== 'sync_conflict') {
+    const subj = d.item.subject;
+    const draft = subj && (subj.entity_kind === 'draft_device' || subj.entity_kind === 'draft_cable') ? subj.entity_id : null;
     return (
       <>
         {head}
         <Text style={styles.sub}>
-          {kindLabel(d.item.kind)} items are reviewed in Setup (their screens come with the setup tasks). Listed here so nothing is missed.
+          {draft
+            ? 'Settled in Setup → Review drafts (T44): Accept with the count you choose, or Reject to keep the baseline.'
+            : `${kindLabel(d.item.kind)} items are reviewed in Setup (their screens come with the setup tasks). Listed here so nothing is missed.`}
         </Text>
+        {draft ? (
+          <Pressable onPress={() => router.push({ pathname: '/setup/[projectId]', params: { projectId: d.item.project_id, step: 'drafts', draft } })}>
+            <Text style={styles.link}>Open in Review drafts ▸</Text>
+          </Pressable>
+        ) : null}
       </>
     );
   }

@@ -130,5 +130,6 @@ its header to the scan; it inherits the nearest page's bands.
   ERP48 ×6) attach to the nearest ERP line; the riser cross-check (T43) splits them.
 - A pooled venue's drafts carry no level until the riser places them (D10, T43); the review
   screen can also assign one by hand (T44).
-- Source crops for the review panel (T44) are not rendered here; `source_ref.bbox` and `page`
-  locate them in the stored PDF (`imports/<batch>/<file>`).
+- Source crops for the review panel are rendered on request by `GET /imports/{id}/crop` (T44,
+  `app/jobs/crops.py`) from the stored PDF (`imports/<batch>/<file>`) at `source_ref.page`;
+  the iPad converts a line's `[x0, top, x1, bottom]` box to `x,y,w,h`.

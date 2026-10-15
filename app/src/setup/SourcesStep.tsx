@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useIdentity } from '../identity/IdentityGate';
+import { ExtractionSources } from './ExtractionSources';
 import { FloorPlans } from './FloorPlans';
 import { Btn, ChipPicker, Notice, Section } from './widgets';
 import {
@@ -124,6 +125,7 @@ export function SourcesStep({ projectId }: { projectId: string }) {
 
   return (
     <>
+      <ExtractionSources projectId={projectId} />
       <FloorPlans projectId={projectId} />
       <Section title="Seed import">
         <Text style={styles.hint}>

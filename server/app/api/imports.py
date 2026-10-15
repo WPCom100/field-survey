@@ -1,4 +1,5 @@
-"""`POST /imports` · `GET /imports/{id}` · `GET /imports?project_id` (PLAN §8, T27).
+"""`POST /imports` · `GET /imports/{id}` · `GET /imports?project_id` (PLAN §8, T27) ·
+`GET /imports/{id}/crop` (a draft's source crop as PNG, T44).
 
 A seed import is a multipart upload: `project_id`, `kind` (`master_xlsx` | `floor_xlsx`), the
 workbook as `file`, and an optional `mapping` (JSON `{tab: {field: header}}` from the column-
@@ -10,15 +11,15 @@ import json
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from sqlalchemy import select
 
 from app.auth import SessionDep, current_user, require_token
 from app.config import settings
-from app.jobs import bom, plans, riser, runner
+from app.jobs import bom, crops, plans, riser, runner
 from app.jobs.workbook import WorkbookError, inspect_workbook
 from app.models import ImportBatch, User
-from app.storage import ObjectStore, get_object_store
+from app.storage import ObjectMissing, ObjectStore, get_object_store
 
 router = APIRouter(prefix="/imports", dependencies=[Depends(require_token)])
 
@@ -137,6 +138,43 @@ def get_import(batch_id: uuid.UUID, session: SessionDep) -> dict[str, Any]:
     if batch is None:
         raise HTTPException(404, f"unknown import {batch_id}")
     return runner.batch_out(batch)
+
+
+@router.get("/{batch_id}/crop")
+def get_crop(
+    batch_id: uuid.UUID,
+    session: SessionDep,
+    store: StoreDep,
+    page: int,
+    bbox: str,
+    pad: float = 36.0,
+    px: int = 1200,
+    mark: bool = True,
+) -> Response:
+    """A PNG of the batch's stored PDF around `bbox` (`x,y,w,h` in points, top-left origin) on
+    1-based `page`, the bbox outlined in red: the source crop of a draft (T44, Phase 3 §3.3).
+    The file never changes, so the image may be cached."""
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        raise HTTPException(404, f"unknown import {batch_id}")
+    key = (batch.files or [{}])[0].get("key")
+    if not key:
+        raise HTTPException(404, "the import has no stored file")
+    try:
+        data = store.read(key)
+    except ObjectMissing as e:
+        raise HTTPException(404, "the import's file is missing from storage") from e
+    if not data.startswith(b"%PDF"):
+        raise HTTPException(422, {"error": "not_a_pdf", "detail": "this import is not a PDF"})
+    try:
+        png = crops.render_crop(
+            data, page, crops.parse_bbox(bbox), pad=max(0.0, pad), px=px, mark=mark
+        )
+    except crops.CropError as e:
+        raise HTTPException(422, {"error": "bad_crop", "detail": str(e)}) from e
+    return Response(
+        png, media_type="image/png", headers={"Cache-Control": "private, max-age=604800"}
+    )
 
 
 @router.get("")

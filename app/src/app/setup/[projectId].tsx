@@ -8,24 +8,31 @@ import { SetupActions, SetupError, loadProjectSetup, type ProjectSetup, type Set
 import { Btn, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
 import { SourcesStep } from '../../setup/SourcesStep';
 import { BaselineDialog } from '../../setup/BaselineDialog';
+import { DraftReview } from '../../drafts/DraftReview';
 import { loadLockTable, lockWarnings, type LockLevel } from '../../setup/lock';
 import { useSyncStatus } from '../../sync/useSyncStatus';
 import { syncDataKey } from '../../sync/dataKey';
 
-type Step = 'project' | 'levels' | 'sources' | 'lock';
+type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'lock';
+const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'lock'];
 
 /**
  * Setup of an existing project (Phase 3 §3.1 steps 1–2): the project's fields and the levels
- * table. Every change is an op (`SetupActions`), so this works offline; the later steps
- * (Review drafts, Place devices) light up with T44 and T46; Sources is the seed import (T28);
- * Lock baseline is the Phase 3 §3.5 table (T47), whose Lock / Unlock is also on each Levels row.
+ * table. Every change is an op (`SetupActions`), so this works offline. Sources is the seed
+ * import (T28), floor plans (T45) and the BOM / riser extraction (T44); Review drafts is the
+ * Phase 3 §3.3 review (T44, `?step=drafts&draft=<id>` opens one draft); Place devices lights up
+ * with T46; Lock baseline is the Phase 3 §3.5 table (T47), whose Lock / Unlock is also on each
+ * Levels row.
  */
 export default function ProjectSetupScreen() {
-  const { projectId, step: stepParam } = useLocalSearchParams<{ projectId: string; step?: string }>();
+  const { projectId, step: stepParam, draft } = useLocalSearchParams<{ projectId: string; step?: string; draft?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
   const dataKey = syncDataKey(sync);
-  const [step, setStep] = useState<Step>(stepParam === 'project' || stepParam === 'sources' || stepParam === 'lock' ? stepParam : 'levels');
+  const [step, setStep] = useState<Step>(stepParam && STEPS.includes(stepParam) ? (stepParam as Step) : 'levels');
+  useEffect(() => {
+    if (stepParam && STEPS.includes(stepParam)) setStep(stepParam as Step);
+  }, [stepParam, draft]);
   const [setup, setSetup] = useState<ProjectSetup | null>(null);
   const [actions, setActions] = useState<SetupActions | null>(null);
   const [locks, setLocks] = useState<Map<string, LockLevel>>(new Map());
@@ -96,11 +103,12 @@ export default function ProjectSetupScreen() {
         <Pressable onPress={() => setStep('sources')} style={[styles.step, step === 'sources' && styles.stepOn]}>
           <Text style={styles.stepText}>3 Sources</Text>
         </Pressable>
-        {['4 Review drafts', '5 Place devices'].map((s) => (
-          <View key={s} style={styles.step}>
-            <Text style={[styles.stepText, styles.stepDim]}>{s}</Text>
-          </View>
-        ))}
+        <Pressable onPress={() => setStep('drafts')} style={[styles.step, step === 'drafts' && styles.stepOn]}>
+          <Text style={styles.stepText}>4 Review drafts</Text>
+        </Pressable>
+        <View style={styles.step}>
+          <Text style={[styles.stepText, styles.stepDim]}>5 Place devices</Text>
+        </View>
         <Pressable onPress={() => setStep('lock')} style={[styles.step, step === 'lock' && styles.stepOn]}>
           <Text style={styles.stepText}>6 Lock baseline</Text>
         </Pressable>
@@ -110,19 +118,25 @@ export default function ProjectSetupScreen() {
         </Pressable>
       </View>
 
-      <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
-        <Notice text={error} error />
-        <Notice text={notice} />
-        {step === 'project' ? (
-          <ProjectStep setup={setup} run={run} />
-        ) : step === 'sources' ? (
-          <SourcesStep projectId={projectId} />
-        ) : step === 'lock' ? (
-          <LockStep levels={setup.levels.map((l) => locks.get(l.id)).filter((l): l is LockLevel => !!l)} onLock={setDialog} />
-        ) : (
-          <LevelsStep setup={setup} locks={locks} run={run} toBottom={toBottom} onLock={setDialog} />
-        )}
-      </ScrollView>
+      {step === 'drafts' ? (
+        <View style={{ flex: 1 }}>
+          <DraftReview projectId={projectId} focus={draft ?? null} />
+        </View>
+      ) : (
+        <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+          <Notice text={error} error />
+          <Notice text={notice} />
+          {step === 'project' ? (
+            <ProjectStep setup={setup} run={run} />
+          ) : step === 'sources' ? (
+            <SourcesStep projectId={projectId} />
+          ) : step === 'lock' ? (
+            <LockStep levels={setup.levels.map((l) => locks.get(l.id)).filter((l): l is LockLevel => !!l)} onLock={setDialog} />
+          ) : (
+            <LevelsStep setup={setup} locks={locks} run={run} toBottom={toBottom} onLock={setDialog} />
+          )}
+        </ScrollView>
+      )}
       <BaselineDialog
         projectId={projectId}
         userId={user.id}

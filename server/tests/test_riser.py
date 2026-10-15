@@ -477,7 +477,8 @@ def test_build_merges_with_the_bom(analysed):
     # riser-only (no BOM line on that level): flagged for the reviewer
     riser_only = [d for d in res.drafts if "source:riser_only" in d.conflicts]
     assert {d.level_code for d in riser_only} >= {"01", "02"}  # the OCR page's floors
-    assert res.merged > 10 and res.split >= 9 + 6 + 15 + 5 + 1  # + the OCR floors' partial placements
+    # + the OCR floors' partial placements
+    assert res.merged > 10 and res.split >= 9 + 6 + 15 + 5 + 1
     stats = res.stats()
     assert stats["bom_deleted"] == len(res.deletions) and stats["pooled_split"] == res.split
 
