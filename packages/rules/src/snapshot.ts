@@ -156,6 +156,8 @@ export interface LibraryTypeRow extends Deletable {
   default_cables: unknown;
   optional_cables: unknown;
   optional_accessories: unknown;
+  /** Null = the category's default (`neuronIdDefault`, T68, D185). */
+  needs_neuron_id: boolean | null;
   state: 'draft' | 'accepted' | 'rejected';
 }
 

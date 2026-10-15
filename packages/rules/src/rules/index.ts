@@ -30,4 +30,18 @@ export { defaultPartNotes, partProblem } from './r4';
 export { LAND_0_10V } from './e5';
 export { SIGNAL, NEURON_ITEM, DMX_KITS_NOTE, BUS_LABEL, signalOf, targetOf, terminationItem, waitsForSurvey, compareIds, compareLevels } from './shared';
 export { runQuickAction, appendPhrase, QUICK_ACTION_TEXT, type QuickAction, type QuickActionResult } from './quick';
-export { CABLE_CODES, governingCables, parseLibraryAccessories, parseLibraryCables, typeOfDevice, type LibraryAccessory, type LibraryCable } from './library';
+export {
+  CABLE_CODES,
+  NO_NEURON_CATEGORIES,
+  deviceNeedsNeuronId,
+  findDeviceType,
+  governingCables,
+  needsNeuronId,
+  neuronIdDefault,
+  parseLibraryAccessories,
+  parseLibraryCables,
+  typeOfDevice,
+  type LibraryAccessory,
+  type LibraryCable,
+  type TypeLike,
+} from './library';

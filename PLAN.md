@@ -86,7 +86,7 @@ Bold = master column (name kept verbatim for export). `*` = server-assigned.
 | `finding` | id, project, level, lint_id, subject, message, state ∈ {open, resolved, dismissed}, dismissed_reason | |
 | `import_batch` | id, project, kind ∈ {bom, riser, plans, master_xlsx, floor_xlsx, mss}, files, job_state, stats, created_by/at | |
 | `draft_device` / `draft_cable` | per Phase 1f schema: level?, model/candidates[], category, qty, accessories[], source_ref{job, page, line|bbox}, level_basis, confidence, conflicts[], state ∈ {proposed, accepted, edited, rejected}, placed, not_on_sheet | |
-| `library_type` | id, project (**nullable: null = app-level library**), model, aliases[], category, id_scheme ∈ {level_number, level_tag}, default_cables[], optional_cables[], optional_accessories[], state ∈ {draft, accepted, rejected}, created_by, promoted_from | D43, D48, D65 |
+| `library_type` | id, project (**nullable: null = app-level library**), model, aliases[], category, id_scheme ∈ {level_number, level_tag}, default_cables[], optional_cables[], optional_accessories[], needs_neuron_id (null = category default: off for Equipment rack and NSPS), state ∈ {draft, accepted, rejected}, created_by, promoted_from | D43, D48, D65, D185 |
 | `vocab` | id, project, list ∈ {device_note, punch_item, punch_note, part_note, connection_note, photo_caption, model_map, level_alias, category, type}, value, canonical_of | |
 | `export` | id, project, kind ∈ {xlsx, floor_pdf}, params{levels}, blob (SHA-256 of the file, stored as a blob), job_state, stats{filename, rows…}, created_by/at, diff_summary | Export history; a job row (D137) |
 
@@ -205,7 +205,7 @@ Pure TypeScript over an in-memory project snapshot (no DB, no React; the same pa
 | R2f | Other end surveyed, this end not | Nothing is copied (D171): the end stays empty (`Unsurveyed`, D110/D138) until someone surveys it; far level out of scope → `Not started` |
 | R3a | End `Not installed` | Punch "Run <signal> to <other end>", `Cable not run`, `EC`, surveyed end only (E3) — one per wire: with both ends surveyed, on the start of the run (side A, D177); → Termination item when the end becomes Issue |
 | R3b | DMX end Issue "no term kit" | Device item `Terminate DMX to <far end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits" (the master's form, D175) |
-| R3c | Numbering group exists | "Missing all Device Neuron IDs", `Information`, `EC`, `sort_last`; Notes = IDs with null `neuron_id`; auto-close when empty, reopen on a new device without ID (D49) |
+| R3c | Numbering group exists | "Missing all Device Neuron IDs", `Information`, `EC`, `sort_last`; Notes = IDs with null `neuron_id` among devices that need one (D185: type flag, else category — not Equipment rack / NSPS); auto-close when empty, reopen on a new device without ID (D49) |
 | R3d | Item text | Finding on "test"/"commission" |
 | R3e/f | Item editor | Phrase picker from `vocab(punch_item)`; lint "outside vocabulary" (dismissable) |
 | R4a–d | Part created / R3b accepted / saved | Owner `EC`; "DMX termination kit - <destination> run" Qty 1 Needed "Need to be ordered" with `part_source`; default Notes by kind; lint on re-pull/network-kit parts |

@@ -548,6 +548,8 @@ export const ENTITIES = {
       default_cables: j(),
       optional_cables: j(),
       optional_accessories: j(),
+      // T68 (D185): null = the category's default (`neuronIdDefault` in packages/rules).
+      needs_neuron_id: b(),
       state: enumCol(v.LIBRARY_STATE, { notNull: true, default: 'draft' }),
       created_by_id: t(),
       promoted_from_id: t(),

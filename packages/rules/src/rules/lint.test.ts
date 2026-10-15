@@ -70,6 +70,7 @@ describe('punch item lints', () => {
     b.device(l06m, 'Station', { display_id: '06M-S1' });
     const l03 = b.level('03');
     b.device(l03, 'Station', { display_id: '03-S1', neuron_id: '00A1' }); // every ID captured: no item needed
+    b.device(l03, 'NSPS', { display_id: '03-02' }); // needs none (T68, D185)
     expect(found(b, [LintNeuronItem])).toEqual([['lint.neuron_item', 'g6', 'Levels 06/06M: no "Missing all Device Neuron IDs" item']]);
     const item = b.punch(l06, { item: 'Missing all Device Neuron IDs', type: 'Information', sort_last: false });
     expect(found(b, [LintNeuronItem])).toEqual([['lint.neuron_item', item.id, 'Levels 06/06M: "Missing all Device Neuron IDs" is not sorted last']]);

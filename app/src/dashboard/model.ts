@@ -12,6 +12,7 @@
 
 import { vocab, type Store } from '@field-survey/core';
 
+import { deviceNeedsNeuron, loadNeuronTypes } from '../library/neuron';
 import { connectionMatches } from '../plan/lists';
 
 export const UNSURVEYED = 'Unsurveyed';
@@ -56,7 +57,10 @@ export type Readiness = {
 export type AsFound = {
   fieldAdditions: number;
   neverFound: number;
+  /** Captured among the devices that need one. */
   neuronCaptured: number;
+  /** Devices whose type needs a Neuron ID (T68, D185: not racks or NSPS by default). */
+  neuronDevices: number;
   devices: number;
 };
 
@@ -64,7 +68,7 @@ export type DashboardData = {
   levels: DashLevel[];
   rows: DashRow[];
   /** Device facts the as-found line counts, by device id. */
-  deviceFacts: Map<string, { fieldAddition: boolean; neverFound: boolean; neuron: boolean }>;
+  deviceFacts: Map<string, { fieldAddition: boolean; neverFound: boolean; neuron: boolean; needsNeuron: boolean }>;
   readiness: Readiness[];
 };
 
@@ -115,12 +119,13 @@ export async function loadDashboard(store: Store, projectId: string): Promise<Da
   const deviceFacts: DashboardData['deviceFacts'] = new Map();
   const devices = await store.db.query<Row>(`SELECT * FROM device WHERE deleted_at IS NULL AND ${inLevels}`, [projectId]);
   const deviceLabel = new Map<string, string>();
+  const types = await loadNeuronTypes(store, projectId);
   for (const d of devices) {
     const levelId = String(d.level_id);
     const label = str(d.display_id) ?? `${code.get(levelId)}-? NEW`;
     deviceLabel.set(String(d.id), label);
     rows.push({ entity: 'device', id: String(d.id), levelId, levelCode: code.get(levelId)!, status: str(d.status) ?? UNSURVEYED, owner: null, label, text: join(d.device ?? d.type ?? d.category, d.room_location), deviceId: String(d.id) });
-    deviceFacts.set(String(d.id), { fieldAddition: d.origin === 'field_addition', neverFound: d.found_on_site === 0 || d.found_on_site === false, neuron: !!str(d.neuron_id) });
+    deviceFacts.set(String(d.id), { fieldAddition: d.origin === 'field_addition', neverFound: d.found_on_site === 0 || d.found_on_site === false, neuron: !!str(d.neuron_id), needsNeuron: deviceNeedsNeuron(types, d) });
   }
   const punches = await store.db.query<Row>(`SELECT * FROM punch_item WHERE deleted_at IS NULL AND ${inLevels}`, [projectId]);
   for (const p of punches) {
@@ -249,7 +254,7 @@ export function drillRows(data: DashboardData, d: Drill, f: DashFilter = {}): Da
   if (d.table === 'asFound') {
     return scoped(data, 'device', f).filter((r) => {
       const x = data.deviceFacts.get(r.id)!;
-      return d.key === 'fieldAdditions' ? x.fieldAddition : d.key === 'neverFound' ? x.neverFound : !x.neuron;
+      return d.key === 'fieldAdditions' ? x.fieldAddition : d.key === 'neverFound' ? x.neverFound : x.needsNeuron && !x.neuron;
     });
   }
   const t = TABLES.find((x) => x.id === d.table)!;
@@ -266,13 +271,16 @@ export function drillTitle(d: Drill): string {
 }
 
 export function asFound(data: DashboardData, f: DashFilter = {}): AsFound {
-  const out: AsFound = { fieldAdditions: 0, neverFound: 0, neuronCaptured: 0, devices: 0 };
+  const out: AsFound = { fieldAdditions: 0, neverFound: 0, neuronCaptured: 0, neuronDevices: 0, devices: 0 };
   for (const r of scoped(data, 'device', f)) {
     const x = data.deviceFacts.get(r.id)!;
     out.devices++;
     if (x.fieldAddition) out.fieldAdditions++;
     if (x.neverFound) out.neverFound++;
-    if (x.neuron) out.neuronCaptured++;
+    if (x.needsNeuron) {
+      out.neuronDevices++;
+      if (x.neuron) out.neuronCaptured++;
+    }
   }
   return out;
 }

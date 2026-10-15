@@ -13,6 +13,7 @@ import { statements as m0005 } from './migrations/0005_outbox_state';
 import { statements as m0006 } from './migrations/0006_sheet_features';
 import { statements as m0007 } from './migrations/0007_install';
 import { statements as m0008 } from './migrations/0008_vocab_state';
+import { statements as m0009 } from './migrations/0009_needs_neuron_id';
 
 export interface Migration {
   version: number;
@@ -29,6 +30,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 6, name: 'sheet_features', statements: m0006 },
   { version: 7, name: 'install', statements: m0007 },
   { version: 8, name: 'vocab_state', statements: m0008 },
+  { version: 9, name: 'needs_neuron_id', statements: m0009 },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

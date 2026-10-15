@@ -73,16 +73,53 @@ export function parseLibraryAccessories(v: unknown): LibraryAccessory[] {
 
 const modelKey = (s: string) => s.replace(/\s+/g, '').toUpperCase();
 
-/** The type a device belongs to: its `library_type_id`, else a live, not rejected type matching its Device text. */
-export function typeOfDevice(ctx: RuleContext, d: DeviceRow): LibraryTypeRow | null {
-  if (d.library_type_id) return ctx.index.libraryType.get(d.library_type_id) ?? null;
+/** What `findDeviceType` reads of a type; the app's own rows satisfy it too. */
+export type TypeLike = Pick<LibraryTypeRow, 'id' | 'project_id' | 'model' | 'aliases' | 'state'>;
+
+/**
+ * The type a device belongs to among `types` (live rows of its project and the app library): its
+ * `library_type_id`, else a not rejected type whose model or alias matches its Device text, the
+ * project's before the app library's.
+ */
+export function findDeviceType<T extends TypeLike>(types: ReadonlyMap<string, T>, d: Pick<DeviceRow, 'library_type_id' | 'device'>): T | null {
+  if (d.library_type_id) return types.get(d.library_type_id) ?? null;
   const text = str(d.device);
   if (!text) return null;
   const k = modelKey(text);
-  const matches = [...ctx.index.libraryType.values()]
+  const matches = [...types.values()]
     .filter((t) => t.state !== 'rejected' && (modelKey(t.model) === k || (t.aliases ?? []).some((a) => typeof a === 'string' && modelKey(a) === k)))
     .sort((a, b) => Number(a.project_id == null) - Number(b.project_id == null) || a.id.localeCompare(b.id));
   return matches[0] ?? null;
+}
+
+/** The type a device belongs to: its `library_type_id`, else a live, not rejected type matching its Device text. */
+export function typeOfDevice(ctx: RuleContext, d: DeviceRow): LibraryTypeRow | null {
+  return findDeviceType(ctx.index.libraryType, d);
+}
+
+/** Categories whose devices carry no Neuron ID unless their type says so (T68, D185). */
+export const NO_NEURON_CATEGORIES: readonly string[] = ['Equipment rack', 'NSPS'];
+
+/** A category's Neuron ID default: off for Equipment rack and NSPS, on otherwise (and with no category). */
+export function neuronIdDefault(category: string | null | undefined): boolean {
+  return !category || !NO_NEURON_CATEGORIES.includes(category);
+}
+
+/**
+ * Whether a device needs a Neuron ID (T68, D185): its type's `needs_neuron_id`, else the default of
+ * the type's category, else of the device's own category (a device with no type).
+ */
+export function needsNeuronId(
+  type: { needs_neuron_id?: boolean | null; category?: string | null } | null,
+  d: { category: string | null },
+): boolean {
+  if (type?.needs_neuron_id != null) return type.needs_neuron_id;
+  return neuronIdDefault(type?.category ?? d.category);
+}
+
+/** `needsNeuronId` with the device's type looked up in the snapshot. */
+export function deviceNeedsNeuronId(ctx: RuleContext, d: DeviceRow): boolean {
+  return needsNeuronId(typeOfDevice(ctx, d), d);
 }
 
 /** The default cables an accepted type imposes on the device, or null when the category table applies. */

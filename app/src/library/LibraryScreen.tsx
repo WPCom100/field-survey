@@ -14,6 +14,7 @@ import {
   promoteType,
   describeCable,
   loadLibrary,
+  neuronIdDefault,
   parseAliases,
   rejectType,
   reopenType,
@@ -268,6 +269,7 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
   const [category, setCategory] = useState<string | null>(t.category);
   const [aliases, setAliases] = useState(t.aliases.join(', '));
   const [scheme, setScheme] = useState<IdScheme | null>(t.idScheme);
+  const [neuron, setNeuron] = useState<boolean | null>(t.needsNeuronId);
   const [defaults, setDefaults] = useState<LibraryCable[]>(t.defaultCables);
   const [optional, setOptional] = useState<LibraryCable[]>(t.optionalCables);
   const [accessories, setAccessories] = useState<LibraryAccessory[]>(t.optionalAccessories);
@@ -276,12 +278,13 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
     category !== t.category ||
     aliases !== t.aliases.join(', ') ||
     scheme !== t.idScheme ||
+    neuron !== t.needsNeuronId ||
     JSON.stringify(defaults) !== JSON.stringify(t.defaultCables) ||
     JSON.stringify(optional) !== JSON.stringify(t.optionalCables) ||
     JSON.stringify(accessories) !== JSON.stringify(t.optionalAccessories);
   const save = () =>
     props.run(
-      (e, s) => updateType(e, s, t.id, { model, category, aliases: parseAliases(aliases), idScheme: scheme, defaultCables: defaults, optionalCables: optional, optionalAccessories: accessories }),
+      (e, s) => updateType(e, s, t.id, { model, category, aliases: parseAliases(aliases), idScheme: scheme, needsNeuronId: neuron, defaultCables: defaults, optionalCables: optional, optionalAccessories: accessories }),
       'Saved.',
     );
   const ro = !props.canEdit;
@@ -310,6 +313,17 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
           {([null, 'level_number', 'level_tag'] as const).map((v) => (
             <Pressable key={v ?? 'default'} disabled={ro} onPress={() => setScheme(v)} style={[styles.chip, scheme === v && styles.chipOn]}>
               <Text style={scheme === v ? styles.chipTextOn : styles.chipText}>{v === null ? 'Category default' : v === 'level_number' ? 'Level-number' : 'Level-tag (S/D)'}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Field>
+      <Field label="Neuron ID" hint="Whether devices of this type carry one. A type that does not hides it on the card and is left out of “Missing all Device Neuron IDs” and the dashboard count.">
+        <View style={styles.wrap}>
+          {([null, true, false] as const).map((v) => (
+            <Pressable key={String(v)} disabled={ro} onPress={() => setNeuron(v)} style={[styles.chip, neuron === v && styles.chipOn]}>
+              <Text style={neuron === v ? styles.chipTextOn : styles.chipText}>
+                {v === null ? `Category default (${neuronIdDefault(category) ? 'needed' : 'not needed'})` : v ? 'Needed' : 'Not needed'}
+              </Text>
             </Pressable>
           ))}
         </View>

@@ -12,7 +12,7 @@
 import { DEVICE_CATEGORIES } from '../lints';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow, PunchItemRow } from '../snapshot';
-import { governingCables } from './library';
+import { deviceNeedsNeuronId, governingCables } from './library';
 import { isNeuronItem } from './r3';
 import { SIGNAL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, NEURON_ITEM, signalOf, str, subjectOfDevice, subjectOfEnd } from './shared';
 
@@ -85,7 +85,7 @@ export const LintNeuronItem: Rule = {
         if (!p.sort_last) ctx.find({ subject: { entity_kind: 'punch_item', entity_id: p.id, level_id: p.level_id }, message: `${levelNames(levels)}: "${NEURON_ITEM}" is not sorted last` });
       }
       if (items.length) continue;
-      const missing = levels.some((l) => (ctx.index.devicesByLevel.get(l.id) ?? []).some((d) => !str(d.neuron_id)));
+      const missing = levels.some((l) => (ctx.index.devicesByLevel.get(l.id) ?? []).some((d) => !str(d.neuron_id) && deviceNeedsNeuronId(ctx, d)));
       if (missing) {
         ctx.find({ subject: { entity_kind: 'numbering_group', entity_id: groupId, level_id: first.id }, message: `${levelNames(levels)}: no "${NEURON_ITEM}" item` });
       }

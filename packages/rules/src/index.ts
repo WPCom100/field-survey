@@ -104,8 +104,14 @@ export {
   parseLibraryAccessories,
   parseLibraryCables,
   typeOfDevice,
+  findDeviceType,
+  needsNeuronId,
+  neuronIdDefault,
+  deviceNeedsNeuronId,
+  NO_NEURON_CATEGORIES,
   type LibraryAccessory,
   type LibraryCable,
+  type TypeLike,
 } from './rules';
 export { LINT_CHECKS, DEVICE_CATEGORIES, checkOf, checkOrder, rulingSeeds, type LintCheck, type RulingSeed, type SeedInput } from './lints';
 export {

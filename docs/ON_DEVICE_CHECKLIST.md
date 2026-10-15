@@ -286,6 +286,18 @@ Decision D183 (Proposed): cable templates `{code, from, to, far, single_row, qty
 
 Decision D184 (Proposed (2)–(5)): the library's ops are stored with no project and named by a fixed stream id on the iPad; the library syncs first; `promoted_from` is a plain id; Promote and "Copy from…" into the app library record `promoted_from`. → Approve / change:
 
+## T68 — Neuron ID needed per device type  ·  Needs: no new build (JS update; server deploy with migration 0010 first)
+
+**Why it matters:** racks and NSPS have no Neuron ID (your note from the 2026-10-11 round, T20-4). Until now the card asked for one and "Missing all Device Neuron IDs" listed them, so the EC's list was never going to close.
+
+- [ ] **Card hides it on a rack or NSPS.** Open any Equipment rack or NSPS card on the Tower round project: no **Neuron ID** section. A Relay panel, Station or Sensor card still has it. → saw:
+- [ ] **The Neuron item leaves them out.** Rules (or the punch list) → "Missing all Device Neuron IDs" on a floor with a rack or NSPS: within a few seconds its Notes no longer name the rack / NSPS IDs (one "Rule engine R3c" edit in its History). → saw:
+- [ ] **Dashboard.** Dashboard → as-found line reads `Neuron IDs captured n/N` where N no longer counts racks and NSPS (on the seeded master: 204 of 210 devices). Tapping it lists no rack or NSPS. → saw:
+- [ ] **Per-type override.** Library → pick a Station type → **Neuron ID** shows `Category default (needed)` selected; choose **Not needed** → Save. Open a station of that type: no Neuron ID section, and the Neuron item's Notes drop it. Choose **Category default** again → Save: it comes back. → saw:
+- [ ] **Second iPad.** The other iPad shows the same choice in the Library and the same card within a few seconds. → saw:
+
+Decision D185: a type's `needs_neuron_id` is empty by default, meaning "the category decides": **off for Equipment rack and NSPS, on for every other category**. A device with no type follows its own category. The editor's **Needed** / **Not needed** overrides that. A card whose device has a Neuron ID anyway still shows it. → Approve / change:
+
 ---
 
 ## Rules for this file

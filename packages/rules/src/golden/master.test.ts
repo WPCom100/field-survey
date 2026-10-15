@@ -495,13 +495,17 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
   });
 });
 
-/** The IDs with no Neuron ID in the numbering group of `levelId`: level order, then natural ID order (D175 (4)). */
+/**
+ * The IDs with no Neuron ID in the numbering group of `levelId`: level order, then natural ID order
+ * (D175 (4)); racks and NSPS need none (T68, D185 — the master import has no library types).
+ */
 function expectedNeuronNotes(snap: Snapshot, levelId: string): string | null {
+  expect(snap.libraryTypes.filter((t) => !t.deleted_at)).toEqual([]);
   const level = snap.levels.find((l) => l.id === levelId)!;
   const levels = snap.levels.filter((l) => l.numbering_group_id === level.numbering_group_id && !l.deleted_at).sort(compareLevels);
   const ids = levels.flatMap((l) =>
     snap.devices
-      .filter((d) => d.level_id === l.id && !d.deleted_at && !(d.neuron_id ?? '').trim())
+      .filter((d) => d.level_id === l.id && !d.deleted_at && !(d.neuron_id ?? '').trim() && !['Equipment rack', 'NSPS'].includes(d.category ?? ''))
       .map((d) => d.display_id ?? `${l.level}-?`)
       .sort(compareIds),
   );

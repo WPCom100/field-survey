@@ -58,10 +58,10 @@ describe('RULES over a store', () => {
     const { store, editor, engine, ids } = await project();
     await engine.run();
     const neuron = (await open(store)).find((p) => p.rule_id === 'R3c')!;
-    expect(neuron.payload).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', notes: '06-01, 06M-01, 06M-S1', sort_last: true, device_text: 'All devices' });
+    expect(neuron.payload).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', notes: '06M-01, 06M-S1', sort_last: true, device_text: 'All devices' });
     const res = await engine.decide(neuron.id, { kind: 'accept' });
     const itemId = res.recordIds[0]!;
-    expect(await store.get<Row>('punch_item', itemId)).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', type: 'Information', owner: 'EC', tracking_status: 'Open', sort_last: true, rule_id: 'R3c', proposal_id: neuron.id, notes: '06-01, 06M-01, 06M-S1' });
+    expect(await store.get<Row>('punch_item', itemId)).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', type: 'Information', owner: 'EC', tracking_status: 'Open', sort_last: true, rule_id: 'R3c', proposal_id: neuron.id, notes: '06M-01, 06M-S1' });
     // the lint "no Missing all Device Neuron IDs item" (T36) resolves: one op, then nothing
     expect((await engine.run()).ops).toBe(1);
     expect((await engine.run()).ops).toBe(0);
@@ -70,14 +70,13 @@ describe('RULES over a store', () => {
     const r = await engine.run();
     expect(r).toMatchObject({ upkeep: 1, ops: 1 });
     const item = (await store.get<Row>('punch_item', itemId))!;
-    expect(item.notes).toBe('06-01, 06M-S1');
+    expect(item.notes).toBe('06M-S1');
     const ops = await store.opsFor(itemId);
-    expect(ops.at(-1)).toMatchObject({ kind: 'set', field: 'notes', now: '06-01, 06M-S1', change_type: 'Field survey', reason: 'Rule engine R3c', proposal_id: neuron.id, user_id: ME });
+    expect(ops.at(-1)).toMatchObject({ kind: 'set', field: 'notes', now: '06M-S1', change_type: 'Field survey', reason: 'Rule engine R3c', proposal_id: neuron.id, user_id: ME });
     // the rewrite is not a person's Edit: the row stays accepted and the next run is quiet
     expect((await engine.run()).ops).toBe(0);
     expect(await store.get<ProposalRow>('proposal', neuron.id)).toMatchObject({ state: 'accepted' });
-    // every ID captured → Closed with today's date
-    await editor.setField('device', ids.rack, 'neuron_id', '00A1B2C3D4E6', CTX);
+    // every ID captured → Closed with today's date (the rack needs none, T68 / D185)
     await editor.setField('device', ids.station, 'neuron_id', '00A1B2C3D4E7', CTX);
     await engine.run();
     const closed = (await store.get<Row>('punch_item', itemId))!;
@@ -90,6 +89,14 @@ describe('RULES over a store', () => {
     // the proposal row stays accepted throughout (no second item)
     expect(await store.get<ProposalRow>('proposal', neuron.id)).toMatchObject({ state: 'accepted' });
     expect((await store.list('punch_item', { where: 'level_id IN (?, ?)', params: [ids.l06, ids.l06m] })).length).toBe(1);
+  });
+
+  it('R3c reads library_type.needs_neuron_id from the store (T68, D185): a rack type that needs one lists the rack', async () => {
+    const { store, editor, engine } = await project();
+    await editor.create('library_type', { project_id: PROJECT, model: 'Equipment rack', category: 'Equipment rack', needs_neuron_id: true, state: 'accepted' }, CTX);
+    await engine.run();
+    const neuron = (await open(store)).find((p) => p.rule_id === 'R3c')!;
+    expect(neuron.payload).toMatchObject({ notes: '06-01, 06M-01, 06M-S1' });
   });
 
   it('accepting a library draft (R2c) makes the cable with both ends; the device then has the code and the draft stays accepted', async () => {

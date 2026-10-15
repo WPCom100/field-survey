@@ -9,14 +9,14 @@
  */
 
 import { LIBRARY_STREAM, OpError, type EditContext, type Editor, type Store } from '@field-survey/core';
-import { CABLE_CODES, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
+import { CABLE_CODES, neuronIdDefault, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
 
 export const LIBRARY_CTX: EditContext = { change_type: 'Master edit', reason: 'Device-type library' };
 
 /** The eight categories (CLAUDE.md §3), the picker's order. */
 export const CATEGORIES = ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor'] as const;
 
-export { CABLE_CODES, type LibraryAccessory, type LibraryCable };
+export { CABLE_CODES, neuronIdDefault, type LibraryAccessory, type LibraryCable };
 
 /** D52: an NSPS kit carries its power supply, expected 1. Offered on NSPS types. */
 export const NSPS_POWER_SUPPLY: LibraryAccessory = { model: 'P-NSPS-D Power Supply', expected_qty: 1 };
@@ -36,6 +36,10 @@ export interface LibraryType {
   defaultCables: LibraryCable[];
   optionalCables: LibraryCable[];
   optionalAccessories: LibraryAccessory[];
+  /** Stored flag; null = the category's default (T68, D185). */
+  needsNeuronId: boolean | null;
+  /** What applies: the flag, else the category's default (off for Equipment rack and NSPS). */
+  neuronId: boolean;
   state: LibraryState;
   createdById: string | null;
   /** When the type's first op was made (the "added … 10/09" line). */
@@ -108,6 +112,8 @@ function toType(r: Row): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | '
     defaultCables: parseLibraryCables(r.default_cables),
     optionalCables: parseLibraryCables(r.optional_cables),
     optionalAccessories: parseLibraryAccessories(r.optional_accessories),
+    needsNeuronId: typeof r.needs_neuron_id === 'boolean' ? r.needs_neuron_id : null,
+    neuronId: typeof r.needs_neuron_id === 'boolean' ? r.needs_neuron_id : neuronIdDefault(str(r.category)),
     state: r.state === 'accepted' || r.state === 'rejected' ? r.state : 'draft',
     createdById: str(r.created_by_id),
     promotedFromId: str(r.promoted_from_id),
@@ -191,6 +197,8 @@ export interface TypePatch {
   defaultCables?: LibraryCable[];
   optionalCables?: LibraryCable[];
   optionalAccessories?: LibraryAccessory[];
+  /** null = back to the category's default. */
+  needsNeuronId?: boolean | null;
 }
 
 function checkCables(list: readonly LibraryCable[], what: string): LibraryCable[] | null {
@@ -219,6 +227,7 @@ export async function updateType(editor: Editor, store: Store, id: string, patch
   if (patch.idScheme !== undefined) values.id_scheme = patch.idScheme;
   if (patch.defaultCables !== undefined) values.default_cables = checkCables(patch.defaultCables, 'Default cables');
   if (patch.optionalCables !== undefined) values.optional_cables = checkCables(patch.optionalCables, 'Optional cables');
+  if (patch.needsNeuronId !== undefined) values.needs_neuron_id = patch.needsNeuronId;
   if (patch.optionalAccessories !== undefined) {
     const list = patch.optionalAccessories.map((a) => ({ model: clean(a.model), expected_qty: a.expected_qty }));
     if (list.some((a) => !a.model)) throw new OpError('An accessory needs a model.');
@@ -295,6 +304,8 @@ export async function copyTypes(editor: Editor, store: Store, scope: string | nu
         default_cables: r.default_cables ?? null,
         optional_cables: r.optional_cables ?? null,
         optional_accessories: r.optional_accessories ?? null,
+        // only when set: a server without migration 0010 refuses the column (T68)
+        ...(r.needs_neuron_id != null ? { needs_neuron_id: r.needs_neuron_id } : {}),
         state: 'accepted',
         created_by_id: editor.userId,
         ...(scope === null && r.project_id ? { promoted_from_id: r.id } : {}),

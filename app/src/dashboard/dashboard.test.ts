@@ -100,9 +100,9 @@ describe('dashboard (T38)', () => {
   it('counts as-found facts and drills into them', async () => {
     const { store } = await setup();
     const data = await loadDashboard(store, PROJECT);
-    expect(asFound(data)).toEqual({ fieldAdditions: 1, neverFound: 1, neuronCaptured: 1, devices: 4 });
+    expect(asFound(data)).toEqual({ fieldAdditions: 1, neverFound: 1, neuronCaptured: 1, neuronDevices: 3, devices: 4 }); // the NSPS needs none (T68, D185)
     expect(drillRows(data, { table: 'asFound', key: 'neverFound', status: null }).map((r) => r.label)).toEqual(['01-? NEW']);
-    expect(drillRows(data, { table: 'asFound', key: 'neuronMissing', status: null })).toHaveLength(3);
+    expect(drillRows(data, { table: 'asFound', key: 'neuronMissing', status: null }).map((r) => r.label)).toEqual(['01-S2', '01-? NEW']);
   });
 
   it('derives readiness: setup with review count, ready once locked, surveying after an edit past the lock', async () => {
@@ -202,6 +202,7 @@ describe.skipIf(missing)(`dashboard over the seeded master${missing ? ' — SKIP
         "devices": 210,
         "fieldAdditions": 0,
         "neuronCaptured": 0,
+        "neuronDevices": 204,
         "neverFound": 0,
       }
     `);

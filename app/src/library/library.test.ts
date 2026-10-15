@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { addFieldDevice, libraryChoices } from '../additions/model';
 import { loadReviewList } from '../review/model';
 import { loadDeviceCard } from '../card/model';
+import { asFound, drillRows, loadDashboard } from '../dashboard/model';
 import { engineFor, ruleDecider } from '../rules/engine';
 import {
   NSPS_POWER_SUPPLY,
@@ -112,6 +113,48 @@ describe('device-type library editor (T48)', () => {
     await expect(updateType(p.editor, store, id, { defaultCables: [{ ...blankCable('Z') }] })).rejects.toThrow(/not a cable code/);
     await expect(updateType(p.editor, store, id, { optionalAccessories: [{ model: ' ', expected_qty: 1 }] })).rejects.toThrow(/needs a model/);
     await expect(updateType(p.editor, store, id, { model: '' })).rejects.toThrow(/needs a model/);
+  });
+
+  it('Neuron ID per type (T68, D185): category default, the flag in the editor, the card, the dashboard and Copy from', async () => {
+    const { store, project } = await setup();
+    const p = await project('Tower');
+    const nspsType = await createType(p.editor, store, p.id, { model: 'P-NSPS-D-KIT', category: 'NSPS' });
+    const stationType = await createType(p.editor, store, p.id, { model: 'PI1002', category: 'Station' });
+    let lib = await loadLibrary(store, p.id);
+    expect(lib.types.map((t) => [t.model, t.needsNeuronId, t.neuronId])).toEqual([
+      ['P-NSPS-D-KIT', null, false],
+      ['PI1002', null, true],
+    ]);
+    const nsps = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-05', category: 'NSPS', device: 'P-NSPS-D-KIT' }, CTX);
+    const rack = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-06', category: 'Equipment rack', device: 'Rack' }, CTX);
+    const station = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-S1', category: 'Station', library_type_id: stationType }, CTX);
+    expect((await loadDeviceCard(store, nsps.id))!.device.needsNeuronId).toBe(false);
+    expect((await loadDeviceCard(store, rack.id))!.device.needsNeuronId).toBe(false); // no type: the category decides
+    expect((await loadDeviceCard(store, station.id))!.device.needsNeuronId).toBe(true);
+    let dash = await loadDashboard(store, p.id);
+    expect(asFound(dash)).toMatchObject({ neuronCaptured: 0, neuronDevices: 1, devices: 3 });
+    expect(drillRows(dash, { table: 'asFound', key: 'neuronMissing', status: null }).map((r) => r.label)).toEqual(['06M-S1']);
+    // the editor's flag: one op; the station type stops needing one, the NSPS type starts
+    await updateType(p.editor, store, nspsType, { needsNeuronId: true });
+    await updateType(p.editor, store, stationType, { needsNeuronId: false });
+    expect((await store.opsFor(nspsType)).at(-1)).toMatchObject({ field: 'needs_neuron_id', now: true });
+    lib = await loadLibrary(store, p.id);
+    expect(lib.types.map((t) => [t.model, t.needsNeuronId, t.neuronId])).toEqual([
+      ['P-NSPS-D-KIT', true, true],
+      ['PI1002', false, false],
+    ]);
+    expect((await loadDeviceCard(store, nsps.id))!.device.needsNeuronId).toBe(true);
+    expect((await loadDeviceCard(store, station.id))!.device.needsNeuronId).toBe(false);
+    dash = await loadDashboard(store, p.id);
+    expect(drillRows(dash, { table: 'asFound', key: 'neuronMissing', status: null }).map((r) => r.label)).toEqual(['06M-05']);
+    // back to the category default
+    await updateType(p.editor, store, nspsType, { needsNeuronId: null });
+    expect((await loadDeviceCard(store, nsps.id))!.device.needsNeuronId).toBe(false);
+    // Copy from carries the flag
+    await acceptType(p.editor, stationType);
+    const q = await project('Other');
+    await copyTypes(q.editor, store, q.id, [stationType]);
+    expect((await loadLibrary(store, q.id)).types[0]).toMatchObject({ model: 'PI1002', needsNeuronId: false, neuronId: false });
   });
 
   it('accepting a type with default cables raises R2g drafts for the devices already there (and R2d stands aside)', async () => {

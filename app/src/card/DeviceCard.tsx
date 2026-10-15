@@ -256,7 +256,8 @@ export function DeviceCard(props: DeviceCardProps) {
           </Section>
         ) : null}
 
-        <NeuronSection card={card} store={store} readOnly={readOnly} run={run} />
+        {/* A type without Neuron IDs (racks, NSPS by default — T68, D185) hides the section unless one was captured anyway. */}
+        {card.device.needsNeuronId || card.device.neuronId ? <NeuronSection card={card} store={store} readOnly={readOnly} run={run} /> : null}
 
         <Section title={`Photos (${card.photos.length})`} marks={card.photosWaiting ? `📷 ${card.photosWaiting} waiting` : ''}>
           <PhotoStrip photos={card.photos} resolveBlobUri={props.resolveBlobUri} onOpen={props.onOpenPhoto} />

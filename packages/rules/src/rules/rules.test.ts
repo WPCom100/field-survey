@@ -10,7 +10,7 @@ import type { Rule } from '../rule';
 import { Build } from '../testing/build';
 import { Acc, E5 } from './e5';
 import { R1 } from './r1';
-import { R2g } from './library';
+import { R2g, needsNeuronId, neuronIdDefault } from './library';
 import { R2a, R2b, R2c, R2d, R2e, R2f } from './r2';
 import { LintPower, LintRelay } from './lint';
 import { R3a, R3b, R3c, R3d, R3f } from './r3';
@@ -417,6 +417,42 @@ describe('R3c Missing all Device Neuron IDs (D49, D170)', () => {
     expect(run(b, [R3c]).upkeep[0]!.fields).toEqual({ notes: null }); // nothing to change (the engine skips unchanged values)
     b.device(l06, 'Sensor', { display_id: '06-D1' });
     expect(run(b, [R3c]).upkeep[0]!.fields).toEqual({ notes: '06-D1', tracking_status: 'Open', date_closed: null });
+  });
+
+  it('lists only devices that need a Neuron ID: racks and NSPS are out by category, a type\'s flag overrides (T68, D185)', () => {
+    const { b, l06, l06m } = group();
+    b.device(l06, 'Equipment rack', { display_id: '06-03' });
+    b.device(l06m, 'NSPS', { display_id: '06M-04', device: 'P-NSPS-D' });
+    expect(run(b, [R3c]).proposals[0]!.payload.notes).toBe('06-02, 06M-S2, 06M-S10');
+    // a type that says yes brings its rack back, by link or by Device text; a station type that says no drops its devices
+    const rackType = b.libraryType('Rack 42U', 'Equipment rack', { needs_neuron_id: true });
+    b.device(l06, 'Equipment rack', { display_id: '06-05', library_type_id: rackType.id });
+    b.libraryType('P-NSPS-D', 'NSPS', { needs_neuron_id: true, state: 'draft' });
+    b.libraryType('PI1002', 'Station', { needs_neuron_id: false });
+    b.device(l06m, 'Station', { display_id: '06M-S7', device: 'PI1002' });
+    expect(run(b, [R3c]).proposals[0]!.payload.notes).toBe('06-02, 06-05, 06M-04, 06M-S2, 06M-S10');
+  });
+
+  it('proposes nothing for a group whose only devices need no Neuron ID', () => {
+    const b = new Build();
+    const l = b.level('07', { numbering_group_id: 'g7' });
+    b.device(l, 'Equipment rack', { display_id: '07-01' });
+    b.device(l, 'NSPS', { display_id: '07-02' });
+    expect(run(b, [R3c]).proposals).toEqual([]);
+  });
+});
+
+describe('needsNeuronId (T68, D185)', () => {
+  it('reads the type flag, else the type category default, else the device category', () => {
+    expect(neuronIdDefault('Equipment rack')).toBe(false);
+    expect(neuronIdDefault('NSPS')).toBe(false);
+    expect(neuronIdDefault('Station')).toBe(true);
+    expect(neuronIdDefault(null)).toBe(true);
+    expect(needsNeuronId(null, { category: 'NSPS' })).toBe(false);
+    expect(needsNeuronId({ needs_neuron_id: null, category: 'Station' }, { category: 'NSPS' })).toBe(true);
+    expect(needsNeuronId({ needs_neuron_id: null, category: null }, { category: 'Equipment rack' })).toBe(false);
+    expect(needsNeuronId({ needs_neuron_id: true, category: 'NSPS' }, { category: 'NSPS' })).toBe(true);
+    expect(needsNeuronId({ needs_neuron_id: false, category: 'Station' }, { category: 'Station' })).toBe(false);
   });
 });
 

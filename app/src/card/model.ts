@@ -7,6 +7,7 @@
 import { defaultDeviceText, displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
 import { editableKeys } from '@field-survey/rules';
 
+import { deviceNeedsNeuron, loadNeuronTypes } from '../library/neuron';
 import { photoStrip } from '../photo/links';
 import { baselineEvents, type BaselineEvent } from '../setup/lock';
 
@@ -69,6 +70,8 @@ export type CardDevice = {
   pin: { sheet: string; x: number; y: number } | null;
   neuronId: string | null;
   neuronMethod: string | null;
+  /** Its type (or category) carries a Neuron ID (T68, D185); the card hides the section otherwise. */
+  needsNeuronId: boolean;
   fieldAddition: boolean;
   deleted: boolean;
   deleteReason: string | null;
@@ -312,6 +315,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
         : null,
     neuronId: str(d.neuron_id),
     neuronMethod: str(d.neuron_method),
+    needsNeuronId: deviceNeedsNeuron(await loadNeuronTypes(store, projectId), d),
     fieldAddition: d.origin === 'field_addition',
     deleted: !!d.deleted_at,
     deleteReason: str(d.delete_reason),

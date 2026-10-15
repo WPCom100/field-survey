@@ -576,6 +576,8 @@ class LibraryType(Id, Synced, Base):
     default_cables: Mapped[list[Any] | None]
     optional_cables: Mapped[list[Any] | None]
     optional_accessories: Mapped[list[Any] | None]
+    # Whether its devices carry a Neuron ID; null = the category's default (T68, D185).
+    needs_neuron_id: Mapped[bool | None]
     state: Mapped[str] = mapped_column(default="draft", server_default="draft")
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(fk("app_user.id"))
     # Provenance across op streams (a project type promoted to the app library, D184): a plain

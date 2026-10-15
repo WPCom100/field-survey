@@ -176,9 +176,14 @@ def test_copy_from(client, session):
     sid = source["id"]
     lvl = source["levels"][0]["id"]
 
-    def lt(project_id, model, state="accepted", category=None):
+    def lt(project_id, model, state="accepted", category=None, needs_neuron_id=None):
         return LibraryType(
-            id=uuid7(), project_id=project_id, model=model, category=category, state=state
+            id=uuid7(),
+            project_id=project_id,
+            model=model,
+            category=category,
+            state=state,
+            needs_neuron_id=needs_neuron_id,
         )
 
     canonical = Vocab(id=uuid7(), project_id=sid, list="device_note", value="Not run")
@@ -207,7 +212,7 @@ def test_copy_from(client, session):
             gone,
             lt(None, "P-NSPS-D", category="NSPS"),
             lt(None, "X-DRAFT", state="draft"),
-            lt(sid, "PI1002", category="Station"),
+            lt(sid, "PI1002", category="Station", needs_neuron_id=False),
             lt(sid, "p-nsps-d", category="NSPS"),
             lt(sid, "ERP-XYZ", state="draft"),
             standing,
@@ -237,6 +242,8 @@ def test_copy_from(client, session):
     types = session.scalars(select(LibraryType).where(LibraryType.project_id == pid)).all()
     assert sorted(t.model for t in types) == ["P-NSPS-D", "PI1002"]
     assert all(t.state == "accepted" and t.promoted_from_id is None for t in types)
+    # The Neuron ID flag comes along; null stays null (the category's default, T68 / D185).
+    assert {t.model: t.needs_neuron_id for t in types} == {"P-NSPS-D": None, "PI1002": False}
     rulings = session.scalars(select(Ruling).where(Ruling.project_id == pid)).all()
     assert [r.text for r in rulings] == ["Wagos everywhere"]
     assert rulings[0].standing and rulings[0].scope_levels is None and rulings[0].applied_at is None

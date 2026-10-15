@@ -176,7 +176,7 @@ export default function DashboardScreen() {
               <Text style={styles.muted}>·</Text>
               <CountLink text={`never found ${found.neverFound}`} on={drill?.table === 'asFound' && drill.key === 'neverFound'} onPress={() => open({ table: 'asFound', key: 'neverFound', status: null })} />
               <Text style={styles.muted}>·</Text>
-              <CountLink text={`Neuron IDs captured ${found.neuronCaptured}/${found.devices}`} on={drill?.table === 'asFound' && drill.key === 'neuronMissing'} onPress={() => open({ table: 'asFound', key: 'neuronMissing', status: null })} />
+              <CountLink text={`Neuron IDs captured ${found.neuronCaptured}/${found.neuronDevices}`} on={drill?.table === 'asFound' && drill.key === 'neuronMissing'} onPress={() => open({ table: 'asFound', key: 'neuronMissing', status: null })} />
             </View>
           ) : null}
           {data ? (

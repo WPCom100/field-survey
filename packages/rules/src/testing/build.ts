@@ -108,7 +108,7 @@ export class Build {
   libraryType(model: string, category: string, p: Partial<LibraryTypeRow> = {}): LibraryTypeRow {
     const row: LibraryTypeRow = {
       id: this.id('type'), project_id: this.snap.projectId, model, aliases: null, category, id_scheme: null, default_cables: null,
-      optional_cables: null, optional_accessories: null, state: 'accepted', deleted_at: null, ...p,
+      optional_cables: null, optional_accessories: null, needs_neuron_id: null, state: 'accepted', deleted_at: null, ...p,
     };
     this.snap.libraryTypes.push(row);
     return row;

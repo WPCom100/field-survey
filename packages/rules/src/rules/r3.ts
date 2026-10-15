@@ -8,7 +8,8 @@
  *   end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits" (as the master's
  *   rows read; D175).
  * - R3c: every numbering group ends with "Missing all Device Neuron IDs" (`Information`, `EC`,
- *   `sort_last`), Notes = the device IDs still missing; once accepted the engine maintains it:
+ *   `sort_last`), Notes = the device IDs still missing (only devices whose type needs one, T68 /
+ *   D185: not racks or NSPS by default); once accepted the engine maintains it:
  *   Notes rewritten, Closed when the list is empty, reopened on a new device without an ID
  *   (D49, D170).
  * - R3d: an item that says "test" or "commission" is flagged (no test or commissioning items).
@@ -36,6 +37,7 @@ import {
   terminationItem,
   waitsForSurvey,
 } from './shared';
+import { deviceNeedsNeuronId } from './library';
 
 // ------------------------------------------------------------------ R3a
 
@@ -139,7 +141,7 @@ export function isNeuronItem(p: PunchItemRow): boolean {
 export const R3c: Rule = {
   id: 'R3c',
   title: 'Missing all Device Neuron IDs',
-  text: 'Every numbering group ends with "Missing all Device Neuron IDs" (`Information`, `EC`, sorted last) whose Notes list the device IDs still missing. Once accepted the engine keeps it: Notes rewritten on each capture, Closed when the list is empty, reopened on a new device without an ID (D49, D170).',
+  text: 'Every numbering group ends with "Missing all Device Neuron IDs" (`Information`, `EC`, sorted last) whose Notes list the device IDs still missing, counting only devices whose type needs one (not Equipment racks or NSPS unless their type says so, D185). Once accepted the engine keeps it: Notes rewritten on each capture, Closed when the list is empty, reopened on a new device without an ID (D49, D170).',
   run(ctx) {
     for (const [groupId, group] of ctx.index.levelsByGroup) {
       const levels = group.slice().sort(compareLevels);
@@ -148,7 +150,7 @@ export const R3c: Rule = {
       const devices = levels.flatMap((l) => (ctx.index.devicesByLevel.get(l.id) ?? []).map((d) => ({ d, l })));
       if (!devices.length) continue;
       const missing = devices
-        .filter(({ d }) => !str(d.neuron_id))
+        .filter(({ d }) => !str(d.neuron_id) && deviceNeedsNeuronId(ctx, d))
         .sort((a, b) => compareLevels(a.l, b.l) || compareIds(a.d.display_id ?? `${a.l.level}-?`, b.d.display_id ?? `${b.l.level}-?`))
         .map(({ d }) => deviceLabel(ctx, d));
       const notes = missing.length ? missing.join(', ') : null;
