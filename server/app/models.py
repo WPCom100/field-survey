@@ -574,12 +574,13 @@ class LibraryType(Id, Synced, Base):
 
 class Vocab(Id, Synced, Base):
     __tablename__ = "vocab"
-    __table_args__ = (one_of("list", vocab.VOCAB_LIST),)
+    __table_args__ = (one_of("list", vocab.VOCAB_LIST), one_of("state", vocab.LIBRARY_STATE))
 
     project_id: Mapped[uuid.UUID] = mapped_column(fk("project.id"), index=True)
     list: Mapped[str]
     value: Mapped[str]
     canonical_of_id: Mapped[uuid.UUID | None] = mapped_column(fk("vocab.id"))
+    state: Mapped[str] = mapped_column(default="accepted", server_default="accepted")
 
 
 class Export(Id, Base):

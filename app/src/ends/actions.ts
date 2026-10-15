@@ -40,3 +40,21 @@ export function setEndText(editor: Editor, endId: string, field: 'from_text' | '
   const t = text.trim();
   return editor.setField('cable_end', endId, field, t === '' ? null : t, FIELD_SURVEY);
 }
+
+/**
+ * Point an end at a placeholder (D26) — the endpoint picker. Only an end that is not a device may
+ * change (a device end is placed on the plan); the placeholder must belong to the editor's project.
+ */
+export async function setEndPlaceholder(editor: Editor, endId: string, placeholderId: string): Promise<Op[]> {
+  const [end, ph] = await Promise.all([
+    editor.store.get<Record<string, unknown>>('cable_end', endId),
+    editor.store.get<Record<string, unknown>>('placeholder', placeholderId),
+  ]);
+  if (!end) throw new OpError('This connection end is not on this iPad.');
+  if (!ph || ph.deleted_at || ph.project_id !== editor.projectId) throw new OpError('That placeholder is not in this project.');
+  if (end.device_id) throw new OpError('This end is a device; change it on the plan.');
+  return editor.group(FIELD_SURVEY, async (g) => {
+    if (end.endpoint_kind === 'placeholder' && end.placeholder_id === placeholderId) return;
+    await g.setFields('cable_end', endId, { endpoint_kind: 'placeholder', placeholder_id: placeholderId });
+  });
+}

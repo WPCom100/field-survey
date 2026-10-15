@@ -16,7 +16,8 @@ import type { JumpTarget } from '../card/model';
 import { PhotoStrip } from '../photo/PhotoStrip';
 import { chipStyles } from '../plan/chips';
 import { pinStyleFor } from '../plan/pins';
-import { setEndNote, setEndStatus, setEndText } from './actions';
+import { PlaceholderPicker } from '../vocab/PlaceholderPicker';
+import { setEndNote, setEndPlaceholder, setEndStatus, setEndText } from './actions';
 import { CABLE_NAME, loadCableEnds, type CableView, type EndView } from './model';
 
 const CHIPS_SHOWN = 4;
@@ -110,6 +111,8 @@ export function EndEditor(props: EndEditorProps) {
           view={view}
           readOnly={readOnly}
           run={run}
+          store={store}
+          editor={editor}
           names={props.names}
           onJump={props.onJump}
           canOpenLevels={props.canOpenLevels}
@@ -124,6 +127,8 @@ export function EndEditor(props: EndEditorProps) {
             view={view}
             readOnly={readOnly}
             run={run}
+            store={store}
+            editor={editor}
             names={props.names}
             onJump={props.onJump}
             canOpenLevels={props.canOpenLevels}
@@ -170,6 +175,8 @@ function EndSection(props: {
   view: CableView;
   readOnly: boolean;
   run: Run;
+  store: Store;
+  editor: Editor | null;
   names: ReadonlyMap<string, string>;
   onJump: (t: JumpTarget) => void;
   canOpenLevels: boolean;
@@ -185,6 +192,8 @@ function EndSection(props: {
   const marks = (f: string) => [review(f) ? 'in review' : null, end.pending.has(f) ? '↑' : null].filter(Boolean).join(' ');
   const where = ep.kind === 'device' ? `${ep.label}${ep.model ? ` ${ep.model}` : ''}` : ep.kind === 'placeholder' ? ep.label : '(no endpoint)';
   const level = end.levelCode ? ` (Level ${end.levelCode})` : '';
+  const [picking, setPicking] = useState(false);
+  const canPick = !readOnly && !!props.editor && ep.kind !== 'device';
   const canJump = !!end.jump && (end.jump.sameLevel || props.canOpenLevels);
 
   return (
@@ -196,6 +205,20 @@ function EndSection(props: {
         </Text>
         <Text style={styles.endLabel}>{end.label}</Text>
       </View>
+      {canPick && !picking ? (
+        <Pressable onPress={() => setPicking(true)} style={styles.btn}>
+          <Text style={styles.btnText}>{ep.kind === 'placeholder' ? 'Change placeholder…' : 'Choose placeholder…'}</Text>
+        </Pressable>
+      ) : null}
+      {canPick && picking ? (
+        <PlaceholderPicker
+          store={props.store}
+          editor={props.editor!}
+          currentLabel={ep.kind === 'placeholder' ? ep.label : null}
+          onPick={(id) => run((e) => setEndPlaceholder(e, end.id, id))}
+          onClose={() => setPicking(false)}
+        />
+      ) : null}
       <View style={styles.rowWrap}>
         {vocab.CONNECTION_STATUS.map((s) => {
           const on = end.status === s;

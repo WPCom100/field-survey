@@ -562,6 +562,7 @@ export const ENTITIES = {
       list: enumCol(v.VOCAB_LIST, { notNull: true }),
       value: t({ notNull: true }),
       canonical_of_id: t(),
+      state: enumCol(v.LIBRARY_STATE, { notNull: true, default: 'accepted' }),
     },
     [['project_id', 'list']],
   ),

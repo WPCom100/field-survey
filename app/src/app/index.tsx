@@ -29,6 +29,7 @@ const SIDEBAR = [
   'Lint',
   'Export',
   'Setup',
+  'Vocabulary',
   'Library',
   'Sync',
 ] as const;
@@ -122,6 +123,10 @@ export default function ProjectHomeScreen() {
             </Link>
           ) : name === 'Export' && projectId ? (
             <Link key={name} href={{ pathname: '/export', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+              {name}
+            </Link>
+          ) : name === 'Vocabulary' && projectId ? (
+            <Link key={name} href={{ pathname: '/vocabulary', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
               {name}
             </Link>
           ) : name === 'Setup' && projectId ? (

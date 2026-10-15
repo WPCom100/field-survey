@@ -244,6 +244,19 @@ Decision D180 (Proposed): the cable view's six checks (code mismatch = no code, 
 
 Decision D181 (Proposed): the dashboard counts exactly what the export's Summary counts (in-scope levels in floor order, live records, a status outside the columns in no column and not in Total); the **Owner** filter is exact (`EC` does not include `EC/ETC`, unlike the plan's D99 filter) and applies to punch items and parts only; readiness = `setup` until locked (with unreviewed drafts + open review items counted), `ready` once locked, `surveying` once any edit to the level's records lands after the lock; search covers every level of the project, in scope or not. → Approve / change:
 
+## T40 — Vocabulary and placeholder editors  ·  Needs: no new build
+
+**Why it matters:** the note chips, captions, categories and placeholder endpoints are the project's own vocabulary; they must be editable in the field without losing a phrase.
+
+- [ ] **Open it.** Home sidebar → **Vocabulary**. Two tabs: Lists and Placeholders. → saw:
+- [ ] **Load standard lists.** Tap **Load standard lists**: a line says how many values and placeholders were added; the Lists tab shows the master's phrases (e.g. `Empty box on wall.`) and the eight categories, Placeholders shows Fixtures, 120v Power, Stations & Sensors, Level 09–12 and the rest. Tap it again: "Everything standard is already here." → saw:
+- [ ] **Add, accept, edit, remove.** Add `Stuck button` to Device notes: it shows with a yellow `draft` tag; **Accept** removes the tag; **Edit** renames; **Remove** deletes. A repeat of the same spelling is refused. → saw:
+- [ ] **Chips follow.** Open a device card on the plan: the Notes chips show the project's Device notes (including a fresh draft). → saw:
+- [ ] **Endpoint picker.** On a connection whose end is a placeholder (e.g. fixtures), open the end editor: **Change placeholder…** lists the project's placeholders; pick another and the header and the Cable view show it. **Add & use** creates one. A device end has no picker. → saw:
+- [ ] **Remove guard.** Remove a placeholder a connection still uses: refused with the count. → saw:
+
+Decision D182 (Proposed): `vocab.state` draft/accepted, seed as a Load button, placeholder removal guard. → Approve / change:
+
 ---
 
 ## Rules for this file
