@@ -10,7 +10,9 @@ import type { Rule } from '../rule';
 import { Build } from '../testing/build';
 import { Acc, E5 } from './e5';
 import { R1 } from './r1';
+import { R2g } from './library';
 import { R2a, R2b, R2c, R2d, R2e, R2f } from './r2';
+import { LintPower, LintRelay } from './lint';
 import { R3a, R3b, R3c, R3d, R3f } from './r3';
 import { R4a, R4b, R4d } from './r4';
 import { RULES } from './index';
@@ -169,6 +171,61 @@ describe('R2c / R2d / R2e library cables as drafts (D173)', () => {
     // a level with any U end already is left alone
     b.cable('U', { device: nsps, to_text: 'Unison from stations & sensors' }, { placeholder: bus, level });
     expect(run(b, [R2e]).proposals.map((p) => p.subject.entity_id)).toEqual([l01.id]);
+  });
+});
+
+describe('R2g device-type library cables (T48, D183)', () => {
+  const tenV = { code: '0-10V', to: 'Fixtures', far: 'Fixtures', single_row: true, qty: 1 };
+  it('an accepted type offers its default cables to every device of the type, by id or by model / alias', () => {
+    const b = new Build();
+    const { level, panel, fixtures } = floor(b);
+    const type = b.libraryType('ERP-FT-241P', 'Relay panel', { aliases: ['CT06LCPA'], default_cables: [tenV, { code: 'X', to: 'DMX to Fixtures', far: 'Gateway' }, { code: 'X', to: 'DMX 2' }, { code: 'U', to: 'bus' }] });
+    const linked = b.device(level, 'Relay panel', { display_id: '06M-02', device: 'Other', library_type_id: type.id });
+    const out = run(b, [R2g]);
+    // the panel matches by alias (its Device text), the second by id; U is R2e's, never R2g's
+    expect(out.proposals.map((p) => [p.subject.entity_id, p.discriminator])).toEqual([
+      [panel.id, '0-10V'], [panel.id, 'X'], [panel.id, 'X#2'],
+      [linked.id, '0-10V'], [linked.id, 'X'], [linked.id, 'X#2'],
+    ]);
+    expect(out.proposals[0]!.payload).toMatchObject({
+      cable: { cable: '0-10V', qty: 1, single_row: true, origin: 'library', endpoint_confirmed: true },
+      ends: [
+        { side: 'A', endpoint_kind: 'device', device_id: panel.id, from_text: 'CT06LCPA', to_text: 'Fixtures' },
+        { side: 'B', endpoint_kind: 'placeholder', placeholder_id: fixtures.id, from_text: 'Fixtures' },
+      ],
+    });
+    // no placeholder named "Gateway": the far end is text only
+    expect((out.proposals[1]!.payload.ends as Record<string, unknown>[])[1]).toMatchObject({ endpoint_kind: null, from_text: 'Gateway', level_id: level.id });
+    expect(out.proposals[0]!.why).toBe('06M-01 is a ERP-FT-241P (library: 0-10V → Fixtures).');
+    // one X run present → only the second X is still offered on the panel
+    b.cable('X', { device: panel, to_text: 'DMX to Fixtures' });
+    expect(run(b, [R2g]).proposals.filter((p) => p.subject.entity_id === panel.id).map((p) => p.discriminator)).toEqual(['0-10V', 'X#2']);
+  });
+
+  it('only an accepted type with default cables governs; then R2c / R2d and their lints stand aside', () => {
+    const b = new Build();
+    const { level, panel } = floor(b);
+    const nsps = b.device(level, 'NSPS', { display_id: '06M-05', device: 'P-NSPS-D-KIT' });
+    const draft = b.libraryType('CT06LCPA', 'Relay panel', { state: 'draft', default_cables: [tenV] });
+    const empty = b.libraryType('P-NSPS-D-KIT', 'NSPS');
+    expect(run(b, [R2g]).proposals).toEqual([]);
+    expect(run(b, [R2c, R2d]).proposals.map((p) => [p.rule_id, p.discriminator])).toEqual([['R2c', '0-10V'], ['R2c', 'P'], ['R2d', '120V']]);
+    // accepting the draft and giving the NSPS type a cable list hands both devices to R2g
+    draft.state = 'accepted';
+    empty.default_cables = [{ code: '120V', from: '120v Power', to: 'P-NSPS-D Power Supply', far: '120v Power', single_row: true, qty: 1 }];
+    expect(run(b, [R2c, R2d]).proposals).toEqual([]);
+    expect(run(b, [LintRelay, LintPower]).findings).toEqual([]);
+    const out = run(b, [R2g]);
+    expect(out.proposals.map((p) => [p.subject.entity_id, p.discriminator])).toEqual([[panel.id, '0-10V'], [nsps.id, '120V']]);
+    // editing the template changes the inputs, so the open draft is re-proposed with the new text
+    const before = out.proposals[1]!.inputs_hash;
+    empty.default_cables = [{ code: '120V', from: '120v Power', to: 'NSPS power', far: '120v Power', single_row: true, qty: 1 }];
+    const after = run(b, [R2g]).proposals[1]!;
+    expect(after.inputs_hash).not.toBe(before);
+    expect((after.payload.ends as Record<string, unknown>[])[0]).toMatchObject({ to_text: 'NSPS power' });
+    // a rejected type is never matched by model
+    empty.state = 'rejected';
+    expect(run(b, [R2g]).proposals.map((p) => p.subject.entity_id)).toEqual([panel.id]);
   });
 });
 
@@ -475,7 +532,7 @@ describe('the registry', () => {
     // the T36 lints name what the drafts would add: the rack's 120V, the panel's P, the Neuron item
     expect(a.findings.map((f) => f.lint_id).sort()).toEqual(['Acc', 'R1.no_item', 'lint.neuron_item', 'lint.power_120v', 'lint.relay_cables'].sort());
     expect(RULES.map((r) => r.id)).toEqual([
-      'R1', 'R2a', 'R2b', 'R2c', 'R2d', 'R2e', 'R2f', 'R3a', 'R3b', 'R3c', 'R3d', 'R3f', 'R4a', 'R4b', 'R4d', 'E5', 'Acc',
+      'R1', 'R2a', 'R2b', 'R2c', 'R2d', 'R2e', 'R2f', 'R2g', 'R3a', 'R3b', 'R3c', 'R3d', 'R3f', 'R4a', 'R4b', 'R4d', 'E5', 'Acc',
       'lint.power_120v', 'lint.relay_cables', 'lint.item_owner', 'lint.neuron_item', 'lint.vocab', 'lint.far_end', 'lint.end_status',
       'lint.neuron_dup', 'lint.id_dup', 'lint.deleted_link', 'lint.pin_sheet', 'lint.locked_drafts', 'ruling',
     ]);

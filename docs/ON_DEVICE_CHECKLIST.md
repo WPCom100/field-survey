@@ -257,6 +257,21 @@ Decision D181 (Proposed): the dashboard counts exactly what the export's Summary
 
 Decision D182 (Proposed): `vocab.state` draft/accepted, seed as a Load button, placeholder removal guard. → Approve / change:
 
+## T48 — Device-type library editor (project)  ·  Needs: no new build (JS update)
+
+**Why it matters:** device types carry the runs every device of the type must have; accepting one is how a new floor's NSPS, panels and racks get their library cables proposed instead of typed by hand. Use the **Tower round project** (or a scratch one).
+
+- [ ] **Open it.** Levels home → sidebar **Library**: `Device-type library (n types · n drafts)`, **+ New type** and **Copy from…** on the right; the list on the left is grouped by category, each row with its device count. A model typed freely on the plan earlier (T23, e.g. `ERP-XYZ`) shows as `DRAFT ERP-XYZ` with `added by <you> <date> ⚑`. → saw:
+- [ ] **New type.** **+ New type** → model `P-NSPS-D-KIT`, category **NSPS** → **Add draft**: the editor opens on it with `DRAFT`; the device count says how many devices already carry that Device text (on the master: 4). Adding the same model again is refused with "already in the library". → saw:
+- [ ] **Edit and save.** Aliases `P-NSPS-D`; ID scheme **Level-number**; Default cables **+ add cable** → code **120V**, From `120v Power`, To `P-NSPS-D Power Supply`, Far end `120v Power`, Single row on; Optional accessories → **+ P-NSPS-D Power Supply (expected 1, D52)**. **Save** → "Saved."; leave and come back: everything is kept. `Rules that reference this type: R2e, R2g`. → saw:
+- [ ] **Accept raises drafts for existing devices.** With the form saved, **Accept draft** → "Accepted. The rules will offer its default cables to 4 devices as drafts." Open an NSPS card on the plan (one without a 120V row): its draft reads `R2g cable` with **why?** "… is a P-NSPS-D-KIT (library: 120V → P-NSPS-D Power Supply)", and the old `R2d` draft is gone. Accept it: the connection appears with the type's From / To; the draft does not come back. → saw:
+- [ ] **Template edit follows open drafts.** Change the To text in the type, Save: on another NSPS card still showing the draft, its text follows after the rules run (a second or two). → saw:
+- [ ] **Reject and back.** Reject a draft type: it moves under **Rejected** (greyed) and leaves the + Device type picker on the plan; **Back to draft** restores it. → saw:
+- [ ] **Copy from.** In a second project (e.g. Scratch), Library → **Copy from…** → pick the Tower project → tick the accepted types → **Copy n**: they arrive accepted; a model the project already has is listed as "already here". → saw:
+- [ ] **Two iPads.** After a sync, the other iPad's Library shows the new type and its state. → saw:
+
+Decision D183 (Proposed): cable templates `{code, from, to, far, single_row, qty, status}`; only an accepted type with default cables governs its devices (R2g drafts; R2c / R2d stand aside; U stays R2e's per level); imported devices match a type by model or alias; Copy from copies accepted types only. → Approve / change:
+
 ---
 
 ## Rules for this file

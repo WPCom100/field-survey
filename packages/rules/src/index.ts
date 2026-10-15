@@ -98,6 +98,14 @@ export {
   QUICK_ACTION_TEXT,
   type QuickAction,
   type QuickActionResult,
+  R2g,
+  CABLE_CODES,
+  governingCables,
+  parseLibraryAccessories,
+  parseLibraryCables,
+  typeOfDevice,
+  type LibraryAccessory,
+  type LibraryCable,
 } from './rules';
 export { LINT_CHECKS, DEVICE_CATEGORIES, checkOf, checkOrder, rulingSeeds, type LintCheck, type RulingSeed, type SeedInput } from './lints';
 export {

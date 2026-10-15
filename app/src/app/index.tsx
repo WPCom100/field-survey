@@ -129,6 +129,10 @@ export default function ProjectHomeScreen() {
             <Link key={name} href={{ pathname: '/vocabulary', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
               {name}
             </Link>
+          ) : name === 'Library' && projectId ? (
+            <Link key={name} href={{ pathname: '/library', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+              {name}
+            </Link>
           ) : name === 'Setup' && projectId ? (
             <Link key={name} href={{ pathname: '/setup/[projectId]', params: { projectId } }} style={[styles.navItem, styles.navText]}>
               {name}

@@ -4,7 +4,7 @@
  * Ids are deterministic (`<kind>-<n>`), so expectations can name them.
  */
 
-import { emptySnapshot, type CableEndRow, type CableRow, type DeviceRow, type LevelRow, type MissingPartRow, type PlaceholderRow, type PunchItemRow, type Snapshot } from '../snapshot';
+import { emptySnapshot, type CableEndRow, type CableRow, type DeviceRow, type LevelRow, type LibraryTypeRow, type MissingPartRow, type PlaceholderRow, type PunchItemRow, type Snapshot } from '../snapshot';
 
 export const PROJECT = '0190a5f0-0000-7000-8000-00000000bb01';
 
@@ -101,6 +101,16 @@ export class Build {
   accessory(device: DeviceRow, model: string, expected: number | null, found: number | null) {
     const row = { id: this.id('acc'), device_id: device.id, model, expected_qty: expected, found_qty: found, notes: null, deleted_at: null };
     this.snap.accessories.push(row);
+    return row;
+  }
+
+  /** A device type of this project (T48); accepted unless said otherwise. */
+  libraryType(model: string, category: string, p: Partial<LibraryTypeRow> = {}): LibraryTypeRow {
+    const row: LibraryTypeRow = {
+      id: this.id('type'), project_id: this.snap.projectId, model, aliases: null, category, id_scheme: null, default_cables: null,
+      optional_cables: null, optional_accessories: null, state: 'accepted', deleted_at: null, ...p,
+    };
+    this.snap.libraryTypes.push(row);
     return row;
   }
 

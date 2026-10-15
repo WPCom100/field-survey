@@ -12,6 +12,7 @@
 import { DEVICE_CATEGORIES } from '../lints';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow, PunchItemRow } from '../snapshot';
+import { governingCables } from './library';
 import { isNeuronItem } from './r3';
 import { SIGNAL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, NEURON_ITEM, signalOf, str, subjectOfDevice, subjectOfEnd } from './shared';
 
@@ -36,7 +37,7 @@ export const LintPower: Rule = {
   run(ctx) {
     for (const d of ctx.index.device.values()) {
       if (d.category !== 'NSPS' && d.category !== 'Equipment rack') continue;
-      if (hasCode(ctx, d, '120V')) continue;
+      if (hasCode(ctx, d, '120V') || governingCables(ctx, d)) continue;
       ctx.find({ subject: subjectOfDevice(d), message: `${deviceLabel(ctx, d)}: ${d.category} without a 120V row` });
     }
   },
@@ -48,7 +49,7 @@ export const LintRelay: Rule = {
   text: 'A Relay panel has a P row and a 0-10V row (PLAN §6.2); a missing one is flagged. R2c offers it as a draft.',
   run(ctx) {
     for (const d of ctx.index.device.values()) {
-      if (d.category !== 'Relay panel') continue;
+      if (d.category !== 'Relay panel' || governingCables(ctx, d)) continue;
       for (const code of ['P', '0-10V']) {
         if (!hasCode(ctx, d, code)) ctx.find({ subject: subjectOfDevice(d), discriminator: code, message: `${deviceLabel(ctx, d)}: Relay panel without a ${code} row` });
       }

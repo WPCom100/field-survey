@@ -8,6 +8,8 @@
  *   `EBDK panic wire` (single rows), an NSPS's or rack's 120V (`120v Power` → `P-NSPS-D Power
  *   Supply` / `Equipment rack`, D52), one Unison pair per level `Stations & Sensors` ↔ the NSPS
  *   (or the rack where the level has none).
+ *   A device whose accepted library type defines default cables gets those instead (R2g,
+ *   `library.ts`, T48); R2e's bus stays per level.
  * - R2f: nothing is copied between ends (D171); an unsurveyed end stays empty (`Unsurveyed`).
  *   An end on an out-of-scope level, or whose far end is, is offered `Not started` (D171).
  */
@@ -16,6 +18,7 @@ import { riserCheck } from '@field-survey/core';
 
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow } from '../snapshot';
+import { governingCables } from './library';
 import { BUS_LABEL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, endLevel, endPlaceholder, noteHas, placeholderFor, str, subjectOfEnd } from './shared';
 
 // ------------------------------------------------------------------ R2a
@@ -98,7 +101,7 @@ export const R2c: Rule = {
   text: 'A Relay panel has a 0-10V run to `Fixtures` and a panic (P) run to `EBDK panic wire`, each a single row; P is always treated as run (`Installed, untested`). Offered as drafts to accept (D173).',
   run(ctx) {
     for (const d of ctx.index.device.values()) {
-      if (d.category !== 'Relay panel') continue;
+      if (d.category !== 'Relay panel' || governingCables(ctx, d)) continue; // an accepted type's cables govern (R2g)
       const label = deviceLabel(ctx, d);
       if (!hasCode(ctx, d, '0-10V')) {
         proposeCable(
@@ -138,7 +141,7 @@ export const R2d: Rule = {
   run(ctx) {
     for (const d of ctx.index.device.values()) {
       if (d.category !== 'NSPS' && d.category !== 'Equipment rack') continue;
-      if (hasCode(ctx, d, '120V')) continue;
+      if (hasCode(ctx, d, '120V') || governingCables(ctx, d)) continue;
       const to = d.category === 'NSPS' ? 'P-NSPS-D Power Supply' : 'Equipment rack';
       proposeCable(
         ctx,
