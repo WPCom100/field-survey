@@ -47,6 +47,8 @@ export interface RunReport {
   ops: number;
   created: number;
   updated: number;
+  /** Records a rule maintains without an Accept (D170) that changed this run. */
+  upkeep: number;
   problems: number;
   ms: number;
 }
@@ -152,8 +154,10 @@ export class RuleEngine {
   async plan(snap?: Snapshot): Promise<{ snap: Snapshot; out: EvalOutput; changes: Change[] }> {
     const s = snap ?? (await this.loadSnapshot());
     const index = indexSnapshot(s);
-    const out = evaluate(s, this.rules, index);
-    const citations = await this.citations(s, index.recordsByProposal);
+    const out = evaluate(s, this.rules, index, { now: this.now() });
+    const maintained = new Map<string, Set<string>>();
+    for (const u of out.upkeep) maintained.set(u.id, new Set([...(maintained.get(u.id) ?? []), ...Object.keys(u.fields)]));
+    const citations = await this.citations(s, index.recordsByProposal, maintained);
     const changes = [
       ...reconcileProposals({ projectId: s.projectId, existing: s.proposals, output: out.proposals, ruleIds: out.ruleIds, citations }),
       ...reconcileFindings({ projectId: s.projectId, existing: s.findings, output: out.findings, lintIds: out.lintIds }),
@@ -180,12 +184,30 @@ export class RuleEngine {
           }
         })
       : [];
+    // Upkeep (D170): one group per maintained record, reason naming the rule, so History reads
+    // "Rule engine R3c" on the item. A record that already holds the values writes nothing.
+    let upkeep = 0;
+    let upkeepOps = 0;
+    for (const u of out.upkeep) {
+      try {
+        const written = await this.editor.group({ change_type: 'Field survey', reason: `Rule engine ${u.rule_id}`, proposal_id: u.proposal_id }, (g) =>
+          g.setFields(u.entity, u.id, u.fields),
+        );
+        if (written.length) {
+          upkeep++;
+          upkeepOps += written.length;
+        }
+      } catch (e) {
+        this.log('warn', 'upkeep_failed', { rule: u.rule_id, entity: u.entity, id: u.id, message: String((e as Error)?.message ?? e) });
+      }
+    }
     const report: RunReport = {
       proposals: out.proposals.length,
       findings: out.findings.length,
-      ops: ops.length,
+      ops: ops.length + upkeepOps,
       created,
       updated,
+      upkeep,
       problems: out.problems.length,
       ms: Date.now() - t0,
     };
@@ -198,13 +220,17 @@ export class RuleEngine {
    * them and when, from the record's create op, and whether their content differs from the
    * payload (an Edit). Only rows whose proposal is not already decided cost a query.
    */
-  private async citations(s: Snapshot, byProposal: Map<string, (PunchItemRow | MissingPartRow)[]>): Promise<Map<string, Citation>> {
+  private async citations(
+    s: Snapshot,
+    byProposal: Map<string, (PunchItemRow | MissingPartRow)[]>,
+    maintained: ReadonlyMap<string, ReadonlySet<string>> = new Map(),
+  ): Promise<Map<string, Citation>> {
     const out = new Map<string, Citation>();
     const rows = new Map(s.proposals.map((p) => [p.id, p] as const));
     for (const [proposalId, records] of byProposal) {
       const row = rows.get(proposalId);
       const record = records[0] as unknown as Row;
-      const edited = row ? recordDiffers(row, record) : false;
+      const edited = row ? recordDiffers(row, record, maintained.get(record.id as string)) : false;
       if (row && (row.state === 'accepted' || row.state === 'edited') && row.decided_by_id) {
         out.set(proposalId, { edited, decided_by_id: row.decided_by_id, decided_at: row.decided_at });
         continue;

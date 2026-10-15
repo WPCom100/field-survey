@@ -35,11 +35,29 @@ export interface FindingInput {
   message: string;
 }
 
+/**
+ * Upkeep of a record a rule already owns (D170): fields the engine sets without an Accept. The
+ * only use so far is R3c's accepted Neuron ID item (its Notes list, auto-close and reopen). The
+ * engine writes the sets as `Field survey` ops, reason `Rule engine <rule_id>`, carrying
+ * `proposal_id` when the record was accepted from a proposal. Unchanged values write nothing.
+ */
+export interface UpkeepInput {
+  entity: 'punch_item' | 'missing_part' | 'cable_end' | 'device';
+  id: string;
+  fields: Record<string, unknown>;
+  proposal_id?: string | null;
+  why?: string;
+}
+
 export interface RuleContext {
   readonly snap: Snapshot;
   readonly index: SnapshotIndex;
+  /** The run's clock (ISO 8601); `today()` is its date. Never put it in `inputs`. */
+  readonly now: string;
+  today(): string;
   propose(p: ProposalInput): void;
   find(f: FindingInput): void;
+  maintain(u: UpkeepInput): void;
 }
 
 export interface Rule {
@@ -74,6 +92,15 @@ export interface FindingOutput {
   subject: Subject & { discriminator?: string | null };
   level_id: string | null;
   message: string;
+}
+
+export interface UpkeepOutput {
+  rule_id: string;
+  entity: UpkeepInput['entity'];
+  id: string;
+  fields: Record<string, unknown>;
+  proposal_id: string | null;
+  why: string | null;
 }
 
 /** `rule|kind:id|discriminator` — the (rule_id, subject, discriminator) key as one string. */

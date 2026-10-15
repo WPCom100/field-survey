@@ -118,12 +118,16 @@ export function acceptPlan(row: ProposalRow, payload: Record<string, unknown> = 
   throw new DecideError(`Unknown proposal kind ${String(row.kind)}`);
 }
 
-/** Does a live record's content differ from the payload it was accepted from (an Edit)? */
-export function recordDiffers(row: Pick<ProposalRow, 'kind' | 'payload'>, record: Record<string, unknown>): boolean {
+/**
+ * Does a live record's content differ from the payload it was accepted from (an Edit)? Fields a
+ * rule maintains on the record (D170 upkeep, `ignore`) do not count: the engine's own rewrites
+ * of the Neuron ID item's Notes are not a person's edit.
+ */
+export function recordDiffers(row: Pick<ProposalRow, 'kind' | 'payload'>, record: Record<string, unknown>, ignore?: ReadonlySet<string>): boolean {
   const payload = row.payload ?? {};
   const columns: readonly string[] = row.kind === 'punch' ? PUNCH_COLUMNS : row.kind === 'part' ? PART_COLUMNS : [];
   for (const c of columns) {
-    if (c === 'level_id' || c.endsWith('_id')) continue;
+    if (c === 'level_id' || c.endsWith('_id') || ignore?.has(c)) continue;
     if (payload[c] === undefined) continue;
     if (JSON.stringify(payload[c] ?? null) !== JSON.stringify(record[c] ?? null)) return true;
   }

@@ -17,6 +17,8 @@ import {
   type ProposalOutput,
   type Rule,
   type RuleContext,
+  type UpkeepInput,
+  type UpkeepOutput,
 } from './rule';
 
 export interface EvalProblem {
@@ -29,10 +31,17 @@ export interface EvalProblem {
 export interface EvalOutput {
   proposals: ProposalOutput[];
   findings: FindingOutput[];
+  /** Field sets the engine applies without an Accept (D170); one entry per (rule, record). */
+  upkeep: UpkeepOutput[];
   problems: EvalProblem[];
   /** Rule ids that ran (registered), and every lint id they own. */
   ruleIds: Set<string>;
   lintIds: Set<string>;
+}
+
+export interface EvalOptions {
+  /** The run's clock (ISO 8601); defaults to now. */
+  now?: string;
 }
 
 /** The lint ids a rule set owns: each rule's id plus its declared `lints`. */
@@ -45,14 +54,18 @@ export function ownedLintIds(rules: readonly Rule[]): Set<string> {
   return out;
 }
 
-export function evaluate(snap: Snapshot, rules: readonly Rule[], index: SnapshotIndex = indexSnapshot(snap)): EvalOutput {
+export function evaluate(snap: Snapshot, rules: readonly Rule[], index: SnapshotIndex = indexSnapshot(snap), opts: EvalOptions = {}): EvalOutput {
   const proposals = new Map<string, ProposalOutput>();
   const findings = new Map<string, FindingOutput>();
+  const upkeep = new Map<string, UpkeepOutput>();
   const problems: EvalProblem[] = [];
+  const now = opts.now ?? new Date().toISOString();
   for (const rule of rules) {
     const ctx: RuleContext = {
       snap,
       index,
+      now,
+      today: () => now.slice(0, 10),
       propose(p: ProposalInput) {
         const key = proposalKey(rule.id, p.subject, p.discriminator);
         if (proposals.has(key)) {
@@ -90,6 +103,18 @@ export function evaluate(snap: Snapshot, rules: readonly Rule[], index: Snapshot
           message: f.message,
         });
       },
+      maintain(u: UpkeepInput) {
+        const key = `${rule.id}|${u.entity}:${u.id}`;
+        const prev = upkeep.get(key);
+        upkeep.set(key, {
+          rule_id: rule.id,
+          entity: u.entity,
+          id: u.id,
+          fields: { ...(prev?.fields ?? {}), ...u.fields },
+          proposal_id: u.proposal_id ?? prev?.proposal_id ?? null,
+          why: u.why ?? prev?.why ?? null,
+        });
+      },
     };
     try {
       rule.run(ctx);
@@ -100,6 +125,7 @@ export function evaluate(snap: Snapshot, rules: readonly Rule[], index: Snapshot
   return {
     proposals: [...proposals.values()],
     findings: [...findings.values()],
+    upkeep: [...upkeep.values()],
     problems,
     ruleIds: new Set(rules.map((r) => r.id)),
     lintIds: ownedLintIds(rules),

@@ -193,8 +193,11 @@ const CARD_SEEDED_KEY = 'demo_card_seeded';
 /**
  * Device-card samples on the demo level (T20), seeded once and only from the demo route (the
  * side-list tests count the base seed's connections): on 06M-01 two accessories (one short), a
- * DMX cable to 06M-03, a 0-10V run to Fixtures, a Unison run the server has not numbered, two
- * rule drafts and a finding — so every card section has something to show on the iPad.
+ * DMX cable to 06M-03 (Issue "no term kit"), a 0-10V run to Fixtures (Issue "Not landed") and a
+ * Unison run the server has not numbered (Not installed) — so every card section has something
+ * to show on the iPad. The drafts and findings come from the real rules (T34): R3a on the Unison
+ * run and the 0-10V landing, R3b for the DMX kit, R2c for the missing panic run, the ERP-FT-LVD
+ * accessory finding and R1 on the panel's `Installed, untested`.
  */
 export async function ensureDemoCardExtras(store: Store, log: (msg: string) => void = () => {}): Promise<void> {
   if (await store.getState<boolean>(CARD_SEEDED_KEY)) return;
@@ -240,22 +243,9 @@ export async function ensureDemoCardExtras(store: Store, log: (msg: string) => v
   );
   cable(
     'U',
-    { endpoint_kind: 'device', device_id: panel, to_text: 'Stations & Sensors', status: 'Not installed', note: 'Not run' },
+    { endpoint_kind: 'device', device_id: panel, to_text: 'Stations & Sensors', status: 'Not installed', note: 'Not run', status_source: 'surveyed' },
     { endpoint_kind: 'placeholder', placeholder_id: bus },
   );
-  const subject = { entity: 'device', entity_id: panel };
-  create('proposal', {
-    project_id: PROJECT, rule_id: 'R3a', kind: 'punch', subject, discriminator: 'U run', inputs_hash: 'demo',
-    payload: { item: 'Run Unison to Stations & Sensors', type: 'Cable not run', owner: 'EC', tracking_status: 'Open', why: 'The U end is Not installed (R3a: one "Run …" item per unpulled wire).' },
-  });
-  create('proposal', {
-    project_id: PROJECT, rule_id: 'R4b', kind: 'part', subject, discriminator: 'X kit', inputs_hash: 'demo',
-    payload: { part: 'DMX termination kit - 06M-03 run', owner: 'EC', part_status: 'Needed', why: 'C-03 is Issue "no term kit" (R3b/R4b: one kit per run).' },
-  });
-  create('finding', {
-    project_id: PROJECT, level_id: DEMO_LEVEL_ID, lint_id: 'R1', subject,
-    message: 'Installed, untested with outstanding wiring → Issue (suggested)',
-  });
   log(`card samples: ${ops.length} ops`);
   await store.applyRemoteMany(ops);
   await store.setState(CARD_SEEDED_KEY, true);

@@ -166,8 +166,9 @@ describe('device card read model', () => {
       ['C-08', '0-10V', null],
       ['NEW', 'U', null],
     ]);
-    expect(card.drafts.map((d) => d.ruleId)).toEqual(['R3a', 'R4b']);
-    expect(card.findings).toHaveLength(1);
+    // drafts and findings come from the rule engine (T34, `src/rules/rules.test.ts`), not the seed
+    expect(card.drafts).toEqual([]);
+    expect(card.findings).toEqual([]);
     // The far end sees the cable too.
     expect((await loadDeviceCard(store, byLabel('06M-03').id))!.connections[0]).toMatchObject({ label: 'C-04', to: '06M-01' });
   });

@@ -78,6 +78,7 @@ export {
   type LinkPunchResult,
 } from './punch';
 export { DebouncedTrigger, type TriggerOptions, type TriggerHandler } from './trigger';
+export { riserCheck, type RiserCheck } from './riser';
 export {
   Store,
   StoreError,

@@ -448,8 +448,10 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     }),
   );
 
-  // --- rule drafts on the device or its ends, and open findings on the device
-  const subjects = [deviceId, ...ends.map((e) => String(e.id))];
+  // --- rule drafts on the device, its ends or the far ends of its cables (R2f's `Not started` on
+  // a far end shows here, where the surveyor is), and open findings on the device
+  const farEnds = [...others.values()].filter((e) => String(e.device_id ?? '') !== deviceId).map((e) => String(e.id));
+  const subjects = [deviceId, ...ends.map((e) => String(e.id)), ...farEnds];
   const drafts = (
     await store.list<Row>('proposal', {
       where: `state = 'proposed' AND json_extract(subject, '$.entity_id') IN (${inList(subjects)})`,

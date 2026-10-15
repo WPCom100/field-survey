@@ -4,12 +4,13 @@
  * `actions.ts`. Plain taps are `Field survey` (D96); `[⋯]` delete / restore / move pin ask for
  * a reason (`Correction`). Camera / Library and a thumbnail tap hand over to the photo flow
  * (T21); a connection row opens the end editor (T22); rule drafts are decided through the
- * `ProposalDecider` (T33). Neuron ID scan (T54) and quick actions (T34) are shown with their
- * buttons disabled until those land.
+ * `ProposalDecider` (T33); the quick actions E6 / E7 / E9 run through `runQuickAction` of the
+ * rules package (T34). Neuron ID scan (T54) is shown with its button disabled until it lands.
  * Render it with `key={deviceId}`: a card instance belongs to one device (its note commits on leave).
  */
 
 import { OpError, vocab, type Editor, type Store } from '@field-survey/core';
+import { runQuickAction, type QuickAction } from '@field-survey/rules';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -30,7 +31,7 @@ import {
   setStatus,
 } from './actions';
 import { loadDeviceCard, type CardDraft, type DeviceCard as Card, type HistoryEntry, type JumpTarget } from './model';
-import { QUICK_ACTIONS, type ProposalDecider } from './proposals';
+import { QUICK_ACTIONS, type ProposalDecider, type QuickActionKey } from './proposals';
 
 const CHIPS_SHOWN = 4;
 
@@ -330,12 +331,7 @@ export function DeviceCard(props: DeviceCardProps) {
         </Section>
 
         <Section title="Quick actions" marks="" collapsed>
-          <View style={styles.rowWrap}>
-            {QUICK_ACTIONS.map((q) => (
-              <SmallButton key={q.key} label={q.label} disabled onPress={() => {}} />
-            ))}
-          </View>
-          <Text style={styles.muted}>Arrive with the rules (T34).</Text>
+          <QuickActions deviceId={d.id} readOnly={readOnly} run={run} />
         </Section>
 
         <Section title={`History (${card.history.length})`} marks="" collapsed>
@@ -595,6 +591,62 @@ function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardDraft; d
       {why !== null ? <Text style={styles.itemSub}>{why}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {!decider.wired ? <Text style={styles.muted}>Read-only here; decide from the plan.</Text> : null}
+    </View>
+  );
+}
+
+/**
+ * Quick actions E6 / E7 / E9 (Phase 3 §4.3, T34): a tap opens the one question the action asks
+ * (what was found / the make / the new room), Apply writes the records in one group through the
+ * rules package; the card reloads through `run`.
+ */
+function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly: boolean; run: (fn: (e: Editor) => Promise<unknown>) => Promise<boolean> }) {
+  const [asking, setAsking] = useState<QuickActionKey | null>(null);
+  const [answer, setAnswer] = useState('');
+  const [busy, setBusy] = useState(false);
+  const q = QUICK_ACTIONS.find((x) => x.key === asking) ?? null;
+
+  const apply = async () => {
+    if (!q) return;
+    const text = answer.trim();
+    if (!q.optional && !text) return;
+    const action: QuickAction | null = q.key === 'E6' ? { kind: 'E6', found: text || null } : q.key === 'E7' ? { kind: 'E7', make: text } : q.key === 'E9' ? { kind: 'E9', room: text } : null;
+    if (!action) return;
+    setBusy(true);
+    const ok = await run((e) => runQuickAction(e, deviceId, action));
+    setBusy(false);
+    if (ok) {
+      setAsking(null);
+      setAnswer('');
+    }
+  };
+
+  return (
+    <View style={styles.draftForm}>
+      <View style={styles.rowWrap}>
+        {QUICK_ACTIONS.map((x) => (
+          <SmallButton
+            key={x.key}
+            label={x.label}
+            disabled={readOnly || !x.enabled || busy}
+            onPress={() => {
+              setAnswer('');
+              setAsking(asking === x.key ? null : x.key);
+            }}
+          />
+        ))}
+      </View>
+      {q?.input ? (
+        <View style={styles.draftField}>
+          <Text style={styles.draftLabel}>{q.input}</Text>
+          <TextInput style={styles.draftInput} value={answer} onChangeText={setAnswer} autoCapitalize="sentences" autoCorrect={false} autoFocus />
+          <View style={styles.rowWrap}>
+            <SmallButton label="Apply" disabled={busy || (!q.optional && !answer.trim())} onPress={() => void apply()} />
+            <SmallButton label="Cancel" disabled={busy} onPress={() => setAsking(null)} />
+          </View>
+        </View>
+      ) : null}
+      {!readOnly && !q ? <Text style={styles.muted}>Spot-check fixed closes an ETC item "Reterminated - all good"; Non-ETC device marks it Not installed and asks the EC to confirm; Relocated notes the move.</Text> : null}
     </View>
   );
 }

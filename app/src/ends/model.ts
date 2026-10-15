@@ -5,10 +5,13 @@
  * the riser label check. No React or Expo imports: runs in Node.
  */
 
-import { displayNumber, reviewFields, type Store } from '@field-survey/core';
+import { displayNumber, reviewFields, riserCheck, type RiserCheck, type Store } from '@field-survey/core';
 
 import type { CardPhoto, JumpTarget } from '../card/model';
 import { photoStrip } from '../photo/links';
+
+// The riser matcher lives in core since T34 (the rule engine's R2b uses the same one).
+export { riserCheck, type RiserCheck };
 
 /** Chips under an end's note until T40 brings the project's `connection_note` vocabulary (CLAUDE.md §3). */
 export const CONNECTION_PHRASES: readonly string[] = [
@@ -64,11 +67,6 @@ export type EndView = {
   photos: CardPhoto[];
 };
 
-export type RiserCheck =
-  | { state: 'none' }
-  | { state: 'match'; riser: string }
-  | { state: 'differs'; riser: string; to: string | null };
-
 export type CableView = {
   id: string;
   code: string | null;
@@ -86,34 +84,6 @@ export type CableView = {
 type Row = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-
-function tokens(s: string): string[] {
-  return s
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .trim()
-    .split(' ')
-    .filter(Boolean)
-    .map((t) => (/^\d+$/.test(t) ? String(Number(t)) : t));
-}
-
-/**
- * Does the stored To text say what the riser says? Lenient on case, punctuation and leading zeros,
- * and a riser word may be the start of a longer To word (riser "DMX TO LEVEL 03 UFMP" matches To
- * "DMX to Level 3 UFMP4s", Phase 3 §4.5), but every riser word must appear, in order.
- */
-export function riserCheck(riserLabel: string | null, toText: string | null): RiserCheck {
-  if (!riserLabel?.trim()) return { state: 'none' };
-  const want = tokens(riserLabel);
-  const have = tokens(toText ?? '');
-  let j = 0;
-  for (const w of want) {
-    while (j < have.length && !have[j]!.startsWith(w)) j++;
-    if (j === have.length) return { state: 'differs', riser: riserLabel.trim(), to: toText };
-    j++;
-  }
-  return { state: 'match', riser: riserLabel.trim() };
-}
 
 async function endView(store: Store, e: Row, fromDeviceLevel: string | null): Promise<EndView> {
   const id = String(e.id);

@@ -1,8 +1,8 @@
-# `packages/rules` engine (T33)
+# `packages/rules` engine (T33) and rules (T34)
 
 How rules run on the iPad. Normative references: PLAN §6 (rule engine), CLAUDE.md §4 (rules
-produce proposals and findings, never records except on Accept), D24 (client only), D169
-(deterministic proposal ids). T34 adds the rules themselves to `src/rules/`.
+produce proposals and findings, never records except on Accept — with D170's one exception),
+D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34's readings).
 
 ## Files
 
@@ -15,10 +15,41 @@ produce proposals and findings, never records except on Accept), D24 (client onl
 | `src/decide.ts` | What an Accept creates per proposal `kind` (`acceptPlan`), the keys an Edit form offers, `recordDiffers`. |
 | `src/engine.ts` | `RuleEngine` over a core `Store`: `loadSnapshot`, `run`, `decide`, `explain`, `openProposals`, `openFindings`. |
 | `src/hash.ts` | SHA-256 (pure TS), `stableStringify`, `hashUuid` (UUID v8 from a hash). |
-| `src/rules/index.ts` | `RULES`, the registry the app runs (empty until T34). |
-| `src/testing/sample.ts` | A two-device snapshot and two sample rules for tests. |
+| `src/rules/index.ts` | `RULES`, the registry the app runs, and the rule exports. |
+| `src/rules/shared.ts` | Helpers: signal words, `targetOf` (how item text names the far end), `terminationItem`, `waitsForSurvey` (R5), level / ID ordering. |
+| `src/rules/r1.ts` … `e5.ts` | The rules, one file per family (below). |
+| `src/rules/quick.ts` | Quick actions E6 / E7 / E9: `runQuickAction(editor, deviceId, action)` writes the records at once (a person tapped). |
+| `src/testing/sample.ts`, `src/testing/build.ts` | A two-device snapshot with two sample rules, and the snapshot builder the rule tests use. |
 
-## Writing a rule (T34)
+## The rules (T34)
+
+| Rule | Kind | What it does |
+|---|---|---|
+| R1 | findings `R1.untested` / `R1.no_item` / `R1.complete` | `Installed, untested` with an end `Not installed`/`Issue` or an open wiring item; `Issue` with no open item; `Complete` while `project.settings.completion_phase` is not true. |
+| R2a | finding | A note contradicting the status ("Not run" on a non-`Not installed` end, "Run, not terminated" on a `Not installed` one, "no term kit" on a non-DMX cable). Never writes a note (D172). |
+| R2b | finding | `riserCheck` (core) says the A end's To text differs from `cable.riser_to_label`. |
+| R2c | `cable` drafts, per Relay panel | 0-10V → `Fixtures` and P → `EBDK panic wire` (single rows; P `Installed, untested`, derived), paired to the EBDK with the same `panel_name`. Skipped when the device already has an end of that code. |
+| R2d | `cable` draft, per NSPS / rack | 120V: `120v Power` → `P-NSPS-D Power Supply` / `Equipment rack` (D52). |
+| R2e | `cable` draft, per in-scope level | One Unison pair `Stations & Sensors` ↔ the level's NSPS (else its rack): host end `Unison from stations & sensors`, bus end `Devices to P-NSPS-D` / `Devices to equipment rack`. Skipped when the level has any U end. |
+| R2f | `status` draft `Not started` (derived) | An unsurveyed end on an out-of-scope level, or whose far end is on one (or a `level_not_in_scope` placeholder). Nothing is ever copied (D171). |
+| R3a | `punch` draft on the end | `Not installed` → `Run <signal> to <far end>` (`Cable not run`, `EC`); 0-10V reads "Run and land 0-10V control wiring". `Issue` + "not terminated"/"not landed"/"needs landing" → `Terminate <signal> to <far end>` (`Termination`; "Land 0-10V control wiring", "Land 120V power"), discriminator `terminate`, owner per D175 (3). Gated by R5; skipped when an open item with the same text exists. |
+| R3b | `punch` draft on the device, discriminator = end id | DMX end `Issue` "no term kit" → `Terminate DMX to <far end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits". Gated by R5. |
+| R3c | `punch` draft on the numbering group + **upkeep** | "Missing all Device Neuron IDs", `Information`, `EC`, `sort_last`, `device_text` "All devices", Notes = missing IDs, on the group's first level. Once an item exists (accepted, or the master's), `ctx.maintain` rewrites Notes, closes it (date = today) when empty, reopens it on a new device without an ID (D170). |
+| R3d / R3f | findings on the item | "test"/"commission" in the text; text outside `vocab(punch_item)` when that list exists (rule-made items exempt). |
+| R4a / R4d | findings on the part | Owner ≠ `EC`; re-pulled wire (Belden, re-pull) or a network termination kit as a part. |
+| R4b | `part` draft on the device, discriminator = item id | An open DMX-kit item (`rule_id` R3b or Missing part + the Notes phrase) with no part sourced to it → "DMX termination kit - <destination> run", Qty 1, `EC`, `Needed`, "Need to be ordered", `sources: [{punch, item}]`. |
+| R4c | helper | `defaultPartNotes('part' | 'device')` → "Need to be ordered" / "Confirm whether on site" for the part editor. |
+| R5 | gate | `waitsForSurvey(end)`: level `surveyed` null and the end never surveyed on an iPad → R3a / R3b / R4b stay quiet for that end. |
+| E5 | `status` draft on the 0-10V end + `punch` draft on the device | ERP-FT-LVD found < expected → end `Issue` with `extra {note: "Not landed", status_source: derived}`; "Land 0-10V control wiring" (`Wiring`, `EC`) unless R3a's Termination branch already raises it. |
+| Acc | finding, discriminator = accessory id | Any accessory found < expected (D52). |
+| E6 / E7 / E9 | quick actions | See `quick.ts`: Spot-check fixed, Non-ETC device (make), Relocated (new room). |
+
+Upkeep (D170) is the one output a rule applies without an Accept: `ctx.maintain({entity, id,
+fields, proposal_id, why})`. The engine writes the changed fields as one group per record,
+`Field survey`, reason `Rule engine <rule_id>`, carrying `proposal_id`; unchanged values write
+nothing, and `recordDiffers` ignores maintained fields so the row stays `accepted`, not `edited`.
+
+## Writing a rule
 
 ```ts
 export const R3a: Rule = {
@@ -39,6 +70,9 @@ export const R3a: Rule = {
   },
 };
 ```
+
+`ctx.now` / `ctx.today()` give the run's clock (never put it in `inputs`); `ctx.maintain(...)` is
+upkeep (D170, R3c only so far).
 
 - A rule reads the snapshot and index only; it never touches a store. It must be
   deterministic: the same snapshot gives the same output on every iPad.
