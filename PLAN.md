@@ -248,6 +248,8 @@ Column bands from headers; `dedupe_chars`; VENUE rows group; Material List forma
 
 Separator lines → level bands; fragment merge; devices by tag; bubbles = wire ID, counted by geometry; one `draft_cable` per bubble; endpoints via Claude per band (≤2000 px crop) with the band's device list; rack outputs → `fixture_run` placeholders; sheet 002 → OCR/vision. Reviewer must **Confirm endpoint** per cable (D6).
 
+As built (T43, D190): bands from a raster row profile; `U` bubbles are chain links, not cables (R2e makes the bus rows); sheet 002 (outlined, no text) is read by the model per band; a riser symbol with a BOM draft of its model on the level puts both sources on that draft (D28), a pooled BOM line placed in full by the riser is replaced by per-level drafts (D10); riser counts vs the project's devices → `review_item(source_conflict)` (D30). `server/docs/riser.md`.
+
 ### 7.4 Plans and grid
 
 Per level: one display sheet (composite) + N source sheets (D29). pdfplumber words → grid bubbles, room codes/names, panel tags. Per grid set (D47): column/row label positions → least-squares affine; `auto` if residual < 2 pt else manual (tap 3 bubbles); prefix per set ("WT"). Drawing Position from pin: "Grid B-C / 9-8" style, "East of H" beyond last column; editable default. Panel tags → dashed pre-placement proposals; stations/sensors always by hand. Room nearest pin → default Room / Location. Embedded raster images ignored (A11).

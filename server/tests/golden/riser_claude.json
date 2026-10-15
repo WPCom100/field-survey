@@ -1,0 +1,4844 @@
+{
+ "07ae7ea088facb20bdb26bdd4a28901bccbd2c3322648e6114ba322507bc339d": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      236,
+      262,
+      40,
+      20
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": null,
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      483,
+      262,
+      40,
+      20
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Line rises through the left trunk; DMX daisy chain of left-side relay panels up the column (trunk top labelled TO RELAY PANEL LEVEL 23).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "15"
+    },
+    {
+     "bbox": [
+      1437,
+      262,
+      40,
+      20
+     ],
+     "bubble_id": "new-b3",
+     "code": "N",
+     "confidence": 0.85,
+     "from_device": "new-6",
+     "from_label": null,
+     "note": "Labelled TO EQUIP RACK LEVEL 6.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      1530,
+      262,
+      40,
+      20
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "Line rises through the right trunk; DMX daisy chain of right-side relay panels (trunk top labelled TO RELAY PANEL LEVEL 23).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "15"
+    },
+    {
+     "bbox": [
+      1782,
+      262,
+      40,
+      20
+     ],
+     "bubble_id": "new-b5",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-8",
+     "from_label": null,
+     "note": null,
+     "to_device": "new-7",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      80,
+      218,
+      145,
+      110
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK ELEC XX14 3E04",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      290,
+      73,
+      175,
+      295
+     ],
+     "category": "Relay panel",
+     "confidence": 0.92,
+     "id": "new-2",
+     "label": "CT14LCPB ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX14 3E04",
+     "model": "ERP-FT-241P",
+     "name": "CT14LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      780,
+      232,
+      95,
+      80
+     ],
+     "category": "Sensor",
+     "confidence": 0.85,
+     "id": "new-3",
+     "label": "PARADIGM P-DOC-C-LR",
+     "model": "P-DOC-C-LR",
+     "name": null,
+     "qty": 26
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      948,
+      232,
+      90,
+      80
+     ],
+     "category": "Sensor",
+     "confidence": 0.85,
+     "id": "new-4",
+     "label": "PARADIGM P-LS",
+     "model": "P-LS",
+     "name": null,
+     "qty": 2
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1107,
+      232,
+      60,
+      80
+     ],
+     "category": "Station",
+     "confidence": 0.88,
+     "id": "new-5",
+     "label": "PARADIGM PI1002",
+     "model": "PI1002",
+     "name": null,
+     "qty": 14
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1280,
+      235,
+      145,
+      85
+     ],
+     "category": "NSPS",
+     "confidence": 0.9,
+     "id": "new-6",
+     "label": "PARADIGM P-NSPS-DIN W/ENCLOSURE",
+     "model": "P-NSPS-DIN",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1585,
+      78,
+      170,
+      300
+     ],
+     "category": "Relay panel",
+     "confidence": 0.92,
+     "id": "new-7",
+     "label": "CT14LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX14-2E01",
+     "model": "ERP-FT-241P",
+     "name": "CT14LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1828,
+      222,
+      145,
+      110
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-8",
+     "label": "EBDK ELEC XX14-2E01",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "14",
+   "notes": "Band label reads LEVEL 14, which is not in the project level list (B2..06M). Station chain (P-DOC-C-LR, P-LS, PI1002) linked by U bubbles to the NSPS, whose line also rises to the level 15 station chain. X trunk endpoints inferred as next relay panel up the chain; verify."
+  },
+  "input_tokens": 5983,
+  "label": "sheet 002 band p2c1b8 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2586
+ },
+ "11baec860636c95ade65d19f6ac67822abd84630c1c9b9edd96cb305a9f078ff": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      1206,
+      90,
+      55,
+      23
+     ],
+     "bubble_id": "b33",
+     "code": "UV",
+     "confidence": 0.6,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Line runs right then up the trunk toward the level 06 equipment rack.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      1023,
+      168,
+      49,
+      23
+     ],
+     "bubble_id": "b34",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "d4",
+     "from_label": null,
+     "note": "DMX from UFMP8 runs right then up the trunk; far end assumed to be the level 06 rack.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      1498,
+      293,
+      49,
+      23
+     ],
+     "bubble_id": "b35",
+     "code": "X",
+     "confidence": 0.45,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Upper DMX at CT04LCPA joins the right-hand vertical trunk; direction up is assumed.",
+     "to_device": null,
+     "to_label": "Foundry panel",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      276,
+      311,
+      49,
+      23
+     ],
+     "bubble_id": "b36",
+     "code": "P",
+     "confidence": 0.75,
+     "from_device": "d7",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT04LCPB.",
+     "to_device": "d1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      492,
+      311,
+      49,
+      23
+     ],
+     "bubble_id": "b37",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Runs right to x~547 then down out of the band; assumed to continue to CT03LCPB.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "03"
+    },
+    {
+     "bbox": [
+      1498,
+      311,
+      49,
+      23
+     ],
+     "bubble_id": "b38",
+     "code": "X",
+     "confidence": 0.45,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Lower DMX at CT04LCPA joins the right-hand vertical trunk; direction down is assumed.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "03"
+    },
+    {
+     "bbox": [
+      1714,
+      311,
+      49,
+      23
+     ],
+     "bubble_id": "b39",
+     "code": "P",
+     "confidence": 0.75,
+     "from_device": "d8",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT04LCPA.",
+     "to_device": "d2",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [],
+   "level_code": "04",
+   "notes": "The listed relay panel model ERP24-FT-241P reads ECHO ERP-FT-241P on the drawing. The listed NSPS model P-NSPS-D reads P-NSPS-DIN W/ENCLOSURE. The U bubbles in the Paradigm chain were omitted. The far ends of the trunk lines (b33, b34, b35, b37, b38) are inferred from the overview and are uncertain; the two X runs at CT04LCPA both enter the right-hand vertical trunk."
+  },
+  "input_tokens": 6606,
+  "label": "sheet 001 band p1c0b5 level 04",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2918
+ },
+ "13d5a4c13349cddf7ee77642c282cee7f8e61aa2058dfe115f3504a2a0e3ff32": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      628,
+      291,
+      38,
+      16
+     ],
+     "bubble_id": "new-b1",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "DMX daisy chain on left trunk; upper bubble assumed to go up to CT27LCPB.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "27"
+    },
+    {
+     "bbox": [
+      628,
+      312,
+      38,
+      16
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "DMX daisy chain on left trunk; lower bubble assumed to go down to CT25LCPB.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "25"
+    },
+    {
+     "bbox": [
+      383,
+      311,
+      39,
+      16
+     ],
+     "bubble_id": "new-b3",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT26LCPB.",
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1430,
+      291,
+      38,
+      16
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "DMX daisy chain on right trunk; upper bubble assumed to go up to CT27LCPA.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "27"
+    },
+    {
+     "bbox": [
+      1430,
+      312,
+      38,
+      16
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "DMX daisy chain on right trunk; lower bubble assumed to go down to CT25LCPA.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "25"
+    },
+    {
+     "bbox": [
+      1673,
+      311,
+      39,
+      16
+     ],
+     "bubble_id": "new-b6",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-4",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT26LCPA.",
+     "to_device": "new-3",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      222,
+      252,
+      150,
+      160
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK ELEC XX26-3E04",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      438,
+      120,
+      175,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-2",
+     "label": "CT26LCPB ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX26-3E04",
+     "model": "ERP-FT-241P",
+     "name": "CT26LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1485,
+      120,
+      175,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-3",
+     "label": "CT26LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX26-2E01",
+     "model": "ERP-FT-241P",
+     "name": "CT26LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1708,
+      252,
+      167,
+      160
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-4",
+     "label": "EBDK ELEC XX26-2E01",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "26",
+   "notes": "Band labelled LEVEL 26 (not in the project level list B2..06M; this sheet covers upper tower levels). Two Echo ERP-FT-241P relay panels, each with an EBDK. DMX for both panels rides vertical trunks (left trunk x~682, right trunk x~1416) chained through each level's LCPB/LCPA panels, ultimately from the Level 28 equipment rack; up/down assignment of each X bubble is inferred from the daisy-chain pattern."
+  },
+  "input_tokens": 7093,
+  "label": "sheet 002 band p2c0b2 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2301
+ },
+ "15f688ce7f79a28a0040859364b30b3751b156693e84aa55435866ea2b0665c6": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      383,
+      319,
+      40,
+      15
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.88,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Panic wire from EBDK (ELEC XX24-3E04) to CT24LCPB.",
+     "to_device": "new-1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      627,
+      300,
+      40,
+      16
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "DMX trunk up the left riser to CT25LCPB; DMX source ultimately the equipment rack on level 28.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "25"
+    },
+    {
+     "bbox": [
+      627,
+      320,
+      40,
+      16
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "DMX trunk down the left riser to CT23LCPB.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "23"
+    },
+    {
+     "bbox": [
+      1428,
+      300,
+      40,
+      16
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.68,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "DMX trunk up the right riser to CT25LCPA.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "25"
+    },
+    {
+     "bbox": [
+      1428,
+      320,
+      40,
+      16
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.68,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "DMX trunk down the right riser to CT23LCPA.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "23"
+    },
+    {
+     "bbox": [
+      1674,
+      320,
+      40,
+      15
+     ],
+     "bubble_id": "new-b6",
+     "code": "P",
+     "confidence": 0.88,
+     "from_device": "new-4",
+     "from_label": null,
+     "note": "Panic wire from EBDK (ELEC XX24-2E01) to CT24LCPA.",
+     "to_device": "new-3",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      437,
+      130,
+      176,
+      353
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-1",
+     "label": "CT24LCPB ECHO ERP-FT-241P",
+     "model": "ERP-FT-241P",
+     "name": "CT24LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      222,
+      276,
+      150,
+      108
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-2",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1475,
+      130,
+      176,
+      353
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-3",
+     "label": "CT24LCPA ECHO ERP-FT-241P",
+     "model": "ERP-FT-241P",
+     "name": "CT24LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1728,
+      276,
+      150,
+      108
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-4",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "24",
+   "notes": "Band labelled LEVEL 24 (level 24 is not in the listed project levels). Two relay panels CT24LCPB (ELEC XX24-3E04) and CT24LCPA (ELEC XX24-2E01), each ECHO ERP-FT-241P with 1 ERP-FT-LVD and 1 ERP-RTO, each with an EBDK feeding a P bubble. The X bubbles are DMX daisy-chain links on vertical trunks; which bubble goes up vs down is inferred from line position. Truncated text at right edge ('NOT IN ... CONT... SCHE... EF.92...') likely refers to a lighting control schedule note on sheet EF.920."
+  },
+  "input_tokens": 7021,
+  "label": "sheet 002 band p2c0b4 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2305
+ },
+ "1da83e6e03c12d70e182c31ba67d02ec8405603f9a8fbfeaa0bfe8be704a4a59": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      237,
+      323,
+      48,
+      20
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT17LCPB.",
+     "to_device": "new-1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      481,
+      303,
+      40,
+      18
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.65,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "DMX line turns up the left trunk at x~537; appears to chain to CT18LCPB on level 18.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "18"
+    },
+    {
+     "bbox": [
+      481,
+      325,
+      40,
+      18
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.65,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "DMX line turns down the left trunk at x~537; appears to chain to CT16LCPB on level 16.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "16"
+    },
+    {
+     "bbox": [
+      1528,
+      303,
+      40,
+      18
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "DMX line turns up the right trunk at x~1516; appears to chain to CT18LCPA on level 18.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "18"
+    },
+    {
+     "bbox": [
+      1528,
+      325,
+      40,
+      18
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "DMX line turns down the right trunk at x~1516; level 16 has no right relay panel, so likely continues to CT15LCPA on level 15.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "15"
+    },
+    {
+     "bbox": [
+      1772,
+      323,
+      48,
+      20
+     ],
+     "bubble_id": "new-b6",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-4",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT17LCPA.",
+     "to_device": "new-3",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 2
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      291,
+      92,
+      175,
+      481
+     ],
+     "category": "Relay panel",
+     "confidence": 0.92,
+     "id": "new-1",
+     "label": "CT17LCPB ECHO ERP-FT-481P 48 x 20 SINGLE POLE RELAYS 2 - ERP-FT-LVD 1 - ERP-RTO ELEC XX17-3E04",
+     "model": "ERP-FT-481P",
+     "name": "CT17LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      78,
+      277,
+      144,
+      109
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-2",
+     "label": "EBDK ELEC XX17-3E04",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1585,
+      140,
+      142,
+      263
+     ],
+     "category": "Relay panel",
+     "confidence": 0.92,
+     "id": "new-3",
+     "label": "CT17LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX17-2E01",
+     "model": "ERP-FT-241P",
+     "name": "CT17LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1828,
+      277,
+      140,
+      109
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-4",
+     "label": "EBDK ELEC XX17-2E01",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      662,
+      560,
+      110,
+      130
+     ],
+     "category": "Sensor",
+     "confidence": 0.88,
+     "id": "new-5",
+     "label": "PARADIGM P-DOC-C-LR",
+     "model": "P-DOC-C-LR",
+     "name": null,
+     "qty": 5
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      822,
+      560,
+      112,
+      130
+     ],
+     "category": "Sensor",
+     "confidence": 0.88,
+     "id": "new-6",
+     "label": "PARADIGM P-LS",
+     "model": "P-LS",
+     "name": null,
+     "qty": 3
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      976,
+      558,
+      90,
+      118
+     ],
+     "category": "Station",
+     "confidence": 0.88,
+     "id": "new-7",
+     "label": "PARADIGM PI1002",
+     "model": "PI1002",
+     "name": null,
+     "qty": 8
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1102,
+      558,
+      92,
+      118
+     ],
+     "category": "Station",
+     "confidence": 0.88,
+     "id": "new-8",
+     "label": "PARADIGM PI1104",
+     "model": "PI1104",
+     "name": null,
+     "qty": 6
+    }
+   ],
+   "level_code": "17",
+   "notes": "Band labelled LEVEL 17 (not in the project level list given). Paradigm chain P-DOC-C-LR (5) - P-LS (3) - PI1002 (8) - PI1104 (6) linked by U bubbles (omitted); chain line drops at x~1254 down to the UNISON ERn4 enclosure on level 16. DMX trunk destinations inferred from the overview column; verify level codes."
+  },
+  "input_tokens": 6559,
+  "label": "sheet 002 band p2c1b5 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2756
+ },
+ "209d2fa3eb35c4c130d0883c39e3b8d212336cd24a807282e27a907e1944ec77": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      237,
+      292,
+      38,
+      17
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": null,
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      482,
+      272,
+      35,
+      17
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Trunk at x~537 rises to CT22LCPB on level 22 (chain continues TO RELAY PANEL LEVEL 23).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "22"
+    },
+    {
+     "bbox": [
+      482,
+      292,
+      35,
+      17
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Trunk at x~537 descends to CT20LCPB on level 20.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "20"
+    },
+    {
+     "bbox": [
+      1440,
+      292,
+      35,
+      17
+     ],
+     "bubble_id": "new-b4",
+     "code": "N",
+     "confidence": 0.85,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "Labelled TO EQUIP RACK LEVEL 28.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "28"
+    },
+    {
+     "bbox": [
+      1517,
+      272,
+      36,
+      17
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-8",
+     "from_label": null,
+     "note": "Trunk at x~1515 rises toward level 22 / TO RELAY PANEL LEVEL 23.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "22"
+    },
+    {
+     "bbox": [
+      1517,
+      292,
+      36,
+      17
+     ],
+     "bubble_id": "new-b6",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-8",
+     "from_label": null,
+     "note": "Trunk at x~1515 descends to CT20LCPA on level 20.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "20"
+    },
+    {
+     "bbox": [
+      1773,
+      292,
+      36,
+      17
+     ],
+     "bubble_id": "new-b7",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-9",
+     "from_label": null,
+     "note": null,
+     "to_device": "new-8",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      79,
+      248,
+      142,
+      109
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      291,
+      103,
+      175,
+      267
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-2",
+     "label": "CT21LCPB ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO",
+     "model": "ERP-FT-241P",
+     "name": "CT21LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      693,
+      260,
+      90,
+      90
+     ],
+     "category": "Sensor",
+     "confidence": 0.9,
+     "id": "new-3",
+     "label": "PARADIGM P-DOC-C-LR",
+     "model": "P-DOC-C-LR",
+     "name": null,
+     "qty": 5
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      852,
+      260,
+      90,
+      90
+     ],
+     "category": "Sensor",
+     "confidence": 0.9,
+     "id": "new-4",
+     "label": "PARADIGM P-LS",
+     "model": "P-LS",
+     "name": null,
+     "qty": 3
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1012,
+      263,
+      45,
+      75
+     ],
+     "category": "Station",
+     "confidence": 0.9,
+     "id": "new-5",
+     "label": "PARADIGM PI1002",
+     "model": "PI1002",
+     "name": null,
+     "qty": 7
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1139,
+      263,
+      43,
+      72
+     ],
+     "category": "Station",
+     "confidence": 0.9,
+     "id": "new-6",
+     "label": "PARADIGM PI1104",
+     "model": "PI1104",
+     "name": null,
+     "qty": 9
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1282,
+      258,
+      140,
+      85
+     ],
+     "category": "NSPS",
+     "confidence": 0.9,
+     "id": "new-7",
+     "label": "PARADIGM P-NSPS-DIN W/ENCLOSURE",
+     "model": "P-NSPS-DIN",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1585,
+      103,
+      175,
+      267
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-8",
+     "label": "CT21LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO",
+     "model": "ERP-FT-241P",
+     "name": "CT21LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1828,
+      248,
+      142,
+      109
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-9",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "21",
+   "notes": "Band is LEVEL 21 (label at lower right). Level 21 and the X-chain far ends (levels 20, 22, 23, 28) are not in the listed project levels. Unbubbled vertical lines from the NSPS (x~1228-1265) run down to the Unison station chains on lower levels and one rises toward TO UNISON STATIONS LEVEL 28; these have no wire bubble and are not listed. U bubbles between sensors/stations omitted per rules. EBDK labels ELEC XX21-3E04 / XX21-2E01 are the electrical panel source, not device tags."
+  },
+  "input_tokens": 5983,
+  "label": "sheet 002 band p2c1b1 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 3262
+ },
+ "2295f5cffa321f34d236c83a94749a0cfd0dca2dfd8bd39158c2f0d731cf5911": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      238,
+      307,
+      40,
+      16
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": null,
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      483,
+      307,
+      38,
+      16
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "DMX joins the vertical trunk on the left side of the column, which runs up past other relay panels to 'TO RELAY PANEL LEVEL 23' at the top of the sheet.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1227,
+      327,
+      38,
+      16
+     ],
+     "bubble_id": "new-b3",
+     "code": "N",
+     "confidence": 0.85,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "Labelled TO EQUIP RACK LEVEL 6",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      1227,
+      342,
+      38,
+      16
+     ],
+     "bubble_id": "new-b4",
+     "code": "N",
+     "confidence": 0.85,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "Labelled TO EQUIP RACK LEVEL 6",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      1530,
+      307,
+      38,
+      16
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "new-4",
+     "from_label": null,
+     "note": "DMX line runs left from the Foundry panel to the right-hand vertical trunk (toward TO RELAY PANEL LEVEL 23); it may instead originate at the ERn4 connector.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      77,
+      262,
+      145,
+      136
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      291,
+      117,
+      171,
+      268
+     ],
+     "category": "Relay panel",
+     "confidence": 0.9,
+     "id": "new-2",
+     "label": "CT16LCPB ECHO ERP-FT-241P",
+     "model": "ERP-FT-241P",
+     "name": "CT16LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "P-ACP",
+       "qty": 2
+      },
+      {
+       "model": "P-SPM-E",
+       "qty": 1
+      },
+      {
+       "model": "U-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1280,
+      258,
+      158,
+      144
+     ],
+     "category": "Other",
+     "confidence": 0.85,
+     "id": "new-3",
+     "label": "UNISON ERn4",
+     "model": "ERn4",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1582,
+      212,
+      118,
+      145
+     ],
+     "category": "Foundry panel",
+     "confidence": 0.9,
+     "id": "new-4",
+     "label": "CT16LCPA FOUNDRY UFMP8",
+     "model": "UFMP8",
+     "name": "CT16LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      800,
+      400,
+      88,
+      88
+     ],
+     "category": "Sensor",
+     "confidence": 0.85,
+     "id": "new-5",
+     "label": "PARADIGM P-DOC-C-LR",
+     "model": "P-DOC-C-LR",
+     "name": null,
+     "qty": 13
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      957,
+      400,
+      90,
+      88
+     ],
+     "category": "Sensor",
+     "confidence": 0.85,
+     "id": "new-6",
+     "label": "PARADIGM P-LS",
+     "model": "P-LS",
+     "name": null,
+     "qty": 2
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1118,
+      400,
+      54,
+      85
+     ],
+     "category": "Station",
+     "confidence": 0.85,
+     "id": "new-7",
+     "label": "PARADIGM PI1002",
+     "model": "PI1002",
+     "name": null,
+     "qty": 6
+    }
+   ],
+   "level_code": "16",
+   "notes": "Band labelled LEVEL 16 (the LEVEL 17 text at the top belongs to the band above). The Unison station chain (P-DOC-C-LR, P-LS, PI1002) is linked by U bubbles into the ERn4, which were omitted. A vertical line rises from the ERn4 to the level 17 station chain. ERn4 options: (1) P-ACP, (1) P-SPM-E, (1) U-RTO, plus a second (1) P-ACP."
+  },
+  "input_tokens": 6055,
+  "label": "sheet 002 band p2c1b6 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 3270
+ },
+ "24fa6e02b0c679a9567dbd72eab3ecc03e6276087433ad4da8227900ca8eab32": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      383,
+      325,
+      40,
+      18
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT25LCPB.",
+     "to_device": "new-1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      627,
+      306,
+      40,
+      18
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "DMX line turns up the left trunk (x\u2248681) toward CT26LCPB; daisy chain from rack on level 28.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "26"
+    },
+    {
+     "bbox": [
+      627,
+      326,
+      40,
+      18
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.72,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "DMX line turns down the left trunk toward CT24LCPB.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "24"
+    },
+    {
+     "bbox": [
+      1430,
+      306,
+      40,
+      18
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "DMX line turns up the right trunk (x\u22481416) toward CT26LCPA.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "26"
+    },
+    {
+     "bbox": [
+      1430,
+      326,
+      40,
+      18
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.72,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "DMX line turns down the right trunk toward CT24LCPA.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "24"
+    },
+    {
+     "bbox": [
+      1673,
+      325,
+      40,
+      18
+     ],
+     "bubble_id": "new-b6",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-4",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT25LCPA.",
+     "to_device": "new-3",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      438,
+      135,
+      174,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-1",
+     "label": "CT25LCPB ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX25-3E04",
+     "model": "ERP-FT-241P",
+     "name": "CT25LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      224,
+      280,
+      146,
+      112
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-2",
+     "label": "EBDK ELEC XX25-3E04",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1484,
+      135,
+      174,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-3",
+     "label": "CT25LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX25-2E01",
+     "model": "ERP-FT-241P",
+     "name": "CT25LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1728,
+      280,
+      145,
+      112
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-4",
+     "label": "EBDK ELEC XX25-2E01",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "25",
+   "notes": "Band label reads LEVEL 25, which is not in the provided project level list (B2\u202606M); column shows levels 28 down to 23. Two DMX trunks (left x\u2248681, right x\u22481416) daisy-chain the relay panels between levels; upper X bubble of each panel connects upward (level 26), lower X downward (level 24). Direction of DMX flow assumed from rack on level 28 downward. Each relay panel also has 0-10V control wires and load/feed circuits by others (not cables)."
+  },
+  "input_tokens": 7093,
+  "label": "sheet 002 band p2c0b3 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2372
+ },
+ "2bf6a941c1f38ddd604d5020ac1ca2fad8614c2b141e1ca6d062e5066eb3db7c": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      1281,
+      241,
+      49,
+      23
+     ],
+     "bubble_id": "b69",
+     "code": "N",
+     "confidence": 0.6,
+     "from_device": "d4",
+     "from_label": null,
+     "note": "Network line leaves the NSPS's right side and rises out of the band as a trunk at x\u22481333. The overview suggests it runs up through B1 to the level 01 equipment rack, but this is not confirmed by a printed label.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "01"
+    },
+    {
+     "bbox": [
+      276,
+      258,
+      49,
+      23
+     ],
+     "bubble_id": "b70",
+     "code": "P",
+     "confidence": 0.75,
+     "from_device": "d5",
+     "from_label": null,
+     "note": "Panic wire between the EBDK and the CTB2LCPB relay panel. The bubble sits at the EBDK's edge.",
+     "to_device": "d1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      492,
+      258,
+      49,
+      23
+     ],
+     "bubble_id": "b71",
+     "code": "X",
+     "confidence": 0.65,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "DMX line leaves the relay panel and rises out of the band at x\u2248545 as a trunk. The overview indicates it continues up through B1 to the level 01 equipment rack.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "01"
+    }
+   ],
+   "devices": [],
+   "level_code": "B2",
+   "notes": "Level B2 has the following devices: relay panel CTB2LCPB (ECHO ERP-FT-241P with 1 ERP-FT-LVD and 1 ERP-RTO), EBDK, P-DOC-C-LR sensor, PI1002 station and P-NSPS-DIN with enclosure. Two U bubbles on the Unison chain (sensor to station to NSPS) were omitted. A second line leaves the top of the NSPS at x\u22481085 with no bubble; it is probably the Unison or station bus continuing to B1. The listed model codes look truncated against the printed labels: ERP24-FT-241P versus ERP-FT-241P, and P-NSPS-D versus P-NSPS-DIN. The far-end levels for the trunks are inferred from the overview, not from printed labels."
+  },
+  "input_tokens": 6025,
+  "label": "sheet 001 band p1c0b10 level B2",
+  "model": "claude-opus-5-5",
+  "output_tokens": 1417
+ },
+ "2f4b22bba3ce5b97f251a1bf84c681e73027254fe28840aee22d1f4db92fa76c": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      383,
+      332,
+      42,
+      18
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT27LCPB.",
+     "to_device": "new-1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      627,
+      310,
+      58,
+      19
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.65,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "Line rises on trunk at x~683 toward level 28 (CT28LCPB / equipment rack DMX chain).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "28"
+    },
+    {
+     "bbox": [
+      627,
+      332,
+      58,
+      19
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "Line drops on trunk at x~683 to CT26LCPB on level 26.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "26"
+    },
+    {
+     "bbox": [
+      1420,
+      310,
+      52,
+      19
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "Line rises on trunk at x~1415 toward level 28; far end assumed to be the equipment rack.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "28"
+    },
+    {
+     "bbox": [
+      1420,
+      332,
+      52,
+      19
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "Line drops on trunk at x~1415 to CT26LCPA on level 26.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "26"
+    },
+    {
+     "bbox": [
+      1673,
+      332,
+      42,
+      18
+     ],
+     "bubble_id": "new-b6",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "Panic wire between CT27LCPA and EBDK.",
+     "to_device": "new-8",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      438,
+      140,
+      175,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-1",
+     "label": "CT27LCPB ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX27-3E04",
+     "model": "ERP-FT-241P",
+     "name": "CT27LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      222,
+      278,
+      145,
+      120
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-2",
+     "label": "EBDK ELEC XX27-3E04",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      718,
+      390,
+      110,
+      122
+     ],
+     "category": "Sensor",
+     "confidence": 0.9,
+     "id": "new-3",
+     "label": "PARADIGM P-DOC-C-LR QTY: 01",
+     "model": "P-DOC-C-LR",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      878,
+      390,
+      110,
+      122
+     ],
+     "category": "Sensor",
+     "confidence": 0.9,
+     "id": "new-4",
+     "label": "PARADIGM P-LS QTY: 01",
+     "model": "P-LS",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1035,
+      390,
+      95,
+      122
+     ],
+     "category": "Station",
+     "confidence": 0.9,
+     "id": "new-5",
+     "label": "PARADIGM PI1002 QTY: 05",
+     "model": "PI1002",
+     "name": null,
+     "qty": 5
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1158,
+      390,
+      95,
+      122
+     ],
+     "category": "Station",
+     "confidence": 0.88,
+     "id": "new-6",
+     "label": "PARADIGM PI1104 QTY: 09",
+     "model": "PI1104",
+     "name": null,
+     "qty": 9
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1485,
+      140,
+      175,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-7",
+     "label": "CT27LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX27-2E01",
+     "model": "ERP-FT-241P",
+     "name": "CT27LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1728,
+      278,
+      145,
+      120
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-8",
+     "label": "EBDK ELEC XX27-2E01",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "27",
+   "notes": "Band is LEVEL 27 (label at lower right). Level 27 and 28 are not in the project level list given. Unison U chain P-DOC-C-LR \u2192 P-LS \u2192 PI1002 \u2192 PI1104 continues up via vertical line at x~1327 toward the equipment rack (ERn4-RM) on level 28; U bubbles omitted per rules. Upward X trunk destinations are inferred from the overview and are uncertain."
+  },
+  "input_tokens": 7093,
+  "label": "sheet 002 band p2c0b1 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2986
+ },
+ "3a75c540bd30ea58e3eda96fbe5cc4b29adc0a7fccdb88bd87ba0e888a077392": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      237,
+      450,
+      40,
+      17
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": null,
+     "to_device": "new-1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      480,
+      430,
+      40,
+      16
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "DMX daisy chain up the left trunk toward relay panels above (chain ends TO RELAY PANEL LEVEL 23).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "16"
+    },
+    {
+     "bbox": [
+      480,
+      452,
+      40,
+      16
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "Second DMX bubble on left trunk; likely continues down to CT14LCPB on level 14, which is not a project level.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1528,
+      431,
+      40,
+      16
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "Single DMX bubble to right trunk; direction (up to 16 or down to 14) unclear from overview.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1773,
+      450,
+      40,
+      17
+     ],
+     "bubble_id": "new-b5",
+     "code": "P",
+     "confidence": 0.7,
+     "from_device": "new-8",
+     "from_label": null,
+     "note": null,
+     "to_device": "new-7",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 2
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      291,
+      100,
+      177,
+      482
+     ],
+     "category": "Relay panel",
+     "confidence": 0.92,
+     "id": "new-1",
+     "label": "CT15LCPB ECHO ERP-FT-481P 48 x 20 SINGLE POLE RELAYS 2 - ERP-FT-LVD 1 - ERP-RTO",
+     "model": "ERP-FT-481P",
+     "name": "CT15LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      78,
+      393,
+      145,
+      130
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-2",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      660,
+      540,
+      95,
+      120
+     ],
+     "category": "Sensor",
+     "confidence": 0.9,
+     "id": "new-3",
+     "label": "PARADIGM P-DOC-C-LR",
+     "model": "P-DOC-C-LR",
+     "name": null,
+     "qty": 4
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      820,
+      540,
+      95,
+      120
+     ],
+     "category": "Sensor",
+     "confidence": 0.9,
+     "id": "new-4",
+     "label": "PARADIGM P-LS",
+     "model": "P-LS",
+     "name": null,
+     "qty": 3
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      980,
+      537,
+      62,
+      120
+     ],
+     "category": "Station",
+     "confidence": 0.9,
+     "id": "new-5",
+     "label": "PARADIGM PI1002",
+     "model": "PI1002",
+     "name": null,
+     "qty": 10
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1095,
+      537,
+      95,
+      120
+     ],
+     "category": "Station",
+     "confidence": 0.9,
+     "id": "new-6",
+     "label": "PARADIGM PI1104",
+     "model": "PI1104",
+     "name": null,
+     "qty": 9
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1585,
+      262,
+      178,
+      295
+     ],
+     "category": "Relay panel",
+     "confidence": 0.92,
+     "id": "new-7",
+     "label": "CT15LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO",
+     "model": "ERP-FT-241P",
+     "name": "CT15LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1828,
+      393,
+      145,
+      130
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-8",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "15",
+   "notes": "Band is labelled LEVEL 15, which is not among the listed project levels (B2..06M); this sheet appears to cover tower levels 14-22. Left EBDK tagged ELEC XX15-3E04, right EBDK and CT15LCPA ELEC XX15-2E01. Paradigm chain (P-DOC-C-LR, P-LS, PI1002, PI1104) is linked by U bubbles only, ending in a U line that drops to level 14's P-NSPS enclosure; no wire bubbles listed for it. P bubble direction assumed EBDK to relay panel."
+  },
+  "input_tokens": 6415,
+  "label": "sheet 002 band p2c1b7 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2629
+ },
+ "4dd3ab5179516b60d858669eab173612cd43db79a9b909fc4cd7fdee8a896242": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      237,
+      248,
+      40,
+      17
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "Panic wire between EBDK and relay panel CT22LCPB.",
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      481,
+      227,
+      40,
+      17
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.85,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Line rises out of the band; labelled TO RELAY PANEL LEVEL 23.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "23"
+    },
+    {
+     "bbox": [
+      481,
+      248,
+      40,
+      17
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Line drops out of the bottom of the band at x~538; appears to continue the DMX chain down to the relay panel on level 21 (CT21LCPB) per the overview.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "21"
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      78,
+      195,
+      148,
+      115
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      291,
+      57,
+      175,
+      297
+     ],
+     "category": "Relay panel",
+     "confidence": 0.92,
+     "id": "new-2",
+     "label": "CT22LCPB ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO",
+     "model": "ERP-FT-241P",
+     "name": "CT22LCPB",
+     "qty": 1
+    }
+   ],
+   "level_code": "22",
+   "notes": "Band labelled LEVEL 22 (not among the listed project levels B2\u201306M; this sheet appears to cover levels 22 down to 14). Two pass-through trunk lines with no devices on this band: TO UNISON STATIONS LEVEL 28 (x~1230) and TO RELAY PANEL LEVEL 23 (x~1516), both continuing down the column. Relay panel fed by (24) 20A 120V feed circuits and (1) 20A 120V power circuit; 0-10V control wiring by others; EBDK has 4-wire 20A max sense feed to normal power source (by others)."
+  },
+  "input_tokens": 5767,
+  "label": "sheet 002 band p2c1b0 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 1305
+ },
+ "4ebca8036cc101a07e8fcbd25d4e0adf1d7f7b58f707fbbc34f3048896e9ef9f": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      522,
+      297,
+      49,
+      23
+     ],
+     "bubble_id": "b1",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "DMX line from CT12LCPB runs right, then drops at x\u2248577 out of the band bottom. It follows the trunk down to the Equipment Rack 18U on level 06.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      1492,
+      405,
+      49,
+      23
+     ],
+     "bubble_id": "b2",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "DMX line from Foundry CT12LCPA runs left, then drops at x\u22481485 out of the band bottom. It follows the right-hand trunk, which appears to feed the level 06 equipment rack outputs.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      306,
+      440,
+      49,
+      23
+     ],
+     "bubble_id": "b3",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Panic wire from the EBDK to the CT12LCPB relay panel.",
+     "to_device": "d2",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [],
+   "level_code": "12",
+   "notes": "Level 12 is not in the project level list (B2, B1, 01, 02, 03, 04, 06, 06M); check the sheet or project mapping. The NSPS (d8) has an unbubbled line that drops at x\u22481390 into the trunk, likely network to the level 06 rack; no wire code is printed. The four U bubbles in the Paradigm chain are Unison links and are omitted. Device list discrepancies against the printed sheet: d2 model printed as ECHO ERP-FT-481P (prompt says ERP48-FT-481P), with options 2 - ERP-FT-LVD and 1 - ERP-RTO. d8 model printed as P-NSPS-DIN W/ENCLOSURE (prompt says P-NSPS-D)."
+  },
+  "input_tokens": 6585,
+  "label": "sheet 001 band p1c0b0 level 12",
+  "model": "claude-opus-5-5",
+  "output_tokens": 1177
+ },
+ "521528e14e6afcbe0df1e1ae9cf34c4edd33aadea9e5157653a50085e0fc6d27": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      1436,
+      177,
+      49,
+      23
+     ],
+     "bubble_id": "b40",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "d4",
+     "from_label": null,
+     "note": "Line runs right to the vertical trunk at x~1490 and turns up toward level 04 (DMX chain from above). Far end inferred from the overview.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "04"
+    },
+    {
+     "bbox": [
+      1436,
+      194,
+      49,
+      23
+     ],
+     "bubble_id": "b41",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "d4",
+     "from_label": null,
+     "note": "Appears to drop down to the CT03LCPA DMX input (b43). This is the same local DMX link as b43.",
+     "to_device": "d2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      492,
+      225,
+      49,
+      23
+     ],
+     "bubble_id": "b42",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Joins the left trunk at x~545 and goes up. This is the DMX chain toward level 04 and on to the level 06 equipment rack.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "04"
+    },
+    {
+     "bbox": [
+      1498,
+      225,
+      49,
+      23
+     ],
+     "bubble_id": "b43",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Local DMX link between CT03LCPA and UFMP4. This is the same wire as b41.",
+     "to_device": "d4",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      276,
+      243,
+      49,
+      23
+     ],
+     "bubble_id": "b44",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Panic wire to the EBDK.",
+     "to_device": "d5",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      492,
+      243,
+      49,
+      23
+     ],
+     "bubble_id": "b45",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Joins the left trunk at x~545 and continues down to level 02 (DMX out).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "02"
+    },
+    {
+     "bbox": [
+      1498,
+      243,
+      49,
+      23
+     ],
+     "bubble_id": "b46",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Joins the right trunk at x~1490 and continues down to level 02.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "02"
+    },
+    {
+     "bbox": [
+      1714,
+      243,
+      49,
+      23
+     ],
+     "bubble_id": "b47",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Panic wire to the EBDK.",
+     "to_device": "d6",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [],
+   "level_code": "03",
+   "notes": "Both relay panels use DMX in/out daisy-chain bubbles on vertical trunks (left x~545, right x~1490). The up/down far ends are inferred from the overview, so confidence on those is moderate. The P-NSPS-DIN enclosure has an unbubbled line that runs right to x~1315 and up toward level 04/06; no run bubble was listed for it. The Paradigm chain (P-LS, PI1004, PI1104, PI1002, P-DOC-C-LR, NSPS) uses U bubbles only, which were omitted. The listed relay model 'ERP24-FT-241P' reads ECHO ERP-FT-241P on the drawing, and the NSPS reads PARADIGM P-NSPS-DIN W/ENCLOSURE."
+  },
+  "input_tokens": 6379,
+  "label": "sheet 001 band p1c0b6 level 03",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2577
+ },
+ "5b938ff0a2e061cbf393880e5a7d7758a898087dd62568b3aa5472e609bc8de8": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      492,
+      270,
+      49,
+      23
+     ],
+     "bubble_id": "b66",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Upper DMX line turns up the trunk at x\u2248547 toward level 01. It is most likely the DMX daisy chain from the level 01 left panel stack, which is fed by the level 01 equipment rack.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "01"
+    },
+    {
+     "bbox": [
+      276,
+      288,
+      49,
+      23
+     ],
+     "bubble_id": "b67",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "d5",
+     "from_label": null,
+     "note": "Panic/sense wire between the EBDK and relay panel CTB1LCPB.",
+     "to_device": "d1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      492,
+      288,
+      49,
+      23
+     ],
+     "bubble_id": "b68",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Lower DMX line turns down the trunk at x\u2248547 to the level B2 relay panel.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "B2"
+    }
+   ],
+   "devices": [],
+   "level_code": "B1",
+   "notes": "Relay panel d1 carries option cards 1 - ERP-FT-LVD and 1 - ERP-RTO, and its printed model is ECHO ERP-FT-241P (24 relays). The listed model 'ERP24-FT-241P' looks like a typo. The Unison chain P-DOC-C-LR \u2192 P-DOC-W \u2192 PI1002 (U bubbles) continues down at x\u22481084 to level B2; it is not listed as a cable. The (2)#16 AWG 0-10V control wiring and the TO LOAD CKTS / feed circuits are by others."
+  },
+  "input_tokens": 6163,
+  "label": "sheet 001 band p1c0b9 level B1",
+  "model": "claude-opus-5-5",
+  "output_tokens": 1611
+ },
+ "66bc7e30ce729c5a34baec8c2ec98c4b59a3db789cfccbfc6c3c4fb21fa0bfc0": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      805,
+      61,
+      49,
+      23
+     ],
+     "bubble_id": "b52",
+     "code": "X",
+     "confidence": 0.9,
+     "from_device": "d3",
+     "from_label": null,
+     "note": null,
+     "to_device": null,
+     "to_label": "DMX TO B3A CANYON",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      805,
+      79,
+      49,
+      23
+     ],
+     "bubble_id": "b53",
+     "code": "X",
+     "confidence": 0.9,
+     "from_device": "d3",
+     "from_label": null,
+     "note": null,
+     "to_device": null,
+     "to_label": "DMX TO C13A OCULUS",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      805,
+      98,
+      49,
+      23
+     ],
+     "bubble_id": "b54",
+     "code": "X",
+     "confidence": 0.9,
+     "from_device": "d3",
+     "from_label": null,
+     "note": null,
+     "to_device": null,
+     "to_label": "DMX TO D1 ED COLUMN CAPITAL",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      804,
+      116,
+      49,
+      23
+     ],
+     "bubble_id": "b55",
+     "code": "N",
+     "confidence": 0.9,
+     "from_device": "d3",
+     "from_label": null,
+     "note": null,
+     "to_device": null,
+     "to_label": "TO WALTER TOWER ETC P-CCS",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      805,
+      134,
+      48,
+      23
+     ],
+     "bubble_id": "b56",
+     "code": "F",
+     "confidence": 0.9,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Printed TO EQUIP RACK LEVEL 06.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      804,
+      266,
+      49,
+      23
+     ],
+     "bubble_id": "b57",
+     "code": "N",
+     "confidence": 0.55,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Line runs right to x~1107 and leaves the band upward; overview suggests it ends at the NSPS enclosure on level 02.",
+     "to_device": null,
+     "to_label": "NSPS",
+     "to_level_code": "02"
+    },
+    {
+     "bbox": [
+      805,
+      284,
+      49,
+      23
+     ],
+     "bubble_id": "b58",
+     "code": "X",
+     "confidence": 0.8,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Line routes right then up to the left side of the UFMP4 Foundry panel.",
+     "to_device": "d4",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      492,
+      303,
+      49,
+      23
+     ],
+     "bubble_id": "b59",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "DMX through from CT01LCPB runs to x~548 and up the trunk to the level 02 relay panel.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "02"
+    },
+    {
+     "bbox": [
+      1498,
+      303,
+      49,
+      23
+     ],
+     "bubble_id": "b60",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "DMX through from CT01LCPA runs up the trunk at x~1490 to the level 02 relay panel.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "02"
+    },
+    {
+     "bbox": [
+      276,
+      321,
+      49,
+      23
+     ],
+     "bubble_id": "b61",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "d5",
+     "from_label": null,
+     "note": null,
+     "to_device": "d1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      492,
+      321,
+      49,
+      23
+     ],
+     "bubble_id": "b62",
+     "code": "X",
+     "confidence": 0.85,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "DMX in from the equipment rack.",
+     "to_device": "d3",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1498,
+      321,
+      49,
+      23
+     ],
+     "bubble_id": "b63",
+     "code": "X",
+     "confidence": 0.85,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "DMX in from the equipment rack.",
+     "to_device": "d3",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      899,
+      444,
+      56,
+      23
+     ],
+     "bubble_id": "b64",
+     "code": "NG",
+     "confidence": 0.85,
+     "from_device": "d3",
+     "from_label": null,
+     "note": null,
+     "to_device": "d6",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1714,
+      450,
+      49,
+      23
+     ],
+     "bubble_id": "b65",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "d7",
+     "from_label": null,
+     "note": null,
+     "to_device": "d2",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [],
+   "level_code": "01",
+   "notes": "Level 01 band with the main ERn4-RM equipment rack. Two unlabelled trunk lines leave the band downward (x~548 and x~1335) from the rack toward lower levels with no bubbles on this band. The x~548 line also continues upward. The station chain (P-DOC-C-LR, PI1002, PI1004, PI1104) is linked by U bubbles only, so none are listed. Device model strings in the prompt (ERP48-FT-481P) appear on the drawing as ECHO ERP-FT-481P."
+  },
+  "input_tokens": 7193,
+  "label": "sheet 001 band p1c0b8 level 01",
+  "model": "claude-opus-5-5",
+  "output_tokens": 3298
+ },
+ "71e32e3df1d83fdffbee1c09fe0aa007e9fd93c1eaa5e150c11ee6f9d0d599c7": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      1498,
+      421,
+      49,
+      23
+     ],
+     "bubble_id": "b15",
+     "code": "X",
+     "confidence": 0.65,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Upper DMX line from CT09LCPA rises out of the band to the Foundry panel (CT10LCPA) on level 10.",
+     "to_device": null,
+     "to_label": "Foundry panel",
+     "to_level_code": "10"
+    },
+    {
+     "bbox": [
+      528,
+      422,
+      49,
+      23
+     ],
+     "bubble_id": "b16",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Upper DMX line from CT09LCPB rises to the relay panel CT10LCPB on level 10 (daisy chain).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "10"
+    },
+    {
+     "bbox": [
+      1498,
+      439,
+      49,
+      23
+     ],
+     "bubble_id": "b17",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Lower DMX line from CT09LCPA drops out of the band. The overview suggests it continues to the right-hand Foundry panel on level 06, but the far end is not certain.",
+     "to_device": null,
+     "to_label": "Foundry panel",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      311,
+      440,
+      49,
+      23
+     ],
+     "bubble_id": "b18",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "d4",
+     "from_label": null,
+     "note": "Panic wire from the EBDK to relay panel CT09LCPB.",
+     "to_device": "d2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      528,
+      440,
+      49,
+      23
+     ],
+     "bubble_id": "b19",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Lower DMX line from CT09LCPB drops through levels 09 and 06 and appears to land at the EQUIPMENT RACK - 18U on level 06.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    }
+   ],
+   "devices": [],
+   "level_code": "09",
+   "notes": "The NSPS (d3) has two unbubbled vertical lines that drop toward the level 06 equipment rack. They are probably the network/power feed to the Paradigm station bus, but no wire code is printed, so no cable was added for them. Several unlabelled vertical trunk lines pass through the band near x 1300-1390 between other levels. The U bubbles between the P-DOC-C-LR, P-LS, PI1002, PI1104 and NSPS are chain links and were omitted. The prompt lists d2's model as ERP48-FT-481P and d3's model as P-NSPS-D; the drawing reads ECHO ERP-FT-481P and P-NSPS-DIN."
+  },
+  "input_tokens": 6694,
+  "label": "sheet 001 band p1c0b3 level 09",
+  "model": "claude-opus-5-5",
+  "output_tokens": 1854
+ },
+ "7f41e00db63b02e04dbf4b5f776f4053a862ba5d759521e260e12eac9b1dd82d": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      237,
+      308,
+      40,
+      16
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "Panic wire between EBDK and relay panel CT20LCPB.",
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      481,
+      288,
+      40,
+      16
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Line rises on trunk at x~537 toward the level 21 relay panel (DMX daisy chain); level 21 is not in the project level list.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "21"
+    },
+    {
+     "bbox": [
+      481,
+      309,
+      40,
+      16
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.72,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Line drops on trunk at x~537 toward the level 19 relay panel (DMX daisy chain).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "19"
+    },
+    {
+     "bbox": [
+      1530,
+      288,
+      40,
+      16
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "Line rises on trunk at x~1515 toward the level 21 relay panel CT21LCPA.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "21"
+    },
+    {
+     "bbox": [
+      1530,
+      309,
+      40,
+      16
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.72,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "Line drops on trunk at x~1515 toward the level 19 relay panel CT19LCPA.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "19"
+    },
+    {
+     "bbox": [
+      1773,
+      308,
+      40,
+      16
+     ],
+     "bubble_id": "new-b6",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-8",
+     "from_label": null,
+     "note": "Panic wire between EBDK and relay panel CT20LCPA.",
+     "to_device": "new-7",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      77,
+      250,
+      146,
+      147
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK ELEC XX20-2E01",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      291,
+      118,
+      175,
+      267
+     ],
+     "category": "Relay panel",
+     "confidence": 0.92,
+     "id": "new-2",
+     "label": "CT20LCPB ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX20-2E01",
+     "model": "ERP-FT-241P",
+     "name": "CT20LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      630,
+      418,
+      110,
+      120
+     ],
+     "category": "Sensor",
+     "confidence": 0.88,
+     "id": "new-3",
+     "label": "PARADIGM P-DOC-C-LR",
+     "model": "P-DOC-C-LR",
+     "name": null,
+     "qty": 5
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      790,
+      418,
+      110,
+      120
+     ],
+     "category": "Sensor",
+     "confidence": 0.88,
+     "id": "new-4",
+     "label": "PARADIGM P-LS",
+     "model": "P-LS",
+     "name": null,
+     "qty": 3
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      945,
+      418,
+      90,
+      120
+     ],
+     "category": "Station",
+     "confidence": 0.88,
+     "id": "new-5",
+     "label": "PARADIGM PI1002",
+     "model": "PI1002",
+     "name": null,
+     "qty": 7
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1070,
+      418,
+      92,
+      120
+     ],
+     "category": "Station",
+     "confidence": 0.88,
+     "id": "new-6",
+     "label": "PARADIGM PI1104",
+     "model": "PI1104",
+     "name": null,
+     "qty": 9
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1585,
+      118,
+      175,
+      267
+     ],
+     "category": "Relay panel",
+     "confidence": 0.92,
+     "id": "new-7",
+     "label": "CT20LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX20-3E04",
+     "model": "ERP-FT-241P",
+     "name": "CT20LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1828,
+      250,
+      145,
+      147
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-8",
+     "label": "EBDK ELEC XX20-3E04",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "20",
+   "notes": "Band labelled LEVEL 20 (the LEVEL 21 text at top belongs to the band above). Level 20 is not among the listed project levels. The Paradigm chain P-DOC-C-LR -> P-LS -> PI1002 -> PI1104 is linked by U bubbles (omitted); its last U line rises on the trunk at x~1222 toward the Paradigm P-NSPS/DIN enclosure on level 21. The relay panels' X lines form vertical DMX daisy chains through the left and right trunks; directions inferred from the overview."
+  },
+  "input_tokens": 6127,
+  "label": "sheet 002 band p2c1b2 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2623
+ },
+ "85970a6bf756a504ecfdaa559baba054b27b0754d96e4cf87a777a54384dd079": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      236,
+      338,
+      52,
+      18
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "Panic wire between left EBDK (ELEC XX18-3E04) and CT18LCPB.",
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      480,
+      318,
+      42,
+      18
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "DMX line rises on trunk at x~537 to CT19LCPB on level 19.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "19"
+    },
+    {
+     "bbox": [
+      480,
+      338,
+      42,
+      18
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "DMX line drops on trunk at x~537 to CT17LCPB on level 17.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "17"
+    },
+    {
+     "bbox": [
+      1528,
+      318,
+      42,
+      18
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "DMX line rises on trunk at x~1517 to CT19LCPA on level 19.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "19"
+    },
+    {
+     "bbox": [
+      1528,
+      338,
+      42,
+      18
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "DMX line drops on trunk at x~1517 to CT17LCPA on level 17.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "17"
+    },
+    {
+     "bbox": [
+      1773,
+      338,
+      52,
+      18
+     ],
+     "bubble_id": "new-b6",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-8",
+     "from_label": null,
+     "note": "Panic wire between right EBDK (ELEC XX18-2E01) and CT18LCPA.",
+     "to_device": "new-7",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      77,
+      280,
+      145,
+      140
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 2
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      291,
+      105,
+      175,
+      483
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-2",
+     "label": "CT18LCPB ECHO ERP-FT-481P 48 x 20 SINGLE POLE RELAYS 2 - ERP-FT-LVD 1 - ERP-RTO",
+     "model": "ERP-FT-481P",
+     "name": "CT18LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      628,
+      605,
+      112,
+      110
+     ],
+     "category": "Sensor",
+     "confidence": 0.88,
+     "id": "new-3",
+     "label": "PARADIGM P-DOC-C-LR",
+     "model": "P-DOC-C-LR",
+     "name": null,
+     "qty": 5
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      788,
+      605,
+      104,
+      110
+     ],
+     "category": "Sensor",
+     "confidence": 0.88,
+     "id": "new-4",
+     "label": "PARADIGM P-LS",
+     "model": "P-LS",
+     "name": null,
+     "qty": 3
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      943,
+      605,
+      88,
+      110
+     ],
+     "category": "Station",
+     "confidence": 0.88,
+     "id": "new-5",
+     "label": "PARADIGM PI1002",
+     "model": "PI1002",
+     "name": null,
+     "qty": 7
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1068,
+      605,
+      104,
+      110
+     ],
+     "category": "Station",
+     "confidence": 0.88,
+     "id": "new-6",
+     "label": "PARADIGM PI1104",
+     "model": "PI1104",
+     "name": null,
+     "qty": 9
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1584,
+      148,
+      172,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-7",
+     "label": "CT18LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO",
+     "model": "ERP-FT-241P",
+     "name": "CT18LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1827,
+      280,
+      108,
+      140
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-8",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "18",
+   "notes": "LEVEL 18 label at lower right. Paradigm chain P-DOC-C-LR(5) - P-LS(3) - PI1002(7) - PI1104(9) linked by U bubbles (omitted); the last U line rises at x~1265 toward the level-21 Paradigm power supply/rack trunk. Relay panels on both sides are daisy-chained by DMX through vertical trunks; level codes 19/17 are not in the project level list given. Electrical locations: CT18LCPB/left EBDK ELEC XX18-3E04, CT18LCPA/right EBDK ELEC XX18-2E01."
+  },
+  "input_tokens": 6559,
+  "label": "sheet 002 band p2c1b4 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2598
+ },
+ "87a7bcababd2f328ae7e00c2ab2e597fca922fcb6166c50ba0a0a80e3a4d2a15": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      383,
+      311,
+      40,
+      18
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT23LCPB; direction ambiguous.",
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      627,
+      311,
+      40,
+      18
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.8,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "DMX joins left vertical trunk, labelled TO RELAY PANEL LEVEL 22; trunk also continues up to level 24 chain (fed from rack at level 28).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "22"
+    },
+    {
+     "bbox": [
+      1430,
+      311,
+      40,
+      18
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.8,
+     "from_device": "new-4",
+     "from_label": null,
+     "note": "DMX joins right vertical trunk, labelled TO RELAY PANEL LEVEL 22; trunk also continues up to level 24.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "22"
+    },
+    {
+     "bbox": [
+      1673,
+      311,
+      40,
+      18
+     ],
+     "bubble_id": "new-b4",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "new-5",
+     "from_label": null,
+     "note": "Panic wire between CT23LCPA and EBDK; direction ambiguous.",
+     "to_device": "new-4",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      222,
+      264,
+      148,
+      110
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK ELEC XX23-3E04",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      438,
+      121,
+      175,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.95,
+     "id": "new-2",
+     "label": "CT23LCPB ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX23-3E04",
+     "model": "ERP-FT-241P",
+     "name": "CT23LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      966,
+      305,
+      58,
+      95
+     ],
+     "category": "Station",
+     "confidence": 0.9,
+     "id": "new-3",
+     "label": "PARADIGM PI1002",
+     "model": "PI1002",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1486,
+      121,
+      175,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.95,
+     "id": "new-4",
+     "label": "CT23LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO ELEC XX23-2E01",
+     "model": "ERP-FT-241P",
+     "name": "CT23LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1728,
+      264,
+      146,
+      110
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-5",
+     "label": "EBDK ELEC XX23-2E01",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "23",
+   "notes": "Band label reads LEVEL 23 (not in the project level list provided). PI1002 (QTY 01) has a U bubble whose line runs down to TO P-NSPS-DIN LEVEL 22; U bubble omitted per rules. Level 22 referenced as trunk destination is not in project levels list."
+  },
+  "input_tokens": 7165,
+  "label": "sheet 002 band p2c0b5 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2164
+ },
+ "8a1bc26d4756ad008d843ed01ce593eb1da42860d926c26a75887f8e7535ab60": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      1492,
+      337,
+      49,
+      23
+     ],
+     "bubble_id": "b10",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Upper DMX bubble on CT10LCPA joins the right-hand vertical trunk (x\u22481485), which runs up to the level 11 Foundry panel. Daisy-chain direction is assumed.",
+     "to_device": null,
+     "to_label": "Foundry panel",
+     "to_level_code": "11"
+    },
+    {
+     "bbox": [
+      1492,
+      355,
+      49,
+      23
+     ],
+     "bubble_id": "b11",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Lower DMX bubble on CT10LCPA joins the right-hand trunk running down to the level 09 Foundry panel, continuing toward lower levels. Assumed chain.",
+     "to_device": null,
+     "to_label": "Foundry panel",
+     "to_level_code": "09"
+    },
+    {
+     "bbox": [
+      522,
+      355,
+      49,
+      23
+     ],
+     "bubble_id": "b12",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Upper DMX bubble on CT10LCPB joins the left vertical trunk (x\u2248576), which runs up to the level 11 relay panel.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "11"
+    },
+    {
+     "bbox": [
+      306,
+      373,
+      49,
+      23
+     ],
+     "bubble_id": "b13",
+     "code": "P",
+     "confidence": 0.8,
+     "from_device": "d4",
+     "from_label": null,
+     "note": "Panic wire between EBDK and CT10LCPB.",
+     "to_device": "d2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      522,
+      373,
+      49,
+      23
+     ],
+     "bubble_id": "b14",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Lower DMX bubble on CT10LCPB joins the left trunk running down through the level 09 relay panel to the equipment rack on level 06. The direct far end may be the level 06 Equipment rack.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "09"
+    }
+   ],
+   "devices": [],
+   "level_code": "10",
+   "notes": "DMX runs on both panels look like daisy chains on vertical trunks. The far ends are inferred from the overview with no printed labels, so confidence is low. U bubbles in the Paradigm sensor/station chain (d5\u2013d8 to NSPS d3) are omitted. The NSPS enclosure feeds trunk lines down the right side (x\u22481300\u20131390), but these carry no wire bubble on this band. Level 10 is not in the project level list."
+  },
+  "input_tokens": 6622,
+  "label": "sheet 001 band p1c0b2 level 10",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2024
+ },
+ "a8d1cbe6f9d33d825a87dd99d984a8a64dc126e11a12778864f6df20ab6208b1": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      1059,
+      312,
+      49,
+      23
+     ],
+     "bubble_id": "b4",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "d4",
+     "from_label": null,
+     "note": "Line runs right to x~1370, then down the trunk out of the band; the overview shows the trunk bundle ending at the level 06 equipment rack.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      1492,
+      433,
+      49,
+      23
+     ],
+     "bubble_id": "b5",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Joins the vertical trunk at x~1485. Read as the upward DMX daisy-chain to the level 12 UFMP8; the direction is a guess.",
+     "to_device": null,
+     "to_label": "Foundry panel",
+     "to_level_code": "12"
+    },
+    {
+     "bbox": [
+      522,
+      433,
+      49,
+      23
+     ],
+     "bubble_id": "b6",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Joins the vertical trunk at x~575. Read as the upward DMX chain to the level 12 relay panel; the direction is a guess.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "12"
+    },
+    {
+     "bbox": [
+      1492,
+      451,
+      49,
+      23
+     ],
+     "bubble_id": "b7",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Joins the vertical trunk at x~1485. Read as the downward DMX feed toward the level 06 rack.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    },
+    {
+     "bbox": [
+      306,
+      451,
+      49,
+      23
+     ],
+     "bubble_id": "b8",
+     "code": "P",
+     "confidence": 0.9,
+     "from_device": "d5",
+     "from_label": null,
+     "note": "Panic wire from the EBDK to relay panel CT11LCPB.",
+     "to_device": "d2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      522,
+      451,
+      49,
+      23
+     ],
+     "bubble_id": "b9",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Joins the vertical trunk at x~575. Read as the downward DMX feed toward the level 06 rack.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    }
+   ],
+   "devices": [],
+   "level_code": "11",
+   "notes": "The four U bubbles in the sensor/station chain (P-DOC-C-LR, P-LS, PI1002, PI1104, NSPS) are omitted as chain links. The NSPS (d3) has two unlabelled lines leaving its right side down the trunk, presumably network to the level 06 rack; no bubble is drawn, so no cable is listed. Prompt model strings 'ERP48-FT-481P' and 'P-NSPS-D' read on the drawing as 'ECHO ERP-FT-481P' and 'P-NSPS-DIN'. The relay panel shows 48 x 20A single-pole relays with option cards 2 - ERP-FT-LVD and 1 - ERP-RTO. The up/down direction of the paired X trunk bubbles (b5/b7, b6/b9) cannot be resolved from the overview and should be checked."
+  },
+  "input_tokens": 6756,
+  "label": "sheet 001 band p1c0b1 level 11",
+  "model": "claude-opus-5-5",
+  "output_tokens": 1779
+ },
+ "ac28af4ec8500e966f63d913afe79028b27537bd5921b66a6841f8f943561b9e": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      382,
+      296,
+      42,
+      16
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": null,
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      627,
+      275,
+      40,
+      16
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.85,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "DMX between relay panel and equipment rack on this level.",
+     "to_device": "new-3",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      627,
+      298,
+      40,
+      16
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.6,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "Line drops out of the band at x~681; in the overview it runs down the trunk past levels 27-23 (DMX daisy chain) ending at TO RELAY PANEL LEVEL 22; next panel is likely CT27LCPB.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "27"
+    },
+    {
+     "bbox": [
+      1054,
+      53,
+      40,
+      16
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.9,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": null,
+     "to_device": null,
+     "to_label": "DMX/KINET TO B3B ELEV CORE C",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1054,
+      73,
+      40,
+      16
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.9,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": null,
+     "to_device": null,
+     "to_label": "DMX/KINET TO B3 BROW FIXTURES",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1054,
+      94,
+      40,
+      16
+     ],
+     "bubble_id": "new-b6",
+     "code": "X",
+     "confidence": 0.9,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": null,
+     "to_device": null,
+     "to_label": "DMX/KINET TO B3C STAIR A BROW FIX",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1054,
+      114,
+      40,
+      16
+     ],
+     "bubble_id": "new-b7",
+     "code": "X",
+     "confidence": 0.9,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": null,
+     "to_device": null,
+     "to_label": "DMX/KINET TO B3B PARAPET FIX",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1054,
+      134,
+      40,
+      16
+     ],
+     "bubble_id": "new-b8",
+     "code": "N",
+     "confidence": 0.85,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "Label reads TO P-NSPS LEVEL 21.",
+     "to_device": null,
+     "to_label": "NSPS",
+     "to_level_code": "21"
+    },
+    {
+     "bbox": [
+      1054,
+      154,
+      40,
+      16
+     ],
+     "bubble_id": "new-b9",
+     "code": "F",
+     "confidence": 0.88,
+     "from_device": "new-3",
+     "from_label": null,
+     "note": "Label reads TO EQUIP RACK LEVEL 06.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "06"
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      224,
+      248,
+      146,
+      110
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      437,
+      103,
+      176,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-2",
+     "label": "CT28LCPB ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO",
+     "model": "ERP-FT-241P",
+     "name": "CT28LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "P-ACP",
+       "qty": 2
+      },
+      {
+       "model": "P-SPM-E",
+       "qty": 2
+      }
+     ],
+     "bbox": [
+      800,
+      42,
+      240,
+      395
+     ],
+     "category": "Equipment rack",
+     "confidence": 0.88,
+     "id": "new-3",
+     "label": "EQUIPMENT RACK - 18U ELEC XX28-2E04 UNISON ERn4-RM ARCHITECTURAL CONTROL UNIT 1 - P-ACP 1 - P-SPM-E 1 - P-ACP 1 - P-SPM-E",
+     "model": "ERn4-RM",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "28",
+   "notes": "Band labelled LEVEL 28, which is not in the listed project levels (B2..06M); column covers levels 28-23. Two unbubbled lines leave the rack (from 24-port patch panel at x~1415 and network switch at x~1326) and drop through the trunk to level 27 (one feeds the Paradigm station U chain, the other likely the CT27LCPA panel side); no wire codes are shown on them so they are not listed as cables. Panel feeds: (24) 20A 120V feed circuits, (1) 20A power circuit; EBDK and panel labelled ELEC XX28-2E04."
+  },
+  "input_tokens": 7093,
+  "label": "sheet 002 band p2c0b0 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2510
+ },
+ "b7a1ecf3afa2b7ed36bfb812ff2e3473df9e64b93b958b9c6997a4f2c9447bac": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      895,
+      102,
+      49,
+      23
+     ],
+     "bubble_id": "b20",
+     "code": "X",
+     "confidence": 0.85,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Rack DMX output; B3B is not a level in this column.",
+     "to_device": null,
+     "to_label": "DMX/KINET TO B3B ELEV CORE C FIX",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      895,
+      120,
+      49,
+      23
+     ],
+     "bubble_id": "b21",
+     "code": "X",
+     "confidence": 0.85,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Rack DMX output.",
+     "to_device": null,
+     "to_label": "DMX/KINET TO B7 STAIR A FIX",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      895,
+      138,
+      49,
+      23
+     ],
+     "bubble_id": "b22",
+     "code": "X",
+     "confidence": 0.9,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Spare output.",
+     "to_device": null,
+     "to_label": "SPARE DMX OUT",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      895,
+      156,
+      49,
+      23
+     ],
+     "bubble_id": "b23",
+     "code": "X",
+     "confidence": 0.9,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Spare output.",
+     "to_device": null,
+     "to_label": "SPARE DMX OUT",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      528,
+      241,
+      49,
+      23
+     ],
+     "bubble_id": "b24",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Line runs right then vertically up out of the band at x~580 toward the level 09 relay panel.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "09"
+    },
+    {
+     "bbox": [
+      1498,
+      251,
+      49,
+      23
+     ],
+     "bubble_id": "b25",
+     "code": "X",
+     "confidence": 0.55,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Joins vertical trunk at x~1492 running through the right column; assumed upward to level 09 Foundry panel.",
+     "to_device": null,
+     "to_label": "Foundry panel",
+     "to_level_code": "09"
+    },
+    {
+     "bbox": [
+      311,
+      259,
+      49,
+      23
+     ],
+     "bubble_id": "b26",
+     "code": "P",
+     "confidence": 0.85,
+     "from_device": "d4",
+     "from_label": null,
+     "note": "Panic line between EBDK and relay panel CT06LCPB.",
+     "to_device": "d2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      528,
+      259,
+      49,
+      23
+     ],
+     "bubble_id": "b27",
+     "code": "X",
+     "confidence": 0.85,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Horizontal DMX line from relay panel to equipment rack.",
+     "to_device": "d3",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1498,
+      269,
+      49,
+      23
+     ],
+     "bubble_id": "b28",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Joins vertical trunk at x~1492; assumed downward to level 04 right-column relay panel.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "04"
+    },
+    {
+     "bbox": [
+      894,
+      323,
+      49,
+      23
+     ],
+     "bubble_id": "b29",
+     "code": "N",
+     "confidence": 0.85,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Level 16 not in this column or project level list.",
+     "to_device": null,
+     "to_label": "TO ERn4 LEVEL 16",
+     "to_level_code": "16"
+    },
+    {
+     "bbox": [
+      894,
+      341,
+      49,
+      23
+     ],
+     "bubble_id": "b30",
+     "code": "N",
+     "confidence": 0.85,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "Second network run to level 16.",
+     "to_device": null,
+     "to_label": "TO ERn4 LEVEL 16",
+     "to_level_code": "16"
+    },
+    {
+     "bbox": [
+      895,
+      359,
+      48,
+      23
+     ],
+     "bubble_id": "b31",
+     "code": "F",
+     "confidence": 0.85,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "TO EQUIP RACK LEVEL 28; level 28 not in this column.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "28"
+    },
+    {
+     "bbox": [
+      895,
+      377,
+      48,
+      23
+     ],
+     "bubble_id": "b32",
+     "code": "F",
+     "confidence": 0.9,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "TO EQUIP RACK LEVEL 01; level 01 band has an 18U rack.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "01"
+    }
+   ],
+   "devices": [],
+   "level_code": "06",
+   "notes": "Relay panel d2 model reads ECHO ERP-FT-241P (prompt lists ERP24-FT-241P). Rack shows UNISON ERn4-RM with 1-P-ACP, 1-P-SPM-E, 1-P-ACP, patch panel, brush panel, 28-port PoE switch, (2) PWPP RM P4 term rear, UPS. Many unbubbled trunk lines leave the rack's right side going up and down to other levels. Two U bubbles (sensor-station-rack chain) omitted per instructions. Foundry X bubbles b25/b28 connect to a long vertical trunk at x~1492; direction of each is a guess."
+  },
+  "input_tokens": 6718,
+  "label": "sheet 001 band p1c0b4 level 06",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2574
+ },
+ "c5a0486f30dc28f3267ebf1a936fa2955ac6e7ee73a73a1bc97c2da3c0bbe4cc": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      1498,
+      236,
+      49,
+      23
+     ],
+     "bubble_id": "b48",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Runs left from CT02LCPA to the right-hand vertical trunk (x\u22481490). Up (level 03) versus down (level 01) is assigned by position only.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "03"
+    },
+    {
+     "bbox": [
+      276,
+      254,
+      49,
+      23
+     ],
+     "bubble_id": "b49",
+     "code": "P",
+     "confidence": 0.65,
+     "from_device": "d4",
+     "from_label": null,
+     "note": "Panic link between EBDK and CT02LCPB. The bubble sits at the EBDK edge.",
+     "to_device": "d1",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1498,
+      254,
+      49,
+      23
+     ],
+     "bubble_id": "b50",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d2",
+     "from_label": null,
+     "note": "Second DMX line from CT02LCPA to the right-hand vertical trunk. The direction (down to level 01) is a guess.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "01"
+    },
+    {
+     "bbox": [
+      1714,
+      254,
+      49,
+      23
+     ],
+     "bubble_id": "b51",
+     "code": "P",
+     "confidence": 0.65,
+     "from_device": "d5",
+     "from_label": null,
+     "note": "Panic link between the right-hand EBDK and CT02LCPA.",
+     "to_device": "d2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      497,
+      124,
+      44,
+      18
+     ],
+     "bubble_id": "new-b1",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "Runs from the CT02LCPB right side to the vertical at x\u2248545, which leaves the band at the top toward level 03.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "03"
+    },
+    {
+     "bbox": [
+      562,
+      142,
+      36,
+      18
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.7,
+     "from_device": "d1",
+     "from_label": null,
+     "note": "DMX from CT02LCPB to the UFMP4 Foundry panel.",
+     "to_device": "d3",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      557,
+      255,
+      38,
+      18
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.5,
+     "from_device": "d3",
+     "from_label": null,
+     "note": "The line drops from the UFMP4 bottom to y\u2248264, then runs left to the vertical at x\u2248545, which leaves the band downward. Assumed to reach the level 01 equipment rack.",
+     "to_device": null,
+     "to_label": "Equipment rack",
+     "to_level_code": "01"
+    }
+   ],
+   "devices": [],
+   "level_code": "02",
+   "notes": "The prompt models 'ERP24-FT-241P' and 'P-NSPS-D' read on the sheet as ECHO ERP-FT-241P and PARADIGM P-NSPS-DIN W/ENCLOSURE. Both relay panels show the option cards 1 - ERP-FT-LVD and 1 - ERP-RTO. UFMP4 shows QTY: 01. Three unlisted X bubbles near CT02LCPB and UFMP4 were added as new-b1 to new-b3. The P-NSPS-DIN enclosure has an unbubbled line from its right side down the trunk at x\u22481107, presumably station power or network to another level. U bubbles in the PI1104-PI1002-P-DOC-C-LR-NSPS chain were omitted. Trunk directions on both verticals (x\u2248545 and x\u22481490) are uncertain."
+  },
+  "input_tokens": 6430,
+  "label": "sheet 001 band p1c0b7 level 02",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2951
+ },
+ "e8897c13da7851f7edfe6ffbd39f2e72b32a439e3d12ef6d2cac9299cc5490ce": {
+  "data": {
+   "cables": [
+    {
+     "bbox": [
+      237,
+      352,
+      40,
+      18
+     ],
+     "bubble_id": "new-b1",
+     "code": "P",
+     "confidence": 0.75,
+     "from_device": "new-1",
+     "from_label": null,
+     "note": "Panic wire between EBDK and relay panel CT19LCPB; direction assumed.",
+     "to_device": "new-2",
+     "to_label": null,
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      481,
+      333,
+      38,
+      16
+     ],
+     "bubble_id": "new-b2",
+     "code": "X",
+     "confidence": 0.75,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "DMX line rises via trunk at x\u2248537 to the CT20LCPB panel on level 20.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "20"
+    },
+    {
+     "bbox": [
+      481,
+      355,
+      38,
+      16
+     ],
+     "bubble_id": "new-b3",
+     "code": "X",
+     "confidence": 0.65,
+     "from_device": "new-2",
+     "from_label": null,
+     "note": "DMX line descends via trunk at x\u2248537 toward the CT18LCPB panel on the level below (level 18, not a project level code).",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1530,
+      333,
+      38,
+      16
+     ],
+     "bubble_id": "new-b4",
+     "code": "X",
+     "confidence": 0.72,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "DMX line rises via trunk at x\u22481515 to CT20LCPA on level 20.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": "20"
+    },
+    {
+     "bbox": [
+      1530,
+      355,
+      38,
+      16
+     ],
+     "bubble_id": "new-b5",
+     "code": "X",
+     "confidence": 0.65,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "DMX line descends via trunk at x\u22481515 toward CT18LCPA on level 18.",
+     "to_device": null,
+     "to_label": "Relay panel",
+     "to_level_code": null
+    },
+    {
+     "bbox": [
+      1774,
+      355,
+      40,
+      16
+     ],
+     "bubble_id": "new-b6",
+     "code": "P",
+     "confidence": 0.75,
+     "from_device": "new-7",
+     "from_label": null,
+     "note": "Panic wire between CT19LCPA and EBDK; direction assumed.",
+     "to_device": "new-8",
+     "to_label": null,
+     "to_level_code": null
+    }
+   ],
+   "devices": [
+    {
+     "accessories": [],
+     "bbox": [
+      78,
+      306,
+      145,
+      112
+     ],
+     "category": "EBDK",
+     "confidence": 0.9,
+     "id": "new-1",
+     "label": "EBDK",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 2
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      291,
+      121,
+      180,
+      483
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-2",
+     "label": "CT19LCPB ECHO ERP-FT-481P 48 x 20 SINGLE POLE RELAYS 2 - ERP-FT-LVD 1 - ERP-RTO",
+     "model": "ERP-FT-481P",
+     "name": "CT19LCPB",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      640,
+      474,
+      82,
+      82
+     ],
+     "category": "Sensor",
+     "confidence": 0.9,
+     "id": "new-3",
+     "label": "PARADIGM P-DOC-C-LR",
+     "model": "P-DOC-C-LR",
+     "name": null,
+     "qty": 5
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      800,
+      474,
+      84,
+      84
+     ],
+     "category": "Sensor",
+     "confidence": 0.9,
+     "id": "new-4",
+     "label": "PARADIGM P-LS",
+     "model": "P-LS",
+     "name": null,
+     "qty": 3
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      960,
+      474,
+      64,
+      94
+     ],
+     "category": "Station",
+     "confidence": 0.9,
+     "id": "new-5",
+     "label": "PARADIGM PI1002",
+     "model": "PI1002",
+     "name": null,
+     "qty": 7
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1086,
+      474,
+      58,
+      94
+     ],
+     "category": "Station",
+     "confidence": 0.9,
+     "id": "new-6",
+     "label": "PARADIGM PI1104",
+     "model": "PI1104",
+     "name": null,
+     "qty": 9
+    },
+    {
+     "accessories": [
+      {
+       "model": "ERP-FT-LVD",
+       "qty": 1
+      },
+      {
+       "model": "ERP-RTO",
+       "qty": 1
+      }
+     ],
+     "bbox": [
+      1584,
+      163,
+      192,
+      270
+     ],
+     "category": "Relay panel",
+     "confidence": 0.93,
+     "id": "new-7",
+     "label": "CT19LCPA ECHO ERP-FT-241P 24 x 20 SINGLE POLE RELAYS 1 - ERP-FT-LVD 1 - ERP-RTO XX19-2E01",
+     "model": "ERP-FT-241P",
+     "name": "CT19LCPA",
+     "qty": 1
+    },
+    {
+     "accessories": [],
+     "bbox": [
+      1828,
+      306,
+      144,
+      112
+     ],
+     "category": "EBDK",
+     "confidence": 0.88,
+     "id": "new-8",
+     "label": "EBDK XX19-2E01",
+     "model": "EBDK",
+     "name": null,
+     "qty": 1
+    }
+   ],
+   "level_code": "19",
+   "notes": "Band labelled LEVEL 19 (not among the listed project levels B2\u201306M). The LEVEL 20 text at the top belongs to the band above. Four U bubbles chain the Paradigm sensors and stations; the chain leaves the band upward at x\u22481245 toward the NSPS enclosure on level 21. These are omitted as Unison links. The DMX daisy chains run through vertical trunks on both sides (x\u2248537 and x\u22481515), linking the relay panels from level to level."
+  },
+  "input_tokens": 6559,
+  "label": "sheet 002 band p2c1b3 level ?",
+  "model": "claude-opus-5-5",
+  "output_tokens": 2572
+ }
+}

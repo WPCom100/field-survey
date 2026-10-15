@@ -47,8 +47,8 @@ log = logging.getLogger("jobs")
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 SEED_KINDS = ("master_xlsx", "floor_xlsx")
-# Other batch kinds with their own job: plan sheets (T45) and the BOM (T42).
-FILE_KINDS = ("plans", "bom")
+# Other batch kinds with their own job: plan sheets (T45), the BOM (T42), the riser (T43).
+FILE_KINDS = ("plans", "bom", "riser")
 STATES = ("queued", "running", "done", "failed", "skipped")
 
 

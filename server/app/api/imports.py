@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.auth import SessionDep, current_user, require_token
 from app.config import settings
-from app.jobs import bom, plans, runner
+from app.jobs import bom, plans, riser, runner
 from app.jobs.workbook import WorkbookError, inspect_workbook
 from app.models import ImportBatch, User
 from app.storage import ObjectStore, get_object_store
@@ -39,17 +39,19 @@ async def create_import(
 ) -> dict[str, Any]:
     """Queue a seed import of the uploaded workbook — or, with `kind=plans`, a plan sheet PDF for
     `level_id` as its `sheet_kind` (`display` | `source`, T45) — or, with `kind=bom`, a BOM PDF
-    for extraction into device drafts (T42). 202 with the batch; poll it by id."""
+    for extraction into device drafts (T42) — or, with `kind=riser`, the riser PDF for device
+    and cable drafts with Claude-read endpoints (T43). 202 with the batch; poll it by id."""
     data = await file.read()
     if len(data) > settings.blob_max_bytes:
         raise HTTPException(413, {"error": "too_large", "max": settings.blob_max_bytes})
-    if kind == bom.BOM_KIND:
+    if kind in (bom.BOM_KIND, riser.RISER_KIND):
+        create = bom.create_bom_batch if kind == bom.BOM_KIND else riser.create_riser_batch
         try:
-            batch = bom.create_bom_batch(
+            batch = create(
                 session,
                 store,
                 project_id=project_id,
-                filename=file.filename or "bom.pdf",
+                filename=file.filename or f"{kind}.pdf",
                 data=data,
                 user=user,
             )

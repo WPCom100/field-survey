@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # xlsx export per project by the `export` system user, skipped when nothing changed; files
     # older than this are deleted (each project's newest is kept).
     export_backup_retention_days: int = 183
+    # Claude API for extraction (D189, T43): the key lives only in the server `.env`; the model
+    # is Opus 5.5 unless stepped up. Empty key = the riser job runs without endpoints (D11).
+    anthropic_api_key: str = ""
+    claude_model: str = "claude-opus-5-5"
 
     @property
     def team_names(self) -> list[str]:

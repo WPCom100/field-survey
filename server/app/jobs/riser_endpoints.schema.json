@@ -1,0 +1,65 @@
+{
+  "type": "object",
+  "description": "What one riser band crop yields (T43, PLAN 7.3).",
+  "properties": {
+    "level_code": {
+      "type": ["string", "null"],
+      "description": "The level label printed in this band (e.g. '03', 'B2', '06M'), null when none is visible."
+    },
+    "devices": {
+      "type": "array",
+      "description": "Devices read from the image. Empty when the prompt already lists the band's devices.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "A short id you assign (new-1, new-2, …)."},
+          "label": {"type": "string", "description": "The text printed at the symbol, verbatim."},
+          "model": {"type": "string", "description": "The ETC model (PI1002, P-DOC-C-LR, UFMP8, ERP-FT-241P, EBDK, ERn4-RM, P-NSPS-DIN, P-TS7-E, UHCI-WM …)."},
+          "name": {"type": ["string", "null"], "description": "A panel tag such as CT03LCPB, else null."},
+          "category": {
+            "type": "string",
+            "enum": ["Relay panel", "Foundry panel", "EBDK", "Equipment rack", "NSPS", "Touchscreen", "Station", "Sensor", "Other"]
+          },
+          "qty": {"type": "integer", "description": "The QTY: callout, else 1."},
+          "accessories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {"model": {"type": "string"}, "qty": {"type": "integer"}},
+              "required": ["model", "qty"],
+              "additionalProperties": false
+            }
+          },
+          "bbox": {"type": "array", "items": {"type": "number"}, "description": "[x, y, width, height] in pixels of the band image."},
+          "confidence": {"type": "number"}
+        },
+        "required": ["id", "label", "model", "name", "category", "qty", "accessories", "bbox", "confidence"],
+        "additionalProperties": false
+      }
+    },
+    "cables": {
+      "type": "array",
+      "description": "One entry per wire bubble (X, N, NG, F, P, UV). Unison U bubbles are chain links, not runs: leave them out.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "bubble_id": {"type": "string", "description": "The bubble id from the prompt, or a new id (new-b1, …) for a bubble the prompt did not list."},
+          "code": {"type": "string", "enum": ["X", "N", "NG", "F", "P", "UV"]},
+          "bbox": {"type": "array", "items": {"type": "number"}, "description": "[x, y, width, height] in pixels of the band image."},
+          "from_device": {"type": ["string", "null"], "description": "The device id the wire starts at (the bubble sits on its line)."},
+          "from_label": {"type": ["string", "null"], "description": "When from_device is null: the text at that end."},
+          "to_device": {"type": ["string", "null"], "description": "The device id at the other end when it is on this band."},
+          "to_label": {"type": ["string", "null"], "description": "Otherwise: the text at the far end, or 'Equipment rack' / 'Relay panel' / 'NSPS' with to_level_code when the line leaves the band through the trunk."},
+          "to_level_code": {"type": ["string", "null"]},
+          "confidence": {"type": "number"},
+          "note": {"type": ["string", "null"]}
+        },
+        "required": ["bubble_id", "code", "bbox", "from_device", "from_label", "to_device", "to_label", "to_level_code", "confidence", "note"],
+        "additionalProperties": false
+      }
+    },
+    "notes": {"type": "string", "description": "Anything the reviewer should know about this band."}
+  },
+  "required": ["level_code", "devices", "cables", "notes"],
+  "additionalProperties": false
+}
