@@ -163,7 +163,7 @@ Decision D169: **approved** (Landry, 2026-10-15); nothing to answer here. (The "
 - [ ] **Findings on the card.** A device set to **Installed, untested** with an end `Not installed` shows the finding line `Installed, untested with outstanding wiring/termination → Issue (suggested)`; set it to **Issue** with no open item → `Issue device with no open punch item`; accept or add an item → the line goes. → saw:
 - [ ] **Sync load.** After the first run, the Sync screen pushes the engine's proposal and finding creates (count them in the outbox before the sync; on the Tower round expect a few hundred) and ends "Synced" with no "need attention" ops. → saw:
 
-Decision D175: how the rules read the master where PLAN was silent — R3b's item text `Terminate DMX to <far end>` with the kit phrase in Notes; the Termination branch's owners (ETC network/Unison, EC/ETC DMX/fiber, EC 0-10V/120V); the Neuron item's `All devices` Device text and its Notes list; `Not started` offered to both ends of a run to an out-of-scope level; the R5 gate; same-text items silence drafts; the quick actions' wording. → Approve / change (per point):
+Decision D175: **approved** (Landry, 2026-10-15) as the defaults; D176 makes every value settable per project and in the library (T102). Nothing to answer here.
 
 ---
 

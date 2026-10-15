@@ -357,3 +357,4 @@ Run **T03 then T04** first (D69): Entra sign-in replaces the interim identity; i
 - T34 → T40: R3f only runs when the project has `vocab(punch_item)` rows; T40's seed turns it on. The master's 12 most-used items are the seed list (Phase 2 §6.2 R3e).
 - T34: the D170 upkeep op is written by whichever iPad runs first; two iPads maintaining the Neuron item while both offline can meet in one sync-conflict review on its Notes (D175 (4)) — resolve either way, the engine rewrites the list after.
 - **2026-10-15 (Landry, on D175):** the rules' owners, wordings and statuses must be settable per project and in the library — **D176**; D175's readings become the defaults; new task **T102** (O/H, decision first). T35 still tests the defaults and can run before T102.
+- **2026-10-15 (Landry):** D175 approved as the defaults; T35 runs next, T102 after it.
