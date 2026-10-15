@@ -192,7 +192,7 @@ describe('duplicates, links, pins, locks', () => {
 
 describe('the lint view catalogue (Phase 3 §9)', () => {
   it('lists every lint the registry can raise under a PLAN §6.3 check, each once', () => {
-    const raised = RULES.flatMap((r) => r.lints ?? [r.id]).filter((id) => !['R2c', 'R2d', 'R2e', 'R2f', 'R3a', 'R3b', 'R3c', 'R4b', 'E5'].includes(id));
+    const raised = RULES.flatMap((r) => r.lints ?? [r.id]).filter((id) => !['R2c', 'R2d', 'R2e', 'R2f', 'R3a', 'R3b', 'R3c', 'R4b', 'E5', 'ruling'].includes(id));
     for (const id of raised) expect(checkOf(id).id, id).not.toMatch(/^other:/);
     const all = LINT_CHECKS.flatMap((c) => c.lints);
     expect(new Set(all).size).toBe(all.length);

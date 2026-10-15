@@ -10,6 +10,7 @@ import { useTeamNames } from '../../identity/useTeamNames';
 import { openAppStore } from '../../db';
 import type { PlanSheet } from '../../plan/data';
 import { PlanScreen } from '../../plan/PlanScreen';
+import { handRuling } from '../../rulings/handoff';
 import { syncDataKey } from '../../sync/dataKey';
 import { describeSync, useSyncStatus } from '../../sync/useSyncStatus';
 
@@ -18,6 +19,7 @@ import { describeSync, useSyncStatus } from '../../sync/useSyncStatus';
  * cache (T12). `?device=` selects and opens that device's card on arrival (a cross-level jump).
  * Photos taken here go to the app's blob queue (T21); the top bar shows "N photos waiting".
  * `?review=` draws that pin-position conflict on the plan with Choose A / Choose B (T26).
+ * Select in the side lists → "Apply as ruling…" opens the ruling editor over the chosen records (T37).
  */
 export default function LevelPlanRoute() {
   const { levelId, device, review } = useLocalSearchParams<{ levelId: string; device?: string; review?: string }>();
@@ -69,6 +71,10 @@ export default function LevelPlanRoute() {
       onReviewResolved={() => (router.canGoBack() ? router.back() : router.replace('/review'))}
       blobs={blobs}
       onOpenLevel={(other, deviceId) => router.push({ pathname: '/plan/[levelId]', params: { levelId: other, device: deviceId } })}
+      onApplyAsRuling={(projectId, draft, source) => {
+        handRuling(projectId, draft, source);
+        router.push({ pathname: '/rulings', params: { project: projectId, from: 'handoff' } });
+      }}
     />
   );
 }

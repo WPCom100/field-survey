@@ -13,7 +13,7 @@
  * Runs are serialised per engine; a run requested during a run follows it.
  */
 
-import { Editor, type EditContext, type Store } from '@field-survey/core';
+import { Editor, uuidv7, type EditContext, type Store } from '@field-survey/core';
 import { acceptPlan, recordDiffers, DecideError } from './decide';
 import { evaluate, type EvalOutput } from './evaluate';
 import { applyChanges, reconcileFindings, reconcileProposals, type Change, type Citation } from './reconcile';
@@ -25,9 +25,11 @@ import {
   type MissingPartRow,
   type ProposalRow,
   type PunchItemRow,
+  type RulingRow,
   type Snapshot,
   type Subject,
 } from './snapshot';
+import { checkRuling, parseRuling, previewRuling, vocabPlan, RULING_RULE_ID, type RulingDraft, type RulingPreview } from './rulings';
 
 export type RuleLog = (level: 'info' | 'warn' | 'error', event: string, data?: Record<string, unknown>) => void;
 
@@ -60,6 +62,16 @@ export interface DecideResult {
   /** Ids of the records created (punch item, part, cable…), in plan order. */
   recordIds: string[];
   ops: number;
+}
+
+export interface ApplyRulingResult {
+  rulingId: string;
+  ops: number;
+  /** Records changed or created (the Change Log lines). */
+  records: number;
+  recordIds: string[];
+  /** Preview rows unticked (now in the ruling's `except`). */
+  skipped: number;
 }
 
 const RUN_CTX: EditContext = { change_type: 'Field survey', reason: 'Rule engine' };
@@ -129,6 +141,7 @@ export class RuleEngine {
       list<Snapshot['proposals'][number]>('proposal', 'project_id = ?'),
       list<Snapshot['findings'][number]>('finding', 'project_id = ?'),
     ]);
+    s.rulings = await list<Snapshot['rulings'][number]>('ruling', 'project_id = ?');
     // T36 lints: sheets (pin outside the sheet), unreviewed drafts (locked level), and only the
     // live photos whose device is deleted (deleted link) — not the project's thousands of photos.
     const [sheets, draftDevices, draftCables, photos] = await Promise.all([
@@ -292,7 +305,14 @@ export class RuleEngine {
     const plan = acceptPlan({ ...row, subject: await this.subjectWithLevel(row.subject) }, payload);
     const state = decision.kind === 'edit' ? 'edited' : 'accepted';
     const recordIds: string[] = [];
-    const ops = await this.editor.group({ change_type: 'Field survey', reason: `${decision.kind === 'edit' ? 'Edit' : 'Accept'} ${label}`, proposal_id: row.id }, async (g) => {
+    // A standing ruling's proposal is accepted as that ruling's change (T37): Change = Ruling,
+    // Reason = the ruling text, `ruling_id`, as if the ruling had been applied to the record.
+    const rulingId = typeof row.payload?.ruling_id === 'string' ? row.payload.ruling_id : null;
+    const ruling = rulingId ? await this.store.get<RulingRow>('ruling', rulingId) : null;
+    const ctx: EditContext = ruling?.text
+      ? { change_type: 'Ruling', reason: ruling.text, ruling_id: ruling.id, proposal_id: row.id }
+      : { change_type: 'Field survey', reason: `${decision.kind === 'edit' ? 'Edit' : 'Accept'} ${label}`, proposal_id: row.id };
+    const ops = await this.editor.group(ctx, async (g) => {
       for (const step of plan) {
         if (step.kind === 'create') {
           const { id } = await g.create(step.entity, { id: step.id, ...step.payload });
@@ -341,6 +361,106 @@ export class RuleEngine {
     );
     this.log('info', 'reopen', { finding: row.id, lint: row.lint_id });
     return ops.length;
+  }
+
+  // -------------------------------------------------------------- rulings (T37)
+
+  /** The preview of a draft (Phase 3 §8) over the project as it stands. */
+  async previewRuling(draft: RulingDraft): Promise<RulingPreview> {
+    const s = await this.loadSnapshot();
+    return previewRuling(s, indexSnapshot(s), draft);
+  }
+
+  /**
+   * Apply a ruling (PLAN §6.4): the ticked preview rows as one group of `Ruling` ops, reason = the
+   * ruling text, `ruling_id` on every op, the `ruling` row created in the same group (or, for a
+   * stored ruling applied again, its `applied_at` / `op_count` updated). `skip` = the preview
+   * keys unticked: those records go into `filter.except` and the ruling never touches or proposes
+   * them. A rename also records the old spelling in `vocab` (`vocabPlan`). The preview is
+   * recomputed here, so a record changed since the screen's preview is written as it now is.
+   */
+  async applyRuling(draft: RulingDraft, opts: { skip?: Iterable<string> } = {}): Promise<ApplyRulingResult> {
+    const existing = draft.id ? await this.store.get<RulingRow>('ruling', draft.id) : null;
+    if (draft.id && (!existing || existing.deleted_at)) throw new DecideError('This ruling is not on this iPad (or was deleted)');
+    // A stored ruling is applied as stored; a changed one is a new ruling (Copy in the editor).
+    const d = existing ? parseRuling(existing) : draft;
+    if (!d) throw new DecideError('This ruling was written by another app version and cannot be applied here');
+    const problems = checkRuling(d);
+    if (problems.length) throw new DecideError(problems.join(' '));
+    const s = await this.loadSnapshot();
+    const preview = previewRuling(s, indexSnapshot(s), d);
+    const skip = new Set(opts.skip ?? []);
+    const ticked = preview.rows.filter((r) => !skip.has(r.key));
+    const skipped = preview.rows.filter((r) => skip.has(r.key)).map((r) => r.id);
+    const id = existing?.id ?? uuidv7();
+    const now = this.now();
+    const except = [...new Set([...(d.filter.except ?? []), ...skipped])];
+    const filter = { entity: d.filter.entity, where: d.filter.where, ...(d.filter.ids?.length ? { ids: d.filter.ids } : {}), ...(except.length ? { except } : {}) };
+    const vocab = preview.vocab ? vocabPlan(s, preview.vocab) : [];
+    const recordIds: string[] = [];
+    const ops = await this.editor.group({ change_type: 'Ruling', reason: d.text.trim(), ruling_id: id }, async (g) => {
+      if (!existing) {
+        await g.create('ruling', {
+          id,
+          project_id: this.projectId,
+          text: d.text.trim(),
+          scope_levels: d.scope_levels?.length ? d.scope_levels : null,
+          filter,
+          action: d.action,
+          standing: d.standing,
+          created_by_id: this.opts.userId,
+          created_at: now,
+          applied_at: now,
+          op_count: ticked.length,
+        });
+      }
+      for (const r of ticked) {
+        if (r.create) {
+          const made = await g.create('punch_item', { ...r.create, rule_id: RULING_RULE_ID });
+          recordIds.push(made.id);
+        } else if (await g.setField(r.entity, r.id, r.field, r.now)) {
+          recordIds.push(r.id);
+        }
+      }
+      for (const step of vocab) {
+        if (step.kind === 'create') await g.create(step.entity, { id: step.id, ...step.payload });
+        else if (step.kind === 'set') await g.setFields(step.entity, step.id, step.fields);
+      }
+      if (existing) {
+        await g.setFields('ruling', id, { applied_at: now, op_count: (existing.op_count ?? 0) + recordIds.length, ...(skipped.length ? { filter } : {}) });
+      }
+    });
+    this.log('info', 'ruling_apply', { ruling: id, records: recordIds.length, skipped: skipped.length, vocab: vocab.length, ops: ops.length });
+    return { rulingId: id, ops: ops.length, records: recordIds.length, recordIds, skipped: skipped.length };
+  }
+
+  /** Standing on / off (one `Ruling` op on the ruling row). Proposals of a ruling no longer standing are superseded on the next run. */
+  async setRulingStanding(rulingId: string, standing: boolean): Promise<number> {
+    const row = await this.store.get<RulingRow>('ruling', rulingId);
+    if (!row || row.deleted_at) throw new DecideError('Unknown ruling');
+    const ops = await this.editor.group({ change_type: 'Ruling', reason: `${standing ? 'Standing' : 'No longer standing'}: ${row.text}`.slice(0, 500), ruling_id: row.id }, (g) =>
+      g.setFields('ruling', row.id, { standing }),
+    );
+    return ops.length;
+  }
+
+  /** Delete a ruling (soft). What it changed stays; its open proposals are superseded on the next run. */
+  async deleteRuling(rulingId: string, reason: string): Promise<number> {
+    const text = reason.trim();
+    if (!text) throw new DecideError('Deleting a ruling needs a reason');
+    const row = await this.store.get<RulingRow>('ruling', rulingId);
+    if (!row || row.deleted_at) throw new DecideError('Unknown ruling');
+    const ops = await this.editor.group({ change_type: 'Ruling', reason: `Delete ruling "${row.text}": ${text}`.slice(0, 500), ruling_id: row.id }, (g) => g.delete('ruling', row.id));
+    return ops.length;
+  }
+
+  /** Open proposals of the standing rulings (all, or one ruling's), for the Rulings screen. */
+  async rulingProposals(rulingId?: string): Promise<ProposalRow[]> {
+    return this.store.list<ProposalRow>('proposal', {
+      where: rulingId ? `project_id = ? AND rule_id = ? AND state = 'proposed' AND discriminator = ?` : `project_id = ? AND rule_id = ? AND state = 'proposed'`,
+      params: rulingId ? [this.projectId, RULING_RULE_ID, rulingId] : [this.projectId, RULING_RULE_ID],
+      orderBy: 'discriminator, id',
+    });
   }
 
   /**

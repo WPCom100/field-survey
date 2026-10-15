@@ -231,7 +231,7 @@ NSPS/rack without 120V · relay panel without P or 0-10V · Issue device without
 
 ### 6.4 Rulings
 
-`ruling{text, scope_levels, filter, action, standing}`. Preview = computed op list (Level · Ref · Field · Was → Now), untickable. Apply emits ops `change_type=Ruling`, `reason=text`, `ruling_id`. Standing rulings re-evaluate on new matches and raise proposals. Rename rulings update `vocab.canonical_of`.
+`ruling{text, scope_levels, filter, action, standing}`. Preview = computed op list (Level · Ref · Field · Was → Now), untickable. Apply emits ops `change_type=Ruling`, `reason=text`, `ruling_id`. Standing rulings re-evaluate on new matches and raise proposals. Rename rulings update `vocab.canonical_of`. Stored shape, untick (`except`), the vocabulary rule and the standing proposals: D179, `packages/rules/docs/engine.md` (T37).
 
 ## 7. Import, extraction, export
 

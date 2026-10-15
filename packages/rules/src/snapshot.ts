@@ -194,6 +194,21 @@ export interface DraftRow extends Deletable {
   state: string;
 }
 
+/** A ruling (T37, `rulings.ts`): filter and action are JSON the ruling module parses. */
+export interface RulingRow extends Deletable {
+  id: string;
+  project_id: string;
+  text: string;
+  scope_levels: unknown;
+  filter: unknown;
+  action: unknown;
+  standing: boolean;
+  created_by_id: string | null;
+  created_at: string | null;
+  applied_at: string | null;
+  op_count: number | null;
+}
+
 export type ProposalState = 'proposed' | 'accepted' | 'edited' | 'rejected' | 'superseded';
 export type ProposalKind = 'punch' | 'part' | 'cable' | 'status' | 'note';
 
@@ -251,6 +266,8 @@ export interface Snapshot {
   sheets: SheetRow[];
   photos: PhotoRow[];
   drafts: DraftRow[];
+  /** Rulings (T37); the standing ones propose on new matches. */
+  rulings: RulingRow[];
 }
 
 /** An empty snapshot; tests and the engine start from it. */
@@ -275,6 +292,7 @@ export function emptySnapshot(projectId: string): Snapshot {
     sheets: [],
     photos: [],
     drafts: [],
+    rulings: [],
   };
 }
 

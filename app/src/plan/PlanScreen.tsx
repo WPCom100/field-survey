@@ -54,6 +54,7 @@ import {
   type StrokeList,
   type StrokePoint,
 } from '@field-survey/core';
+import { draftFromSelection, type RulingDraft } from '@field-survey/rules';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -85,6 +86,7 @@ import type { JumpTarget } from '../card/model';
 import { NOT_WIRED } from '../card/proposals';
 import { ruleDecider } from '../rules/engine';
 import { useRulesVersion } from '../rules/useRulesVersion';
+import { LIST_ENTITY } from '../rulings/model';
 import type { PhotoTarget } from '../photo/model';
 import { PhotoFlow, pickFromLibrary, type PhotoRequest } from '../photo/PhotoFlow';
 
@@ -190,6 +192,8 @@ export type PlanScreenProps = {
   reviewItemId?: string;
   /** Called after Choose A / Choose B on that item. */
   onReviewResolved?: (itemId: string) => void;
+  /** Multi-select in the side lists → "Apply as ruling…" (T37): open the ruling editor with this draft. */
+  onApplyAsRuling?: (projectId: string, draft: RulingDraft, source: string) => void;
 };
 
 const NO_NAMES: ReadonlyMap<string, string> = new Map();
@@ -275,6 +279,9 @@ export function PlanScreen(props: PlanScreenProps) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<Set<string> | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
+  /** Multi-select in the side lists (T37): the chosen record ids, or null when not selecting. */
+  const [picked, setPicked] = useState<ReadonlySet<string> | null>(null);
+  useEffect(() => setPicked(null), [tab, levelId]);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const insets = useSafeAreaInsets();
 
@@ -1297,20 +1304,50 @@ export function PlanScreen(props: PlanScreenProps) {
               );
             })}
           </View>
-          <View style={styles.sideHead}>
-            <Text style={styles.sideNote} numberOfLines={1}>
-              {filtering || hits ? 'Filtered' : 'All'} · {tabData.length}
-              {tab === 'devices' && plan ? ` of ${plan.devices.length}` : ''}
-              {tab === 'devices' && unplaced > 0 ? ` · ${unplaced} not on the plan` : ''}
-            </Text>
-            <Pressable onPress={() => setShowDeleted((v) => !v)} hitSlop={8}>
-              <Text style={styles.sideNote}>{showDeleted ? '☑' : '☐'} Deleted</Text>
-            </Pressable>
-          </View>
+          {picked ? (
+            <View style={styles.sideHead}>
+              <Text style={styles.sideNote} numberOfLines={1}>
+                {picked.size} chosen
+              </Text>
+              <Pressable onPress={() => setPicked(new Set(tabData.filter((r) => !('tab' in r ? r.badges.deleted : r.deleted)).map((r) => r.id)))} hitSlop={8}>
+                <Text style={styles.sideLink}>All {tabData.length}</Text>
+              </Pressable>
+              <Pressable
+                disabled={!picked.size || !plan}
+                onPress={() => {
+                  if (!plan || !props.onApplyAsRuling) return;
+                  props.onApplyAsRuling(plan.level.projectId, draftFromSelection(LIST_ENTITY[tab], [...picked], [plan.level.code]), `${TAB_LABEL[tab]} on ${plan.level.code}`);
+                  setPicked(null);
+                }}
+                hitSlop={8}
+              >
+                <Text style={[styles.sideLink, !picked.size && styles.sideOff]}>Apply as ruling…</Text>
+              </Pressable>
+              <Pressable onPress={() => setPicked(null)} hitSlop={8}>
+                <Text style={styles.sideLink}>Cancel</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.sideHead}>
+              <Text style={styles.sideNote} numberOfLines={1}>
+                {filtering || hits ? 'Filtered' : 'All'} · {tabData.length}
+                {tab === 'devices' && plan ? ` of ${plan.devices.length}` : ''}
+                {tab === 'devices' && unplaced > 0 ? ` · ${unplaced} not on the plan` : ''}
+              </Text>
+              {props.onApplyAsRuling && userId ? (
+                <Pressable onPress={() => setPicked(new Set())} hitSlop={8}>
+                  <Text style={styles.sideLink}>Select</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={() => setShowDeleted((v) => !v)} hitSlop={8}>
+                <Text style={styles.sideNote}>{showDeleted ? '☑' : '☐'} Deleted</Text>
+              </Pressable>
+            </View>
+          )}
           <FlatList
             ref={listRef}
             data={tabData}
-            extraData={selectedId}
+            extraData={picked ?? selectedId}
             keyExtractor={(r) => r.id}
             getItemLayout={(_d, index) => ({ length: ROW_H, offset: ROW_H * index, index })}
             onScrollToIndexFailed={() => {}}
@@ -1322,8 +1359,10 @@ export function PlanScreen(props: PlanScreenProps) {
               'tab' in item ? (
                 <ListRowView
                   row={item}
-                  selected={!!item.deviceId && item.deviceId === selectedId}
+                  selected={picked ? picked.has(item.id) : !!item.deviceId && item.deviceId === selectedId}
+                  picking={!!picked}
                   onPress={() => {
+                    if (picked) return setPicked(togglePick(picked, item.id));
                     if (item.tab === 'connections') {
                       // a connection opens its end editor; its device's pin is lit behind it
                       if (item.deviceId) select(item.deviceId, 'list');
@@ -1335,8 +1374,9 @@ export function PlanScreen(props: PlanScreenProps) {
                 <DeviceRow
                   device={item}
                   badges={lists?.deviceBadges.get(item.id) ?? NO_BADGES}
-                  selected={item.id === selectedId}
-                  onPress={() => select(item.id === selectedId ? null : item.id, 'list')}
+                  selected={picked ? picked.has(item.id) : item.id === selectedId}
+                  picking={!!picked}
+                  onPress={() => (picked ? setPicked(togglePick(picked, item.id)) : select(item.id === selectedId ? null : item.id, 'list'))}
                 />
               )
             }
@@ -1629,10 +1669,18 @@ function MenuItem(props: {
   );
 }
 
-function ListRowView({ row, selected, onPress }: { row: ListRow; selected: boolean; onPress: () => void }) {
+function togglePick(cur: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  const next = new Set(cur);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+function ListRowView({ row, selected, picking, onPress }: { row: ListRow; selected: boolean; picking?: boolean; onPress: () => void }) {
   const st = pinStyleFor(row.tab === 'connections' ? row.endStatus : row.deviceStatus);
   return (
     <Pressable style={[styles.row, selected && styles.rowSelected, row.badges.deleted && styles.rowDeleted]} onPress={onPress}>
+      {picking ? <Text style={styles.pickBox}>{selected ? '☑' : '☐'}</Text> : null}
       {row.tab === 'connections' ? <Swatch {...st} /> : <Text style={styles.rowNum}>{row.label}</Text>}
       <View style={styles.rowMain}>
         <View style={styles.rowLine}>
@@ -1646,10 +1694,11 @@ function ListRowView({ row, selected, onPress }: { row: ListRow; selected: boole
   );
 }
 
-function DeviceRow({ device, badges, selected, onPress }: { device: PlanDevice; badges: Badges; selected: boolean; onPress: () => void }) {
+function DeviceRow({ device, badges, selected, picking, onPress }: { device: PlanDevice; badges: Badges; selected: boolean; picking?: boolean; onPress: () => void }) {
   const st = pinStyleFor(device.status);
   return (
     <Pressable style={[styles.row, selected && styles.rowSelected, device.deleted && styles.rowDeleted]} onPress={onPress}>
+      {picking ? <Text style={styles.pickBox}>{selected ? '☑' : '☐'}</Text> : null}
       <Swatch {...st} />
       <View style={styles.rowMain}>
         <View style={styles.rowLine}>
@@ -1737,6 +1786,9 @@ const styles = StyleSheet.create({
   sideHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
   sideTitle: { fontSize: 16, fontWeight: '600' },
   sideNote: { fontSize: 13, color: '#666' },
+  sideLink: { fontSize: 13, color: '#1f6feb', fontWeight: '600' },
+  sideOff: { opacity: 0.4 },
+  pickBox: { fontSize: 18, width: 22 },
   empty: { padding: 16, color: '#666' },
   row: { height: ROW_H, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#e3e5e8' },
   rowSelected: { backgroundColor: '#e0f7fa' },

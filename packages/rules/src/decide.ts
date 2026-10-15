@@ -35,6 +35,8 @@ const PART_COLUMNS = ['level_id', 'device_id', 'device_location', 'part', 'part_
 const CABLE_COLUMNS = ['cable', 'qty', 'origin', 'single_row', 'riser_ref', 'riser_to_label', 'vertical', 'endpoint_confirmed'] as const;
 const END_COLUMNS = ['side', 'endpoint_kind', 'device_id', 'placeholder_id', 'level_id', 'from_text', 'to_text', 'status', 'note', 'surveyed_by_id', 'surveyed_at', 'status_source'] as const;
 
+const SET_SUBJECTS: readonly string[] = ['device', 'cable_end', 'cable', 'punch_item', 'missing_part'];
+
 /** The keys of a payload a person may edit on the card (strings and numbers, not ids or `why`). */
 export function editableKeys(kind: ProposalRow['kind'], payload: Record<string, unknown>): string[] {
   const allowed: readonly string[] =
@@ -86,8 +88,9 @@ export function acceptPlan(row: ProposalRow, payload: Record<string, unknown> = 
     }
     case 'status':
     case 'note': {
-      if (!subject || (subject.entity_kind !== 'device' && subject.entity_kind !== 'cable_end')) {
-        throw new DecideError(`A ${row.kind} proposal needs a device or cable end subject`);
+      // Rules set fields on devices and ends; a standing ruling (T37) also on cables, items and parts.
+      if (!subject || !SET_SUBJECTS.includes(subject.entity_kind)) {
+        throw new DecideError(`A ${row.kind} proposal needs a device, cable end, cable, punch item or part subject`);
       }
       if (payload.now === undefined) throw new DecideError(`A ${row.kind} proposal needs 'now'`);
       const field =

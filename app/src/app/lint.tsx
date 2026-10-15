@@ -1,7 +1,8 @@
 import type { Store } from '@field-survey/core';
+import { draftFromSeed } from '@field-survey/rules';
 import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { pickProject } from '../home/currentProject';
@@ -11,6 +12,7 @@ import { detailTitle, loadLintView, seedSummary, type LintGroup, type LintRow, t
 import { logTo } from '../log';
 import { bumpRulesVersion, engineFor } from '../rules/engine';
 import { useRulesVersion } from '../rules/useRulesVersion';
+import { handRuling } from '../rulings/handoff';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 
@@ -23,8 +25,8 @@ type Item = { type: 'group'; group: LintGroup; collapsed: boolean } | { type: 'r
  * Lint (T36, Phase 3 §9): the rule engine's findings grouped by check (PLAN §6.3) or by level,
  * open by default, dismissed ones on a toggle. The panel shows the finding, what to do about it,
  * Open card, and Dismiss… (a reason is required; the finding comes back when its facts change,
- * D178) or Reopen. The vocabulary check offers "Fix all via ruling" per value: the ruling editor
- * is T37, so for now it says what the ruling will do. "This iPad" lists records the server has
+ * D178) or Reopen. The vocabulary check offers "Fix all via ruling" per value, which opens the
+ * ruling editor (T37) pre-filled with the records. "This iPad" lists records the server has
  * not numbered (local, never synced). `?project=` names the project.
  */
 export default function LintScreen() {
@@ -106,16 +108,21 @@ export default function LintScreen() {
     [engine],
   );
 
+  // "Fix all via ruling" (T37): the seed opens the ruling editor pre-filled; nothing changes
+  // before its preview is applied.
   const fixAll = useCallback(
     (g: LintGroup, i: number) => {
       const s = g.seeds[i];
-      if (!s) return;
-      Alert.alert(
-        'Fix all via ruling',
-        `${seedSummary(s, codes)}.\n\nRulings arrive with T37: this selection will open the ruling editor pre-filled, with a preview to untick rows before anything changes. Until then, fix the records one by one.`,
-      );
+      if (!s || !projectId) return;
+      const draft = draftFromSeed(s, s.levelIds.map((id) => codes.get(id)).filter((c): c is string => !!c));
+      if (!draft) {
+        setNote(`${seedSummary(s, codes)}: a ruling cannot change ${s.entity.replace(/_/g, ' ')} records.`);
+        return;
+      }
+      handRuling(projectId, draft, 'Lint');
+      router.push({ pathname: '/rulings', params: { project: projectId, from: 'handoff' } });
     },
-    [codes],
+    [codes, projectId],
   );
 
   const title = view ? `Lint (${view.open} open · ${view.dismissed} dismissed)` : 'Lint';

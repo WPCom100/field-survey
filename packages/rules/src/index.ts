@@ -31,6 +31,7 @@ export {
   type SheetRow,
   type PhotoRow,
   type DraftRow,
+  type RulingRow,
 } from './snapshot';
 export {
   proposalKey,
@@ -53,7 +54,7 @@ export {
 export { evaluate, ownedLintIds, type EvalOutput, type EvalOptions, type EvalProblem } from './evaluate';
 export { reconcileProposals, reconcileFindings, applyChanges, type Change, type Citation, type ReconcileInput, type ReconcileFindingsInput } from './reconcile';
 export { acceptPlan, editableKeys, recordDiffers, DecideError, type RecordPlan } from './decide';
-export { RuleEngine, afterChanges, type RuleEngineOptions, type RuleLog, type RunReport, type Decision, type DecideResult } from './engine';
+export { RuleEngine, afterChanges, type RuleEngineOptions, type RuleLog, type RunReport, type Decision, type DecideResult, type ApplyRulingResult } from './engine';
 export {
   RULES,
   R5_TEXT,
@@ -99,3 +100,46 @@ export {
   type QuickActionResult,
 } from './rules';
 export { LINT_CHECKS, DEVICE_CATEGORIES, checkOf, checkOrder, rulingSeeds, type LintCheck, type RulingSeed, type SeedInput } from './lints';
+export {
+  RULING_ENTITIES,
+  ENTITY_LABEL,
+  FILTER_OPS,
+  OP_LABEL,
+  UNARY_OPS,
+  ACTION_LABEL,
+  RULING_FIELDS,
+  RULING_RULE_ID,
+  RulingRule,
+  fieldOf,
+  actionFields,
+  actionsFor,
+  vocabListOf,
+  parseFilter,
+  parseAction,
+  parseRuling,
+  checkRuling,
+  rulingRecords,
+  matches,
+  inRuling,
+  renamePhrase,
+  effectOf,
+  vocabEffect,
+  vocabPlan,
+  previewRuling,
+  describeFilter,
+  describeAction,
+  describeRuling,
+  draftFromSelection,
+  draftFromSeed,
+  type RulingEntity,
+  type FilterOp,
+  type Condition,
+  type RulingFilter,
+  type RulingAction,
+  type ActionKind,
+  type RulingDraft,
+  type RulingField,
+  type RulingRecord,
+  type PreviewRow,
+  type RulingPreview,
+} from './rulings';

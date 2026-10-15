@@ -21,6 +21,7 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | `src/rules/r1.ts` … `e5.ts` | The rules, one file per family (below). |
 | `src/rules/lint.ts` | The PLAN §6.3 checks the rules above do not raise (T36), `LINT_RULES`, `VOCAB_FIELDS`. |
 | `src/lints.ts` | `LINT_CHECKS` (every lint id under its §6.3 check, with a hint, in the lint view's order), `checkOf`, `rulingSeeds` (the "fix all via ruling" hand-off to T37). |
+| `src/rulings.ts` | Rulings (T37, PLAN §6.4): `RulingDraft` (filter, action, scope, standing), `RULING_FIELDS`, `parseRuling` (incl. the D50 import form), `checkRuling`, `previewRuling`, `vocabPlan`, `describeRuling`, the hand-off drafts (`draftFromSeed`, `draftFromSelection`) and `RulingRule` (standing rulings). |
 | `src/rules/quick.ts` | Quick actions E6 / E7 / E9: `runQuickAction(editor, deviceId, action)` writes the records at once (a person tapped). |
 | `src/testing/sample.ts`, `src/testing/build.ts` | A two-device snapshot with two sample rules, and the snapshot builder the rule tests use. |
 
@@ -188,3 +189,19 @@ starts a core `DebouncedTrigger` (500 ms after the last commit or pull) over eve
 the store, logs under `rules`, and bumps a version the plan screen's card reloads on. Rows of
 rules this build does not register are left alone (and can still be accepted or rejected: the
 demo level's seeded drafts).
+
+## Rulings (T37, PLAN §6.4, D179)
+
+A ruling is one decision applied to every record it fits. `RuleEngine.previewRuling(draft)` lists
+what it would change (one row per record: Level · Ref · Field · Was → Now; records already right
+are left out); `applyRuling(draft, { skip })` writes the ticked rows as one group of ops with
+`change_type = Ruling`, `reason` = the ruling text and `ruling_id`, the `ruling` row created in the
+same group. `setRulingStanding`, `deleteRuling` and `rulingProposals` serve the Rulings screen.
+
+| Part | Stored as |
+|---|---|
+| Scope | `scope_levels`: level **codes** (null = all levels), as the seed import's D50 ruling writes them |
+| Filter | `{ entity, where: [{field, op, value}], ids?, except? }`; entities `device`, `cable_end` (with the cable's code as `cable`), `cable`, `punch_item`, `missing_part`; ops `eq`, `ne`, `contains`, `not_contains` (case-insensitive), `has_phrase` (whole value or one `; ` phrase), `empty`, `not_empty`, `in`. `ids` = chosen records (multi-select, lint seed); `except` = records unticked in a preview, never changed or proposed again. The import's `{entity, field, values}` reads as one `in` condition. |
+| Action | `set` (field = value; enum fields checked against their list) · `rename` (old phrase → new, whole value or one `; ` phrase) · `append` (a phrase after `; `, once) · `item` (one punch item per device or end, `rule_id = ruling`; none when an item with that text is already on the record, open or closed). The import's `{set: {field: value}}` reads as `set`. |
+| Rename → vocabulary | when the field has a vocabulary list (`VOCAB_FIELDS`) **and the project already has rows in it**: the new phrase canonical, the old one `canonical_of` it, older spellings of the old one re-pointed; `lint.vocab` then flags any new use. An empty list is left alone (the first `punch_item` row would switch R3f on for every item). |
+| Standing | `RulingRule` (`rule_id = ruling`, discriminator = the ruling id) proposes the change on each record the ruling fits that is not right yet: `note` / `status` kind (`payload {field, now, ruling_id}`) or `punch` for an item ruling. `decide()` accepts it as a `Ruling` op with the ruling's text and id; Reject holds until the record's value or the ruling changes; a ruling no longer standing, or deleted, supersedes its open proposals. |
