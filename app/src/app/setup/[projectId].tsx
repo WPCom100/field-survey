@@ -259,6 +259,8 @@ function LevelsStep({
         <HeadCell style={styles.cScope} label="In scope" help={LEVEL_HELP.inScope} />
         <HeadCell style={styles.cGroup} label="Numbering group" help={`${LEVEL_HELP.numbering} Fixed once a level has records.`} />
         <HeadCell style={styles.cPick} label="Split of" help={LEVEL_HELP.splitOf} />
+        <Text style={[styles.cDate, w.label]}>Surveyed</Text>
+        <Text style={[styles.cDate, w.label]}>Updated</Text>
         <Text style={[styles.cSheet, w.label]}>Display sheet</Text>
         <Text style={[styles.cActions, w.label]}> </Text>
       </View>
@@ -310,6 +312,33 @@ function LevelsStep({
         />
       </View>
     </Section>
+  );
+}
+
+/** One `YYYY-MM-DD` input, saved on blur; an invalid date is refused and the saved value comes back. */
+function DateCell({ value, onSave }: { value: string | null; onSave: (text: string) => () => Promise<void> }) {
+  const [text, setText] = useState(value ?? '');
+  const [bad, setBad] = useState(false);
+  useEffect(() => setText(value ?? ''), [value]);
+  const commit = () => {
+    if (text.trim() === (value ?? '')) return;
+    void onSave(text)();
+  };
+  return (
+    <TextInput
+      style={[w.input, styles.cDate, bad && { borderColor: '#c62828' }]}
+      value={text}
+      onChangeText={(t) => {
+        setText(t);
+        setBad(t.trim() !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(t.trim()));
+      }}
+      onBlur={commit}
+      placeholder="YYYY-MM-DD"
+      placeholderTextColor="#9aa0a8"
+      autoCorrect={false}
+      autoCapitalize="none"
+      keyboardType="numbers-and-punctuation"
+    />
   );
 }
 
@@ -369,6 +398,8 @@ function LevelRow({
       <View style={styles.cPick}>
         <ChipPicker value={l.splitOfId} options={others} onPick={(id) => void run((a) => a.setSplitOf(l.id, id))()} />
       </View>
+      <DateCell value={l.surveyed} onSave={(t) => run((a) => a.setLevelDate(l.id, 'surveyed', t))} />
+      <DateCell value={l.updated} onSave={(t) => run((a) => a.setLevelDate(l.id, 'updated', t))} />
       <Text style={styles.cSheet}>{l.sheet ?? '(none yet)'}</Text>
       <View style={[styles.cActions, styles.actions]}>
         {lock ? <LockButton level={lock} onLock={onLock} /> : null}
@@ -403,6 +434,7 @@ const styles = StyleSheet.create({
   groupText: { fontSize: 14 },
   groupBtns: { flexDirection: 'row', gap: 6 },
   cPick: { width: 130 },
+  cDate: { width: 112 },
   cSheet: { width: 140, fontSize: 13, color: '#555' },
   cActions: { flex: 1 },
   cLockNum: { width: 90, fontSize: 15 },

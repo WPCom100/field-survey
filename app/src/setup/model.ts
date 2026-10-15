@@ -38,6 +38,9 @@ export type SetupLevel = {
   shared: boolean;
   splitOfId: string | null;
   splitOfCode: string | null;
+  /** `YYYY-MM-DD` or null: the date printed in the export header (D125, D159). */
+  surveyed: string | null;
+  updated: string | null;
   /** Title (or blob tail) of the display sheet; null before T45 uploads one. */
   sheet: string | null;
   /** Devices, punch items, parts, photos and cable ends on the level: once > 0 its numbering group is fixed. */
@@ -56,6 +59,16 @@ export class SetupError extends Error {
 }
 
 // ------------------------------------------------------------------- codes
+
+/** A level date as typed: empty → null, otherwise a real calendar date `YYYY-MM-DD`. Throws `SetupError`. */
+export function parseLevelDate(text: string): string | null {
+  const t = text.trim();
+  if (!t) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  const d = m ? new Date(Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!)) : null;
+  if (!m || !d || d.toISOString().slice(0, 10) !== t) throw new SetupError(`"${t}" is not a date like 2026-10-14`);
+  return t;
+}
 
 /** `6` → `06`, `6m` → `06M`, `b2` → `B2`: the project's level codes (CLAUDE.md §3). */
 export function normLevelCode(code: string): string {
@@ -181,6 +194,8 @@ export async function loadProjectSetup(store: Store, projectId: string): Promise
         shared: codes.length > 1,
         splitOfId,
         splitOfCode: splitOfId ? (codeById.get(splitOfId) ?? null) : null,
+        surveyed: typeof l.surveyed === 'string' && l.surveyed ? l.surveyed : null,
+        updated: typeof l.updated === 'string' && l.updated ? l.updated : null,
         sheet: typeof l.display_sheet_id === 'string' ? (sheets.get(l.display_sheet_id) ?? null) : null,
         records: records.get(id) ?? 0,
       };
@@ -297,6 +312,15 @@ export class SetupActions {
 
   async setInScope(levelId: string, inScope: boolean): Promise<void> {
     await this.editor.setField('level', levelId, 'in_scope', inScope, SETUP_CTX);
+  }
+
+  /** Surveyed / Updated date of a level (empty clears it). A no-op when unchanged, so blur never writes an empty op. */
+  async setLevelDate(levelId: string, field: 'surveyed' | 'updated', text: string): Promise<void> {
+    const s = await this.setup();
+    const l = SetupActions.level(s, levelId);
+    const value = parseLevelDate(text);
+    if (value === l[field]) return;
+    await this.editor.setField('level', levelId, field, value, SETUP_CTX);
   }
 
   async setSplitOf(levelId: string, parentId: string | null): Promise<void> {

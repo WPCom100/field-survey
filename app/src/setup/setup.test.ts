@@ -2,7 +2,7 @@ import { Editor, Store, SyncEngine, rememberProjects, uuidv7, type Op } from '@f
 import { BetterSqliteDriver, FakeServer } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
-import { SetupActions, SetupError, loadProjectSetup, normLevelCode, parseLevelRange } from './model';
+import { SetupActions, SetupError, loadProjectSetup, normLevelCode, parseLevelDate, parseLevelRange } from './model';
 
 const ME = uuidv7();
 
@@ -147,6 +147,21 @@ describe('SetupActions', () => {
     s = (await loadProjectSetup(store, pid))!;
     expect(s.levels.map((l) => [l.code, l.floorOrder, l.groupLabel])).toEqual([['06M', 1, '06M/06'], ['06', 2, '06M/06'], ['B2', 3, 'B2'], ['09', 4, '09']]);
     await expect(actions.reorder([ids.B2])).rejects.toThrow(/every level/);
+  });
+
+  it('level Surveyed / Updated dates: set, clear, refuse invalid, no-op when unchanged', async () => {
+    const { store, pid, ids, actions } = await tower();
+    const get = async () => (await loadProjectSetup(store, pid))!.levels.find((l) => l.id === ids.L06M)!;
+    expect(await get()).toMatchObject({ surveyed: null, updated: null });
+    await actions.setLevelDate(ids.L06M, 'surveyed', ' 2026-10-13 ');
+    await actions.setLevelDate(ids.L06M, 'updated', '2026-10-14');
+    expect(await get()).toMatchObject({ surveyed: '2026-10-13', updated: '2026-10-14' });
+    await expect(actions.setLevelDate(ids.L06M, 'surveyed', '2026-02-30')).rejects.toThrow(/not a date/);
+    await expect(actions.setLevelDate(ids.L06M, 'surveyed', '10/13/2026')).rejects.toThrow(/not a date/);
+    expect((await get()).surveyed).toBe('2026-10-13');
+    await actions.setLevelDate(ids.L06M, 'surveyed', '');
+    expect((await get()).surveyed).toBeNull();
+    expect(parseLevelDate('')).toBeNull();
   });
 
   it('numbering sharing: share, separate, and refuse once a level has numbered records', async () => {
