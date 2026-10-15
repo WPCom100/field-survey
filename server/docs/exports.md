@@ -23,7 +23,11 @@ D50, D51, D67, D94, D110, D128, D136–D139, D148–D152.
 POST /exports            Authorization: Bearer <token> · X-Survey-User: <name>
                          {"project_id": "<uuid>", "kind": "xlsx", "params": {"levels": ["B2", "B1"]}}
 202 {"id", "project_id", "kind", "params", "job_state": "queued", "blob": null, "filename": null, …}
-GET  /exports/{id}       → job_state ∈ queued · running · done · failed; stats; blob; filename; diff_summary
+409 {"detail": {"error": "export_running", "export": {…the queued or running one…}}}   (D166)
+GET  /exports/{id}       → job_state ∈ queued · running · done · failed · cancelled; stats; blob;
+                           filename; diff_summary; created_by; cancel_requested_at; cancelled_by
+POST /exports/{id}/cancel → queued: cancelled at once; running: stops at its next progress report;
+                           finished: unchanged (anyone may cancel, D166)
 GET  /exports/{id}/file  → the workbook, Content-Disposition with its filename (409 until done)
 GET  /blobs/{blob}/content → the same bytes, as any blob (the iPad's download path)
 GET  /exports?project_id → history, newest first
@@ -49,7 +53,19 @@ reads the server's tables, never the local store.
 | `export.blob` | SHA-256 of the file; the bytes live at `blobs/<sha>` with a complete `blob` row (MIME `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`) |
 | `export.stats` | `filename`, `levels`, `rows` per tab, `images`, `images_missing`, `markup_flattened`, `strokes_skipped`, `bytes`, `seconds`, `checks_list`, `previous_export`; on failure `error` (+ `traceback` for a crash) |
 | `export.diff_summary` | against the project's previous done xlsx export: per data tab `rows`, `added`, `removed`, `changed` (by Level + ID / #) and up to five `examples`; `null` for the first export |
-| `export.job_state` | `queued → running → done` or `failed` (D137; `failed` rows are retried by `run_export` only on request) |
+| `export.job_state` | `queued → running → done`, `failed` or `cancelled` (D137, D166; `failed` rows are retried by `run_export` only on request) |
+| `export.stats` while running | `started_at`, `stage`, and for a counted stage `done` / `total` / `unit` (`Photo Log 3,200 / 10,000 pictures`), plus `stage_seconds` of the stages finished; written by `Progress` at each new stage and at most once a second. The finished row keeps `started_at`, `stage_seconds` and adds `finished_at` (T94 measures with them) |
+| `export.cancel_requested_at`, `cancelled_by_id` | Cancel (D166); a running job reads them on each progress write |
+
+**One at a time (T93, D166).** At most one queued or running export per project and kind (the
+partial unique index `ux_export_active`): a second `POST` is refused with 409 naming the active
+one, so the iPad shows that card instead. Stages: workbook `Starting` → `Reading the records` →
+`Photo Log` (counted, only with the Photo Log tab) → `Writing the workbook` → `Saving the file`
+→ `Comparing with the last export`; floor PDF `Reading the records` → `Devices` (counted) →
+`Plan snapshot` → `Photos` (counted) → `Rendering the PDF` → `Saving the file`. A worker restart
+(a deploy) puts a `running` export back to `queued` (or `cancelled` when Cancel was pressed) and it
+runs again from the start. The daily backup skips a project whose workbook is queued or running
+and tries again the next minute.
 
 Filename: `Lighting_Control_Survey_Master_<first>-<last>_<n>.xlsx` — Landry's convention for the
 fixture (`…_B2-06_4.xlsx`): first and last level by floor order (`06M` folds into `06`, D33), `n`

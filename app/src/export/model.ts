@@ -19,7 +19,7 @@ export const DATA_TABS = ['Devices', 'Connections', 'Punch List', 'Missing Parts
 export type DataTab = (typeof DATA_TABS)[number];
 export const FIXED_TABS = ['Summary', 'Lists'] as const;
 
-export type ExportState = 'queued' | 'running' | 'done' | 'failed';
+export type ExportState = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 export type TabDiff = { rows: number; added: number; removed: number; changed: number; examples: string[] };
 export type ExportRow = {
   id: string;
@@ -37,11 +37,22 @@ export type ExportRow = {
     error?: string;
     images_missing?: number;
     checks_list?: string[];
+    /** While running (T93, D166): when it started, the stage and its counts. */
+    started_at?: string;
+    stage?: string;
+    done?: number;
+    total?: number;
+    unit?: string;
     [k: string]: unknown;
   } | null;
   diff_summary: { previous?: string; note?: string; tabs?: Record<string, TabDiff> } | null;
   created_by_id: string | null;
   created_at: string | null;
+  /** The person who pressed Generate (`export` for the daily backup). */
+  created_by?: string | null;
+  /** Cancel pressed (D166): a running export stops at its next progress report. */
+  cancel_requested_at?: string | null;
+  cancelled_by?: string | null;
 };
 
 // ------------------------------------------------------------------ D94 gate
@@ -179,7 +190,7 @@ export function floorHeader(level: ExportLevel | undefined, title = 'ETC Lightin
 
 // ------------------------------------------------------------------ history
 
-export const isFinished = (s: ExportState): boolean => s === 'done' || s === 'failed';
+export const isFinished = (s: ExportState): boolean => s === 'done' || s === 'failed' || s === 'cancelled';
 
 /** "Exported 12 Oct 2026, 14:05" — every history item is labelled with its export time (D94). */
 export function exportTime(iso: string | null, locale?: string): string {
@@ -197,11 +208,84 @@ export function jobLine(e: ExportRow): string {
       return e.kind === 'floor_pdf' ? 'Building the PDF…' : 'Building the workbook…';
     case 'failed':
       return `Failed: ${e.stats?.error ?? 'see the server log'}`;
+    case 'cancelled':
+      return e.cancelled_by ? `Cancelled by ${e.cancelled_by}` : 'Cancelled';
     default: {
       const size = e.stats?.bytes ? ` · ${formatSize(e.stats.bytes)}` : '';
       return `Ready${size}`;
     }
   }
+}
+
+// ------------------------------------------------------------------ a running export (T93)
+
+/** "45 s", "4 min 12 s", "1 h 03 min". */
+export function elapsed(fromIso: string | null | undefined, nowMs: number): string | null {
+  if (!fromIso) return null;
+  const s = Math.max(0, Math.floor((nowMs - Date.parse(fromIso)) / 1000));
+  if (Number.isNaN(s)) return null;
+  if (s < 60) return `${s} s`;
+  if (s < 3600) return `${Math.floor(s / 60)} min ${s % 60} s`;
+  return `${Math.floor(s / 3600)} h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')} min`;
+}
+
+const count = (n: number) => n.toLocaleString('en-US');
+
+/**
+ * The live line of a queued or running export: "Photo Log 3,200 / 10,000 pictures · 4 min 12 s"
+ * from the stage the server job writes into `stats` (D166). Null when it is finished.
+ */
+export function progressLine(e: ExportRow, nowMs: number): string | null {
+  if (isFinished(e.job_state)) return null;
+  if (e.cancel_requested_at) return `Cancelling${e.cancelled_by ? ` (${e.cancelled_by})` : ''}… it stops at its next step`;
+  if (e.job_state === 'queued') {
+    const wait = elapsed(e.created_at, nowMs);
+    return `Queued${wait ? ` ${wait}` : ''} — waiting for the server${e.stats?.restarted_at ? ' (restarted after a server update)' : ''}`;
+  }
+  const st = e.stats ?? {};
+  const counts = typeof st.total === 'number' ? ` ${count(st.done ?? 0)} / ${count(st.total)}${st.unit ? ` ${st.unit}` : ''}` : '';
+  const time = elapsed(st.started_at, nowMs);
+  return `${st.stage ?? 'Starting'}${counts}${time ? ` · ${time}` : ''}`;
+}
+
+/** "Landry", or "the daily backup" for the scheduled export. */
+export function startedBy(e: ExportRow): string {
+  if (e.params?.scheduled) return 'the daily backup';
+  return e.created_by ?? 'someone';
+}
+
+/** Generate's line while one runs: "An export is already running (started by Landry 14:05)". */
+export function busyLine(e: ExportRow, locale?: string): string {
+  const at = e.created_at ? ` ${new Date(e.created_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}` : '';
+  const what = e.job_state === 'queued' ? 'queued' : 'running';
+  return `An export is already ${what} (started by ${startedBy(e)}${at})`;
+}
+
+export const isActive = (e: ExportRow | null | undefined): e is ExportRow => !!e && !isFinished(e.job_state);
+
+export type Jobs = Partial<Record<ExportKind, ExportRow>>;
+
+/**
+ * Re-attach on opening the screen (T93): each kind's card is the project's queued or running
+ * export from the server's list (one per project and kind, D166), whoever started it; with none,
+ * the card this screen already showed stays, refreshed from the list (so "Ready" stays visible).
+ */
+export function attachJobs(current: Jobs, rows: ExportRow[]): Jobs {
+  const out: Jobs = {};
+  for (const kind of Object.keys(KIND_LABEL) as ExportKind[]) {
+    const active = rows.filter((r) => r.kind === kind && isActive(r)).sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0];
+    const mine = current[kind];
+    const shown = active ?? (mine ? (rows.find((r) => r.id === mine.id) ?? mine) : undefined);
+    if (shown) out[kind] = shown;
+  }
+  return out;
+}
+
+/** The export a refused Generate names (409 `export_running`), to show its card instead. */
+export function runningFrom(err: unknown): ExportRow | null {
+  const detail = (err as { status?: number; detail?: unknown } | null)?.detail as { detail?: { error?: string; export?: ExportRow } } | undefined;
+  if ((err as { status?: number })?.status !== 409 || detail?.detail?.error !== 'export_running') return null;
+  return detail.detail.export ?? null;
 }
 
 export function formatSize(bytes: number): string {
@@ -289,6 +373,9 @@ export const startExport = (identity: Identity, body: { project_id: string; kind
   client(identity).json<ExportRow>('POST', '/exports', body);
 
 export const getExport = (identity: Identity, id: string): Promise<ExportRow> => client(identity).json<ExportRow>('GET', `/exports/${id}`);
+
+/** Cancel (D166, anyone): queued → cancelled at once; running → stops at its next step. */
+export const cancelExport = (identity: Identity, id: string): Promise<ExportRow> => client(identity).json<ExportRow>('POST', `/exports/${id}/cancel`);
 
 export const listExports = (identity: Identity, projectId: string): Promise<ExportRow[]> =>
   client(identity).json<ExportRow[]>('GET', `/exports?project_id=${encodeURIComponent(projectId)}`);

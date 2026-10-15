@@ -1,6 +1,6 @@
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useBlobStatus } from '../blobs/useBlobStatus';
 import { openAppStore } from '../db';
@@ -13,25 +13,34 @@ import {
   floorHeader,
   type FloorSection,
   KIND_LABEL,
+  attachJobs,
+  busyLine,
   cachedHistory,
+  cancelExport,
   diffDetail,
   diffLine,
   downloadedExports,
   exportTime,
   getExport,
+  isActive,
   isFinished,
   jobLine,
   levelsTitle,
   listExports,
   loadPreflight,
   preflightLine,
+  progressLine,
   rememberHistory,
+  runningFrom,
   scopeLine,
+  startedBy,
   startExport,
   startGate,
   workbookBody,
   type DataTab,
+  type ExportKind,
   type ExportRow,
+  type Jobs,
   type Preflight,
 } from '../export/model';
 import { listProjects } from '../home/data';
@@ -48,6 +57,10 @@ type Pane = 'workbook' | 'pdf' | 'history';
  * to Files. **D94:** Generate stays disabled until the status reads "Synced" with nothing pending;
  * nothing is ever exported from this iPad's store. History lists every export with its export
  * time; files downloaded once still open offline.
+ *
+ * T93 (D166): one queued or running export per project and kind, on the server. Opening the
+ * screen re-attaches to it from the server's list, whoever started it, and follows its stage and
+ * counts; Generate for that kind names it instead; anyone may Cancel it.
  */
 export default function ExportScreen() {
   const identity = useIdentity();
@@ -62,7 +75,9 @@ export default function ExportScreen() {
   const [tabs, setTabs] = useState<DataTab[]>([...DATA_TABS]);
   const [floorLevel, setFloorLevel] = useState<string | null>(null);
   const [sections, setSections] = useState<FloorSection[]>(FLOOR_SECTIONS.map((s) => s.key));
-  const [job, setJob] = useState<ExportRow | null>(null);
+  const [jobs, setJobs] = useState<Jobs>({});
+  const [now, setNow] = useState(() => Date.now());
+  const setJob = (e: ExportRow) => setJobs((cur) => ({ ...cur, [e.kind]: e }));
   const [history, setHistory] = useState<ExportRow[]>([]);
   const [historyNote, setHistoryNote] = useState<string | null>(null);
   const [onIpad, setOnIpad] = useState<Record<string, string>>({});
@@ -109,6 +124,7 @@ export default function ExportScreen() {
       await rememberHistory(store, projectId, rows);
       if (!live.current) return;
       setHistory(rows);
+      setJobs((cur) => attachJobs(cur, rows));
       setHistoryNote(null);
     } catch {
       const rows = await cachedHistory(store, projectId);
@@ -122,37 +138,68 @@ export default function ExportScreen() {
     refreshHistory().catch(fail);
   }, [refreshHistory]);
 
-  // Follow the running job.
-  const jobId = job?.id;
-  const finished = job ? isFinished(job.job_state) : true;
+  // Follow every queued or running export of the project (this iPad's or anyone's, T93).
+  const following = (Object.values(jobs) as ExportRow[]).filter(isActive).map((e) => e.id).join(',');
   useEffect(() => {
-    if (!jobId || finished) return;
+    if (!following) return;
+    const ids = following.split(',');
     const t = setInterval(() => {
-      getExport(identity, jobId).then(
-        (e) => {
-          if (!live.current) return;
-          setJob(e);
-          if (isFinished(e.job_state)) refreshHistory().catch(fail);
-        },
-        () => undefined,
-      );
+      setNow(Date.now());
+      for (const id of ids) {
+        getExport(identity, id).then(
+          (e) => {
+            if (!live.current) return;
+            setJob(e);
+            if (isFinished(e.job_state)) refreshHistory().catch(fail);
+          },
+          () => undefined,
+        );
+      }
     }, 2000);
     return () => clearInterval(t);
-  }, [identity, jobId, finished, refreshHistory]);
+  }, [identity, following, refreshHistory]);
 
   const gate = startGate(sync);
-  const running = job !== null && !finished;
+  const xlsxJob = jobs.xlsx ?? null;
+  const pdfJob = jobs.floor_pdf ?? null;
   const chosenLevels = levels === 'all' ? (pre?.levels.length ?? 0) : levels.length;
-  const canGenerate = gate.ok && !running && busy === null && tabs.length > 0 && chosenLevels > 0;
+  const canGenerate = gate.ok && !isActive(xlsxJob) && busy === null && tabs.length > 0 && chosenLevels > 0;
   const floor = pre?.levels.find((l) => l.code === floorLevel) ?? pre?.levels[0];
-  const canGeneratePdf = gate.ok && !running && busy === null && sections.length > 0 && !!floor;
+  const canGeneratePdf = gate.ok && !isActive(pdfJob) && busy === null && sections.length > 0 && !!floor;
+  const gateLine = (j: ExportRow | null) => (isActive(j) ? busyLine(j) : gate.reason);
+  const gateOk = (j: ExportRow | null) => gate.ok && !isActive(j);
+
+  /** Generate refused because one is already queued or running: show that one instead. */
+  const start = async (body: Parameters<typeof startExport>[1]) => {
+    try {
+      setJob(await startExport(identity, body));
+    } catch (e) {
+      const other = runningFrom(e);
+      if (!other) throw e;
+      if (live.current) setJob(other);
+    }
+  };
+
+  const cancel = (e: ExportRow) => {
+    const go = () => {
+      cancelExport(identity, e.id).then((row) => {
+        if (!live.current) return;
+        setJob(row);
+        if (isFinished(row.job_state)) refreshHistory().catch(fail);
+      }, fail);
+    };
+    Alert.alert(`Cancel this ${KIND_LABEL[e.kind as ExportKind] ?? 'export'}?`, `Started by ${e.created_by ?? 'someone'}. Anyone can start it again afterwards.`, [
+      { text: 'Keep it running', style: 'cancel' },
+      { text: 'Cancel export', style: 'destructive', onPress: go },
+    ]);
+  };
 
   const generatePdf = async () => {
     if (!projectId || !floor || !canGeneratePdf) return;
     setError(null);
     setBusy('Asking the server…');
     try {
-      setJob(await startExport(identity, floorBody(projectId, floor.code, sections)));
+      await start(floorBody(projectId, floor.code, sections));
     } catch (e) {
       fail(e);
     } finally {
@@ -167,7 +214,7 @@ export default function ExportScreen() {
     setError(null);
     setBusy('Asking the server…');
     try {
-      setJob(await startExport(identity, workbookBody(projectId, { levels, tabs })));
+      await start(workbookBody(projectId, { levels, tabs }));
     } catch (e) {
       fail(e);
     } finally {
@@ -258,7 +305,7 @@ export default function ExportScreen() {
                 See the {pre.lint} lint finding{pre.lint === 1 ? '' : 's'} ▸
               </Link>
             ) : null}
-            <Text style={[styles.gate, gate.ok ? styles.gateOk : styles.gateNo]}>{gate.reason}</Text>
+            <Text style={[styles.gate, gateOk(xlsxJob) ? styles.gateOk : styles.gateNo]}>{gateLine(xlsxJob)}</Text>
 
             <View style={styles.row}>
               <Btn title="Sync first" onPress={syncFirst} disabled={sync.state === 'syncing'} />
@@ -267,7 +314,7 @@ export default function ExportScreen() {
             {busy ? <Text style={styles.hint}>{busy}</Text> : null}
             <Notice text={error} error />
 
-            {job ? <JobCard e={job} onShare={share} downloaded={!!onIpad[job.id]} /> : null}
+            {xlsxJob ? <JobCard e={xlsxJob} now={now} onShare={share} onCancel={cancel} downloaded={!!onIpad[xlsxJob.id]} /> : null}
           </Section>
         ) : null}
 
@@ -295,14 +342,14 @@ export default function ExportScreen() {
                 See the {pre.lint} lint finding{pre.lint === 1 ? '' : 's'} ▸
               </Link>
             ) : null}
-            <Text style={[styles.gate, gate.ok ? styles.gateOk : styles.gateNo]}>{gate.reason}</Text>
+            <Text style={[styles.gate, gateOk(pdfJob) ? styles.gateOk : styles.gateNo]}>{gateLine(pdfJob)}</Text>
             <View style={styles.row}>
               <Btn title="Sync first" onPress={syncFirst} disabled={sync.state === 'syncing'} />
               <Btn title="Generate PDF" primary onPress={() => void generatePdf()} disabled={!canGeneratePdf} />
             </View>
             {busy ? <Text style={styles.hint}>{busy}</Text> : null}
             <Notice text={error} error />
-            {job ? <JobCard e={job} onShare={share} downloaded={!!onIpad[job.id]} /> : null}
+            {pdfJob ? <JobCard e={pdfJob} now={now} onShare={share} onCancel={cancel} downloaded={!!onIpad[pdfJob.id]} /> : null}
           </Section>
         ) : null}
 
@@ -316,7 +363,7 @@ export default function ExportScreen() {
             <Notice text={error} error />
             {history.length === 0 ? <Text style={styles.hint}>No exports yet.</Text> : null}
             {history.map((e) => (
-              <JobCard key={e.id} e={e} onShare={share} downloaded={!!onIpad[e.id]} history />
+              <JobCard key={e.id} e={jobs[e.kind]?.id === e.id ? jobs[e.kind]! : e} now={now} onShare={share} onCancel={cancel} downloaded={!!onIpad[e.id]} history />
             ))}
           </Section>
         ) : null}
@@ -333,10 +380,25 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
   );
 }
 
-function JobCard({ e, onShare, downloaded, history }: { e: ExportRow; onShare: (e: ExportRow) => void; downloaded: boolean; history?: boolean }) {
+function JobCard({
+  e,
+  now,
+  onShare,
+  onCancel,
+  downloaded,
+  history,
+}: {
+  e: ExportRow;
+  now: number;
+  onShare: (e: ExportRow) => void;
+  onCancel: (e: ExportRow) => void;
+  downloaded: boolean;
+  history?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const diff = diffLine(e);
   const detail = diffDetail(e);
+  const progress = progressLine(e, now);
   return (
     <View style={styles.card}>
       <Text style={styles.cardTime}>
@@ -344,7 +406,17 @@ function JobCard({ e, onShare, downloaded, history }: { e: ExportRow; onShare: (
       </Text>
       {e.filename ? <Text style={styles.cardFile}>{e.filename}</Text> : null}
       <Text style={styles.cardLine}>{scopeLine(e)}</Text>
-      <Text style={[styles.cardLine, e.job_state === 'failed' && styles.failed]}>{jobLine(e)}</Text>
+      {e.created_by ? <Text style={styles.cardLine}>Started by {startedBy(e)}</Text> : null}
+      {progress ? (
+        <Text style={styles.progress}>{progress}</Text>
+      ) : (
+        <Text style={[styles.cardLine, e.job_state === 'failed' && styles.failed]}>{jobLine(e)}</Text>
+      )}
+      {isActive(e) && !e.cancel_requested_at ? (
+        <View style={styles.row}>
+          <Btn title="Cancel export" small onPress={() => onCancel(e)} />
+        </View>
+      ) : null}
       {diff ? (
         <Pressable onPress={() => setOpen(!open)} disabled={!detail.length}>
           <Text style={styles.cardLine}>
@@ -398,5 +470,6 @@ const styles = StyleSheet.create({
   cardLine: { fontSize: 13, color: '#3a4250' },
   detail: { fontSize: 12, color: '#5a6270', marginLeft: 12 },
   failed: { color: '#c62828' },
+  progress: { fontSize: 14, fontWeight: '600', color: '#1f3864' },
   onIpad: { fontSize: 13, color: '#2e7d32' },
 });

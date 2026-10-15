@@ -48,6 +48,18 @@ Failed 2026-10-14 (close-out B-3): "I did not see a surveyed date field anywhere
 - [ ] **PDF header.** Generate that level's floor PDF and open it: every page after the cover carries the same date, no company name; the Connections, Punch list and Missing parts tables match the workbook for that level. → saw:
 - [ ] **A set date wins.** Set the level's Surveyed date in Setup → Levels (T91): the header shows that date. → saw:
 
+## T93 — A long export keeps its card; one at a time; Cancel  ·  Needs: no new build (server deploy + JS update)
+
+**Why it matters:** on TP-3 a long export showed no status, its card vanished when you left the screen, and a second Generate waited behind it (close-out G-4). Use "TP-3 synthetic" so the export runs long enough to watch; T94 (speed) comes after.
+
+- [ ] **Stage and counts.** Export → Generate workbook (all levels, all tabs). Within a few seconds the card shows a stage line that changes, e.g. `Photo Log 1,240 / 10,000 pictures · 1 min 05 s`, the count climbing and the time ticking. → saw:
+- [ ] **Leave and come back.** While it runs, go back to Levels, then open Export again: the same card is there with the stage and the time still counting, without pressing anything. → saw:
+- [ ] **Another iPad.** On a second iPad (any name), open Export on the same project: the same card, "Started by <first name>", same stage. Its Generate workbook button is disabled and the line above it reads `An export is already running (started by <name> hh:mm)`. Generate floor PDF stays available. → saw:
+- [ ] **Cancel.** On the second iPad tap *Cancel export* → confirm. Within a couple of seconds both iPads show `Cancelling…`, then `Cancelled by <name>`; Generate workbook is enabled again. → saw:
+- [ ] **Run one to the end.** Generate again and wait: the card ends at `Ready · <size>` and Share works; note the minutes from Generate to Ready (also T32's number below). → saw:
+
+Decision D166 (already answered by you: one at a time per project and kind, anyone may Cancel) — nothing to approve.
+
 ## T32 — TP-3 export  ·  Needs: no new build; re-run after T93 and T94
 
 Failed 2026-10-14 (close-out G-4): over 5 minutes, no status, the card lost on leaving the screen. Every other TP-3 step passed (`docs/perf/tp3.md` §3).

@@ -160,7 +160,9 @@ def load(
     project_id: uuid.UUID,
     level_code: str,
     sections: tuple[str, ...] = SECTIONS,
+    progress: export_xlsx.ProgressFn = export_xlsx.no_progress,
 ) -> FloorData:
+    progress("Reading the records")
     project = session.get(Project, project_id)
     if project is None:
         raise LookupError(f"unknown project {project_id}")
@@ -227,7 +229,8 @@ def load(
 
     sheet = session.get(Sheet, level.display_sheet_id) if level.display_sheet_id else None
     by_id: dict[uuid.UUID, Device] = {d.id: d for d in devices}
-    for d in sorted(devices, key=lambda d: export_xlsx.id_sort_key(d.display_id)):
+    for i, d in enumerate(sorted(devices, key=lambda d: export_xlsx.id_sort_key(d.display_id))):
+        progress("Devices", i, len(devices), "devices")
         pin = None
         if (
             sheet is not None
@@ -266,6 +269,7 @@ def load(
         data.counts[s or UNSURVEYED] = sum(1 for d in data.devices if d.status == s)
 
     if sheet is not None and ({"plan", "findings"} & set(data.sections)):
+        progress("Plan snapshot")
         data.sheet_pdf = _read(store, sheet.blob)
         if data.sheet_pdf is None:
             data.checks.append("display sheet not in storage: no plan snapshot")
@@ -287,7 +291,8 @@ def load(
         data.parts = rows["Missing Parts"]
 
     if "photos" in data.sections:
-        for ph in photos:
+        for i, ph in enumerate(photos):
+            progress("Photos", i, len(photos), "pictures")
             jpeg = _read(store, ph.image_blob) or _read(store, ph.thumb_blob)
             if jpeg and ph.markup_blob:
                 strokes = _read(store, ph.markup_blob)

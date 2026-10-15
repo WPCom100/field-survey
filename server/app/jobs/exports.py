@@ -2,6 +2,7 @@
 daily master export backup (D149, T82) and a command line.
 
     POST /exports → export(job_state="queued") → worker: run_queued() → done | failed
+    POST /exports/{id}/cancel → cancelled (queued: at once; running: at its next progress report)
     python -m app.jobs.exports <project_id> --out master.xlsx [--levels B2,B1] [--user NAME]
 
 `run_export` builds the workbook from the materialised tables (`app.jobs.export_xlsx`), stores it
@@ -9,6 +10,10 @@ as a content-addressed blob (`blobs/<sha256>`, a `blob` row with the xlsx MIME t
 downloads it through `GET /blobs/{sha}/content` like a photo) and records `export.blob`, the
 stats (filename, row counts, timings) and a `diff_summary` against the project's previous xlsx
 export. A failure leaves the row `failed` with the error; the worker keeps running.
+
+One queued or running export per project and kind (T93, D166; the `ux_export_active` index):
+a second one is refused with `ExportBusy`. While it runs, the job writes its stage and counts
+into `stats` (`Progress`, about once a second) and stops when Cancel was pressed.
 
 Filename: `Lighting_Control_Survey_Master_<first>-<last>_<n>.xlsx`, Landry's convention for the
 fixture (`…_B2-06_4.xlsx`), with `n` the project's xlsx export count.
@@ -31,8 +36,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import openpyxl
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, object_session
 
 from app.auth import system_user, upsert_user
 from app.blobs import object_key
@@ -47,7 +53,8 @@ log = logging.getLogger("jobs")
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 KINDS = ("xlsx", "floor_pdf")  # floor_pdf: T59, app.jobs.floor_pdf
 MIME = {"xlsx": XLSX_MIME, "floor_pdf": "application/pdf"}
-STATES = ("queued", "running", "done", "failed")
+STATES = ("queued", "running", "done", "failed", "cancelled")
+ACTIVE = ("queued", "running")  # at most one per project and kind (D166)
 EXPORT_USER_NAME = "export"  # the daily backup's system user
 DAILY_GAP = timedelta(hours=20)  # D149: a restart never doubles the day's backup
 DATA_TABS = ("Devices", "Connections", "Punch List", "Missing Parts", "Photo Log")
@@ -59,6 +66,26 @@ def _event(event: str, **data: Any) -> None:
 
 class ExportError(Exception):
     """A job failure the export row records (unknown project, bad params…)."""
+
+
+class ExportBusy(ExportError):
+    """An export of this project and kind is already queued or running (D166)."""
+
+    def __init__(self, active: Export):
+        super().__init__(f"an export is already {active.job_state}: {active.id}")
+        self.active = active
+
+
+class ExportCancelled(Exception):
+    """Raised inside a running job when Cancel was pressed (D166)."""
+
+
+def active_export(session: Session, project_id: uuid.UUID, kind: str) -> Export | None:
+    return session.scalars(
+        select(Export).where(
+            Export.project_id == project_id, Export.kind == kind, Export.job_state.in_(ACTIVE)
+        )
+    ).first()
 
 
 # ----------------------------------------------------------------- rows
@@ -101,6 +128,9 @@ def create_export(
         not isinstance(tabs, list) or not tabs or not set(tabs) <= set(DATA_TABS)
     ):
         raise ExportError(f"params.tabs must be a non-empty list of: {', '.join(DATA_TABS)}")
+    busy = active_export(session, project_id, kind)
+    if busy is not None:
+        raise ExportBusy(busy)
     row = Export(
         id=uuid7(),
         project_id=project_id,
@@ -110,9 +140,22 @@ def create_export(
         created_by_id=user.id if user else None,
     )
     session.add(row)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:  # two people pressed Generate at the same moment
+        session.rollback()
+        busy = active_export(session, project_id, kind)
+        if busy is None:
+            raise
+        raise ExportBusy(busy) from None
     _event("export_queued", export=str(row.id), project=str(project_id), kind=kind, params=params)
     return row
+
+
+def _user_name(row: Export, user_id: uuid.UUID | None) -> str | None:
+    s = object_session(row)
+    user = s.get(User, user_id) if s is not None and user_id else None
+    return user.name if user else None
 
 
 def export_out(row: Export) -> dict[str, Any]:
@@ -128,7 +171,12 @@ def export_out(row: Export) -> dict[str, Any]:
         "stats": row.stats,
         "diff_summary": row.diff_summary,
         "created_by_id": str(row.created_by_id) if row.created_by_id else None,
+        "created_by": _user_name(row, row.created_by_id),
         "created_at": row.created_at.isoformat() if row.created_at else None,
+        "cancel_requested_at": (
+            row.cancel_requested_at.isoformat() if row.cancel_requested_at else None
+        ),
+        "cancelled_by": _user_name(row, row.cancelled_by_id),
     }
 
 
@@ -145,19 +193,27 @@ def filename_for(levels: list[str], n: int) -> str:
 # ---------------------------------------------------------------- the job
 
 
-def build(session: Session, store: ObjectStore, row: Export) -> dict[str, Any]:
+def build(
+    session: Session,
+    store: ObjectStore,
+    row: Export,
+    progress: export_xlsx.ProgressFn = export_xlsx.no_progress,
+) -> dict[str, Any]:
     """Write the workbook for one export row into the object store and return its stats. The
     caller owns the transaction."""
     if row.kind == "floor_pdf":
-        return build_floor_pdf(session, store, row)
+        return build_floor_pdf(session, store, row, progress)
     if row.kind != "xlsx":
         raise ExportError(f"not an xlsx export: {row.kind}")
     started = time.monotonic()
     try:
-        data_bytes, data = export_xlsx.export_bytes(session, store, row.project_id, row.params)
+        data_bytes, data = export_xlsx.export_bytes(
+            session, store, row.project_id, row.params, progress
+        )
     except LookupError as e:
         raise ExportError(str(e)) from e
     sha = hashlib.sha256(data_bytes).hexdigest()
+    progress("Saving the file")
     if session.get(Blob, sha) is None:
         store.put_file(object_key(sha), io.BytesIO(data_bytes), XLSX_MIME)
         session.add(
@@ -187,6 +243,8 @@ def build(session: Session, store: ObjectStore, row: Export) -> dict[str, Any]:
         .order_by(Export.created_at.desc())
     ).first()
     row.blob = sha
+    if previous:
+        progress("Comparing with the last export")
     row.diff_summary = diff_summary(store, previous, data) if previous else None
     stats = {
         **data.stats,
@@ -211,18 +269,25 @@ def floor_filename(level: str, n: int) -> str:
     return f"ETC_Lighting_Controls_Survey_Level_{re.sub(r'[^A-Za-z0-9-]', '', level)}_{n}.pdf"
 
 
-def build_floor_pdf(session: Session, store: ObjectStore, row: Export) -> dict[str, Any]:
+def build_floor_pdf(
+    session: Session,
+    store: ObjectStore,
+    row: Export,
+    progress: export_xlsx.ProgressFn = export_xlsx.no_progress,
+) -> dict[str, Any]:
     """The floor PDF of `params.level` (T59, PLAN §7.7) as a blob; returns its stats."""
     started = time.monotonic()
     params = row.params or {}
     level = str(params.get("level") or "")
     sections = tuple(params.get("sections") or floor_pdf.SECTIONS)
     try:
-        data = floor_pdf.load(session, store, row.project_id, level, sections)
+        data = floor_pdf.load(session, store, row.project_id, level, sections, progress)
     except LookupError as e:
         raise ExportError(str(e)) from e
+    progress("Rendering the PDF")
     pdf = floor_pdf.render(data)
     sha = hashlib.sha256(pdf).hexdigest()
+    progress("Saving the file")
     if session.get(Blob, sha) is None:
         store.put_file(object_key(sha), io.BytesIO(pdf), floor_pdf.PDF_MIME)
         session.add(
@@ -336,26 +401,97 @@ def _comparable(row: tuple) -> tuple:
 SessionFactory = Callable[[], Session]
 
 
+class Progress:
+    """The running job's stage and counts in `export.stats` (T93, D166): `started_at`, `stage`,
+    `done` / `total` / `unit` (e.g. Photo Log 3,200 / 10,000 pictures) and `stage_seconds`, the
+    time each finished stage took (T94 measures with them). Written in its own transaction at a
+    new stage and otherwise at most once every `every` seconds; each write reads
+    `cancel_requested_at` and raises `ExportCancelled` when Cancel was pressed."""
+
+    def __init__(
+        self,
+        session_factory: SessionFactory,
+        export_id: uuid.UUID,
+        started_at: str,
+        every: float = 1.0,
+        clock: Callable[[], float] = time.monotonic,
+    ):
+        self.session_factory = session_factory
+        self.export_id = export_id
+        self.started_at = started_at
+        self.every = every
+        self.clock = clock
+        self.stage: str | None = None
+        self.stage_started = 0.0
+        self.last_write: float | None = None
+        self.stage_seconds: dict[str, float] = {}
+
+    def __call__(
+        self, stage: str, done: int | None = None, total: int | None = None, unit: str | None = None
+    ) -> None:
+        now = self.clock()
+        if stage != self.stage:
+            self.finish()
+            self.stage, self.stage_started = stage, now
+        elif self.last_write is not None and now - self.last_write < self.every:
+            return
+        self.last_write = now
+        stats: dict[str, Any] = {**self.base(), "stage": stage}
+        if total is not None:
+            stats.update(done=done or 0, total=total, unit=unit)
+        with self.session_factory() as s:
+            cancel = s.execute(
+                update(Export)
+                .where(Export.id == self.export_id)
+                .values(stats=stats)
+                .returning(Export.cancel_requested_at)
+            ).scalar()
+            s.commit()
+        if cancel is not None:
+            raise ExportCancelled()
+
+    def finish(self) -> None:
+        """Close the current stage's timing."""
+        if self.stage is not None:
+            self.stage_seconds[self.stage] = round(self.clock() - self.stage_started, 2)
+            self.stage = None
+
+    def base(self) -> dict[str, Any]:
+        return {"started_at": self.started_at, "stage_seconds": dict(self.stage_seconds)}
+
+
 def run_export(session_factory: SessionFactory, store: ObjectStore, export_id: uuid.UUID) -> str:
-    """Run one export to `done` or `failed`; returns the final state."""
+    """Run one export to `done`, `failed` or `cancelled`; returns the final state."""
+    started_at = datetime.now(UTC).isoformat()
     with session_factory() as s:
         row = s.get(Export, export_id)
         if row is None:
             raise ExportError(f"unknown export {export_id}")
         if row.job_state not in ("queued", "failed"):
             return row.job_state
-        row.job_state = "running"
-        row.stats = {"started_at": datetime.now(UTC).isoformat()}
+        # only a row still queued (or failed, rerun by hand) starts: Cancel may have just won
+        started = s.execute(
+            update(Export)
+            .where(Export.id == export_id, Export.job_state.in_(("queued", "failed")))
+            .values(job_state="running", stats={"started_at": started_at})
+        ).rowcount
         s.commit()
+        if not started:
+            s.expire_all()
+            return s.get(Export, export_id).job_state
+    progress = Progress(session_factory, export_id, started_at)
     state = "failed"
     stats: dict[str, Any]
     try:
+        progress("Starting")
         with session_factory() as s:
             row = s.get(Export, export_id)
             assert row is not None
-            stats = build(s, store, row)
+            stats = build(s, store, row, progress)
             s.commit()
         state = "done"
+    except ExportCancelled:
+        state, stats = "cancelled", {}
     except ExportError as e:
         stats = {"error": str(e)}
     except Exception as e:  # noqa: BLE001 - recorded on the row, logged, worker keeps running
@@ -363,14 +499,72 @@ def run_export(session_factory: SessionFactory, store: ObjectStore, export_id: u
         log.error(
             json.dumps({"event": "export_crashed", "export": str(export_id), "error": repr(e)})
         )
+    progress.finish()
     with session_factory() as s:
         row = s.get(Export, export_id)
         assert row is not None
         row.job_state = state
-        row.stats = {**stats, "finished_at": datetime.now(UTC).isoformat()}
+        row.stats = {**progress.base(), **stats, "finished_at": datetime.now(UTC).isoformat()}
         s.commit()
-    _event("export_finished", export=str(export_id), state=state)
+    _event("export_finished", export=str(export_id), state=state, stages=progress.stage_seconds)
     return state
+
+
+def cancel_export(session: Session, export_id: uuid.UUID, user: User | None) -> Export:
+    """Cancel (D166, anyone on the team): a queued export is cancelled at once; a running one is
+    flagged and stops at its next progress report; a finished one is left as it is. Commits."""
+    if session.get(Export, export_id) is None:
+        raise ExportError(f"unknown export {export_id}")
+    now = datetime.now(UTC)
+    by = user.id if user else None
+    queued = session.execute(
+        update(Export)
+        .where(Export.id == export_id, Export.job_state == "queued")
+        .values(
+            job_state="cancelled",
+            cancel_requested_at=now,
+            cancelled_by_id=by,
+            stats={"finished_at": now.isoformat()},
+        )
+    ).rowcount
+    if not queued:
+        session.execute(
+            update(Export)
+            .where(
+                Export.id == export_id,
+                Export.job_state == "running",
+                Export.cancel_requested_at.is_(None),
+            )
+            .values(cancel_requested_at=now, cancelled_by_id=by)
+        )
+    session.commit()
+    row = session.get(Export, export_id)
+    assert row is not None
+    session.refresh(row)
+    _event(
+        "export_cancel", export=str(export_id), state=row.job_state, by=user.name if user else None
+    )
+    return row
+
+
+def recover_interrupted(session_factory: SessionFactory) -> list[str]:
+    """Worker start: a job left `running` by a restart (a deploy) is queued again, or cancelled
+    if Cancel was pressed meanwhile; jobs are idempotent, so it simply runs again."""
+    with session_factory() as s:
+        rows = s.scalars(select(Export).where(Export.job_state == "running")).all()
+        now = datetime.now(UTC).isoformat()
+        for row in rows:
+            if row.cancel_requested_at is not None:
+                row.job_state = "cancelled"
+                row.stats = {**(row.stats or {}), "finished_at": now}
+            else:
+                row.job_state = "queued"
+                row.stats = {"restarted_at": now}
+        s.commit()
+        out = [f"{r.id}:{r.job_state}" for r in rows]
+    if out:
+        _event("export_recovered", exports=out)
+    return out
 
 
 def run_queued(session_factory: SessionFactory, store: ObjectStore, limit: int = 1) -> list[str]:
@@ -453,14 +647,21 @@ def daily_tick(
                     continue
                 due.append((p.id, seq))
             ids = []
+            busy = False
             for pid, seq in due:
                 params = {"scheduled": True, "server_seq": seq}
-                row = create_export(s, project_id=pid, params=params, user=user)
+                try:
+                    row = create_export(s, project_id=pid, params=params, user=user)
+                except ExportBusy:  # someone's workbook is queued or running: next minute
+                    busy = True
+                    _event("export_daily_busy", project=str(pid))
+                    continue
                 ids.append(row.id)  # read while the session is open (commit expires the row)
         for export_id in ids:
             ran.append(run_export(session_factory, store, export_id))
         prune_backups(session_factory, store, now)
-        _daily_checked_on = now.date()
+        if not busy:
+            _daily_checked_on = now.date()
     except Exception as e:  # noqa: BLE001 - the worker must keep running (CLAUDE.md §5)
         _event("export_daily_failed", error=repr(e), ran=ran)
     return ran

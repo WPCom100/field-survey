@@ -23,6 +23,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -583,7 +584,17 @@ class Vocab(Id, Synced, Base):
 
 class Export(Id, Base):
     __tablename__ = "export"
-    __table_args__ = (one_of("kind", vocab.EXPORT_KIND),)
+    __table_args__ = (
+        one_of("kind", vocab.EXPORT_KIND),
+        # one queued or running export per project and kind (T93, D166)
+        Index(
+            "ux_export_active",
+            "project_id",
+            "kind",
+            unique=True,
+            postgresql_where=text("job_state IN ('queued', 'running')"),
+        ),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(fk("project.id"), index=True)
     kind: Mapped[str]
@@ -592,7 +603,10 @@ class Export(Id, Base):
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(fk("app_user.id"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     diff_summary: Mapped[dict[str, Any] | None]
-    # Job lifecycle (T29, D137): queued → running → done | failed; `stats` holds the filename,
-    # row counts, timings or the error.
+    # Job lifecycle (T29, D137, T93): queued → running → done | failed | cancelled; `stats` holds
+    # the stage and counts while running, then the filename, row counts, timings or the error.
     job_state: Mapped[str | None]
     stats: Mapped[dict[str, Any] | None]
+    # Cancel (D166): the API stamps these; the job stops at its next progress report
+    cancel_requested_at: Mapped[datetime | None]
+    cancelled_by_id: Mapped[uuid.UUID | None] = mapped_column(fk("app_user.id"))

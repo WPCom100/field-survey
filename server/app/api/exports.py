@@ -7,6 +7,10 @@ An export is a job: `POST` queues an `export` row (JSON `{project_id, kind, para
 workbook (`app.jobs.exports`), and `GET /exports/{id}` reports `job_state` (`queued · running ·
 done · failed`), `stats` (filename, row counts, error) and `blob` — the finished file's SHA-256,
 downloadable through `GET /blobs/{sha}/content` or, with its filename, `GET /exports/{id}/file`.
+
+One queued or running export per project and kind (T93, D166): a second `POST` gets 409
+`{"error": "export_running", "export": <the active one>}`. `POST /exports/{id}/cancel` (anyone)
+cancels a queued one at once and stops a running one at its next progress report.
 """
 
 import uuid
@@ -47,6 +51,10 @@ def create_export(
         row = exports.create_export(
             session, project_id=body.project_id, kind=body.kind, params=body.params, user=user
         )
+    except exports.ExportBusy as e:
+        raise HTTPException(
+            409, {"error": "export_running", "export": exports.export_out(e.active)}
+        ) from e
     except exports.ExportError as e:
         session.rollback()
         status = 404 if "unknown project" in str(e) else 422
@@ -59,6 +67,20 @@ def get_export(export_id: uuid.UUID, session: SessionDep) -> dict[str, Any]:
     row = session.get(Export, export_id)
     if row is None:
         raise HTTPException(404, f"unknown export {export_id}")
+    return exports.export_out(row)
+
+
+@router.post("/{export_id}/cancel")
+def cancel_export(
+    export_id: uuid.UUID,
+    session: SessionDep,
+    user: Annotated[User, Depends(current_user)],
+) -> dict[str, Any]:
+    """Cancel an export (D166); a finished one comes back unchanged."""
+    try:
+        row = exports.cancel_export(session, export_id, user)
+    except exports.ExportError as e:
+        raise HTTPException(404, str(e)) from e
     return exports.export_out(row)
 
 

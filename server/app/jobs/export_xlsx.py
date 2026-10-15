@@ -20,6 +20,7 @@ import io
 import math
 import re
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, BinaryIO
@@ -47,6 +48,16 @@ from app.models import (
 from app.storage import ObjectMissing, ObjectStore
 
 DEFAULT_TITLE = "ETC Lighting Controls Survey"
+
+# A running job's progress report (T93): (stage, done, total, unit), e.g. ("Photo Log", 3200,
+# 10000, "pictures"); `app.jobs.exports.Progress` writes it to the export row.
+ProgressFn = Callable[..., None]
+
+
+def no_progress(stage: str, done: int | None = None, total: int | None = None, unit=None) -> None:
+    pass
+
+
 DEFAULT_DISCLAIMER = (
     "THIS SHEET IS NOT A SUBSTITUTE FOR THE SUBMITTAL DRAWINGS! "
     "PLEASE REFER TO SUBMITTALS BEFORE ACTING ON ANY NOTES IN THIS SHEET!"
@@ -326,10 +337,12 @@ def load(
     store: ObjectStore | None,
     project_id: uuid.UUID,
     params: dict[str, Any] | None = None,
+    progress: ProgressFn = no_progress,
 ) -> ExportData:
     """Rows for every tab from the materialised tables. `params.levels` (codes) narrows the
     export; otherwise every in-scope level. `store` None skips the pictures."""
     params = params or {}
+    progress("Reading the records")
     project = session.get(Project, project_id)
     if project is None:
         raise LookupError(f"unknown project {project_id}")
@@ -535,6 +548,8 @@ def load(
     rows: list[list[Any]] = []
     flattened = skipped = missing = 0
     for i, ph in enumerate(photos):
+        if store is not None:
+            progress("Photo Log", i, len(photos), "pictures")
         ids = [dev_by_id[d].display_id for d in photo_devices[ph.id] if d in dev_by_id]
         first, rest = ids[:1], sorted(set(ids[1:]) - set(ids[:1]), key=id_sort_key)
         rows.append(
@@ -1087,10 +1102,11 @@ def export_bytes(
     store: ObjectStore | None,
     project_id: uuid.UUID,
     params: dict[str, Any] | None = None,
+    progress: ProgressFn = no_progress,
 ) -> tuple[bytes, ExportData]:
     tabs = selected_tabs(params)
     # no Photo Log → no pictures to read from storage
-    data = load(session, store if PHOTOS.name in tabs else None, project_id, params)
+    data = load(session, store if PHOTOS.name in tabs else None, project_id, params, progress)
     data.stats["rows"] = {t: n for t, n in data.stats.get("rows", {}).items() if t in tabs}
     data.stats["tabs"] = list(tabs)
     dates = {
@@ -1103,5 +1119,6 @@ def export_bytes(
         )
     }
     buf = io.BytesIO()
+    progress("Writing the workbook")
     write(data, buf, dates, tabs)
     return buf.getvalue(), data

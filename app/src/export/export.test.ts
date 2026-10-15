@@ -1,9 +1,15 @@
-import { Store, uuidv7, type Op, type SyncStatus } from '@field-survey/core';
+import { Store, TransportError, uuidv7, type Op, type SyncStatus } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
 import {
+  attachJobs,
+  busyLine,
   cachedHistory,
+  elapsed,
+  isActive,
+  progressLine,
+  runningFrom,
   diffDetail,
   diffLine,
   downloadedExports,
@@ -157,5 +163,47 @@ describe('history', () => {
     await rememberDownload(store, 'e1', 'exports/e1/x.xlsx');
     await rememberDownload(store, 'e0', 'exports/e0/y.xlsx');
     expect(await downloadedExports(store)).toEqual({ e1: 'exports/e1/x.xlsx', e0: 'exports/e0/y.xlsx' });
+  });
+});
+
+describe('a running export (T93, D166)', () => {
+  const T0 = Date.parse('2026-10-14T14:05:00Z');
+  const running = (over: Partial<ExportRow> = {}) =>
+    row({ id: 'r1', job_state: 'running', blob: null, filename: null, created_by: 'Landry', created_at: '2026-10-14T14:05:00Z', stats: { started_at: '2026-10-14T14:05:00Z', stage: 'Photo Log', done: 3200, total: 10000, unit: 'pictures' }, ...over });
+
+  it('shows the stage, the counts and the time since it started', () => {
+    expect(progressLine(running(), T0 + 252_000)).toBe('Photo Log 3,200 / 10,000 pictures · 4 min 12 s');
+    expect(progressLine(running({ stats: { started_at: '2026-10-14T14:05:00Z', stage: 'Writing the workbook' } }), T0 + 45_000)).toBe('Writing the workbook · 45 s');
+    expect(progressLine(running({ job_state: 'queued', stats: null }), T0 + 8_000)).toBe('Queued 8 s — waiting for the server');
+    expect(progressLine(running({ cancel_requested_at: '2026-10-14T14:06:00Z', cancelled_by: 'Zach' }), T0)).toMatch(/^Cancelling \(Zach\)/);
+    expect(progressLine(row(), T0)).toBeNull();
+    expect(elapsed('2026-10-14T14:05:00Z', T0 + 3_780_000)).toBe('1 h 03 min');
+    expect(jobLine(row({ job_state: 'cancelled', cancelled_by: 'Zach' }))).toBe('Cancelled by Zach');
+  });
+
+  it('names the running export on Generate', () => {
+    const at = new Date('2026-10-14T14:05:00Z').toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    expect(busyLine(running(), 'en-GB')).toBe(`An export is already running (started by Landry ${at})`);
+    expect(busyLine(running({ job_state: 'queued', params: { scheduled: true }, created_by: 'export' }))).toMatch(/^An export is already queued \(started by the daily backup /);
+  });
+
+  it('re-attaches to the queued or running export from the server list, whoever started it', () => {
+    const pdf = running({ id: 'p1', kind: 'floor_pdf', created_by: 'Zach' });
+    const old = row({ id: 'e0' });
+    // a fresh screen (or another iPad) finds both running cards
+    expect(attachJobs({}, [pdf, running(), old])).toEqual({ xlsx: running(), floor_pdf: pdf });
+    // nothing running: no card, unless this screen showed one, which is refreshed from the list
+    expect(attachJobs({}, [old])).toEqual({});
+    const doneNow = row({ id: 'r1', job_state: 'done' });
+    expect(attachJobs({ xlsx: running() }, [doneNow, old])).toEqual({ xlsx: doneNow });
+    expect(isActive(running())).toBe(true);
+    expect(isActive(doneNow)).toBe(false);
+  });
+
+  it('turns a refused Generate (409 export_running) into that export', () => {
+    const err = new TransportError('rejected', 'POST /exports → 409', 409, { detail: { error: 'export_running', export: running() } });
+    expect(runningFrom(err)?.id).toBe('r1');
+    expect(runningFrom(new TransportError('rejected', 'x', 422, { detail: 'bad' }))).toBeNull();
+    expect(runningFrom(new Error('offline'))).toBeNull();
   });
 });

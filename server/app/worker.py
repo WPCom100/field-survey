@@ -23,6 +23,7 @@ HEARTBEAT_EVERY = 12  # polls → once a minute
 
 def main() -> None:
     tick = 0
+    exports.recover_interrupted(SessionLocal)  # a deploy restarted a running export (T93)
     while True:
         if tick % HEARTBEAT_EVERY == 0:
             log.info(json.dumps({"event": "heartbeat", "concurrency": settings.worker_concurrency}))
