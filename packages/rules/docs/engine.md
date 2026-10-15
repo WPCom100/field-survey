@@ -32,7 +32,7 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | R2d | `cable` draft, per NSPS / rack | 120V: `120v Power` → `P-NSPS-D Power Supply` / `Equipment rack` (D52). |
 | R2e | `cable` draft, per in-scope level | One Unison pair `Stations & Sensors` ↔ the level's NSPS (else its rack): host end `Unison from stations & sensors`, bus end `Devices to P-NSPS-D` / `Devices to equipment rack`. Skipped when the level has any U end. |
 | R2f | `status` draft `Not started` (derived) | An unsurveyed end on an out-of-scope level, or whose far end is on one (or a `level_not_in_scope` placeholder). Nothing is ever copied (D171). |
-| R3a | `punch` draft on the end | `Not installed` → `Run <signal> to <far end>` (`Cable not run`, `EC`); 0-10V reads "Run and land 0-10V control wiring". `Issue` + "not terminated"/"not landed"/"needs landing" → `Terminate <signal> to <far end>` (`Termination`; "Land 0-10V control wiring", "Land 120V power"), discriminator `terminate`, owner per D175 (3). Gated by R5; skipped when an open item with the same text exists. |
+| R3a | `punch` draft on the end | `Not installed` → `Run <signal> to <far end>` (`Cable not run`, `EC`); 0-10V reads "Run and land 0-10V control wiring". **One per wire** (D177): when both ends are surveyed `Not installed` the draft sits on the end with a device (side A when both or neither have one), and a Run item the rule made on the other end stands for the wire. `Issue` + "not terminated"/"not landed"/"needs landing" → `Terminate <signal> to <far end>` (`Termination`; "Land 0-10V control wiring", "Land 120V power"), discriminator `terminate`, owner per D175 (3) — one per end, since each end is terminated. Gated by R5; skipped when an open item with the same text exists. A single row's far end is its To text (`P-NSPS-D Power Supply`, `Equipment rack`, `Fixtures`), never the placeholder that pairs it (`120v Power`). |
 | R3b | `punch` draft on the device, discriminator = end id | DMX end `Issue` "no term kit" → `Terminate DMX to <far end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits". Gated by R5. |
 | R3c | `punch` draft on the numbering group + **upkeep** | "Missing all Device Neuron IDs", `Information`, `EC`, `sort_last`, `device_text` "All devices", Notes = missing IDs, on the group's first level. Once an item exists (accepted, or the master's), `ctx.maintain` rewrites Notes, closes it (date = today) when empty, reopens it on a new device without an ID (D170). |
 | R3d / R3f | findings on the item | "test"/"commission" in the text; text outside `vocab(punch_item)` when that list exists (rule-made items exempt). |
@@ -129,6 +129,22 @@ and a `set` based on either create applies without review (`server/docs/sync.md`
 finding rows are ordinary synced records; the engine's ops are `Field survey` / "Rule engine",
 one group per run; decisions are one group each with `proposal_id` on every op and the reason
 `Accept R3a: <item>` / `Edit …` / `Reject …`.
+
+## Golden tests over the master (TP-8, T35)
+
+`src/golden/master.test.ts` replays `fixtures/master-ops.json` — the op log a client pulls after
+the server has imported the master (`server/tests/dump_master_ops.py`, `server/docs/imports.md`)
+— into a Node store through `Store.applyRemoteMany` and runs the engine as the iPad would. It
+pins down: the replay and the master's counts; that over the master **as imported** the engine
+proposes exactly the **known differences** committed in the file (31 rows, each against the
+master row it stands for: the engine's D175 (2) wording vs the surveyor's free text, runs the
+master folded into a device's "Not installed" item, ends the import left unresolved, D126) and
+no finding, with R3c rewriting the seven Neuron ID items' Notes as its only write (D175 (4));
+that the rows marked `copied` vanish once the master's eight copied ends ("(per …)") are
+unsurveyed (D171); R3c, R3b → R4b and E5 re-made from the master with those rows removed. The
+test is skipped, with the reason in its name, when the fixture is missing. Regenerate the fixture
+after a seed-import change; extend the lists in the test when a rule's wording changes on
+purpose, never to hide a new proposal.
 
 ## Running
 

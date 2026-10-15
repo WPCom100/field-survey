@@ -259,10 +259,41 @@ describe('R3a Cable not run / Termination', () => {
     const far = b.device(l03, 'Relay panel', { display_id: '03-01' });
     const c = b.cable('X', { device: panel, display_id: 'C-01', to_text: 'DMX to Level 03', status: 'Not installed' }, { device: far, to_text: 'DMX to Level 06M', status: 'Not installed' });
     expect(items(b, [R3a])).toEqual(['Run DMX to Level 03']); // the 03 end waits
-    c.b!.surveyed_at = NOW; // someone surveyed it on an iPad → no longer waits
-    expect(items(b, [R3a])).toEqual(['Run DMX to Level 03', 'Run DMX to Level 06M']);
-    b.punch(level, { device_id: panel.id, item: 'Run DMX to Level 03', type: 'Cable not run' });
+    c.b!.surveyed_at = NOW; // someone surveyed it on an iPad → no longer waits; one item per wire, on side A
+    expect(items(b, [R3a])).toEqual(['Run DMX to Level 03']);
+    c.a.status = 'Installed, untested'; // only the far end is still unpulled → it carries the item
     expect(items(b, [R3a])).toEqual(['Run DMX to Level 06M']);
+    b.punch(l03, { device_id: far.id, item: 'Run DMX to Level 06M', type: 'Cable not run' });
+    expect(items(b, [R3a])).toEqual([]);
+  });
+
+  it('raises one Run item per wire (D177): on the end with a device, else side A; a Run item the rule made on the other end stands for the wire', () => {
+    const b = new Build();
+    const { level, panel, bus } = floor(b);
+    const rack = b.device(level, 'Equipment rack', { display_id: '06M-09' });
+    const nsps = b.device(level, 'NSPS', { display_id: '06M-05' });
+    // both ends surveyed Not installed, both with a device → side A
+    b.cable('X', { device: panel, display_id: 'C-01', to_text: 'DMX to equipment rack', status: 'Not installed' }, { device: rack, display_id: 'C-02', to_text: 'DMX to CT06LCPA', status: 'Not installed' });
+    // the bus placeholder on side A, the NSPS on side B → the NSPS end carries it (the master's 02 #7)
+    b.cable('U', { placeholder: bus, level, display_id: 'C-03', to_text: 'Devices to P-NSPS-D', status: 'Not installed' }, { device: nsps, display_id: 'C-04', to_text: 'Unison from stations & sensors', status: 'Not installed' });
+    // the rule's own item on the B end (accepted before A was surveyed) keeps A quiet
+    const c = b.cable('N', { device: panel, display_id: 'C-05', to_text: 'Network to equipment rack', status: 'Not installed' }, { device: rack, display_id: 'C-06', to_text: 'Network to CT06LCPA', status: 'Not installed' });
+    b.punch(level, { device_id: rack.id, cable_end_id: c.b!.id, item: 'Run network to CT06LCPA', type: 'Cable not run', rule_id: 'R3a' });
+    const out = run(b, [R3a]);
+    expect(out.proposals.map((p) => [p.payload.item, p.payload.device_id])).toEqual([
+      ['Run DMX to equipment rack', panel.id],
+      ['Run Unison to Stations & Sensors', nsps.id],
+    ]);
+  });
+
+  it('names a single row\'s far end by its To text: a 120V run reads "Run 120V to P-NSPS-D Power Supply", never the power placeholder', () => {
+    const b = new Build();
+    const { level, power } = floor(b);
+    const nsps = b.device(level, 'NSPS', { display_id: '06M-05' });
+    const rack = b.device(level, 'Equipment rack', { display_id: '06M-09' });
+    b.cable('120V', { device: nsps, display_id: 'C-01', from_text: '120v Power', to_text: 'P-NSPS-D Power Supply', status: 'Not installed', note: 'Not run' }, { placeholder: power }, { single_row: true });
+    b.cable('120V', { device: rack, display_id: 'C-02', from_text: '120v Power', to_text: 'Equipment rack', status: 'Not installed', note: 'Not run' }, { placeholder: power }, { single_row: true });
+    expect(items(b, [R3a])).toEqual(['Run 120V to P-NSPS-D Power Supply', 'Run 120V to Equipment rack']);
   });
 });
 

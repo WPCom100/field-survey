@@ -174,11 +174,13 @@ def import_workbook(session: Session, store: ObjectStore, batch: ImportBatch) ->
 
     requester = session.get(User, batch.created_by_id) if batch.created_by_id else None
     import_user = system_user(session, seed_import.IMPORT_USER_NAME)
+    new_groups: dict[uuid.UUID, str] = {}
     target = seed_import.Target(
         project_id=project.id,
         user_id=(requester or import_user).id,
         import_user_id=import_user.id,
-        levels=_levels(session, project.id, wb),
+        levels=_levels(session, project.id, wb, new_groups),
+        new_groups=new_groups,
         placeholders={
             p.label: p.id
             for p in session.scalars(
@@ -235,20 +237,23 @@ def import_workbook(session: Session, store: ObjectStore, batch: ImportBatch) ->
     return stats
 
 
-def _levels(session: Session, project_id: uuid.UUID, wb) -> dict[str, seed_import.LevelRef]:
+def _levels(
+    session: Session, project_id: uuid.UUID, wb, new_groups: dict[uuid.UUID, str]
+) -> dict[str, seed_import.LevelRef]:
     """The workbook's floors as `LevelRef`s: existing project levels by code, new ones with a
-    numbering group per floor family (06 and 06M share one, D33), created here as rows."""
+    numbering group per floor family (06 and 06M share one, D33); a group the project lacks is
+    added to `new_groups` (id → label) for the plan to create."""
     existing = {
         lv.level: lv
         for lv in session.scalars(
             select(Level).where(Level.project_id == project_id, Level.deleted_at.is_(None))
         )
     }
-    groups_by_family: dict[str, NumberingGroup] = {}
+    groups_by_family: dict[str, uuid.UUID] = {}
     for lv in existing.values():
         g = session.get(NumberingGroup, lv.numbering_group_id)
         if g is not None:
-            groups_by_family.setdefault(seed_import.family(lv.level), g)
+            groups_by_family.setdefault(seed_import.family(lv.level), g.id)
     refs: dict[str, seed_import.LevelRef] = {}
     for row in wb.levels:
         code = seed_import.norm_level(row.code)
@@ -274,14 +279,15 @@ def _levels(session: Session, project_id: uuid.UUID, wb) -> dict[str, seed_impor
                 for r in wb.levels
                 if seed_import.family(seed_import.norm_level(r.code)) == fam
             ]
-            group = NumberingGroup(id=uuid7(), project_id=project_id, label="/".join(members))
-            session.add(group)
-            session.flush()
+            # A new group is an op in the plan (`Builder.levels`), never a bare row: a client
+            # pulling the project must get it, as it does from `POST /projects` (T35).
+            group = uuid7()
+            new_groups[group] = "/".join(members)
             groups_by_family[fam] = group
         refs[code] = seed_import.LevelRef(
             code=code,
             level_id=uuid7(),
-            numbering_group_id=group.id,
+            numbering_group_id=group,
             floor_order=row.floor_order,
             exists=False,
             surveyed=row.surveyed,

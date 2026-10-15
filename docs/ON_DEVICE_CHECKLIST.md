@@ -165,6 +165,16 @@ Decision D169: **approved** (Landry, 2026-10-15); nothing to answer here. (The "
 
 Decision D175: **approved** (Landry, 2026-10-15) as the defaults; D176 makes every value settable per project and in the library (T102). Nothing to answer here.
 
+## T35 — One "Run …" draft per wire; 120V wording  ·  Needs: no new build (JS update)
+
+**Why it matters:** the golden test against the master (TP-8) showed the engine raising two "Run …" drafts for one unpulled wire when both ends were surveyed, and naming a 120V run after the power placeholder. The master has one item per wire and names the power supply.
+
+- [ ] **Both ends surveyed, one draft.** On a cable whose two ends are both on cached levels (e.g. a DMX run between a relay panel and the rack), set the panel's end **Not installed**, then the rack's end **Not installed** too: only one `DRAFT ⚑ R3a Run DMX to …` exists, on the panel's card (side A); the rack's card shows none for that wire. Why: R3 says one Run item per unpulled wire (D177). → saw:
+- [ ] **The accepted item stands.** Accept that draft, then set the rack's end back to empty and to **Not installed** again: no second Run draft appears on either card. → saw:
+- [ ] **120V wording.** On an NSPS or rack, set the 120V end **Not installed**: the draft reads `Run 120V to P-NSPS-D Power Supply` (rack: `Run 120V to Equipment rack`), not "… to 120v Power". → saw:
+
+Decision D177 (Proposed): one Run item per wire — when both ends are surveyed `Not installed` it goes on the end with a device (side A when both have one, as the master files it), and a Run item the rule made on the other end stands for the wire; terminations stay one per end. A single row's far end is its To text. → Approve / change:
+
 ---
 
 ## Rules for this file

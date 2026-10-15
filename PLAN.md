@@ -202,7 +202,7 @@ Pure TypeScript over an in-memory project snapshot (no DB, no React; the same pa
 | R2b | End endpoint ≠ `riser_to_label` | Finding "To does not match the riser" |
 | R2c/R2d/R2e | Library | 0-10V single row To `Fixtures`; P single row To `EBDK panic wire`, default `Installed, untested`; 120V single row (NSPS `P-NSPS-D Power Supply`, rack `Equipment rack` — D52); one Unison pair per level `Stations & Sensors` ↔ NSPS (or rack where no NSPS) |
 | R2f | Other end surveyed, this end not | Nothing is copied (D171): the end stays empty (`Unsurveyed`, D110/D138) until someone surveys it; far level out of scope → `Not started` |
-| R3a | End `Not installed` | Punch "Run <signal> to <other end>", `Cable not run`, `EC`, surveyed end only (E3); → Termination item when the end becomes Issue |
+| R3a | End `Not installed` | Punch "Run <signal> to <other end>", `Cable not run`, `EC`, surveyed end only (E3) — one per wire: with both ends surveyed, on the end with a device, else side A (D177); → Termination item when the end becomes Issue |
 | R3b | DMX end Issue "no term kit" | Device item `Terminate DMX to <far end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits" (the master's form, D175) |
 | R3c | Numbering group exists | "Missing all Device Neuron IDs", `Information`, `EC`, `sort_last`; Notes = IDs with null `neuron_id`; auto-close when empty, reopen on a new device without ID (D49) |
 | R3d | Item text | Finding on "test"/"commission" |

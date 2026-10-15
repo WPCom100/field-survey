@@ -35,6 +35,16 @@ The project must exist (`POST /projects`, T41); it needs
 no numbering groups or levels — the import creates them from the Summary (one group per floor,
 06 and 06M in one, D33). Existing levels with the same code are reused.
 
+**Golden op log (T35, TP-8).** `tests/dump_master_ops.py` imports the master into a throw-away
+`<db>_golden` database exactly this way and writes the project's op log as `GET /ops` returns it
+to `fixtures/master-ops.json`; `packages/rules/src/golden/master.test.ts` replays that file into
+a Node store and runs the rule engine over it. Regenerate it after any change to this job (ids
+are fresh each time; the test compares content, never ids):
+
+```
+.venv/Scripts/python.exe tests/dump_master_ops.py      # from server/, Postgres up
+```
+
 ## What the job writes
 
 Everything is **ops through the ordinary apply loop** (`Push`), by the user who started the import
@@ -44,7 +54,7 @@ tables; every iPad gets the baseline by pull. Stats (`import_batch.stats`) count
 
 | Tab | Records | Notes |
 |---|---|---|
-| Summary | `level` per floor row (floor order = row order, Surveyed/Updated parsed), `numbering_group` rows | levels stay `setup`; the import does not lock baselines (D125) |
+| Summary | `level` per floor row (floor order = row order, Surveyed/Updated parsed); a `numbering_group` **create op** per new group, before its levels (since T35 — a bare row never reached a pulling client) | levels stay `setup`; the import does not lock baselines (D125) |
 | Devices | `device`: ID kept, `origin=import`, `panel_name` from a `CTxxLCPx` in Device or Type (EBDKs included) | `Unsurveyed` → empty status (D110); any other off-list status → empty + `review_item(lint)` |
 | Connections | one `cable_end` per row (`C-nn` kept) + its `cable`; pairing below; the four Unison bus spellings → `Stations & Sensors` via one `ruling` row + a `Ruling` op per end (D50) | From/To verbatim (D32); `cable.endpoint_confirmed=false` on every cable (D6) |
 | Punch List | `punch_item` (# kept, the Device text kept verbatim as `device_text` — D136), `device_id` matched from the Device text (tag `S4`/`D6`, `PI1002 #2`, panel `CT01LCPB`, `EBDK (CT01LCPB)`, model + room, `UFMP4 #2`); `Missing all Device Neuron IDs` → `sort_last` | text naming several devices, a room or "All devices" → no device |

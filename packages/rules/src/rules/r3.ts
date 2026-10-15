@@ -42,7 +42,7 @@ import {
 export const R3a: Rule = {
   id: 'R3a',
   title: 'Cable not run',
-  text: 'One "Run <signal> to <far end>" item per unpulled wire (`Cable not run`, `EC`), on the surveyed end only; once the wire is run but not terminated, a `Termination` item instead. Far-end items wait for that floor\'s survey (R5).',
+  text: 'One "Run <signal> to <far end>" item per unpulled wire (`Cable not run`, `EC`), on the surveyed end only — when both ends are surveyed, on the end with a device, else side A (D177); once the wire is run but not terminated, a `Termination` item instead. Far-end items wait for that floor\'s survey (R5).',
   run(ctx) {
     for (const e of ctx.index.cableEnd.values()) {
       const code = cableOf(ctx, e)?.cable ?? null;
@@ -50,10 +50,10 @@ export const R3a: Rule = {
       const level = endLevel(ctx, e);
       if (!level) continue;
       if (e.status === 'Not installed') {
-        if (waitsForSurvey(ctx, e)) continue;
+        if (waitsForSurvey(ctx, e) || !carriesRunItem(ctx, e)) continue;
         const target = targetOf(ctx, e);
         const item = code === '0-10V' ? 'Run and land 0-10V control wiring' : target ? `Run ${signalOf(code)} to ${target}` : `Run ${signalOf(code)}`;
-        if (hasOpenItemText(ctx, e.device_id, e.id, item)) continue;
+        if (hasOpenItemText(ctx, e.device_id, e.id, item) || otherEndHasRunItem(ctx, e)) continue;
         ctx.propose({
           subject: subjectOfEnd(ctx, e),
           kind: 'punch',
@@ -77,6 +77,27 @@ export const R3a: Rule = {
     }
   },
 };
+
+/**
+ * One "Run …" item per wire (R3): when both ends are surveyed `Not installed`, the item goes on
+ * the end with a device (side A when both or neither have one; D177), as the master files it.
+ * An end whose other end is unsurveyed, or waits for its floor's survey (R5), carries it alone.
+ */
+function carriesRunItem(ctx: RuleContext, e: CableEndRow): boolean {
+  const other = ctx.index.otherEnd(e);
+  if (!other || other.status !== 'Not installed' || waitsForSurvey(ctx, other)) return true;
+  const mine = !!e.device_id;
+  const theirs = !!other.device_id;
+  if (mine !== theirs) return mine;
+  return e.side === 'A';
+}
+
+/** A Run item the rule made on the other end (accepted before this end was surveyed) stands for the wire. */
+function otherEndHasRunItem(ctx: RuleContext, e: CableEndRow): boolean {
+  const other = ctx.index.otherEnd(e);
+  if (!other) return false;
+  return (ctx.index.punchByEnd.get(other.id) ?? []).some((p) => isOpen(p) && p.rule_id === 'R3a' && p.type === 'Cable not run');
+}
 
 // ------------------------------------------------------------------ R3b
 

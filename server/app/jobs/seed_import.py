@@ -154,6 +154,9 @@ class Target:
     placeholders: dict[str, uuid.UUID]  # existing, by label (case-insensitive key)
     source_name: str
     now: datetime = field(default_factory=lambda: datetime.now(UTC))
+    # numbering groups the workbook adds (id → label): created as ops before their levels, so a
+    # client pulling the project gets the group rows too (T35; `POST /projects` does the same)
+    new_groups: dict[uuid.UUID, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -460,6 +463,11 @@ class Builder:
     # --------------------------------------------------------------- levels
 
     def levels(self) -> None:
+        for gid, label in self.t.new_groups.items():
+            self.create(
+                "numbering_group", {"id": gid, "project_id": self.t.project_id, "label": label}
+            )
+            self.count("numbering_groups")
         for code, ref in self.t.levels.items():
             if ref.exists:
                 fills = (("surveyed", ref.fill_surveyed), ("updated", ref.fill_updated))

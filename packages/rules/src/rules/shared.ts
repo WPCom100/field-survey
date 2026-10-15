@@ -68,15 +68,18 @@ export function endLabel(ctx: RuleContext, end: CableEndRow): string {
 
 /**
  * The far end as item text names it: the destination part of the To text ("DMX to Level B1
- * CTB1LCPB" → "Level B1 CTB1LCPB"), else the other end's device (`Level 03 03-05` on another
- * level, the ID on the same level), the placeholder's label, else the To text itself
- * ("Fixtures", "EBDK panic wire"). Null when nothing names it.
+ * CTB1LCPB" → "Level B1 CTB1LCPB"), a single row's To text as it stands ("Fixtures", "EBDK
+ * panic wire", "P-NSPS-D Power Supply" — its other end is only the placeholder that pairs the
+ * row, "120v Power", which no item names; T35), else the other end's device (`Level 03 03-05`
+ * on another level, the ID on the same level), the placeholder's label, else the To text
+ * itself. Null when nothing names it.
  */
 export function targetOf(ctx: RuleContext, end: CableEndRow): string | null {
   const to = str(end.to_text);
   if (to) {
     const m = /\s[Tt][Oo]\s+(.+)$/.exec(to);
     if (m?.[1]) return m[1].trim();
+    if (cableOf(ctx, end)?.single_row) return to;
   }
   const other = ctx.index.otherEnd(end);
   if (other) {
