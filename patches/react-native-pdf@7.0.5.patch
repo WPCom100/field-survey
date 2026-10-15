@@ -81,7 +81,7 @@ index d8192b24f3a6f5a4f272fed160fcd6fa92e32556..4f4688f75b19a4981ec8426b93a0e94a
  
  declare const Pdf: React.ForwardRefExoticComponent<PdfProps & React.RefAttributes<PdfRef>>
 diff --git a/index.js b/index.js
-index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..c0dc41781cc8759a9af7a749077b1f20cfa18dc0 100644
+index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..e0c4b549845155fab3aa9fae906b9bd509268655 100644
 --- a/index.js
 +++ b/index.js
 @@ -69,6 +69,10 @@ export default class Pdf extends Component {
@@ -117,7 +117,7 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..c0dc41781cc8759a9af7a749077b1f20
      _onChange = (event) => {
          // Handle direct events for text selection/highlight
          if (event.nativeEvent.type) {
-@@ -412,6 +431,35 @@ export default class Pdf extends Component {
+@@ -412,6 +431,45 @@ export default class Pdf extends Component {
                  return;
              }
  
@@ -140,6 +140,16 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..c0dc41781cc8759a9af7a749077b1f20
 +            } else if (message[0] === 'ink') {
 +                this.props.onInkMessage && this.props.onInkMessage(event.nativeEvent.message);
 +                return;
++            } else if (message[0] === 'longpress') {
++                // T92: native timings of a long press; `late` = how long the event waited to reach JS
++                const late = Date.now() - Number(message[message[1] === 'timer' ? 4 : 3]);
++                if (message[1] === 'timer') {
++                    const uikit = ['possible', 'began', 'changed', 'ended', 'cancelled', 'failed'][Number(message[3])] || message[3];
++                    console.log(`[plan] long press native: timer fired ${message[2]} ms after finger down, UIKit long press ${uikit}, undecided: ${message.slice(5).join('|') || 'none'}; reached JS ${late} ms later`);
++                } else {
++                    console.log(`[plan] long press native: UIKit recognised it ${message[2]} ms after finger down; reached JS ${late} ms later`);
++                }
++                return;
 +            } else if (message[0] === 'gestures') {
 +                console.log(`[plan] pdf: disabled ${message[1]} PDFKit selection gesture(s): ${message.slice(2).join('|')}`);
 +                return;
@@ -154,10 +164,10 @@ index 916faa503706e05ec05f5fda0ab4ce56adcd41b0..c0dc41781cc8759a9af7a749077b1f20
                  message[4] = message.splice(4).join('|');
              }
 diff --git a/ios/RNPDFPdf/RNPDFPdfView.mm b/ios/RNPDFPdf/RNPDFPdfView.mm
-index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390861731ed 100644
+index 1bc263bb95c584c950583d42485059b8bf34168b..9540427f1336c9a39fc254627a747a0970056758 100644
 --- a/ios/RNPDFPdf/RNPDFPdfView.mm
 +++ b/ios/RNPDFPdf/RNPDFPdfView.mm
-@@ -61,6 +61,81 @@ const float MIN_SCALE = 1.0f;
+@@ -61,6 +61,205 @@ const float MIN_SCALE = 1.0f;
  >
  @end
  
@@ -236,10 +246,134 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
 +
 +@end
 +
++/**
++ *  field-survey patch (T92, D165): the long press, timed by us. UIKit's long press could be held
++ *  back until the finger moved (close-out 2026-10-14, D-15: "the menu does not pop up till the
++ *  holding finger is moved"), so this recognizer never recognizes and so never waits on another
++ *  one: it watches one touch and, still within 10 pt after 0.3 s, reports `began` from its own
++ *  timer, then `move` and `end` from the touches. A second finger or a larger move before then
++ *  means no long press until every finger is up.
++ */
++@interface RNPDFPressWatcher : UIGestureRecognizer
++/** `began` returns NO to refuse the long press (the plan is already panning). */
++@property (nonatomic, copy) BOOL (^onPress)(NSString *kind, CGPoint point);
++@property (nonatomic, readonly) BOOL fired;
++@property (nonatomic, readonly) CFTimeInterval downTime;
++@property (nonatomic, readonly, weak) UITouch *trackedTouch;
++@end
++
++@implementation RNPDFPressWatcher
++{
++    CGPoint _start;
++    CGPoint _last;
++    NSTimer *_timer;
++    BOOL _spoiled;
++}
++
++static const NSTimeInterval RNPDFPressDuration = 0.3;
++static const CGFloat RNPDFPressSlop = 10;
++
++- (NSUInteger)touchesDown:(UIEvent *)event except:(NSSet<UITouch *> *)gone
++{
++    NSUInteger down = 0;
++    for (UITouch *t in [event touchesForGestureRecognizer:self]) {
++        if (t.phase != UITouchPhaseEnded && t.phase != UITouchPhaseCancelled && ![gone containsObject:t]) down++;
++    }
++    return down;
++}
++
++- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
++{
++    [super touchesBegan:touches withEvent:event];
++    if (_trackedTouch == nil && !_spoiled && [self touchesDown:event except:nil] == 1) {
++        _trackedTouch = touches.anyObject;
++        _start = _last = [_trackedTouch locationInView:self.view];
++        _downTime = CACurrentMediaTime();
++        __weak RNPDFPressWatcher *weakSelf = self;
++        _timer = [NSTimer timerWithTimeInterval:RNPDFPressDuration repeats:NO block:^(NSTimer *timer) {
++            [weakSelf timerFired];
++        }];
++        [[NSRunLoop mainRunLoop] addTimer:_timer forMode:NSRunLoopCommonModes];
++        return;
++    }
++    [self spoil];
++}
++
++- (void)timerFired
++{
++    _timer = nil;
++    if (_trackedTouch == nil || _fired || _spoiled || !self.enabled) return;
++    if (self.onPress && !self.onPress(@"began", _last)) {
++        [self spoil];
++        return;
++    }
++    _fired = YES;
++}
++
++- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
++{
++    [super touchesMoved:touches withEvent:event];
++    if (_trackedTouch == nil || ![touches containsObject:_trackedTouch]) return;
++    _last = [_trackedTouch locationInView:self.view];
++    if (_fired) {
++        if (self.onPress) self.onPress(@"move", _last);
++    } else if (hypot(_last.x - _start.x, _last.y - _start.y) > RNPDFPressSlop) {
++        [self spoil];
++    }
++}
++
++- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
++{
++    [super touchesEnded:touches withEvent:event];
++    [self lift:touches event:event];
++}
++
++- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
++{
++    [super touchesCancelled:touches withEvent:event];
++    [self lift:touches event:event];
++}
++
++- (void)lift:(NSSet<UITouch *> *)touches event:(UIEvent *)event
++{
++    if (_trackedTouch != nil && [touches containsObject:_trackedTouch]) {
++        _last = [_trackedTouch locationInView:self.view];
++        [self finish];
++    }
++    // every finger up: Failed resets the recognizer for the next touch
++    if ([self touchesDown:event except:touches] == 0) self.state = UIGestureRecognizerStateFailed;
++}
++
++/** No long press for the rest of this touch sequence; one already shown ends where the finger is. */
++- (void)spoil
++{
++    [self finish];
++    _spoiled = YES;
++}
++
++- (void)finish
++{
++    [_timer invalidate];
++    _timer = nil;
++    BOOL fired = _fired;
++    _fired = NO;
++    _trackedTouch = nil;
++    if (fired && self.onPress) self.onPress(@"end", _last);
++}
++
++- (void)reset
++{
++    [super reset];
++    [self finish];
++    _spoiled = NO;
++}
++
++@end
++
  @implementation RNPDFPdfView
  {
      RCTBridge *_bridge;
-@@ -74,9 +149,19 @@ const float MIN_SCALE = 1.0f;
+@@ -74,9 +273,21 @@ const float MIN_SCALE = 1.0f;
      UITapGestureRecognizer *_singleTapRecognizer;
      UIPinchGestureRecognizer *_pinchRecognizer;
      UILongPressGestureRecognizer *_longPressRecognizer;
@@ -252,6 +386,8 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
 +    RNPDFInkGestureRecognizer *_inkRecognizer;
 +    BOOL _inkMode;
 +    NSMutableArray<UIGestureRecognizer *> *_inkDisabled;
++    // field-survey patch (T92): the long press, timed by us
++    RNPDFPressWatcher *_pressWatcher;
  }
  
 +static void *RNPDFViewportKVOContext = &RNPDFViewportKVOContext;
@@ -259,7 +395,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
  #ifdef RCT_NEW_ARCH_ENABLED
  
  using namespace facebook::react;
-@@ -190,6 +275,7 @@ using namespace facebook::react;
+@@ -190,6 +401,7 @@ using namespace facebook::react;
  {
      [super prepareForRecycle];
  
@@ -267,7 +403,15 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
      [_pdfView removeFromSuperview];
      _pdfDocument = Nil;
      _pdfView = Nil;
-@@ -234,8 +320,136 @@ using namespace facebook::react;
+@@ -203,6 +415,7 @@ using namespace facebook::react;
+     [self removeGestureRecognizer:_singleTapRecognizer];
+     [self removeGestureRecognizer:_pinchRecognizer];
+     [self removeGestureRecognizer:_longPressRecognizer];
++    [self removeGestureRecognizer:_pressWatcher];
+     [self removeGestureRecognizer:_doubleTapEmptyRecognizer];
+ 
+     [self initCommonProps];
+@@ -234,8 +447,137 @@ using namespace facebook::react;
      [self didSetProps:[NSArray arrayWithObject:@"page"]];
  }
  
@@ -334,6 +478,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
 +        if (_singleTapRecognizer) [taps addObject:_singleTapRecognizer];
 +        if (_doubleTapRecognizer) [taps addObject:_doubleTapRecognizer];
 +        if (_longPressRecognizer) [taps addObject:_longPressRecognizer];
++        if (_pressWatcher) [taps addObject:_pressWatcher];
 +        [self collectTapRecognizersIn:_pdfView depth:0 into:taps];
 +        for (UIGestureRecognizer *g in taps) {
 +            if (g.enabled && ![_inkDisabled containsObject:g]) {
@@ -404,7 +549,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
  - (instancetype)initWithBridge:(RCTBridge *)bridge
  {
      self = [super init];
-@@ -476,6 +690,9 @@ using namespace facebook::react;
+@@ -476,6 +818,9 @@ using namespace facebook::react;
                      _pdfView.maxScaleFactor = _fixScaleFactor*_maxScale;
                  }
              }
@@ -414,7 +559,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
  
          }
  
-@@ -567,6 +784,12 @@ using namespace facebook::react;
+@@ -567,6 +912,12 @@ using namespace facebook::react;
          _pdfView.backgroundColor = [UIColor clearColor];
          [_pdfView layoutDocumentView];
          [self setNeedsDisplay];
@@ -423,11 +568,11 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
 +        if (_inkMode) [self applyInkMode:YES];
 +        [self emitViewport];
 +        // field-survey patch (T70): which patch this binary carries, logged by the app once per load
-+        [self notifyOnChangeWithMessage:@"patch|t70|ink,longpress-move"];
++        [self notifyOnChangeWithMessage:@"patch|t92|ink,longpress-move,press-timer"];
      }
  }
  
-@@ -600,6 +823,7 @@ using namespace facebook::react;
+@@ -600,6 +951,7 @@ using namespace facebook::react;
  
  - (void)dealloc{
  
@@ -435,7 +580,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
      _pdfDocument = Nil;
      _pdfView = Nil;
  
-@@ -734,6 +958,7 @@ using namespace facebook::react;
+@@ -734,6 +1086,7 @@ using namespace facebook::react;
  
  - (void)onScaleChanged:(NSNotification *)noti
  {
@@ -443,7 +588,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
  
      if (_initialed && _fixScaleFactor>0) {
          if (_scale != _pdfView.scaleFactor/_fixScaleFactor) {
-@@ -741,6 +966,117 @@ using namespace facebook::react;
+@@ -741,6 +1094,117 @@ using namespace facebook::react;
              [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"scaleChanged|%f", _scale]]];
          }
      }
@@ -474,7 +619,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
 +{
 +    if (!view || depth > 12) return;
 +    for (UIGestureRecognizer *g in view.gestureRecognizers) {
-+        if (g == _longPressRecognizer || g == _singleTapRecognizer || g == _doubleTapRecognizer ||
++        if (g == _longPressRecognizer || g == _pressWatcher || g == _singleTapRecognizer || g == _doubleTapRecognizer ||
 +            g == _doubleTapEmptyRecognizer || g == _pinchRecognizer || !g.enabled) continue;
 +        NSString *cls = NSStringFromClass([g class]);
 +        BOOL selection = [g isKindOfClass:[UILongPressGestureRecognizer class]] ||
@@ -561,7 +706,7 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
  }
  
  #pragma mark gesture process
-@@ -839,8 +1175,10 @@ using namespace facebook::react;
+@@ -839,8 +1303,10 @@ using namespace facebook::react;
      PDFPage *pdfPage = [_pdfView pageForPoint:point nearest:NO];
      if (pdfPage) {
          unsigned long page = [_pdfDocument indexForPage:pdfPage];
@@ -573,63 +718,104 @@ index 1bc263bb95c584c950583d42485059b8bf34168b..e4c85e2ba83d0829f5f50955231b9390
      }
  
      //[self setNeedsDisplay];
-@@ -860,12 +1198,48 @@ using namespace facebook::react;
+@@ -860,12 +1326,75 @@ using namespace facebook::react;
  }
  
  /**
 - *  Do nothing on long Press
-+ *  Long press: report where, once, when it is recognised
-  *
-  *
+- *
+- *
++ *  Long press (UIKit's): T92 moved the reporting to the press watcher below. This recognizer stays
++ *  for what waits on it (the single tap, so the lift is not also a tap) and logs when UIKit
++ *  recognised it, which is how the next iPad round shows whether it was held back.
   */
  - (void)handleLongPress:(UILongPressGestureRecognizer *)sender{
--
-+    // field-survey patch: `pageLongPress|page|x|y|pageX|pageY` when the press is recognised, then
-+    // `pageLongPressMove|…` while the finger moves and `pageLongPressEnd|…` when it lifts, so the
-+    // add-here menu shows at once and the spot can be adjusted before lifting (T23, iPad retest).
-+    NSString *kind = nil;
-+    switch (sender.state) {
-+        case UIGestureRecognizerStateBegan: {
-+            kind = @"pageLongPress";
-+            [self disableTextSelectionGestures];
-+            dispatch_async(dispatch_get_main_queue(), ^{
-+                [self->_pdfView clearSelection];
-+            });
-+            // the plan must not scroll under a finger that is placing something: cancel the pan
-+            UIPanGestureRecognizer *pan = _observedScrollView.panGestureRecognizer;
-+            if (pan.enabled) {
-+                pan.enabled = NO;
-+                pan.enabled = YES;
-+            }
-+            break;
++    if (sender.state != UIGestureRecognizerStateBegan) return;
++    [self disableTextSelectionGestures];
++    // field-survey patch (T92): `longpress|uikit|<ms since finger down>|<epoch ms>`
++    [self notifyOnChangeWithMessage:[NSString stringWithFormat:@"longpress|uikit|%.0f|%.0f",
++                                     (CACurrentMediaTime() - _pressWatcher.downTime) * 1000,
++                                     [[NSDate date] timeIntervalSince1970] * 1000]];
++}
++
++/**
++ *  field-survey patch (T23, T92): `pageLongPress|page|x|y|pageX|pageY` when the press watcher's
++ *  timer fires with the finger still down, then `pageLongPressMove|…` while the finger moves and
++ *  `pageLongPressEnd|…` when it lifts, so the add-here menu shows at once and the spot can be
++ *  adjusted before lifting. Refuses to begin while the plan is panning.
++ */
++- (BOOL)handlePress:(NSString *)kind at:(CGPoint)point
++{
++    NSString *message = nil;
++    UIPanGestureRecognizer *pan = _observedScrollView.panGestureRecognizer;
++    if ([kind isEqualToString:@"began"]) {
++        if (pan.state == UIGestureRecognizerStateBegan || pan.state == UIGestureRecognizerStateChanged) return NO;
++        message = @"pageLongPress";
++        [self disableTextSelectionGestures];
++        dispatch_async(dispatch_get_main_queue(), ^{
++            [self->_pdfView clearSelection];
++        });
++        // the plan must not scroll under a finger that is placing something: cancel the pan
++        if (pan.enabled) {
++            pan.enabled = NO;
++            pan.enabled = YES;
 +        }
-+        case UIGestureRecognizerStateChanged:
-+            kind = @"pageLongPressMove";
-+            break;
-+        case UIGestureRecognizerStateEnded:
-+        case UIGestureRecognizerStateCancelled:
-+            kind = @"pageLongPressEnd";
-+            break;
-+        default:
-+            return;
++        // `longpress|timer|<ms since finger down>|<UIKit long press state>|<epoch ms>|<recognizers still possible>`
++        [self notifyOnChangeWithMessage:[NSString stringWithFormat:@"longpress|timer|%.0f|%ld|%.0f|%@",
++                                         (CACurrentMediaTime() - _pressWatcher.downTime) * 1000,
++                                         (long)_longPressRecognizer.state,
++                                         [[NSDate date] timeIntervalSince1970] * 1000,
++                                         [self pendingRecognizerNames]]];
++    } else if ([kind isEqualToString:@"move"]) {
++        message = @"pageLongPressMove";
++    } else {
++        message = @"pageLongPressEnd";
 +    }
-+    CGPoint point = [sender locationInView:self];
 +    PDFPage *pdfPage = [_pdfView pageForPoint:point nearest:YES];
 +    if (pdfPage) {
 +        unsigned long page = [_pdfDocument indexForPage:pdfPage];
 +        CGPoint pagePoint = [_pdfView convertPoint:[self convertPoint:point toView:_pdfView] toPage:pdfPage];
 +        [self notifyOnChangeWithMessage:
-+         [[NSString alloc] initWithString:[NSString stringWithFormat:@"%@|%lu|%f|%f|%f|%f", kind, page+1, point.x, point.y, pagePoint.x, pagePoint.y]]];
++         [[NSString alloc] initWithString:[NSString stringWithFormat:@"%@|%lu|%f|%f|%f|%f", message, page+1, point.x, point.y, pagePoint.x, pagePoint.y]]];
 +    }
++    // Fabric flushes events when the main run loop is about to sleep; wake it so this one is not
++    // left queued until the next touch (T92)
++    CFRunLoopWakeUp(CFRunLoopGetMain());
++    return YES;
++}
+ 
++/** The recognizers receiving the held finger that are still undecided (T92 log). */
++- (NSString *)pendingRecognizerNames
++{
++    NSMutableOrderedSet<NSString *> *names = [NSMutableOrderedSet orderedSet];
++    for (UIGestureRecognizer *g in _pressWatcher.trackedTouch.gestureRecognizers) {
++        if (g != _pressWatcher && g.state == UIGestureRecognizerStatePossible) {
++            [names addObject:NSStringFromClass([g class])];
++        }
++    }
++    return [names.array componentsJoinedByString:@","];
  }
  
  /**
-@@ -915,6 +1289,17 @@ using namespace facebook::react;
+@@ -915,6 +1444,30 @@ using namespace facebook::react;
  
      [self addGestureRecognizer:longPressRecognizer];
      _longPressRecognizer = longPressRecognizer;
 +    // field-survey patch (T23 fix): the lift after a long press is not also a tap
 +    [singleTapRecognizer requireGestureRecognizerToFail:longPressRecognizer];
++
++    // field-survey patch (T92, D165): the long press reported from our own timer, never held back
++    RNPDFPressWatcher *pressWatcher = [[RNPDFPressWatcher alloc] initWithTarget:nil action:nil];
++    pressWatcher.delegate = self;
++    pressWatcher.cancelsTouchesInView = NO;
++    pressWatcher.delaysTouchesEnded = NO;
++    pressWatcher.enabled = !_inkMode;
++    __weak RNPDFPdfView *weakSelf = self;
++    pressWatcher.onPress = ^BOOL(NSString *kind, CGPoint point) {
++        return [weakSelf handlePress:kind at:point]; // point is in this view (the watcher's view)
++    };
++    [self addGestureRecognizer:pressWatcher];
++    _pressWatcher = pressWatcher;
 +
 +    // field-survey patch (T69): ink capture, off until draw mode
 +    RNPDFInkGestureRecognizer *inkRecognizer = [[RNPDFInkGestureRecognizer alloc] initWithTarget:self
