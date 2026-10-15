@@ -210,6 +210,23 @@ Decision D178 (Proposed): a dismissed finding stays dismissed while it says the 
 
 Decision D179 (Proposed): how a ruling is stored and applied — level codes as scope; `filter.ids` for chosen records and `filter.except` for unticked ones (never touched or proposed again); rename = whole value or one `; ` phrase and records the old spelling only in a vocabulary list the project already has (the first `punch_item` row would switch R3f on for every item); a standing ruling proposes on records that match later, Accept writes a `Ruling` op; items it generates carry `rule_id = ruling`. → Approve / change:
 
+## T39 — Cable / riser view  ·  Needs: no new build (JS update)
+
+**Why it matters:** every cable of the project on one screen with both ends, so a missing far end, a wrong status at one end or an unconfirmed endpoint is seen across floors, not one card at a time. Use the **Tower round project** (imported from the master) — Confirm endpoint writes a real change.
+
+- [ ] **Open it.** Levels home → sidebar **Cable / riser**: the title reads `Cable / riser (80)` on a fresh master import. The footer reads `missing far end 12 · code mismatch 0 · status mismatch 0 · To ≠ riser 0 · unconfirmed endpoint 80 · Not started on in-scope level 0` (the 12 are the far ends the import left unpaired, the same 12 as Lint; every imported cable starts unconfirmed, D6). → saw:
+- [ ] **Group by.** **Vertical** (default): groups like `06M-01 → X (DMX) <n>`, `Same-floor: U (Unison)`, and `Single-row: P · 0-10V · 120V` last. **Level**: one group per level; a run between two floors shows under both. **Code**: `X (DMX)`, `N (network)` … in that order. Tap a group header: it folds. → saw:
+- [ ] **Rows.** Each row: Code · A (`06M-01 C-20`) · A status · B · B status · `⚠n` or `✓`. An end with no status reads `Unsurveyed`; a cable with one end reads `⚠ missing end`; an `ⓡ` marks an open Needs review item. Levels show in brackets when the ends are on different floors. → saw:
+- [ ] **Filters.** Tap a level chip, a code chip, a status chip (`Unsurveyed` too) and **☑ only**: the list narrows and the title reads `(<shown> of 80)`. Tap `missing far end 12` in the footer: only those 12 stay; tap it again to clear. → saw:
+- [ ] **End editor in the side panel.** Tap a row: the right panel shows the T22 end editor (both ends stacked, status buttons, note, From/To, riser check) with **◀ Cables**; below it **Checks on this cable** and **Riser crop**. Change the far end's status: the row and the footer counts update. **Jump to …** opens that level's plan with the pin lit; Back returns here. → saw:
+- [ ] **Confirm endpoint.** On a cable with `unconfirmed endpoint`, tap **Confirm endpoint**: the check leaves the list, the footer counts one less, and the end's History (on the card) does not change — the cable's change is `Riser cross-check` with reason `Endpoint confirmed against the riser`. → saw:
+- [ ] **Needs review link.** On a row with `ⓡ` (an Import pair item) tap **Open Needs review item ▸**: Needs review opens on that item. → saw:
+- [ ] **Riser crop.** Every master cable says `No riser crop for this cable: the riser has not been extracted for it (riser extraction, T43).` — expected until T43 writes `riser_ref`. (Nothing more to check on the iPad yet.) → saw:
+- [ ] **Apply as ruling.** Tap **Select**, tick two rows (or **All n**) → **Apply as ruling… (n)**: Rulings opens `from Cable / riser` with `Only the n chosen records` (both ends of each cable) and their levels as scope. **Cancel** leaves selection mode. → saw:
+- [ ] **Offline.** In airplane mode the view, filters and end edits still work; Confirm endpoint queues like any edit. → saw:
+
+Decision D180 (Proposed): the cable view's six checks (code mismatch = no code, a code outside the list, or a riser label naming another signal; unconfirmed = any cable with `endpoint_confirmed` false, so all 80 imported cables until confirmed; `Not started` is fine on a run to an out-of-scope level), Confirm endpoint as one `Riser cross-check` op, derived verticals when none is stored, and `riser_ref = {sheet, bbox: [x, y, w, h]}` in sheet coordinates for T43. → Approve / change:
+
 ---
 
 ## Rules for this file

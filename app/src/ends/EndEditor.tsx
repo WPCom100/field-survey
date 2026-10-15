@@ -8,7 +8,7 @@
  */
 
 import { OpError, vocab, type Editor, type Store } from '@field-survey/core';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { appendPhrase } from '../card/actions';
@@ -38,6 +38,8 @@ export type EndEditorProps = {
   /** Thumbnails of the end's photos and opening one (caption, links, markup). */
   resolveBlobUri?: (sha: string, kind: 'thumb' | 'image') => string | null;
   onOpenPhoto?: (photoId: string, title: string) => void;
+  /** Below the riser check, inside the scroll (the cable view's riser crop and checks, T39). */
+  footer?: ReactNode;
 };
 
 type Run = (fn: (e: Editor) => Promise<unknown>) => Promise<boolean>;
@@ -148,6 +150,7 @@ export function EndEditor(props: EndEditorProps) {
             </>
           )}
         </View>
+        {props.footer}
       </ScrollView>
     </View>
   );
