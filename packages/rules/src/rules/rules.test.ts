@@ -267,14 +267,14 @@ describe('R3a Cable not run / Termination', () => {
     expect(items(b, [R3a])).toEqual([]);
   });
 
-  it('raises one Run item per wire (D177): on the end with a device, else side A; a Run item the rule made on the other end stands for the wire', () => {
+  it('raises one Run item per wire (D177): on the start of the run (side A), even a placeholder end; a Run item the rule made on the other end stands for the wire', () => {
     const b = new Build();
     const { level, panel, bus } = floor(b);
     const rack = b.device(level, 'Equipment rack', { display_id: '06M-09' });
     const nsps = b.device(level, 'NSPS', { display_id: '06M-05' });
-    // both ends surveyed Not installed, both with a device → side A
+    // both ends surveyed Not installed → side A, the start of the run
     b.cable('X', { device: panel, display_id: 'C-01', to_text: 'DMX to equipment rack', status: 'Not installed' }, { device: rack, display_id: 'C-02', to_text: 'DMX to CT06LCPA', status: 'Not installed' });
-    // the bus placeholder on side A, the NSPS on side B → the NSPS end carries it (the master's 02 #7)
+    // the run starts at the stations (a placeholder end): the item sits there, with no device
     b.cable('U', { placeholder: bus, level, display_id: 'C-03', to_text: 'Devices to P-NSPS-D', status: 'Not installed' }, { device: nsps, display_id: 'C-04', to_text: 'Unison from stations & sensors', status: 'Not installed' });
     // the rule's own item on the B end (accepted before A was surveyed) keeps A quiet
     const c = b.cable('N', { device: panel, display_id: 'C-05', to_text: 'Network to equipment rack', status: 'Not installed' }, { device: rack, display_id: 'C-06', to_text: 'Network to CT06LCPA', status: 'Not installed' });
@@ -282,7 +282,7 @@ describe('R3a Cable not run / Termination', () => {
     const out = run(b, [R3a]);
     expect(out.proposals.map((p) => [p.payload.item, p.payload.device_id])).toEqual([
       ['Run DMX to equipment rack', panel.id],
-      ['Run Unison to Stations & Sensors', nsps.id],
+      ['Run Unison to P-NSPS-D', null],
     ]);
   });
 
