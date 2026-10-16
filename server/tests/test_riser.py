@@ -761,7 +761,9 @@ def test_riser_job_with_claude_endpoints(session, store, factory):
     assert len(unresolved) < len(cables) // 4, len(unresolved)
     low = [c for c in cables if c.confidence < rx.LOW_CONFIDENCE]
     assert low and all("endpoint:low_confidence" in c.conflicts for c in low)
-    assert s["endpoints_low_confidence"] == len(low)
+    assert s["endpoints_low_confidence"] == sum(
+        1 for c in every if c.confidence < rx.LOW_CONFIDENCE
+    )  # lines with no bubble included
     resolved = [c for c in cables if c.from_label and (c.to_label or c.to_level_id)]
     assert len(resolved) >= len(cables) * 3 // 4
     assert all(
@@ -905,5 +907,5 @@ def test_claude_cost_and_recording(tmp_path):
     assert json.loads((tmp_path / "rec.json").read_text())[key]["data"] == {"ok": True}
 
 
-TOWER_UNKNOWN_CODE = 0
+TOWER_UNKNOWN_CODE = 223
 """Lines with no bubble on the Tower's riser, both sheets, with the recorded answers (T108)."""

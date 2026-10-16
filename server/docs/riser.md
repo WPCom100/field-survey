@@ -104,10 +104,13 @@ recorded in `stats.claude_bands` and skipped; its cables stay unresolved.
 
 Cost: `stats.claude` = `{model, calls, replayed, input_tokens, output_tokens, cost_usd}` from
 `response.usage` at D189's prices; each call logs a `claude_call` event with its label, tokens,
-USD and request id. The Tower's two sheets: 26 calls, ≈ 190 K input tokens (the system prompt
-cached), ≈ 65 K output tokens (thinking included), **≈ $2.00 per run** at effort high — above
-the Phase 1f estimate ($0.45) because the estimate had no thinking tokens and one image per
-band. Effort `medium` would roughly halve it; the overview image is a fifth of the input.
+USD and request id. The Tower's two sheets: 26 calls, ≈ 210 K input tokens (the system prompt
+cached), ≈ 113 K output tokens (thinking included), **≈ $3.10 per run** at effort high (T108's
+re-recording, 2026-10-16; ≈ $2.00 before the lines with no bubble were asked about — 244 line
+answers added ≈ 48 K output tokens) — above the Phase 1f estimate ($0.45) because the estimate
+had no thinking tokens and one image per band. With the recording: 223 lines with no bubble on
+the Tower (sheet 001: 99 by geometry + 6 the model added; sheet 002: 118 by the model), guessed
+120V 140, 0-10V 37, U 17, N 3, X 3, none 23. Effort `medium` would roughly halve it; the overview image is a fifth of the input.
 
 ## What the job writes
 
