@@ -143,6 +143,12 @@ def test_read_library_resolves_models_ports_slots_and_scripts(sample):
     assert lib.timestamp == "2026-10-13T18:57:47.923Z" and len(lib.order) == 37
     uh = lib.types[UH10002]
     assert uh.model_pattern == "UH10002-{Heritage Color with TBD}" and uh.model == "UH10002"
+    # power supplies (D198): by property + name (NSPS), by script (P-SPM-E), by description
+    # (the ERn2 upgrade kit); not a relay panel with "Power Supply - Units", not the EBDK
+    assert lib.types[NSPS].is_power_supply and lib.types[LVD].is_power_supply is False
+    assert lib.types["77d22bee-a1bf-4023-a0a2-63869f002b40"].is_power_supply  # P-SPM-E
+    assert lib.types["16a5dbc1-c0d3-4d02-bb79-8ee7717a5b5f"].is_power_supply  # ERn2-W-UPG
+    assert not lib.types[ERP24].is_power_supply and not lib.types[EBDK].is_power_supply
     assert uh.variants[:2] == ("UH10002-X", "UH10002-3") and uh.part_numbers == ("7181B2005",)
     assert uh.family == "Paradigm" and uh.category == "Heritage Stations"
     assert [p.protocol for p in uh.ports] == ["LinkConnect"]
@@ -184,7 +190,8 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     nsps = p[NSPS]
     assert nsps["model"] == "P-NSPS-D" and nsps["category"] == "Equipment"
     assert nsps["aliases"] == ["NSPS", "7182A1711"]
-    assert codes(nsps) == [("U", 1, False), ("N", 1, False)]  # Ethernet → N off a station
+    # Ethernet → N off a station; a power supply needs its 120 V feed (D198)
+    assert codes(nsps) == [("U", 1, False), ("N", 1, False), ("120V", 1, True)]
     assert nsps["needs_neuron_id"] is True  # IP / subnet / gateway properties
     assert nsps["description"] == "Paradigm Network Station Power Supply"
     assert nsps["datasheet_url"].startswith("https://www.etcconnect.com/")
@@ -192,6 +199,7 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     ref = nsps["source_ref"]
     assert ref["kind"] == "davinci" and ref["type_id"] == NSPS and ref["mapped_to"] == "Equipment"
     assert ref["family"] == "Paradigm" and ref["category"] == "Controllers"
+    assert ref["power_supply"] == {"self": True, "accessories": []}
     assert {"protocol": "48vdc Auxiliary Power", "direction": "Bus", "count": 1} in ref["ports"]
 
     ebdk = p[EBDK]
@@ -215,13 +223,18 @@ def test_plan_categories_cables_and_neuron_ids(plan):
 
     erp = p[ERP24]
     assert erp["category"] == "Power Distribution" and erp["model"] == "ERP Feedthrough 24"
-    assert codes(erp) == [
-        ("N", 1, False),
-        ("X", 1, False),
-        ("X", 1, False),
-        ("P", 1, True),
-        ("120V", 24, True),
-    ]
+    # its 24 Power Output ports are load circuits, not cables; the panel's feed is by others
+    assert codes(erp) == [("N", 1, False), ("X", 1, False), ("X", 1, False), ("P", 1, True)]
+    assert "power_supply" not in erp["source_ref"]
+    # the ERn2 enclosure has no mapped port, but carries power-supply modules → a 120V feed
+    ern = p[ERN2]
+    assert codes(ern) == [("120V", 1, True)]
+    assert ern["source_ref"]["power_supply"] == {
+        "self": False,
+        "accessories": ["P-SPM-E", "ERn2-W-UPG"],
+    }
+    # NSPS, NSPS-KIT, ERn2 (by its modules), P-SPM-E and the upgrade kit; the ERP's 24 outputs
+    assert plan.stats["power_supplies"] == 5 and plan.stats["load_outputs"] == 24
     # protocols with no code: never a new code, listed for the vocab draft
     assert plan.unmapped_protocols["Contact"] == 4 and plan.unmapped_protocols["Sense"] == 2
     assert "EchoConnect" in plan.unmapped_protocols and "DMX" not in plan.unmapped_protocols
@@ -356,7 +369,7 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     assert nsps.model == "P-NSPS-D" and nsps.category == "Equipment"
     assert nsps.needs_neuron_id is True and nsps.accessory_only is None
     assert nsps.description == "Paradigm Network Station Power Supply"
-    assert [c["code"] for c in nsps.default_cables] == ["U", "N"]
+    assert [c["code"] for c in nsps.default_cables] == ["U", "N", "120V"]
     assert types[LVD].accessory_only is True and types[LVD].category is None
     assert types[ERN2].optional_accessories[4]["group"]["min"] == 2
     # the ops are in the app library's log, so every iPad pulls them

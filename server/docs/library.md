@@ -58,7 +58,8 @@ product classifications, document types), `propertyTypes` (names), `scripts` (na
 | `modelInformation.generatorData.items` — strings and `{propertyTypeId}` placeholders (colour, legend…) | `model` = the strings with the placeholders removed and trailing `-`, `/`, spaces stripped (`UH10002-{Heritage Color}` → `UH10002`, `P-TS7-E{…}` → `P-TS7-E`); empty → the display name. The raw pattern is kept in `source_ref.model_pattern`. |
 | `typeInformation.displayName`, `partInformation.generatorData.lookupData[]` (`modelNumber`, `partNumber`) | `aliases` = display name, distinct part numbers, the suffixed variants (`UH10002-1` … `UH10002-X`, `P-TS7-E-4`) — everything a BOM or master might call it (D183 (4) matches a device's Device text by model or alias). |
 | family / category → the mapping workbook | `category` (D196's eleven); an `Ignore` row, an override `Ignore`, or a family / category the sheet does not list → the type is left out (`stats.rows_not_in_mapping` names what a newer library added). |
-| `ports[]` protocol | `default_cables` rows: DMX → `X`, 0-10V → `0-10V`, Panic → `P`, LinkConnect → `U`, Fiber (short / long haul) → `F`, Power → `120V`; Ethernet → `NG` on `Touchscreen` and `Station` types, `N` elsewhere. One row per port for X / N / NG / U / F (`qty` 1); the single-row codes P / 0-10V / 120V collapse into one row with `qty` = port count (an EBDK: `P` × 3). `from` / `to` / `far` / `status` are left empty — the reviewer adds the From / To templates (D183); R2g reads `from` empty as the device's panel name. |
+| `ports[]` protocol | `default_cables` rows: DMX → `X`, 0-10V → `0-10V`, Panic → `P`, LinkConnect → `U`, Fiber (short / long haul) → `F`; Ethernet → `NG` on `Touchscreen` and `Station` types, `N` elsewhere. One row per port for X / N / NG / U / F (`qty` 1); P and 0-10V collapse into one row with `qty` = port count (an EBDK: `P` × 3). `from` / `to` / `far` / `status` are left empty — the reviewer adds the From / To templates (D183); R2g reads `from` empty as the device's panel name. |
+| `Power` ports by direction; **power supplies** (D198) | one `120V` feed row (single row) when the type has a Power **Input** or **Bus** port (`qty` = that count: an ECPB AC plate, a ColorSource relay, an ELTS), or **is a power supply**, or **carries one as an accessory** — every power supply needs a 120 V line in. DaVinci marks a supply by its `Power Supplies` category, a `PowerSupplyCurrentDraw` / `ParadigmPowerSupplyCurrentDraw` script, a `… Power Supply - Aux` capacity property (the NSPS, P-SPS-D, the DIN14 SPS kits) or "power supply" / "power module" in its name or description (not "no power supply"); the `Power Supply - Units` / `Enabled` properties sit on relay-panel hosts and are ignored. `source_ref.power_supply = {self, accessories[]}` says why (the ERn2 enclosure: its P-SPM-E module and upgrade kit; the NSPS: itself). A Power **Output** port is a load circuit, not a surveyed cable (`stats.load_outputs`; a relay panel's own feed is by others, as the master has it). |
 | any other protocol (Aux Power Input, 24 / 48 V aux, Sense, Contact, EBDK Switch, EchoConnect, USB, DALI, Serial, MIDI, SMPTE, Paradigm Portable, F-Drive…) | **never a code**: one `vocab(cable_code)` **draft** per protocol in the uploading project, for Landry to accept or reject as a decision (D197). The protocol and its port count stay on the type in `source_ref.ports`. |
 | `accessories[]` (`typeId`, `maxQuantity`, `userDefinable`) | `optional_accessories` rows `{model, expected_qty, max_quantity, group?}`: `expected_qty` = the slot max for a forced slot (`userDefinable = false`, e.g. the UH10002's faceplate, the ERn2's P-ACP-E Mk2) and the `SetMinAccessories` minimum where a type has one; else null. |
 | `scripts[]` `MaxAccessoryMonitor` (`rules[]: accessoryIds, minCount, maxCount, minValueMessage`) | each slot in a rule carries `group: {label, min, max}` — "one of these back boxes" (P-TS7-E: four boxes, min 1 max 1), "two ERn modules incl. the forced processor" (ERn2-W-120 Mk2: min 2 max 2). A group is an expectation across alternatives, which `expected_qty` cannot say; the D52 lint reads `expected_qty` only (the group lint is T113). |
@@ -85,10 +86,11 @@ type); nothing is merged or overwritten. Delete or rename the hand-made type and
 
 **Not written** (D197): From / To templates, far-end placeholders, the NSPS -KIT power-supply
 accessory (D52, the Library screen still offers it on NSPS types), `id_scheme` (the category
-default). Note that DaVinci models the NSPS's and the rack's mains feed as an enclosure property,
-not a Power port, so those types arrive with no `120V` row: add it when accepting the type, or
-leave the type a draft — R2d's category table stays in charge until an accepted type with default
-cables governs the device (D183 (2)).
+default). DaVinci has no Power port on the NSPS or the ERn enclosures (their mains is an
+enclosure property), so the `120V` row on those comes from the power-supply rule above (D198),
+not from a port. An equipment rack is not a DaVinci type at all (the racks are `Equipment
+Racks / Equipment Racks` shells with no ports): R2d's category table keeps giving racks their
+`120V` row until a type with default cables governs them (D183 (2)).
 
 ## Re-runs, accepted types, history
 
@@ -104,8 +106,9 @@ op each in the library log. A later run (a newer `library.json`, or a regrouped 
 - a new `typeId` → created; a type ETC removed → its row stays (nothing is deleted);
 - the `cable_code` drafts already in the uploading project are not written again.
 
-`stats`: `types_in_file`, `placeable`, `accessory_only`, `by_category`, `created`, `updated`,
-`unchanged`, `fields_set`, `kept_accepted`, `kept_rejected`, `clashes[]`, `renamed[]`,
+`stats`: `types_in_file`, `placeable`, `accessory_only`, `by_category`, `power_supplies`,
+`load_outputs`, `created`, `updated`, `unchanged`, `fields_set`, `kept_accepted`,
+`kept_rejected`, `clashes[]`, `renamed[]`,
 `aliases_dropped`, `rows_not_in_mapping[]`, `rows_unassigned[]`, `unmapped_protocols{}`,
 `vocab_drafts`, `library_timestamp`, `categories_file`, `categories_reused_from`, `ops`,
 `last_library_seq`.

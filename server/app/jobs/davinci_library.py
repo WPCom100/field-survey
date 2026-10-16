@@ -15,9 +15,13 @@ What a type gets (PLAN §2.2 `library_type`): `model` = the generated model numb
 `{property}` suffixes stripped; `aliases` = display name, part numbers and the suffixed variants
 of the part lookup; `category` from the mapping workbook (Categories tab "Our category", Types tab
 "Override"; `Ignore` rows are skipped); `default_cables` from the ports (DMX → X, 0-10V → 0-10V,
-Panic → P, LinkConnect → U, Fiber → F, Power → 120V, Ethernet → NG on Touchscreen and Station
-types else N; any other protocol becomes a `vocab(cable_code)` draft in the uploading project —
-never a new code); `optional_accessories` = the accessory slots with `max_quantity`, `expected_qty`
+Panic → P, LinkConnect → U, Fiber → F, Ethernet → NG on Touchscreen and Station types else N;
+a Power **input** → 120V, a Power output is a load circuit and no cable; any other protocol
+becomes a `vocab(cable_code)` draft in the uploading project — never a new code). A type that
+**is a power supply** (DaVinci's Power Supplies category, a PowerSupplyCurrentDraw script, a
+"Power Supply - Aux" property, or the name) or **carries one as an accessory** gets a `120V` feed
+row too (D198: every power supply needs a 120 V line in). `optional_accessories` = the
+accessory slots with `max_quantity`, `expected_qty`
 for forced (`userDefinable = false`) and `SetMinAccessories` slots, and the `MaxAccessoryMonitor`
 group each slot belongs to (`{label, min, max}`); `needs_neuron_id` = true when the type carries
 IP / subnet / gateway properties; `description`, the first datasheet URL and `source_ref`
@@ -76,9 +80,20 @@ CODE_BY_PROTOCOL: dict[str, str] = {
     "LinkConnect": "U",
     "Fiber (Short Haul)": "F",
     "Fiber (Long Haul)": "F",
-    "Power": "120V",
 }
 ETHERNET = "Ethernet"
+POWER = "Power"
+# A Power port that feeds the device (Input, or a Bus such as an ECPB's AC pass-through) is a
+# 120V feed; a Power Output is a load circuit, not a surveyed cable.
+POWER_FEED_DIRECTIONS = frozenset({"Input", "Bus"})
+# How DaVinci marks a power supply (D198): its category, the scripts that size one, the property
+# naming its aux capacity, or the name. "Power Supply - Units" / "Enabled" sit on hosts that may
+# take one and are not used.
+POWER_SUPPLY_CATEGORY = "Power Supplies"
+POWER_SUPPLY_SCRIPTS = frozenset({"PowerSupplyCurrentDraw", "ParadigmPowerSupplyCurrentDraw"})
+POWER_SUPPLY_PROPERTY = "Power Supply - Aux"
+POWER_SUPPLY_NAME = re.compile(r"power supply|power module", re.I)
+NOT_A_POWER_SUPPLY = re.compile(r"no power supply", re.I)
 # Ethernet is `NG` (network + ground) on these categories, `N` elsewhere.
 GROUND_CATEGORIES = frozenset({"Touchscreen", "Station"})
 SINGLE_ROW = frozenset({"P", "0-10V", "120V"})
@@ -159,6 +174,8 @@ class DType:
     groups: tuple[Group, ...]
     properties: tuple[str, ...]
     datasheet_url: str | None
+    is_power_supply: bool = False
+    """DaVinci marks it as a power supply (D198): it needs a 120 V feed, and so does its host."""
 
 
 @dataclass
@@ -275,10 +292,13 @@ def _read_type(
     )
     groups: list[Group] = []
     minimums: dict[str, int] = {}
+    script_names: set[str] = set()
     for s in raw.get("scripts") or []:
         if not isinstance(s, dict):
             continue
         name = lk["scripts"].get(str(s.get("scriptId")))
+        if name:
+            script_names.add(name)
         if name == MAX_ACCESSORY_MONITOR:
             for r in _rules(s.get("scriptData")):
                 if not r.get("accessoryIds"):
@@ -321,12 +341,21 @@ def _read_type(
     english = [u for n, u in datasheets if "english" in n.lower()]
     datasheet = english[0] if english else (datasheets[0][1] if datasheets else None)
     active = info.get("typeActive") or {}
+    description = str(info.get("description") or "").strip()
+    category = lk["categories"].get(str(info.get("categoryId")), "")
+    text = f"{display_name} {description}"
+    is_power_supply = (
+        category == POWER_SUPPLY_CATEGORY
+        or bool(script_names & POWER_SUPPLY_SCRIPTS)
+        or any(POWER_SUPPLY_PROPERTY in p for p in props)
+        or (bool(POWER_SUPPLY_NAME.search(text)) and not NOT_A_POWER_SUPPLY.search(text))
+    )
     return DType(
         type_id=str(raw["typeId"]),
         display_name=display_name,
-        description=str(info.get("description") or "").strip(),
+        description=description,
         family=lk["families"].get(str(info.get("familyId")), ""),
-        category=lk["categories"].get(str(info.get("categoryId")), ""),
+        category=category,
         classification=lk["classes"].get(str(info.get("productClassificationId")), ""),
         legacy=active.get("legacy") is True,
         model_pattern=pattern,
@@ -338,6 +367,7 @@ def _read_type(
         groups=tuple(groups),
         properties=props,
         datasheet_url=datasheet,
+        is_power_supply=is_power_supply,
     )
 
 
@@ -471,13 +501,34 @@ def _cable(code: str, single_row: bool, qty: int) -> dict[str, Any]:
     }
 
 
-def cables_of(t: DType, category: str | None) -> tuple[list[dict[str, Any]], list[str]]:
-    """The type's default cable rows from its ports, and the protocols with no code. One row per
-    port for X / N / NG / U / F; one row with `qty` = port count for the single-row codes."""
+@dataclass
+class Cables:
+    rows: list[dict[str, Any]]
+    unmapped: list[str]
+    """Port protocols with no cable code."""
+    power_supply: dict[str, Any] | None
+    """Why the type has a 120V feed: `{self, accessories[]}` (D198), or None."""
+    load_outputs: int
+    """Power Output ports (load circuits): no cable."""
+
+
+def cables_of(t: DType, category: str | None, supplies: list[str] | None = None) -> Cables:
+    """The type's default cable rows from its ports — one row per port for X / N / NG / U / F,
+    one row with `qty` = port count for P and 0-10V — plus one `120V` feed row when a Power
+    input port, the type itself being a power supply, or one of `supplies` (the models of its
+    power-supply accessories) asks for it (D198); `qty` = the input-port count, else 1."""
     rows: list[dict[str, Any]] = []
     single: dict[str, int] = {}
     unmapped: list[str] = []
+    feeds = 0
+    load_outputs = 0
     for p in t.ports:
+        if p.protocol == POWER:
+            if p.direction in POWER_FEED_DIRECTIONS:
+                feeds += 1
+            else:
+                load_outputs += 1
+            continue
         if p.protocol == ETHERNET:
             code: str | None = "NG" if category in GROUND_CATEGORIES else "N"
         else:
@@ -492,7 +543,12 @@ def cables_of(t: DType, category: str | None) -> tuple[list[dict[str, Any]], lis
         rows.append(_cable(code, False, 1))
     for code, n in single.items():
         rows.append(_cable(code, True, n))
-    return rows, unmapped
+    power_supply = None
+    if t.is_power_supply or supplies:
+        power_supply = {"self": t.is_power_supply, "accessories": list(supplies or [])}
+    if feeds or power_supply:
+        rows.append(_cable("120V", True, feeds or 1))
+    return Cables(rows, unmapped, power_supply, load_outputs)
 
 
 def accessories_of(t: DType, model_of: dict[str, str]) -> list[dict[str, Any]]:
@@ -627,28 +683,40 @@ def build_plan(
         aliases_of[tid] = aliases
 
     by_category: Counter[str] = Counter()
+    power_feeds = 0
+    load_outputs = 0
     for tid in model_of:
         t = lib.types[tid]
         is_accessory = tid not in kept
         category = accessory_only[tid] if is_accessory else kept[tid]
-        cables, unmapped = cables_of(t, category)
-        for u in unmapped:
+        supplies = [
+            model_of[s.type_id]
+            for s in t.slots
+            if s.type_id in model_of and lib.types[s.type_id].is_power_supply
+        ]
+        cables = cables_of(t, category, supplies)
+        for u in cables.unmapped:
             plan.unmapped_protocols[u] += 1
+        ref = source_ref_of(t, category or IGNORE, lib.timestamp, filename)
+        if cables.power_supply:
+            ref["power_supply"] = cables.power_supply
+            power_feeds += 1
+        load_outputs += cables.load_outputs
         payload: dict[str, Any] = {
             "model": model_of[tid],
             "aliases": aliases_of[tid] or None,
             "category": category,
-            "default_cables": cables or None,
+            "default_cables": cables.rows or None,
             "optional_accessories": accessories_of(t, model_of) or None,
             "needs_neuron_id": (
                 True if any(p.startswith(NEURON_PROPERTIES) for p in t.properties) else None
             ),
             "description": t.description or None,
             "datasheet_url": t.datasheet_url,
-            "source_ref": source_ref_of(t, category or IGNORE, lib.timestamp, filename),
+            "source_ref": ref,
             "accessory_only": True if is_accessory else None,
         }
-        plan.types.append(TypePlan(type_id=tid, payload=payload, unmapped=tuple(unmapped)))
+        plan.types.append(TypePlan(type_id=tid, payload=payload, unmapped=tuple(cables.unmapped)))
         if not is_accessory:
             by_category[category or "?"] += 1
     plan.stats = {
@@ -656,6 +724,8 @@ def build_plan(
         "placeable": len(kept),
         "accessory_only": len(accessory_only),
         "by_category": dict(sorted(by_category.items())),
+        "power_supplies": power_feeds,
+        "load_outputs": load_outputs,
         "renamed": renamed,
         "clashes": clashes,
         "aliases_dropped": dropped_aliases,
