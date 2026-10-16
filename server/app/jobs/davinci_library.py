@@ -16,9 +16,10 @@ What a type gets (PLAN §2.2 `library_type`): `model` = the generated model numb
 of the part lookup; `category` from the mapping workbook (Categories tab "Our category", Types tab
 "Override"; `Ignore` rows are skipped); `default_cables` from the ports (DMX → X, 0-10V → 0-10V,
 Panic → P, LinkConnect and EchoConnect → U, aux power → UV, Sense → 120V, DALI → D, Fiber → F,
-Ethernet → NG on Touchscreen and Station types else N (D199); a Power **input** → 120V, a Power
-output is a load circuit and no cable; any other protocol becomes a `vocab(cable_code)` draft in
-the uploading project — never a new code). A type that
+Ethernet → NG on Touchscreen and Station types else N, Paradigm Portable → N (D199, D200); a
+Power **input** → 120V, a Power output is a load circuit and no cable; the protocols Landry ruled
+**not surveyed** (contact closures, USB, serial, MIDI…) make no row; any protocol nobody has ruled
+on becomes a `vocab(cable_code)` draft in the uploading project — never a new code). A type that
 **is a power supply** (DaVinci's Power Supplies category, a PowerSupplyCurrentDraw script, a
 "Power Supply - Aux" property, or the name) or **carries one as an accessory** gets a `120V` feed
 row too (D198: every power supply needs a 120 V line in). `optional_accessories` = the
@@ -90,9 +91,42 @@ CODE_BY_PROTOCOL: dict[str, str] = {
     "48vdc Auxiliary Power": "UV",
     "Sense": "120V",
     "DALI": "D",
+    "Paradigm Portable": "N",
     "Fiber (Short Haul)": "F",
     "Fiber (Long Haul)": "F",
 }
+# Not surveyed (Landry, D200): no cable row, no vocab draft; the ports stay in `source_ref.ports`.
+NOT_SURVEYED: frozenset[str] = frozenset(
+    {
+        "Contact",
+        "EBDK Switch",
+        "USB",
+        "Serial",
+        "MIDI",
+        "SMPTE",
+        "LSH Control",
+        "SPS Connection",
+        "Control",
+        "Emergency",
+        "CANbus",
+        "CANbus (Connect)",
+        "CANbus (Report)",
+        "Multiverse",
+        "MeshConnect",
+        "Echoflex",
+        "Audio",
+        "F-Drive Connection (CC)",
+        "F-Drive Connection (CV)",
+        "F-Drive Connection (FTW)",
+        "F-Drive Connection (Chroma)",
+        "F-Drive Connection (ArcLamp)",
+        "F-Drive RX Connection (CC)",
+        "F-Drive RX Connection (CV)",
+        "F-Drive RX Connection (FTW)",
+        "F-Drive RX Power Supply",
+        "F-Drive R12 Power Supply",
+    }
+)
 ETHERNET = "Ethernet"
 POWER = "Power"
 # A Power port that feeds the device (Input, or a Bus such as an ECPB's AC pass-through) is a
@@ -499,6 +533,7 @@ class TypePlan:
 class Plan:
     types: list[TypePlan] = field(default_factory=list)
     unmapped_protocols: Counter[str] = field(default_factory=Counter)
+    not_surveyed_protocols: Counter[str] = field(default_factory=Counter)
     stats: dict[str, Any] = field(default_factory=dict)
 
 
@@ -518,11 +553,13 @@ def _cable(code: str, single_row: bool, qty: int) -> dict[str, Any]:
 class Cables:
     rows: list[dict[str, Any]]
     unmapped: list[str]
-    """Port protocols with no cable code."""
+    """Port protocols nobody has ruled on (no code, not in `NOT_SURVEYED`)."""
     power_supply: dict[str, Any] | None
     """Why the type has a 120V feed: `{self, accessories[]}` (D198), or None."""
     load_outputs: int
     """Power Output ports (load circuits): no cable."""
+    not_surveyed: list[str]
+    """Port protocols Landry ruled not surveyed (D200): no row."""
 
 
 def cables_of(t: DType, category: str | None, supplies: list[str] | None = None) -> Cables:
@@ -533,6 +570,7 @@ def cables_of(t: DType, category: str | None, supplies: list[str] | None = None)
     rows: list[dict[str, Any]] = []
     single: dict[str, int] = {}
     unmapped: list[str] = []
+    not_surveyed: list[str] = []
     feeds = 0
     load_outputs = 0
     for p in t.ports:
@@ -541,6 +579,10 @@ def cables_of(t: DType, category: str | None, supplies: list[str] | None = None)
                 feeds += 1
             else:
                 load_outputs += 1
+            continue
+        if p.protocol in NOT_SURVEYED:
+            if p.protocol not in not_surveyed:
+                not_surveyed.append(p.protocol)
             continue
         if p.protocol == ETHERNET:
             code: str | None = "NG" if category in GROUND_CATEGORIES else "N"
@@ -562,7 +604,7 @@ def cables_of(t: DType, category: str | None, supplies: list[str] | None = None)
         single["120V"] = max(single.get("120V", 0), feeds or 1)
     for code, n in single.items():
         rows.append(_cable(code, True, n))
-    return Cables(rows, unmapped, power_supply, load_outputs)
+    return Cables(rows, unmapped, power_supply, load_outputs, not_surveyed)
 
 
 def accessories_of(t: DType, model_of: dict[str, str]) -> list[dict[str, Any]]:
@@ -711,6 +753,8 @@ def build_plan(
         cables = cables_of(t, category, supplies)
         for u in cables.unmapped:
             plan.unmapped_protocols[u] += 1
+        for u in cables.not_surveyed:
+            plan.not_surveyed_protocols[u] += 1
         ref = source_ref_of(t, category or IGNORE, lib.timestamp, filename)
         if cables.power_supply:
             ref["power_supply"] = cables.power_supply
@@ -754,6 +798,7 @@ def build_plan(
         ),
         "rows_unassigned": [f"{f} / {c}" for f, c in mapping.unassigned],
         "unmapped_protocols": dict(plan.unmapped_protocols.most_common()),
+        "not_surveyed_protocols": dict(plan.not_surveyed_protocols.most_common()),
     }
     return plan
 

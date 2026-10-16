@@ -247,9 +247,11 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     }
     # NSPS, NSPS-KIT, ERn2 (by its modules), P-SPM-E and the upgrade kit; the ERP's 24 outputs
     assert plan.stats["power_supplies"] == 5 and plan.stats["load_outputs"] == 24
-    # protocols with no code: never a new code, listed for the vocab draft
-    assert plan.unmapped_protocols["Contact"] == 4 and "Sense" not in plan.unmapped_protocols
-    assert "EchoConnect" not in plan.unmapped_protocols and "DMX" not in plan.unmapped_protocols
+    # protocols Landry ruled not surveyed (D200): no row, no draft, counted
+    assert plan.not_surveyed_protocols["Contact"] == 4
+    assert plan.not_surveyed_protocols["EBDK Switch"] == 1
+    assert plan.unmapped_protocols == {}  # every protocol in the sample has a ruling
+    assert "Sense" not in plan.not_surveyed_protocols
 
 
 @needs_sample
@@ -316,6 +318,11 @@ def test_plan_with_overrides_and_reserved_models(sample):
         "Emergency Lighting Control / Emergency Bypass Detection Kit"
         in (plan.stats["rows_not_in_mapping"])
     )
+    # a protocol nobody has ruled on (a newer library) still becomes a draft candidate
+    kit = lib.types["1d37a7d1-f519-4710-8a37-46930085cff6"]  # the NSPS kit is kept here
+    kit.ports = (*kit.ports, dl.Port("Telepathy", "Bus", ""))
+    plan2 = dl.build_plan(lib, m)
+    assert plan2.unmapped_protocols == {"Telepathy": 1}
     # a hand-made type holds P-TS7-E: the DaVinci type is a clash, left out and reported
     assert TS7 not in p
     assert plan.stats["clashes"] == [{"type_id": TS7, "model": "P-TS7-E", "held_by": None}]
@@ -370,7 +377,7 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     assert batch.job_state == "done", batch.stats
     s = batch.stats
     assert s["created"] == 37 and s["updated"] == 0 and s["clashes"] == []
-    assert s["placeable"] == 8 and s["accessory_only"] == 29 and s["vocab_drafts"] == 2
+    assert s["placeable"] == 8 and s["accessory_only"] == 29 and s["vocab_drafts"] == 0
     assert s["library_timestamp"] == "2026-10-13T18:57:47.923Z"
     assert s["categories_file"] == "DaVinci_categories.xlsx" and s["categories_reused_from"] is None
     types = _app_types(session)
@@ -392,8 +399,8 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     vocab = session.scalars(
         select(Vocab).where(Vocab.project_id == pid, Vocab.list == "cable_code")
     ).all()
-    assert sorted(v.value for v in vocab) == ["Contact", "EBDK Switch"]
-    assert all(v.state == "draft" for v in vocab)
+    assert vocab == []  # Contact and EBDK Switch are not surveyed (D200): no draft
+    assert s["not_surveyed_protocols"] == {"Contact": 4, "EBDK Switch": 1}
     # the same pair of files again is skipped
     again = _run(session, store, factory, pid, sample, categories)
     assert again.job_state == "skipped" and again.stats["earlier_batch"] == str(batch.id)
@@ -436,7 +443,7 @@ def test_rerun_updates_drafts_by_type_id_and_leaves_accepted_types(
     assert s["created"] == 1 and s["kept_accepted"] == 1 and s["kept_rejected"] == 1
     # every draft's source_ref carries the new timestamp, so all 35 drafts are "updated"
     assert s["updated"] == 35 and s["unchanged"] == 0
-    assert s["vocab_drafts"] == 0  # the protocols are already drafts in the project
+    assert s["vocab_drafts"] == 0
     session.expire_all()
     types = _app_types(session)
     assert types[TS7].description == 'Paradigm 7" Wall-mount Touchscreen (Mk2)'
