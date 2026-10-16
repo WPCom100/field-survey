@@ -1615,10 +1615,18 @@ def apply_lines(
     lines the geometry found (its near end stands), and the lines it saw that were not listed —
     every one on a sheet with no text layer."""
     known = {ln.id: ln for ln in sheet.band_lines(band)}
-    for item in data.get("unlabelled_lines") or []:
+    for raw in data.get("unlabelled_lines") or []:
+        item = dict(raw)
+        if item.get("from_device") not in device_ids and item.get("to_device") in device_ids:
+            # written arrow-first (from the feed note to the device): the device is the near end
+            item["from_device"], item["to_device"] = item["to_device"], None
+            item["label"] = item.get("label") or item.get("from_label")
+            item["to_label"], item["from_label"] = item.get("from_label"), None
         lid = str(item.get("line_id") or "")
         frm = item.get("from_device")
         ln = known.get(lid)
+        if ln is None and frm not in device_ids:
+            continue  # a trunk passing through: asked about on the band whose device it leaves
         if ln is None:
             box = _grow(crop.to_pt(list(item.get("bbox") or [])), 4, 4)
             if any(o.from_device == frm and _overlaps(o.bbox, box) for o in known.values()):

@@ -237,6 +237,68 @@ def test_bubbles_and_rack_output_labels(analysed):
     assert "12, 11, 10, 09, 06, 04, 03, 02, 01, B1, B2" in prompt
 
 
+def test_model_lines_written_backwards_or_passing_through():
+    """T108 follow-up: a line the model writes arrow-first (from the feed note to the device)
+    gets the device as its near end; a trunk that touches no device on the band is not a line
+    there (it is asked about on the band whose device it leaves)."""
+    b = rx.Band(page=2, column=0, index=0, top=0.0, bottom=100.0, x0=0.0, x1=500.0)
+    panel = rx.Device(
+        id="new-1",
+        band=b,
+        category="Relay panel",
+        model="ERP24-FT-241P",
+        model_raw="ERP-FT-241P",
+        name="CT22LCPA",
+        qty=1,
+        qty_source="model",
+        accessories=[],
+        bbox=[10.0, 10.0, 60.0, 80.0],
+        label="CT22LCPA",
+        extraction="model",
+        confidence=0.85,
+    )
+    sheet = rx.Sheet(2, "002", 3000.0, 2000.0, False, [b], [panel], [], 0, 1)
+    crop = rx.Crop(b"", 1.0, 0.0, 0.0, 500, 100)
+    line = dict.fromkeys(("to_level_code", "label", "note"))
+    data = {
+        "unlabelled_lines": [
+            {
+                **line,
+                "line_id": "new-l1",
+                "bbox": [20, 90, 10, 10],
+                "from_device": None,
+                "from_label": "(24) 20A. 120V. FEED CIRCUITS",
+                "to_device": "new-1",
+                "to_label": None,
+                "code_guess": "120V",
+                "confidence": 0.95,
+            },
+            {
+                **line,
+                "line_id": "new-l2",
+                "bbox": [400, 0, 2, 100],
+                "from_device": None,
+                "from_label": "trunk from levels below",
+                "to_device": None,
+                "to_label": "Relay panel",
+                "to_level_code": "23",
+                "code_guess": "X",
+                "confidence": 0.6,
+            },
+        ]
+    }
+    rx.apply_answer(sheet, b, crop, data)
+    assert [ln.id for ln in sheet.lines] == ["new-l1"]  # the pass-through is dropped
+    ln = sheet.lines[0]
+    assert (ln.from_device, ln.from_label, ln.to_device) == ("new-1", None, None)
+    assert ln.to_label == ln.label == "(24) 20A. 120V. FEED CIRCUITS"
+    assert ln.guess == "120V" and ln.guess_confidence == rx.MODEL_CONFIDENCE_CAP
+    res = rx.build(rx.Riser([sheet]), tower_target())
+    (c,) = res.cables
+    assert "endpoint:unresolved" not in c.conflicts and c.from_label == "CT22LCPA"
+    assert any(x["side"] == "from" for x in c.candidates)
+
+
 def test_far_end_labels_resolve_to_placeholders_and_levels():
     t = tower_target(placeholders={"B3A Canyon": uuid7(), "Spare DMX out": uuid7()})
     b = rx._Build(rx.Riser([]), t)
@@ -744,6 +806,8 @@ def test_riser_job_with_claude_endpoints(session, store, factory):
     assert all(
         "code:unknown" in c.conflicts and c.source_ref["kind"] == "riser_line" for c in unknown
     )
+    # every line leaves a device on its own band: none passes through, none is written backwards
+    assert all(any(x["side"] == "from" for x in c.candidates or []) for c in unknown)
     assert (
         sheet2["unlabelled_lines"] >= 20
         and sum(1 for c in unknown if c.source_ref["sheet"] == "002") == sheet2["unlabelled_lines"]
@@ -907,5 +971,5 @@ def test_claude_cost_and_recording(tmp_path):
     assert json.loads((tmp_path / "rec.json").read_text())[key]["data"] == {"ok": True}
 
 
-TOWER_UNKNOWN_CODE = 223
+TOWER_UNKNOWN_CODE = 221
 """Lines with no bubble on the Tower's riser, both sheets, with the recorded answers (T108)."""

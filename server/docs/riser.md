@@ -108,9 +108,13 @@ USD and request id. The Tower's two sheets: 26 calls, ≈ 210 K input tokens (th
 cached), ≈ 113 K output tokens (thinking included), **≈ $3.10 per run** at effort high (T108's
 re-recording, 2026-10-16; ≈ $2.00 before the lines with no bubble were asked about — 244 line
 answers added ≈ 48 K output tokens) — above the Phase 1f estimate ($0.45) because the estimate
-had no thinking tokens and one image per band. With the recording: 223 lines with no bubble on
-the Tower (sheet 001: 99 by geometry + 6 the model added; sheet 002: 118 by the model), guessed
-120V 140, 0-10V 37, U 17, N 3, X 3, none 23. Effort `medium` would roughly halve it; the overview image is a fifth of the input.
+had no thinking tokens and one image per band. With the recording: 221 lines with no bubble on
+the Tower (sheet 001: 99 by geometry + 6 the model added; sheet 002: 116 by the model), guessed
+120V 140, 0-10V 37, U 16, N 3, X 2, none 23 — about 135 of them load, feed-circuit and sense-feed
+arrows "by others" that the reviewer rejects (kept, D192). Reading the model's lines
+(`apply_lines`): a line written arrow-first (from the note to the device) is turned round so the
+device is its near end, and a trunk that touches no device on the band is dropped there (it is
+asked about on the band whose device it leaves). Effort `medium` would roughly halve it; the overview image is a fifth of the input.
 
 ## What the job writes
 
