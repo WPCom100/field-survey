@@ -190,8 +190,8 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     nsps = p[NSPS]
     assert nsps["model"] == "P-NSPS-D" and nsps["category"] == "Equipment"
     assert nsps["aliases"] == ["NSPS", "7182A1711"]
-    # Ethernet → N off a station; a power supply needs its 120 V feed (D198)
-    assert codes(nsps) == [("U", 1, False), ("N", 1, False), ("120V", 1, True)]
+    # Ethernet → N off a station; 48 V aux → UV (D199); a power supply needs its 120 V feed (D198)
+    assert codes(nsps) == [("U", 1, False), ("N", 1, False), ("UV", 1, False), ("120V", 1, True)]
     assert nsps["needs_neuron_id"] is True  # IP / subnet / gateway properties
     assert nsps["description"] == "Paradigm Network Station Power Supply"
     assert nsps["datasheet_url"].startswith("https://www.etcconnect.com/")
@@ -204,11 +204,13 @@ def test_plan_categories_cables_and_neuron_ids(plan):
 
     ebdk = p[EBDK]
     assert ebdk["category"] == "Emergency Equipment" and ebdk["aliases"] == ["7180A1200"]
-    assert codes(ebdk) == [("P", 3, True)]  # three panic buses, one single row
+    # three panic buses in one row; the Sense wire is 120V (D199)
+    assert codes(ebdk) == [("120V", 1, True), ("P", 3, True)]
     assert ebdk["needs_neuron_id"] is None
 
     uhci = p[UHCI]
-    assert uhci["category"] == "Sensor" and codes(uhci) == [("U", 1, False)]
+    # Unison bus, aux power in → UV (D199)
+    assert uhci["category"] == "Sensor" and codes(uhci) == [("U", 1, False), ("UV", 1, False)]
     assert uhci["aliases"] == ["Wall-Mount Contact Interface", "7181A1022"]
 
     ts7 = p[TS7]
@@ -223,8 +225,18 @@ def test_plan_categories_cables_and_neuron_ids(plan):
 
     erp = p[ERP24]
     assert erp["category"] == "Power Distribution" and erp["model"] == "ERP Feedthrough 24"
-    # its 24 Power Output ports are load circuits, not cables; the panel's feed is by others
-    assert codes(erp) == [("N", 1, False), ("X", 1, False), ("X", 1, False), ("P", 1, True)]
+    # its 24 Power Output ports are load circuits, not cables; the panel's feed is by others;
+    # EchoConnect is a Unison-style bus → U (D199)
+    assert codes(erp) == [
+        ("N", 1, False),
+        ("X", 1, False),
+        ("X", 1, False),
+        ("U", 1, False),
+        ("P", 1, True),
+    ]
+    # the DALI option kit: 24 loops as one D row (D199)
+    dali = next(t for t in plan.types if t.payload["model"] == "ERP-FT-DALI")
+    assert codes(dali.payload) == [("D", 24, True)]
     assert "power_supply" not in erp["source_ref"]
     # the ERn2 enclosure has no mapped port, but carries power-supply modules → a 120V feed
     ern = p[ERN2]
@@ -236,8 +248,8 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     # NSPS, NSPS-KIT, ERn2 (by its modules), P-SPM-E and the upgrade kit; the ERP's 24 outputs
     assert plan.stats["power_supplies"] == 5 and plan.stats["load_outputs"] == 24
     # protocols with no code: never a new code, listed for the vocab draft
-    assert plan.unmapped_protocols["Contact"] == 4 and plan.unmapped_protocols["Sense"] == 2
-    assert "EchoConnect" in plan.unmapped_protocols and "DMX" not in plan.unmapped_protocols
+    assert plan.unmapped_protocols["Contact"] == 4 and "Sense" not in plan.unmapped_protocols
+    assert "EchoConnect" not in plan.unmapped_protocols and "DMX" not in plan.unmapped_protocols
 
 
 @needs_sample
@@ -358,7 +370,7 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     assert batch.job_state == "done", batch.stats
     s = batch.stats
     assert s["created"] == 37 and s["updated"] == 0 and s["clashes"] == []
-    assert s["placeable"] == 8 and s["accessory_only"] == 29 and s["vocab_drafts"] == 8
+    assert s["placeable"] == 8 and s["accessory_only"] == 29 and s["vocab_drafts"] == 2
     assert s["library_timestamp"] == "2026-10-13T18:57:47.923Z"
     assert s["categories_file"] == "DaVinci_categories.xlsx" and s["categories_reused_from"] is None
     types = _app_types(session)
@@ -369,7 +381,7 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     assert nsps.model == "P-NSPS-D" and nsps.category == "Equipment"
     assert nsps.needs_neuron_id is True and nsps.accessory_only is None
     assert nsps.description == "Paradigm Network Station Power Supply"
-    assert [c["code"] for c in nsps.default_cables] == ["U", "N", "120V"]
+    assert [c["code"] for c in nsps.default_cables] == ["U", "N", "UV", "120V"]
     assert types[LVD].accessory_only is True and types[LVD].category is None
     assert types[ERN2].optional_accessories[4]["group"]["min"] == 2
     # the ops are in the app library's log, so every iPad pulls them
@@ -380,16 +392,7 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     vocab = session.scalars(
         select(Vocab).where(Vocab.project_id == pid, Vocab.list == "cable_code")
     ).all()
-    assert sorted(v.value for v in vocab) == [
-        "24vdc Auxiliary Power",
-        "48vdc Auxiliary Power",
-        "Aux Power Input",
-        "Contact",
-        "DALI",
-        "EBDK Switch",
-        "EchoConnect",
-        "Sense",
-    ]
+    assert sorted(v.value for v in vocab) == ["Contact", "EBDK Switch"]
     assert all(v.state == "draft" for v in vocab)
     # the same pair of files again is skipped
     again = _run(session, store, factory, pid, sample, categories)
@@ -470,6 +473,53 @@ def test_a_hand_made_model_is_a_clash_never_overwritten(
     session.expire_all()
     assert session.get(LibraryType, hand.id).model == "p-nsps-d"
     assert NSPS not in _app_types(session)
+
+
+@needs_sample
+@needs_categories
+def test_retire_hand_made_types_soft_deletes_them_first(
+    session, store, factory, sample, categories
+):
+    """D199: with `retire_hand_made` the hand-made app-library types are soft-deleted (history
+    keeps them), so the catalogue's types take their place; project copies stay."""
+    pid = _project(session)
+    hand = LibraryType(
+        id=uuid7(), project_id=None, model="P-NSPS-D", category="NSPS", state="accepted"
+    )
+    other = LibraryType(id=uuid7(), project_id=None, model="Hand-made", state="draft")
+    copy = LibraryType(
+        id=uuid7(), project_id=pid, model="P-NSPS-D", category="NSPS", state="accepted"
+    )
+    session.add_all([hand, other, copy])
+    session.commit()
+    batch = dl.create_davinci_batch(
+        session,
+        store,
+        project_id=pid,
+        library=("library.json", sample),
+        categories=("DaVinci_categories.xlsx", categories),
+        user=upsert_user(session, "Landry"),
+        retire_hand_made=True,
+    )
+    assert batch.files[0]["retire_hand_made"] is True
+    state = runner.run_batch(factory, store, batch.id, job=dl.import_davinci)
+    session.expire_all()
+    batch = session.get(ImportBatch, batch.id)
+    assert state == batch.job_state == "done", batch.stats
+    assert sorted(batch.stats["retired"]) == ["Hand-made", "P-NSPS-D"]
+    assert batch.stats["created"] == 37 and batch.stats["clashes"] == []
+    assert session.get(LibraryType, hand.id).deleted_at is not None
+    assert session.get(LibraryType, other.id).deleted_at is not None
+    assert session.get(LibraryType, copy.id).deleted_at is None  # the project's copy stays
+    assert _app_types(session)[NSPS].model == "P-NSPS-D"
+    deletes = session.scalars(
+        select(Op).where(Op.entity_kind == "library_type", Op.kind == "delete")
+    ).all()
+    assert len(deletes) == 2 and all(o.project_id is None for o in deletes)
+    assert all(o.reason == "Replaced by the DaVinci library import" for o in deletes)
+    # a second run with the flag retires nothing more (only DaVinci types are left)
+    again = _run(session, store, factory, pid, sample, categories)
+    assert again.job_state == "skipped"
 
 
 @needs_sample

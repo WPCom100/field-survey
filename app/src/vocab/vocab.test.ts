@@ -24,7 +24,7 @@ describe('vocabulary editor (T40)', () => {
     expect(v.category.map((e) => e.value).sort()).toEqual([...SEED_VOCAB.category.filter((c) => c !== 'Sensor'), 'sensor'].sort());
     expect(v.device_note.map((e) => e.value)).toContain('Empty box on wall.');
     expect(v.device_note.every((e) => !e.draft)).toBe(true);
-    expect(v.cable_code.map((e) => e.value)).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V']); // T111: the codes, as a list
+    expect(v.cable_code.map((e) => e.value)).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D']); // T111 / D199: the codes, as a list
     expect(await loadStandard(editor, store)).toEqual({ values: 0, placeholders: 0 });
     const ph = await loadPlaceholders(store, projectId);
     expect(ph.find((p) => p.label === 'Stations & Sensors')!.kind).toBe('station_bus');

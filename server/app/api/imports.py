@@ -38,13 +38,15 @@ async def create_import(
     level_id: Annotated[uuid.UUID | None, Form()] = None,
     sheet_kind: Annotated[str | None, Form()] = None,
     categories: Annotated[UploadFile | None, File()] = None,
+    retire_hand_made: Annotated[bool, Form()] = False,
 ) -> dict[str, Any]:
     """Queue a seed import of the uploaded workbook — or, with `kind=plans`, a plan sheet PDF for
     `level_id` as its `sheet_kind` (`display` | `source`, T45) — or, with `kind=bom`, a BOM PDF
     for extraction into device drafts (T42) — or, with `kind=riser`, the riser PDF for device
     and cable drafts with Claude-read endpoints (T43) — or, with `kind=davinci`, DaVinci's
     `library.json` (plus the category mapping workbook as `categories`, else the last one
-    uploaded) for app-library device-type drafts (T111). 202 with the batch; poll it by id."""
+    uploaded; `retire_hand_made` soft-deletes the hand-made app-library types first, D199) for
+    app-library device-type drafts (T111). 202 with the batch; poll it by id."""
     data = await file.read()
     if len(data) > settings.blob_max_bytes:
         raise HTTPException(413, {"error": "too_large", "max": settings.blob_max_bytes})
@@ -63,6 +65,7 @@ async def create_import(
                 library=(file.filename or "library.json", data),
                 categories=mapping_file,
                 user=user,
+                retire_hand_made=retire_hand_made,
             )
         except runner.ImportError_ as e:
             session.rollback()

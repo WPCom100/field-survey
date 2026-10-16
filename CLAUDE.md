@@ -45,7 +45,7 @@ These are the master workbook's values. Use them byte-for-byte in enums, pickers
 | Connection Status | the five above + `Not started` |
 | Device with no status yet | stored empty; shown and exported as `Unsurveyed` (D110) |
 | Device Category | `Relay panel` · `Foundry panel` · `EBDK` · `Equipment rack` · `NSPS` · `Touchscreen` · `Station` · `Sensor` |
-| Cable code | `X` (DMX) · `N` (network) · `NG` (network + ground) · `U` (Unison) · `F` (fiber) · `P` (panic) · `UV` (UHCI-WM partition sensor) · `0-10V` · `120V` |
+| Cable code | `X` (DMX) · `N` (network) · `NG` (network + ground) · `U` (Unison; EchoConnect too, D199) · `F` (fiber) · `P` (panic) · `UV` (UHCI-WM partition sensor; aux power, D199) · `0-10V` · `120V` (feeds and Sense wires) · `D` (DALI, D199) |
 | Punch Type | `Missing part` · `Cable not run` · `Termination` · `Wiring` · `Not installed` · `Replace Part` · `Missed Survey` · `Information` · `Access` |
 | Owner | `EC` · `ETC` · `EC/ETC` (never `ETC/EC`) |
 | Tracking status | `Open` · `In progress` · `Closed` |

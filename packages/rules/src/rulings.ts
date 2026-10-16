@@ -111,7 +111,7 @@ export interface RulingField {
   phrases?: boolean;
 }
 
-const CABLE_CODES = ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V'] as const;
+const CABLE_CODES = ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D'] as const;
 const CATEGORIES = ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor'] as const;
 
 const text = (field: string, label: string, extra: Partial<RulingField> = {}): RulingField => ({ field, label, type: 'text', settable: true, ...extra });

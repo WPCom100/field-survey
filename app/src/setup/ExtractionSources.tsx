@@ -7,7 +7,7 @@ import { extractionLine, listImports, startExtraction, type Batch, type Extracti
 import { useIdentity } from '../identity/IdentityGate';
 import { getImport, isFinished, type FilePart } from './imports';
 import { nativeUploadPart } from './upload-native';
-import { Btn, Notice, Section } from './widgets';
+import { Btn, Check, Notice, Section } from './widgets';
 
 const PDF = 'application/pdf';
 const JSON_MIME = 'application/json';
@@ -42,6 +42,7 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
   const [batches, setBatches] = useState<Batch[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retire, setRetire] = useState(false);
   const live = useRef(true);
   useEffect(() => {
     live.current = true;
@@ -102,7 +103,7 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
     }
     setBusy(`Uploading ${library.name}${categories ? ` and ${categories.name}` : ''}…`);
     try {
-      const b = await startExtraction(identity, projectId, 'davinci', nativeUploadPart(library), categories ? { categories: nativeUploadPart(categories) } : {});
+      const b = await startExtraction(identity, projectId, 'davinci', nativeUploadPart(library), { categories: categories ? nativeUploadPart(categories) : undefined, retireHandMade: retire });
       if (live.current) setBatches((list) => [b, ...(list ?? []).filter((x) => x.id !== b.id)]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -143,6 +144,7 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
         </View>
         <Btn title={davinci ? 'Upload again…' : 'Choose files…'} small disabled={busy !== null} onPress={() => void pickDavinci().catch((e: unknown) => setError(String(e)))} />
       </View>
+      <Check label="Retire the hand-made app-library types first (they are kept in History; project copies stay) — D199" value={retire} onChange={setRetire} />
       {busy ? <Text style={styles.hint}>{busy}</Text> : null}
       <Notice text={error} error />
       {(batches ?? []).some((b) => b.job_state === 'done' && b.kind !== 'davinci') ? (

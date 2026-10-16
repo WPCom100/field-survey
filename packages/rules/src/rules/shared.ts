@@ -19,6 +19,8 @@ export const SIGNAL: Readonly<Record<string, string>> = {
   UV: 'UHCI-WM partition sensor',
   '0-10V': '0-10V',
   '120V': '120V',
+  // D199 (T111): DALI loops, from the DaVinci library's DALI ports
+  D: 'DALI',
 };
 
 export const NEURON_ITEM = 'Missing all Device Neuron IDs';

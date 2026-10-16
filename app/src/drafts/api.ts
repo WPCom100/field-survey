@@ -27,9 +27,16 @@ export const listImports = (identity: Identity, projectId: string): Promise<Batc
  * Upload a BOM or riser PDF for extraction, or DaVinci's `library.json` (with the category mapping
  * workbook as `categories` the first time, T111); the drafts arrive with the next sync.
  */
-export async function startExtraction(identity: Identity, projectId: string, kind: ExtractionKind, file: UploadPart, more: { categories?: UploadPart } = {}): Promise<Batch> {
+export async function startExtraction(
+  identity: Identity,
+  projectId: string,
+  kind: ExtractionKind,
+  file: UploadPart,
+  more: { categories?: UploadPart; retireHandMade?: boolean } = {},
+): Promise<Batch> {
   const c = client(identity, kind === 'davinci' ? 300_000 : 120_000);
-  const res = await c.send('POST', '/imports', { headers: c.headers(), body: uploadForm(file, { project_id: projectId, kind }, undefined, more) });
+  const fields = { project_id: projectId, kind, retire_hand_made: more.retireHandMade ? 'true' : undefined };
+  const res = await c.send('POST', '/imports', { headers: c.headers(), body: uploadForm(file, fields, undefined, { categories: more.categories }) });
   return (await res.json()) as Batch;
 }
 
@@ -84,12 +91,14 @@ export function promotedKeys(drafts: readonly { importBatchId: string | null; so
 
 function davinciLine(s: Record<string, unknown>, n: (k: string) => number | null): string {
   const clashes = Array.isArray(s.clashes) ? s.clashes.length : 0;
+  const retired = Array.isArray(s.retired) ? s.retired.length : 0;
   const kept = (n('kept_accepted') ?? 0) + (n('kept_rejected') ?? 0);
   const parts = [
     `Done: ${n('created') ?? 0} new drafts, ${n('updated') ?? 0} updated, ${n('unchanged') ?? 0} unchanged (${n('placeable') ?? '?'} device types, ${n('accessory_only') ?? 0} accessories)`,
     `${n('vocab_drafts') ?? 0} protocol drafts`,
   ];
   if (kept) parts.push(`${kept} accepted or rejected left alone`);
+  if (retired) parts.push(`${retired} hand-made type${retired === 1 ? '' : 's'} retired`);
   if (clashes) parts.push(`${clashes} model clash${clashes === 1 ? '' : 'es'}`);
   return parts.join(', ');
 }

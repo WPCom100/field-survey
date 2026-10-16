@@ -15,9 +15,10 @@ What a type gets (PLAN §2.2 `library_type`): `model` = the generated model numb
 `{property}` suffixes stripped; `aliases` = display name, part numbers and the suffixed variants
 of the part lookup; `category` from the mapping workbook (Categories tab "Our category", Types tab
 "Override"; `Ignore` rows are skipped); `default_cables` from the ports (DMX → X, 0-10V → 0-10V,
-Panic → P, LinkConnect → U, Fiber → F, Ethernet → NG on Touchscreen and Station types else N;
-a Power **input** → 120V, a Power output is a load circuit and no cable; any other protocol
-becomes a `vocab(cable_code)` draft in the uploading project — never a new code). A type that
+Panic → P, LinkConnect and EchoConnect → U, aux power → UV, Sense → 120V, DALI → D, Fiber → F,
+Ethernet → NG on Touchscreen and Station types else N (D199); a Power **input** → 120V, a Power
+output is a load circuit and no cable; any other protocol becomes a `vocab(cable_code)` draft in
+the uploading project — never a new code). A type that
 **is a power supply** (DaVinci's Power Supplies category, a PowerSupplyCurrentDraw script, a
 "Power Supply - Aux" property, or the name) or **carries one as an accessory** gets a `120V` feed
 row too (D198: every power supply needs a 120 V line in). `optional_accessories` = the
@@ -31,8 +32,11 @@ far-end placeholders and the NSPS -KIT power-supply expectation (D52) are not wr
 reviewer adds them.
 
 Re-running on a newer file updates **draft** rows by DaVinci `typeId` (field by field, as `set`
-ops with history) and never touches an accepted or rejected type. The same pair of files is not
-imported twice (`skipped`). Everything is one transaction through the ordinary apply loop.
+ops with history) and never touches an accepted or rejected type. With `retire_hand_made` the
+run first soft-deletes every app-library type that has no `source_ref` (hand-made, any state) —
+Landry's ruling once the catalogue covers them (D199); the project copies of those types stay.
+The same pair of files is not imported twice (`skipped`). Everything is one transaction through
+the ordinary apply loop.
 """
 
 from __future__ import annotations
@@ -69,15 +73,23 @@ XLSX_MIME = runner.XLSX_MIME
 CHANGE_TYPE = "Master edit"
 REASON = "DaVinci library import"
 IMPORT_USER_NAME = "davinci"
+RETIRE_REASON = "Replaced by the DaVinci library import"
 IGNORE = "Ignore"
 CABLE_CODE_LIST = "cable_code"
 
-# Port protocol (DaVinci `constants.portProtocols[].text`) → cable code (CLAUDE.md §3).
+# Port protocol (DaVinci `constants.portProtocols[].text`) → cable code (CLAUDE.md §3; the
+# EchoConnect, aux power, Sense and DALI rows are Landry's, D199).
 CODE_BY_PROTOCOL: dict[str, str] = {
     "DMX": "X",
     "0-10V": "0-10V",
     "Panic": "P",
     "LinkConnect": "U",
+    "EchoConnect": "U",
+    "Aux Power Input": "UV",
+    "24vdc Auxiliary Power": "UV",
+    "48vdc Auxiliary Power": "UV",
+    "Sense": "120V",
+    "DALI": "D",
     "Fiber (Short Haul)": "F",
     "Fiber (Long Haul)": "F",
 }
@@ -96,7 +108,8 @@ POWER_SUPPLY_NAME = re.compile(r"power supply|power module", re.I)
 NOT_A_POWER_SUPPLY = re.compile(r"no power supply", re.I)
 # Ethernet is `NG` (network + ground) on these categories, `N` elsewhere.
 GROUND_CATEGORIES = frozenset({"Touchscreen", "Station"})
-SINGLE_ROW = frozenset({"P", "0-10V", "120V"})
+# One row per device with `qty` = port count: P and 0-10V (CLAUDE.md §3) and DALI loops (as 0-10V).
+SINGLE_ROW = frozenset({"P", "0-10V", "120V", "D"})
 # A type with any of these properties is addressed on the network: it carries a Neuron ID.
 NEURON_PROPERTIES = ("IP Address", "Subnet Mask", "Gateway Address")
 DATASHEET = "Datasheet"
@@ -541,13 +554,14 @@ def cables_of(t: DType, category: str | None, supplies: list[str] | None = None)
             single[code] = single.get(code, 0) + 1
             continue
         rows.append(_cable(code, False, 1))
-    for code, n in single.items():
-        rows.append(_cable(code, True, n))
     power_supply = None
     if t.is_power_supply or supplies:
         power_supply = {"self": t.is_power_supply, "accessories": list(supplies or [])}
     if feeds or power_supply:
-        rows.append(_cable("120V", True, feeds or 1))
+        # one 120V row per device: the feed and a Sense wire (also 120V) share it
+        single["120V"] = max(single.get("120V", 0), feeds or 1)
+    for code, n in single.items():
+        rows.append(_cable(code, True, n))
     return Cables(rows, unmapped, power_supply, load_outputs)
 
 
@@ -782,10 +796,12 @@ def create_davinci_batch(
     library: tuple[str, bytes],
     categories: tuple[str, bytes] | None,
     user: User | None,
+    retire_hand_made: bool = False,
 ) -> ImportBatch:
     """Store the library (and the mapping workbook, else reuse the last uploaded one) and queue
     the job under `project_id` — the project whose Sources screen started it, which also takes
-    the `vocab(cable_code)` drafts. Commits. Raises `runner.ImportError_` on a bad request."""
+    the `vocab(cable_code)` drafts. `retire_hand_made` soft-deletes the app library's hand-made
+    types first (D199). Commits. Raises `runner.ImportError_` on a bad request."""
     if session.get(Project, project_id) is None:
         raise runner.ImportError_(f"unknown project {project_id}")
     lib_name, lib_data = library
@@ -794,6 +810,8 @@ def create_davinci_batch(
     read_library(lib_data, lib_name)  # the whole file, so a wrong upload fails now, not later
     batch_id = uuid7()
     entries = [_entry(batch_id, "library", lib_name or "library.json", lib_data)]
+    if retire_hand_made:
+        entries[0]["retire_hand_made"] = True
     if categories is not None:
         cat_name, cat_data = categories
         read_categories(cat_data, cat_name)
@@ -887,6 +905,10 @@ class _Ops:
             base_op_id=base,
         )
 
+    def delete(self, entity_kind: str, entity_id: uuid.UUID, base: uuid.UUID | None) -> None:
+        op = self._op(entity_kind=entity_kind, entity_id=entity_id, kind="delete", base_op_id=base)
+        op.reason = RETIRE_REASON
+
 
 def _head(session: Session, entity_id: uuid.UUID, field: str) -> uuid.UUID | None:
     return session.scalar(
@@ -948,6 +970,19 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
             LibraryType.project_id.is_(None), LibraryType.deleted_at.is_(None)
         )
     ).all()
+    requester = session.get(User, batch.created_by_id) if batch.created_by_id else None
+    actor = requester or system_user(session, IMPORT_USER_NAME)
+    ops = _Ops(LIBRARY_STREAM, actor.id)
+    retired: list[str] = []
+    if lib_entry.get("retire_hand_made"):
+        # D199: the catalogue covers the hand-made types; soft-delete them (history keeps them,
+        # a restore op brings one back) so they neither clash nor stay in the pickers
+        for row in existing:
+            if (row.source_ref or {}).get("kind") == DAVINCI_KIND:
+                continue
+            ops.delete("library_type", row.id, _head(session, row.id, "state"))
+            retired.append(row.model)
+        existing = [r for r in existing if (r.source_ref or {}).get("kind") == DAVINCI_KIND]
     by_type_id: dict[str, LibraryType] = {}
     reserved: dict[str, str | None] = {}
     for row in existing:
@@ -967,9 +1002,6 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
 
     plan = build_plan(lib, mapping, reserved=reserved, filename=lib_name)
 
-    requester = session.get(User, batch.created_by_id) if batch.created_by_id else None
-    actor = requester or system_user(session, IMPORT_USER_NAME)
-    ops = _Ops(LIBRARY_STREAM, actor.id)
     counts: Counter[str] = Counter()
     for tp in plan.types:
         row = by_type_id.get(tp.type_id)
@@ -1035,6 +1067,7 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
         "fields_set": counts["fields_set"],
         "kept_accepted": counts["kept_accepted"],
         "kept_rejected": counts["kept_rejected"],
+        "retired": retired,
         "vocab_drafts": len(vocab_ops.ops),
         "ops": len(ops.ops) + len(vocab_ops.ops),
         "last_library_seq": push.seq if push else None,
@@ -1082,6 +1115,11 @@ def main(argv: list[str] | None = None) -> int:
         help="path to DaVinci_categories.xlsx (else the last uploaded)",
     )
     parser.add_argument("--user", default=None, help="team name to record as the importer")
+    parser.add_argument(
+        "--retire-hand-made",
+        action="store_true",
+        help="soft-delete the app library's hand-made types first (D199)",
+    )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     with open(args.library, "rb") as f:
@@ -1101,6 +1139,7 @@ def main(argv: list[str] | None = None) -> int:
                 library=(_basename(args.library), lib_data),
                 categories=categories,
                 user=user,
+                retire_hand_made=args.retire_hand_made,
             )
         except runner.ImportError_ as e:
             print(f"error: {e}", file=sys.stderr)

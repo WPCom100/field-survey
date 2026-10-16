@@ -30,7 +30,7 @@ export const SEED_VOCAB: Readonly<Record<VocabListKey, readonly string[]>> = {
   part_note: ['Need to be ordered', 'Confirm whether on site', 'Confirm whether on site (provided in box)'],
   photo_caption: STANDARD_PHRASES,
   category: ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor'],
-  cable_code: ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V'],
+  cable_code: ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D'],
 };
 
 export type PlaceholderKind = (typeof vocab.PLACEHOLDER_KIND)[number];

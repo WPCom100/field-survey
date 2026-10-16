@@ -16,7 +16,7 @@ import type { PlanDevice } from './data';
 import { ownerMatches, statusKey, type PlanFilter } from './filters';
 
 /** Cable codes (CLAUDE.md §3). A search term equal to one matches the cable type exactly. */
-export const CABLE_CODES: readonly string[] = ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V'];
+export const CABLE_CODES: readonly string[] = ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D'];
 
 export type Tab = 'devices' | 'connections' | 'punch' | 'parts';
 export const TABS: readonly Tab[] = ['devices', 'connections', 'punch', 'parts'];
