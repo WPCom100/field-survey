@@ -1,9 +1,12 @@
 /**
- * The riser crop under the end editor in the cable view (T39, Phase 3 §5): the riser sheet named by
- * `cable.riser_ref{sheet, bbox}` (D180), opened in the plan's PDF viewer and focused on the bbox
- * (sheet coordinates, `plan/viewport.ts`). Pinch to look around; it never edits anything. Shows
- * why there is no crop when the cable has no riser reference (nothing writes one before T43) or the
- * sheet is not on this iPad, with a download button for the latter.
+ * The riser crop under the end editor in the cable view (T39, Phase 3 §5; T106). A cable made from
+ * a riser draft carries `riser_ref = {blob, file, page, bbox}` (D191): the riser PDF kept by its
+ * import batch, opened in the plan's PDF viewer on that page and focused on the bubble, which is
+ * outlined. The bbox is in the page's display frame (the riser is drawn on `/Rotate 270` pages), so
+ * it goes through `displayRectToPage` with the rotation the viewer reports. A ref accepted offline
+ * has no blob yet: it is found by file name from the project's imports (`GET /imports`). The PDF is
+ * fetched on demand by the blob queue like a sheet (⤓ Download). The `{sheet, bbox}` form (D180)
+ * still opens that sheet's blob, though nothing writes it. Pinch to look around; it never edits.
  */
 
 import type { BlobQueue, Store } from '@field-survey/core';
@@ -12,78 +15,118 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Pdf, { type PdfRef } from 'react-native-pdf';
 
 import { getBlobFiles } from '../blobs/queue';
-import { sheetRectToPage, type PdfViewport } from '../plan/viewport';
-import type { RiserRef } from './model';
+import { listImports, riserBlobFor } from '../drafts/api';
+import { useIdentity } from '../identity/IdentityGate';
+import { displayRectToPage, nativeFocusRect, pageRectToView, rotationOf, sheetRectToPage, type PdfViewport, type Rect } from '../plan/viewport';
+import { riserBlobOf, type RiserRef } from './model';
 
-const PAD = 0.15; // margin around the bbox, as a share of its size
+const PAD = 0.15; // margin around a sheet-form bbox, as a share of its size
+const RISER_PAD = 120; // points around a riser bubble: enough of the line to see where it goes (as the review crop)
 
-type Sheet = { blob: string | null; page: number; title: string | null };
+type Source = { blob: string | null; page: number; title: string | null };
 
-export function RiserCrop({ store, riser, blobs }: { store: Store; riser: RiserRef | null; blobs: Pick<BlobQueue, 'ensureLocal'> | null }) {
-  const [sheet, setSheet] = useState<Sheet | null | 'missing'>(null);
+const grow = (b: Rect, dx: number, dy: number): Rect => ({ x: b.x - dx, y: b.y - dy, width: b.width + 2 * dx, height: b.height + 2 * dy });
+
+export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; projectId: string | null; riser: RiserRef | null; blobs: Pick<BlobQueue, 'ensureLocal'> | null }) {
+  const identity = useIdentity();
+  const [source, setSource] = useState<Source | null | 'missing' | 'unresolved'>(null);
   const [tick, setTick] = useState(0);
   const [fetching, setFetching] = useState<'busy' | string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mark, setMark] = useState<Rect | null>(null);
   const pdfRef = useRef<PdfRef>(null);
   const focused = useRef(false);
 
   useEffect(() => {
     let live = true;
     focused.current = false;
-    setSheet(null);
+    setSource(null);
+    setMark(null);
+    setError(null);
+    setFetching(null);
     if (!riser) return;
-    store.get<Record<string, unknown>>('sheet', riser.sheetId).then(
-      (s) => live && setSheet(s ? { blob: typeof s.blob === 'string' ? s.blob : null, page: typeof s.page === 'number' ? s.page : 1, title: typeof s.title === 'string' ? s.title : null } : 'missing'),
-      (e: unknown) => live && setError(String(e)),
-    );
+    if (riser.kind === 'sheet') {
+      store.get<Record<string, unknown>>('sheet', riser.sheetId).then(
+        (s) => live && setSource(s ? { blob: typeof s.blob === 'string' ? s.blob : null, page: typeof s.page === 'number' ? s.page : 1, title: typeof s.title === 'string' ? s.title : null } : 'missing'),
+        (e: unknown) => live && setError(String(e)),
+      );
+    } else {
+      const title = `${riser.file ?? 'Riser'} p.${riser.page}`;
+      if (riser.blob) setSource({ blob: riser.blob, page: riser.page, title });
+      else if (!projectId) setSource('unresolved');
+      else
+        listImports(identity, projectId).then(
+          (batches) => {
+            if (!live) return;
+            const blob = riserBlobOf(riser, (file) => riserBlobFor(batches, file));
+            setSource(blob ? { blob, page: riser.page, title } : 'unresolved');
+          },
+          () => live && setSource('unresolved'),
+        );
+    }
     return () => {
       live = false;
     };
-  }, [store, riser]);
+  }, [store, riser, identity, projectId, tick]);
 
-  // `tick` re-reads the cache after "Download riser sheet".
+  // `tick` re-reads the cache after ⤓ Download (and retries an unresolved blob).
   const uri = useMemo(() => {
-    if (!sheet || sheet === 'missing' || !sheet.blob) return null;
+    if (!source || typeof source === 'string' || !source.blob) return null;
     const files = getBlobFiles();
-    const f = files.file(files.pathFor(sheet.blob, 'sheet'));
+    const f = files.file(files.pathFor(source.blob, 'sheet'));
     return f.exists ? f.uri : null;
-  }, [sheet, tick]);
+  }, [source, tick]);
 
   const download = useCallback(() => {
-    if (!blobs || !sheet || sheet === 'missing' || !sheet.blob) return;
+    if (!blobs || !source || typeof source === 'string' || !source.blob) return;
     setFetching('busy');
-    blobs.ensureLocal(sheet.blob, 'sheet').then(
+    blobs.ensureLocal(source.blob, 'sheet').then(
       (path) => {
-        setFetching(path ? null : 'Not downloaded: no connection to the server (or the sheet is not uploaded yet).');
+        setFetching(path ? null : 'Not downloaded: no connection to the server (or the riser is not uploaded yet).');
         setTick((n) => n + 1);
       },
       (e: unknown) => setFetching(`Not downloaded: ${String(e)}`),
     );
-  }, [blobs, sheet]);
+  }, [blobs, source]);
 
   const onViewport = useCallback(
     (vp: PdfViewport) => {
-      if (focused.current || !riser) return;
-      focused.current = true;
+      if (!riser || !source || typeof source === 'string') return;
+      if (vp.page !== source.page - 1) return; // the viewer reports page 1 before it turns to ours
+      const rotation = rotationOf(vp);
       const b = riser.bbox;
-      const p = sheetRectToPage(vp, { x: b.x - b.width * PAD, y: b.y - b.height * PAD, width: b.width * (1 + 2 * PAD), height: b.height * (1 + 2 * PAD) });
-      pdfRef.current?.focusRect(p.x, p.y, p.width, p.height, false);
+      const box = riser.kind === 'blob' ? displayRectToPage(vp, rotation, b) : sheetRectToPage(vp, b);
+      if (riser.kind === 'blob') setMark(pageRectToView(vp, box));
+      if (focused.current) return;
+      focused.current = true;
+      const around = riser.kind === 'blob' ? grow(box, RISER_PAD, RISER_PAD) : grow(box, box.width * PAD, box.height * PAD);
+      const f = nativeFocusRect(rotation, around);
+      pdfRef.current?.focusRect(f.x, f.y, f.width, f.height, false);
     },
-    [riser],
+    [riser, source],
   );
 
   let body: ReactNode;
-  if (!riser) body = <Text style={styles.muted}>No riser crop for this cable: the riser has not been extracted for it (riser extraction, T43).</Text>;
+  if (!riser) body = <Text style={styles.muted}>No riser crop for this cable: it was not made from a riser draft (Setup → Review drafts).</Text>;
   else if (error) body = <Text style={styles.error}>{error}</Text>;
-  else if (sheet === 'missing') body = <Text style={styles.muted}>The riser sheet this cable points to is not on this iPad.</Text>;
-  else if (!sheet) body = <Text style={styles.muted}>Loading…</Text>;
+  else if (source === 'missing') body = <Text style={styles.muted}>The riser sheet this cable points to is not on this iPad.</Text>;
+  else if (source === 'unresolved')
+    body = (
+      <View style={styles.gap}>
+        <Text style={styles.muted}>The riser PDF ({riser.kind === 'blob' ? (riser.file ?? 'no file name') : 'sheet'}) could not be found: the server is not reachable, or no riser upload of that name is in this project.</Text>
+        <Pressable style={styles.btn} onPress={() => setTick((n) => n + 1)}>
+          <Text style={styles.btnText}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  else if (!source) body = <Text style={styles.muted}>Loading…</Text>;
   else if (!uri)
     body = (
       <View style={styles.gap}>
-        <Text style={styles.muted}>Riser sheet not downloaded.</Text>
-        {blobs && sheet.blob ? (
+        <Text style={styles.muted}>Riser not downloaded.</Text>
+        {blobs && source.blob ? (
           <Pressable style={styles.btn} onPress={download} disabled={fetching === 'busy'}>
-            <Text style={styles.btnText}>{fetching === 'busy' ? 'Downloading…' : '⤓ Download riser sheet'}</Text>
+            <Text style={styles.btnText}>{fetching === 'busy' ? 'Downloading…' : '⤓ Download riser'}</Text>
           </Pressable>
         ) : null}
         {fetching && fetching !== 'busy' ? <Text style={styles.muted}>{fetching}</Text> : null}
@@ -96,7 +139,7 @@ export function RiserCrop({ store, riser, blobs }: { store: Store; riser: RiserR
           ref={pdfRef}
           style={styles.pdf}
           source={{ uri, cache: true }}
-          page={sheet.page}
+          page={source.page}
           fitPolicy={2}
           minScale={1}
           maxScale={32}
@@ -104,14 +147,15 @@ export function RiserCrop({ store, riser, blobs }: { store: Store; riser: RiserR
           enableAnnotationRendering={false}
           enableTextSelection={false}
           onViewportChanged={onViewport}
-          onError={(e) => setError(`The riser sheet could not be opened: ${String((e as Error)?.message ?? e)}`)}
+          onError={(e) => setError(`The riser could not be opened: ${String((e as Error)?.message ?? e)}`)}
         />
+        {mark ? <View pointerEvents="none" style={[styles.mark, { left: mark.x - 3, top: mark.y - 3, width: mark.width + 6, height: mark.height + 6 }]} /> : null}
       </View>
     );
 
   return (
     <View style={styles.section}>
-      <Text style={styles.title}>Riser crop{sheet && sheet !== 'missing' && sheet.title ? ` · ${sheet.title}` : ''}</Text>
+      <Text style={styles.title}>Riser crop{source && typeof source !== 'string' && source.title ? ` · ${source.title}` : ''}</Text>
       {body}
     </View>
   );
@@ -125,6 +169,7 @@ const styles = StyleSheet.create({
   gap: { gap: 6 },
   frame: { height: 220, borderRadius: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#c9ccd1' },
   pdf: { flex: 1, backgroundColor: '#f4f5f7' },
+  mark: { position: 'absolute', borderWidth: 2, borderColor: '#d32f2f', borderRadius: 2 },
   btn: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0', backgroundColor: '#fff' },
   btnText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
 });

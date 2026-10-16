@@ -163,3 +163,58 @@ export function inView(vp: PdfViewport, view: Size, p: Point, marginPx = 0): boo
   const v = apply(sheetToView(vp), p);
   return v.x >= marginPx && v.y >= marginPx && v.x <= view.width - marginPx && v.y <= view.height - marginPx;
 }
+
+export type Rotation = 0 | 90 | 180 | 270;
+
+/**
+ * The page's `/Rotate` (clockwise), read off the page → view map: PDFKit's convertPoint includes
+ * it, so a rotated page's view x follows page y (90: +, 270: −) and an upside-down one runs x back.
+ */
+export function rotationOf(m: Affine): Rotation {
+  if (Math.abs(m.c) > Math.abs(m.a)) return m.c > 0 ? 90 : 270;
+  return m.a < 0 ? 180 : 0;
+}
+
+/**
+ * A rect in the page's **display** frame (the CropBox as rendered with `/Rotate` applied:
+ * top-left origin, y down, points — what pdfium renders and the riser extraction measures, D191)
+ * → page rect (PDF user space, y up). With rotation 0 it equals `sheetRectToPage`.
+ */
+export function displayRectToPage(vp: PdfViewport, rotation: Rotation, r: Rect): Rect {
+  const { x: cx, y: cy, width: w, height: h } = vp.cropBox;
+  const toPage = (X: number, Y: number): Point => {
+    switch (rotation) {
+      case 90:
+        return { x: Y, y: X };
+      case 180:
+        return { x: w - X, y: Y };
+      case 270:
+        return { x: w - Y, y: h - X };
+      default:
+        return { x: X, y: h - Y };
+    }
+  };
+  const ps = [toPage(r.x, r.y), toPage(r.x + r.width, r.y + r.height)];
+  const x0 = Math.min(ps[0]!.x, ps[1]!.x);
+  const y0 = Math.min(ps[0]!.y, ps[1]!.y);
+  return { x: cx + x0, y: cy + y0, width: Math.abs(ps[1]!.x - ps[0]!.x), height: Math.abs(ps[1]!.y - ps[0]!.y) };
+}
+
+/**
+ * The page rect to hand the native focus command so it shows `page` on a rotated page too: the
+ * patch sizes the zoom from the rect's page width and height against the view's, which a quarter
+ * turn swaps, so the rect is swapped about its centre (same centre, the zoom the view needs).
+ */
+export function nativeFocusRect(rotation: Rotation, page: Rect): Rect {
+  if (rotation === 0 || rotation === 180) return page;
+  const mx = page.x + page.width / 2;
+  const my = page.y + page.height / 2;
+  return { x: mx - page.height / 2, y: my - page.width / 2, width: page.height, height: page.width };
+}
+
+/** A page rect's bounds in view points (the outline drawn over a focused region). */
+export function pageRectToView(m: Affine, r: Rect): Rect {
+  const a = apply(m, { x: r.x, y: r.y });
+  const b = apply(m, { x: r.x + r.width, y: r.y + r.height });
+  return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };
+}

@@ -170,8 +170,12 @@ granularity"); the two known quantity conflicts come out as `qty:bom≠riser` on
   Level 06`) and links the rack draft when the riser has it; a relay panel named only by level
   (`Relay panel`, level 02) is text until the reviewer picks (T44's endpoint pickers, D6).
 - `cable.riser_ref` names the riser blob, not a `sheet` row (D191): T44's Accept on a riser
-  cable draft writes `{blob, file, page, bbox, draft}` (D193 (5)); the cable view renders it
-  in T106.
+  cable draft writes `{blob, file, page, bbox, draft}` (D193 (5)); the cable view's riser crop
+  opens that blob (`GET /blobs/{sha}/content`, cached like a sheet) on its page, focused on the
+  box (T106).
+- Every riser `bbox` is in points, top-left origin, **of the page as displayed** — `/Rotate`
+  applied, as pdfium and pdfplumber report it (the Tower riser's pages are `/Rotate 270`,
+  3168 × 2448). The iPad maps it to PDF user space with the rotation its viewer reports (D195).
 
 ## Review on the iPad (T44)
 

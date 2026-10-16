@@ -351,6 +351,20 @@ Decision D193 (Proposed): Accept on a device draft only marks it reviewed; its d
 
 Decision D194 (Proposed): a line with no bubble is found by the geometry on text sheets (touching a device's outline, reaching out of it, no bubble) and by the model on sheet 002; its guess comes from the model, else from its own text, and is never the code. Nothing is excluded: you reject what is not a surveyed cable. An accepted 0-10V line (Relay panel) or 120V line (NSPS / rack) **becomes the device's library row**: it is linked to the row the device already has, or made with the library's wording, so R2c / R2d stop offering one. → Approve / change:
 
+## T106 — Riser crop on cables made from the riser  ·  Needs: no new build (JS update)
+
+**Why it matters:** a cable accepted from a riser draft now shows the riser itself in the Cable / riser view, zoomed to its bubble, so you can check the far end against the drawing without leaving the cable. Use the scratch project from T44 / T108 (it has accepted riser cables).
+
+- [ ] **Download.** Cable / riser → tap a cable you accepted with **Confirm endpoint** in Review drafts → under the end editor, **Riser crop · riser.pdf p.1** reads "Riser not downloaded" with **⤓ Download riser**. Tap it: after a few seconds the riser opens. → saw:
+- [ ] **Focused and outlined.** The crop opens **upright** (the drawing reads left to right, not on its side), zoomed to the cable's wire bubble with some of its line around it, and the bubble has a red outline. It is the same bubble the Review drafts crop outlined for that draft. → saw:
+- [ ] **Pinch.** Pinch out and pan: the red outline stays on the bubble (it may trail a moment behind during the gesture). → saw:
+- [ ] **Page 2.** A cable from a level on sheet 002 (14–28 are out of scope, so pick one whose far end is there if you have one; else skip) opens on **p.2**, focused the same way. → saw:
+- [ ] **Cached.** Pick another riser cable: it opens straight away, no download. Airplane mode: it still opens. → saw:
+- [ ] **Accepted offline.** Airplane mode on: in Review drafts accept another riser cable with Confirm endpoint. Turn airplane mode off, sync, open it in Cable / riser: the crop still finds the riser (by its file name) and opens it. With airplane mode on at that point instead, it says the riser PDF could not be found, with **Try again**. → saw:
+- [ ] **Not from the riser.** A cable from the seeded master or one added on a card reads "No riser crop for this cable: it was not made from a riser draft". → saw:
+
+Decision D195 (Proposed): the riser's boxes are measured on the page as it is displayed (the Tower riser's pages are turned a quarter, `/Rotate 270`); the iPad turns them into PDF coordinates using the rotation the viewer reports, so the crop opens upright on the bubble with no new build. A cable accepted offline finds its riser by file name when it is shown, and nothing is written back to the cable. → Approve / change:
+
 ---
 
 ## Rules for this file

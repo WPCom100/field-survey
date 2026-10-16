@@ -19,7 +19,7 @@ import {
 } from './filters';
 import { hitTest, layoutPins, type RenderPin } from './layout';
 import { pinShape, pinStyleFor, statusRank } from './pins';
-import { focusRect, inView, sheetRectToPage, sheetToView, apply, type PdfViewport } from './viewport';
+import { focusRect, inView, sheetRectToPage, sheetToView, apply, displayRectToPage, nativeFocusRect, pageRectToView, rotationOf, type PdfViewport, type Rotation } from './viewport';
 
 const CROP = { x: 0, y: 0, width: 4235.48, height: 3604.72 };
 
@@ -168,6 +168,40 @@ describe('focus and fit', () => {
     expect(inView(v, view, { x: 4000, y: 100 })).toBe(false);
     const centre = apply(sheetToView(v), { x: 0, y: 0 });
     expect(centre).toEqual({ x: 0, y: 0 });
+  });
+
+  // PDFKit's page → view map for a page with /Rotate r (the riser is on 270, T106): the display
+  // frame (top-left, y down) scaled by s.
+  const rotated = (r: Rotation, s: number): PdfViewport => {
+    const box = { x: 5, y: 7, width: 2448, height: 3168 };
+    const { x: cx, y: cy, width: w, height: h } = box;
+    const m = {
+      0: { a: 1, b: 0, c: 0, d: -1, tx: -cx, ty: h + cy },
+      90: { a: 0, b: 1, c: 1, d: 0, tx: -cy, ty: -cx },
+      180: { a: -1, b: 0, c: 0, d: 1, tx: w + cx, ty: -cy },
+      270: { a: 0, b: -1, c: -1, d: 0, tx: h + cy, ty: w + cx },
+    }[r];
+    return { a: m.a * s, b: m.b * s, c: m.c * s, d: m.d * s, tx: m.tx * s, ty: m.ty * s, cropBox: box, page: 0 };
+  };
+
+  it('reads the rotation off the map and takes display-frame rects (riser bboxes) to the page and back to view', () => {
+    const r = { x: 1200, y: 400, width: 40, height: 20 };
+    for (const rot of [0, 90, 180, 270] as const) {
+      const v = rotated(rot, 0.5);
+      expect(rotationOf(v)).toBe(rot);
+      const page = displayRectToPage(v, rot, r);
+      const back = pageRectToView(v, page);
+      expect([back.x, back.y, back.width, back.height].map((n) => Math.round(n * 1000) / 1000)).toEqual([600, 200, 20, 10]);
+    }
+    expect(displayRectToPage(rotated(0, 1), 0, r)).toEqual(sheetRectToPage(rotated(0, 1), r));
+    // 270: display width runs along page y; the native focus rect is swapped about the centre
+    const p = displayRectToPage(rotated(270, 1), 270, r);
+    expect(p).toMatchObject({ width: 20, height: 40 });
+    const f = nativeFocusRect(270, p);
+    expect(f).toMatchObject({ width: 40, height: 20 });
+    expect(f.x + f.width / 2).toBeCloseTo(p.x + p.width / 2);
+    expect(f.y + f.height / 2).toBeCloseTo(p.y + p.height / 2);
+    expect(nativeFocusRect(0, p)).toBe(p);
   });
 });
 

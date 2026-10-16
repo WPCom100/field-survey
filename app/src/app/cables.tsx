@@ -239,7 +239,7 @@ export default function CablesScreen() {
               footer={
                 <>
                   <CableChecks row={row} canEdit={!!editor} onConfirm={() => confirm(row)} projectId={projectId} />
-                  <RiserCrop store={store} riser={row.riserRef} blobs={blobs} />
+                  <RiserCrop store={store} projectId={projectId} riser={row.riserRef} blobs={blobs} />
                 </>
               }
             />

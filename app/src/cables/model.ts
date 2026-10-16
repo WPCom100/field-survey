@@ -43,7 +43,10 @@ export type CableEndCell = {
   outOfScope: boolean;
 };
 
-export type RiserRef = { sheetId: string; bbox: Rect };
+/** Where a cable's riser crop comes from: the riser PDF's blob and page (D191), or a `sheet` row (D180, unused). */
+export type RiserRef =
+  | { kind: 'blob'; blob: string | null; file: string | null; page: number; bbox: Rect; draftId: string | null }
+  | { kind: 'sheet'; sheetId: string; bbox: Rect };
 
 export type CableRow = {
   id: string;
@@ -101,13 +104,34 @@ export function riserSignal(label: string | null | undefined): readonly string[]
   return null;
 }
 
-/** `riser_ref{sheet, bbox}` (D180): bbox as `[x, y, width, height]` or `{x, y, width, height}` in sheet coordinates. */
+/**
+ * `riser_ref` in either form: the blob form (D191) `{blob, file, page, bbox, draft}` that riser
+ * drafts write (T44; `blob` null when accepted offline, found later by `file`), bbox in the page's
+ * display frame (`plan/viewport.ts` `displayRectToPage`); or the `{sheet, bbox}` form of D180, bbox
+ * in sheet coordinates, which nothing writes since D191. bbox as `[x, y, width, height]` or
+ * `{x, y, width, height}`.
+ */
 export function parseRiserRef(v: unknown): RiserRef | null {
   if (!v || typeof v !== 'object') return null;
   const o = v as Record<string, unknown>;
+  const bbox = parseBox(o.bbox);
+  if (!bbox) return null;
   const sheetId = str(o.sheet) ?? str(o.sheet_id);
-  if (!sheetId) return null;
-  const b = o.bbox;
+  if (sheetId) return { kind: 'sheet', sheetId, bbox };
+  const blob = str(o.blob);
+  const file = str(o.file);
+  if (!blob && !file) return null;
+  const page = num(o.page);
+  return { kind: 'blob', blob, file, page: page != null && page >= 1 ? Math.floor(page) : 1, bbox, draftId: str(o.draft) };
+}
+
+/** The riser PDF's blob for a blob-form ref: its own, else by file name from the project's import batches (`riserBlobFor`). */
+export function riserBlobOf(ref: RiserRef, lookup: (file: string | null) => string | null): string | null {
+  if (ref.kind !== 'blob') return null;
+  return ref.blob ?? (ref.file ? lookup(ref.file) : null);
+}
+
+function parseBox(b: unknown): Rect | null {
   let r: Rect | null = null;
   if (Array.isArray(b) && b.length === 4 && b.every((n) => typeof n === 'number' && Number.isFinite(n))) {
     r = { x: b[0] as number, y: b[1] as number, width: b[2] as number, height: b[3] as number };
@@ -116,7 +140,7 @@ export function parseRiserRef(v: unknown): RiserRef | null {
     const [x, y, width, height] = [num(q.x), num(q.y), num(q.width), num(q.height)];
     if (x != null && y != null && width != null && height != null) r = { x, y, width, height };
   }
-  return r && r.width > 0 && r.height > 0 ? { sheetId, bbox: r } : null;
+  return r && r.width > 0 && r.height > 0 ? r : null;
 }
 
 const RUN: readonly (string | null)[] = ['Complete', 'Installed, untested'];

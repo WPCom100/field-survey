@@ -13,7 +13,7 @@ import { RULES, RuleEngine } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
 
 import { confirmEndpoint } from './actions';
-import { cableChecks, groupCables, loadCables, parseRiserRef, riserSignal, statusCell, verticalOf } from './model';
+import { cableChecks, groupCables, loadCables, parseRiserRef, riserBlobOf, riserSignal, statusCell, verticalOf } from './model';
 
 const PROJECT = uuidv7();
 const ME = uuidv7();
@@ -156,10 +156,25 @@ describe('cable / riser view (T39)', () => {
     expect(riserSignal('NETWORK TO LEVEL 07 RACK')).toEqual(['N', 'NG']);
     expect(riserSignal('0-10V TO FIXTURES')).toEqual(['0-10V']);
     expect(riserSignal('TO LEVEL 03')).toBeNull();
-    expect(parseRiserRef({ sheet: 's1', bbox: [10, 20, 300, 200] })).toEqual({ sheetId: 's1', bbox: { x: 10, y: 20, width: 300, height: 200 } });
+    expect(parseRiserRef({ sheet: 's1', bbox: [10, 20, 300, 200] })).toEqual({ kind: 'sheet', sheetId: 's1', bbox: { x: 10, y: 20, width: 300, height: 200 } });
     expect(parseRiserRef({ sheet: 's1', bbox: { x: 1, y: 2, width: 3, height: 4 } })).toMatchObject({ bbox: { width: 3 } });
     expect(parseRiserRef({ sheet: 's1', bbox: [0, 0, 0, 10] })).toBeNull();
     expect(parseRiserRef(null)).toBeNull();
+    // the blob form T44 writes (D191)
+    const sha = 'a'.repeat(64);
+    expect(parseRiserRef({ blob: sha, file: 'riser.pdf', page: 2, bbox: [1200, 400, 40, 20], draft: 'd1' })).toEqual({
+      kind: 'blob', blob: sha, file: 'riser.pdf', page: 2, bbox: { x: 1200, y: 400, width: 40, height: 20 }, draftId: 'd1',
+    });
+    const offline = parseRiserRef({ blob: null, file: 'riser.pdf', page: 1, bbox: [1, 2, 3, 4], draft: 'd1' })!;
+    expect(offline).toMatchObject({ kind: 'blob', blob: null, page: 1 });
+    expect(parseRiserRef({ blob: null, file: null, page: 1, bbox: [1, 2, 3, 4] })).toBeNull();
+    expect(parseRiserRef({ blob: sha, bbox: [1, 2, 3, 4] })).toMatchObject({ page: 1, file: null });
+    expect(parseRiserRef({ blob: sha, page: 1 })).toBeNull();
+    // an offline-accepted ref finds its blob by file name; its own blob wins; the sheet form has none
+    expect(riserBlobOf(offline, (f) => (f === 'riser.pdf' ? sha : null))).toBe(sha);
+    expect(riserBlobOf(offline, () => null)).toBeNull();
+    expect(riserBlobOf(parseRiserRef({ blob: 'b'.repeat(64), file: 'riser.pdf', page: 1, bbox: [1, 2, 3, 4] })!, () => sha)).toBe('b'.repeat(64));
+    expect(riserBlobOf(parseRiserRef({ sheet: 's1', bbox: [1, 2, 3, 4] })!, () => sha)).toBeNull();
     expect(cableChecks({ code: 'X', riserToLabel: null, endpointConfirmed: true }, [], () => true)).toEqual([{ id: 'far_end', message: 'No ends' }]);
     expect(verticalOf({ vertical: null, singleRow: false, a: null, b: null, levelIds: [], code: 'X' } as never).title).toBe('(no endpoint) → X (DMX)');
   });

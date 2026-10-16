@@ -31,6 +31,7 @@ import {
   setEndpoint,
   DraftError,
 } from './actions';
+import { loadCables } from '../cables/model';
 import { loadDeviceCard } from '../card/model';
 import { engineFor } from '../rules/engine';
 import { batchFor, cropUrl, excludedLines, extractionLine, promotedKeys, riserBlobFor, type Batch } from './api';
@@ -311,6 +312,9 @@ describe('cable drafts (T44, D6, D191)', () => {
     const cable = await store.get<Record<string, unknown>>('cable', res.cableId!);
     expect(cable).toMatchObject({ cable: 'N', qty: 1, origin: 'riser', endpoint_confirmed: true, vertical: 'CT06LCPA N', single_row: false });
     expect(cable!.riser_ref).toEqual({ blob: 'ab'.repeat(32), file: 'riser.pdf', page: 1, bbox: [80, 120, 12, 12], draft: ids.c3 });
+    // the cable view's riser crop reads it (T106)
+    const inView = (await loadCables(store, PROJECT)).rows.find((r) => r.id === res.cableId)!;
+    expect(inView.riserRef).toEqual({ kind: 'blob', blob: 'ab'.repeat(32), file: 'riser.pdf', page: 1, bbox: { x: 80, y: 120, width: 12, height: 12 }, draftId: ids.c3 });
     const ends = await store.list<Record<string, unknown>>('cable_end', { where: 'cable_id = ?', params: [res.cableId], orderBy: 'side' });
     expect(ends.map((e) => [e.side, e.device_id, e.from_text, e.to_text])).toEqual([
       ['A', ids.panel, 'CT06LCPA', 'Network to Equipment rack'],
