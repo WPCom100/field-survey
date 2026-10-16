@@ -17,6 +17,7 @@ export const VOCAB_LISTS = [
   { list: 'part_note', title: 'Part notes', hint: 'Phrases for the Notes of a missing part.' },
   { list: 'photo_caption', title: 'Photo captions', hint: 'Chips on the photo caption.' },
   { list: 'category', title: 'Device categories', hint: 'Device Category picker; a pin shape follows the category (D64).' },
+  { list: 'cable_code', title: 'Cable codes', hint: 'The codes a cable can carry (CLAUDE.md §3). A DaVinci port protocol with no code arrives here as a draft (T111); accepting it records a decision, it does not make a code yet.' },
 ] as const satisfies readonly { list: (typeof vocab.VOCAB_LIST)[number]; title: string; hint: string }[];
 
 export type VocabListKey = (typeof VOCAB_LISTS)[number]['list'];
@@ -29,6 +30,7 @@ export const SEED_VOCAB: Readonly<Record<VocabListKey, readonly string[]>> = {
   part_note: ['Need to be ordered', 'Confirm whether on site', 'Confirm whether on site (provided in box)'],
   photo_caption: STANDARD_PHRASES,
   category: ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor'],
+  cable_code: ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V'],
 };
 
 export type PlaceholderKind = (typeof vocab.PLACEHOLDER_KIND)[number];

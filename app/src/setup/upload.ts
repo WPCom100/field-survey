@@ -20,10 +20,19 @@ export function uploadPart(file: FilePart, read: ReadBytes): UploadPart {
   return { name: file.name, type: file.type, bytes: () => read(file.uri) };
 }
 
-/** Text fields first (undefined ones left out), then the file as `file` — what `POST /imports` reads. */
-export function uploadForm(file: UploadPart, fields: Record<string, string | undefined>, make: () => FormData = () => new FormData()): FormData {
+/**
+ * Text fields first (undefined ones left out), then the file as `file` — what `POST /imports` reads —
+ * then any further file parts by name (`categories` for the DaVinci import, T111).
+ */
+export function uploadForm(
+  file: UploadPart,
+  fields: Record<string, string | undefined>,
+  make: () => FormData = () => new FormData(),
+  more: Record<string, UploadPart | undefined> = {},
+): FormData {
   const body = make();
   for (const [k, v] of Object.entries(fields)) if (v !== undefined) body.append(k, v);
   body.append('file', file as unknown as Blob);
+  for (const [k, part] of Object.entries(more)) if (part) body.append(k, part as unknown as Blob);
   return body;
 }

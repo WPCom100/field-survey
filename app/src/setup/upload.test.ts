@@ -57,6 +57,14 @@ describe('file uploads through expo/fetch (T80)', () => {
     expect(parts[0]![1]).toBe('p1');
   });
 
+  it('further file parts follow the file under their own names (the DaVinci mapping workbook, T111)', () => {
+    const json = { uri: 'file:///tmp/library.json', name: 'library.json', type: 'application/json' };
+    const body = uploadForm(uploadPart(json, read), { project_id: 'p1', kind: 'davinci' }, make, { categories: uploadPart(xlsx, read), missing: undefined });
+    const parts = (body as unknown as PatchedRNFormData)._parts;
+    expect(parts.map(([k]) => k)).toEqual(['project_id', 'kind', 'file', 'categories']);
+    expect((parts[3]![1] as { name: string }).name).toBe(xlsx.name);
+  });
+
   it("Expo's encoder accepts the body: filename, Content-Type and the file's bytes", async () => {
     const body = uploadForm(uploadPart(xlsx, read), { project_id: 'p1', kind: 'plans', level_id: 'l1', sheet_kind: 'display' }, make);
     const text = await encode(body);

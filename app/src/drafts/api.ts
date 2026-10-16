@@ -14,7 +14,7 @@ import { excludedKey, type ExcludedLine } from './actions';
 import type { DraftSource } from './model';
 
 export type Batch = ImportBatch & { kind: string; files?: { name: string; sha256?: string; pages?: number }[]; created_at?: string | null };
-export type ExtractionKind = 'bom' | 'riser';
+export type ExtractionKind = 'bom' | 'riser' | 'davinci';
 
 function client(identity: Identity, timeoutMs = 30_000): HttpClient {
   return new HttpClient({ serverUrl: identity.serverUrl, token: identity.token, userName: identity.user?.name, timeoutMs });
@@ -23,10 +23,13 @@ function client(identity: Identity, timeoutMs = 30_000): HttpClient {
 export const listImports = (identity: Identity, projectId: string): Promise<Batch[]> =>
   client(identity).json<Batch[]>('GET', `/imports?project_id=${encodeURIComponent(projectId)}`);
 
-/** Upload a BOM or riser PDF for extraction; the drafts arrive with the next sync. */
-export async function startExtraction(identity: Identity, projectId: string, kind: ExtractionKind, file: UploadPart): Promise<Batch> {
-  const c = client(identity, 120_000);
-  const res = await c.send('POST', '/imports', { headers: c.headers(), body: uploadForm(file, { project_id: projectId, kind }) });
+/**
+ * Upload a BOM or riser PDF for extraction, or DaVinci's `library.json` (with the category mapping
+ * workbook as `categories` the first time, T111); the drafts arrive with the next sync.
+ */
+export async function startExtraction(identity: Identity, projectId: string, kind: ExtractionKind, file: UploadPart, more: { categories?: UploadPart } = {}): Promise<Batch> {
+  const c = client(identity, kind === 'davinci' ? 300_000 : 120_000);
+  const res = await c.send('POST', '/imports', { headers: c.headers(), body: uploadForm(file, { project_id: projectId, kind }, undefined, more) });
   return (await res.json()) as Batch;
 }
 
@@ -79,6 +82,18 @@ export function promotedKeys(drafts: readonly { importBatchId: string | null; so
   return out;
 }
 
+function davinciLine(s: Record<string, unknown>, n: (k: string) => number | null): string {
+  const clashes = Array.isArray(s.clashes) ? s.clashes.length : 0;
+  const kept = (n('kept_accepted') ?? 0) + (n('kept_rejected') ?? 0);
+  const parts = [
+    `Done: ${n('created') ?? 0} new drafts, ${n('updated') ?? 0} updated, ${n('unchanged') ?? 0} unchanged (${n('placeable') ?? '?'} device types, ${n('accessory_only') ?? 0} accessories)`,
+    `${n('vocab_drafts') ?? 0} protocol drafts`,
+  ];
+  if (kept) parts.push(`${kept} accepted or rejected left alone`);
+  if (clashes) parts.push(`${clashes} model clash${clashes === 1 ? '' : 'es'}`);
+  return parts.join(', ');
+}
+
 /** One line for an extraction job card. */
 export function extractionLine(kind: ExtractionKind, b: Batch): string {
   const s = b.stats ?? {};
@@ -86,14 +101,16 @@ export function extractionLine(kind: ExtractionKind, b: Batch): string {
     case 'queued':
       return 'Queued — the server picks it up within a few seconds';
     case 'running':
+      if (kind === 'davinci') return 'Reading the DaVinci library into app-library drafts…';
       return kind === 'riser' ? 'Reading the riser (bands, devices, bubbles; endpoints by the Claude API — about 12 minutes)…' : 'Reading the BOM (text, OCR where a page has none)…';
     case 'skipped':
-      return 'Already uploaded — this exact file was extracted for this project before';
+      return kind === 'davinci' ? 'Already imported — this library and mapping were imported before' : 'Already uploaded — this exact file was extracted for this project before';
     case 'failed':
       return `Failed: ${typeof s.error === 'string' ? s.error : 'see the server log'}`;
     default: {
       const n = (k: string) => (typeof s[k] === 'number' ? (s[k] as number) : null);
       if (kind === 'bom') return `Done: ${n('drafts') ?? '?'} device drafts, ${n('excluded') ?? 0} excluded lines, ${n('flagged') ?? 0} flagged`;
+      if (kind === 'davinci') return davinciLine(s, n);
       const cost = s.claude && typeof s.claude === 'object' && typeof (s.claude as Record<string, unknown>).cost_usd === 'number' ? ` · Claude $${((s.claude as Record<string, unknown>).cost_usd as number).toFixed(2)}` : '';
       return `Done: ${n('device_drafts') ?? '?'} device drafts (${n('merged_into_bom') ?? 0} merged into the BOM's), ${n('cable_drafts') ?? '?'} cable drafts, ${n('endpoints_unresolved') ?? 0} far ends to pick${cost}`;
     }

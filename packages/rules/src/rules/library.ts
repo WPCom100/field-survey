@@ -34,10 +34,16 @@ export interface LibraryCable {
   status: ConnectionStatus | null;
 }
 
-/** An accessory a type may carry (D52: an NSPS kit's power supply, expected 1). */
+/**
+ * An accessory a type may carry (D52: an NSPS kit's power supply, expected 1). A catalogue import
+ * (T111, D197) also keeps the slot's `max_quantity` and, where the catalogue asks for "n of these",
+ * the `group` the slot belongs to (`{label, min, max}`); neither is read by a rule yet.
+ */
 export interface LibraryAccessory {
   model: string;
   expected_qty: number | null;
+  max_quantity?: number | null;
+  group?: { label: string; min: number; max: number | null } | null;
 }
 
 const STATUSES: readonly string[] = ['Complete', 'Installed, untested', 'Issue', 'Not installed', 'No access', 'Not started'];
@@ -66,7 +72,12 @@ export function parseLibraryAccessories(v: unknown): LibraryAccessory[] {
     const r = raw as Record<string, unknown>;
     const model = str(r.model);
     if (!model) continue;
-    out.push({ model, expected_qty: typeof r.expected_qty === 'number' && Number.isFinite(r.expected_qty) ? r.expected_qty : null });
+    const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const a: LibraryAccessory = { model, expected_qty: num(r.expected_qty) };
+    if (num(r.max_quantity) !== null) a.max_quantity = num(r.max_quantity);
+    const g = r.group && typeof r.group === 'object' ? (r.group as Record<string, unknown>) : null;
+    if (g && str(g.label) && num(g.min) !== null) a.group = { label: str(g.label)!, min: num(g.min)!, max: num(g.max) };
+    out.push(a);
   }
   return out;
 }

@@ -37,6 +37,19 @@ describe('field additions (T23)', () => {
     expect(schemeFor(all[2]!, 'NSPS')).toBe('level_number');
   });
 
+  it('an accessory-only type (T111) is never offered as a device', async () => {
+    const { store, editor, plan } = await setup();
+    await editor.create(
+      'library_type',
+      { project_id: null, model: 'ERP-FT-LVD', aliases: ['0-10V Option Kit - FT (24 CH)'], category: null, state: 'draft', accessory_only: true, source_ref: { kind: 'davinci', type_id: 'd22fb480' } },
+      { change_type: 'Master edit', reason: 't' },
+    );
+    await editor.create('library_type', { project_id: null, model: 'P-TS7-E', category: 'Touchscreen', state: 'draft', accessory_only: null }, { change_type: 'Master edit', reason: 't' });
+    const all = await libraryChoices(store, plan.level.projectId);
+    expect(all.map((c) => c.model)).toEqual(['PI1002', 'UHCI-WM', 'P-NSPS-D', 'P-TS7-E']);
+    expect(matchModel(all, 'ERP-FT-LVD')).toBeNull();
+  });
+
   it('a numbered type is created without an ID: 06M-? + NEW, + mark, field addition, pin rounded', async () => {
     const { store, editor, base, plan } = await setup();
     const nsps = (await libraryChoices(store, plan.level.projectId, 'NSPS'))[0]!;

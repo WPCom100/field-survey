@@ -103,6 +103,8 @@ export const VOCAB_LIST = [
   'level_alias',
   'category',
   'type',
+  // T111 (D197): the cable codes; a DaVinci port protocol with no code lands here as a draft
+  'cable_code',
 ] as const;
 export const EXPORT_KIND = ['xlsx', 'floor_pdf'] as const;
 

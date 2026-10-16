@@ -22,6 +22,15 @@ export { CABLE_CODES, neuronIdDefault, type LibraryAccessory, type LibraryCable 
 export const NSPS_POWER_SUPPLY: LibraryAccessory = { model: 'P-NSPS-D Power Supply', expected_qty: 1 };
 
 export type LibraryState = 'draft' | 'accepted' | 'rejected';
+
+/** `library_type.source_ref` as the DaVinci import writes it (T111); other keys are kept but not read. */
+export interface SourceRef {
+  kind: string;
+  displayName: string | null;
+  family: string | null;
+  category: string | null;
+  libraryTimestamp: string | null;
+}
 export type IdScheme = 'level_number' | 'level_tag';
 
 export interface LibraryType {
@@ -45,6 +54,12 @@ export interface LibraryType {
   /** When the type's first op was made (the "added … 10/09" line). */
   createdAt: string | null;
   promotedFromId: string | null;
+  /** T111 (D197): what a catalogue import kept on the type (null for a hand-made one). */
+  description: string | null;
+  datasheetUrl: string | null;
+  sourceRef: SourceRef | null;
+  /** Imported as another type's accessory: kept for the accessory lists, never offered as a device. */
+  accessoryOnly: boolean;
   /** A project type already promoted: the app-library type made from it (D65). */
   promotedAs: string | null;
   /** Live devices of this project of the type (by link, or by model / alias for imported ones). */
@@ -117,7 +132,27 @@ function toType(r: Row): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | '
     state: r.state === 'accepted' || r.state === 'rejected' ? r.state : 'draft',
     createdById: str(r.created_by_id),
     promotedFromId: str(r.promoted_from_id),
+    description: str(r.description),
+    datasheetUrl: str(r.datasheet_url),
+    sourceRef: sourceRefOf(r.source_ref),
+    accessoryOnly: r.accessory_only === true,
   };
+}
+
+function sourceRefOf(v: unknown): SourceRef | null {
+  if (!v || typeof v !== 'object') return null;
+  const r = v as Record<string, unknown>;
+  const kind = str(r.kind);
+  if (!kind) return null;
+  return { kind, displayName: str(r.display_name), family: str(r.family), category: str(r.category), libraryTimestamp: str(r.library_timestamp) };
+}
+
+/** One line naming where an imported type came from (`DaVinci · Paradigm / Controllers · NSPS`). */
+export function sourceLine(ref: SourceRef | null): string | null {
+  if (!ref) return null;
+  const name = ref.kind === 'davinci' ? 'DaVinci' : ref.kind;
+  const where = [ref.family, ref.category].filter(Boolean).join(' / ');
+  return [name, where || null, ref.displayName].filter(Boolean).join(' · ');
 }
 
 /**
@@ -306,6 +341,11 @@ export async function copyTypes(editor: Editor, store: Store, scope: string | nu
         optional_accessories: r.optional_accessories ?? null,
         // only when set: a server without migration 0010 refuses the column (T68)
         ...(r.needs_neuron_id != null ? { needs_neuron_id: r.needs_neuron_id } : {}),
+        // likewise the T111 columns (Alembic 0011); `source_ref` travels with the copy
+        ...(r.description != null ? { description: r.description } : {}),
+        ...(r.datasheet_url != null ? { datasheet_url: r.datasheet_url } : {}),
+        ...(r.source_ref != null ? { source_ref: r.source_ref } : {}),
+        ...(r.accessory_only != null ? { accessory_only: r.accessory_only } : {}),
         state: 'accepted',
         created_by_id: editor.userId,
         ...(scope === null && r.project_id ? { promoted_from_id: r.id } : {}),

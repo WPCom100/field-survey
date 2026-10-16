@@ -553,6 +553,12 @@ export const ENTITIES = {
       state: enumCol(v.LIBRARY_STATE, { notNull: true, default: 'draft' }),
       created_by_id: t(),
       promoted_from_id: t(),
+      // T111 (D197): what a catalogue import keeps on the type. `source_ref` = `{kind: 'davinci',
+      // type_id, …}`; `accessory_only` = another type's accessory, never offered as a device.
+      description: t(),
+      datasheet_url: t(),
+      source_ref: j(),
+      accessory_only: b(),
     },
     [['project_id']],
   ),

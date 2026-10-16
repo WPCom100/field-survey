@@ -31,10 +31,13 @@ export type LibraryChoice = {
 type Row = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 
-/** Library types usable on this project (project first, then app library), optionally of one category. */
+/**
+ * Library types usable on this project (project first, then app library), optionally of one
+ * category. Accessory-only types (T111) are never offered: they are other types' accessories.
+ */
 export async function libraryChoices(store: Store, projectId: string, category?: string | null): Promise<LibraryChoice[]> {
   const rows = await store.list<Row>('library_type', {
-    where: `(project_id = ? OR project_id IS NULL) AND state <> 'rejected'${category ? ' AND category = ?' : ''}`,
+    where: `(project_id = ? OR project_id IS NULL) AND state <> 'rejected' AND (accessory_only IS NULL OR accessory_only = 0)${category ? ' AND category = ?' : ''}`,
     params: category ? [projectId, category] : [projectId],
   });
   const out = rows.map(

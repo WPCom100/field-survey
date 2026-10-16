@@ -16,7 +16,7 @@ from sqlalchemy import select
 
 from app.auth import SessionDep, current_user, require_token
 from app.config import settings
-from app.jobs import bom, crops, plans, riser, runner
+from app.jobs import bom, crops, davinci_library, plans, riser, runner
 from app.jobs.workbook import WorkbookError, inspect_workbook
 from app.models import ImportBatch, User
 from app.storage import ObjectMissing, ObjectStore, get_object_store
@@ -37,14 +37,38 @@ async def create_import(
     mapping: Annotated[str | None, Form()] = None,
     level_id: Annotated[uuid.UUID | None, Form()] = None,
     sheet_kind: Annotated[str | None, Form()] = None,
+    categories: Annotated[UploadFile | None, File()] = None,
 ) -> dict[str, Any]:
     """Queue a seed import of the uploaded workbook — or, with `kind=plans`, a plan sheet PDF for
     `level_id` as its `sheet_kind` (`display` | `source`, T45) — or, with `kind=bom`, a BOM PDF
     for extraction into device drafts (T42) — or, with `kind=riser`, the riser PDF for device
-    and cable drafts with Claude-read endpoints (T43). 202 with the batch; poll it by id."""
+    and cable drafts with Claude-read endpoints (T43) — or, with `kind=davinci`, DaVinci's
+    `library.json` (plus the category mapping workbook as `categories`, else the last one
+    uploaded) for app-library device-type drafts (T111). 202 with the batch; poll it by id."""
     data = await file.read()
     if len(data) > settings.blob_max_bytes:
         raise HTTPException(413, {"error": "too_large", "max": settings.blob_max_bytes})
+    if kind == davinci_library.DAVINCI_KIND:
+        mapping_file = None
+        if categories is not None:
+            mapping_file = (
+                categories.filename or "DaVinci_categories.xlsx",
+                await categories.read(),
+            )
+        try:
+            batch = davinci_library.create_davinci_batch(
+                session,
+                store,
+                project_id=project_id,
+                library=(file.filename or "library.json", data),
+                categories=mapping_file,
+                user=user,
+            )
+        except runner.ImportError_ as e:
+            session.rollback()
+            status = 404 if "unknown" in str(e) else 422
+            raise HTTPException(status, str(e)) from e
+        return runner.batch_out(batch)
     if kind in (bom.BOM_KIND, riser.RISER_KIND):
         create = bom.create_bom_batch if kind == bom.BOM_KIND else riser.create_riser_batch
         try:

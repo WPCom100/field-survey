@@ -1,6 +1,6 @@
 import { OpError, type Editor, type Store } from '@field-survey/core';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import {
   CABLE_CODES,
@@ -18,6 +18,7 @@ import {
   parseAliases,
   rejectType,
   reopenType,
+  sourceLine,
   updateType,
   type CopySource,
   type IdScheme,
@@ -159,7 +160,7 @@ export function LibraryScreen(props: {
 function groupByCategory(types: readonly LibraryType[]): [string, LibraryType[]][] {
   const out = new Map<string, LibraryType[]>();
   for (const t of types) {
-    const k = t.state === 'rejected' ? 'Rejected' : (t.category ?? 'No category');
+    const k = t.state === 'rejected' ? 'Rejected' : t.accessoryOnly ? 'Accessories (not placeable)' : (t.category ?? 'No category');
     out.set(k, [...(out.get(k) ?? []), t]);
   }
   return [...out.entries()];
@@ -298,6 +299,20 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
         <Text style={styles.sub}>
           {t.devices} device{t.devices === 1 ? '' : 's'} · {t.state}
         </Text>
+      </View>
+      {t.sourceRef || t.description || t.accessoryOnly ? (
+        <View style={styles.source}>
+          {t.sourceRef ? <Text style={styles.sub}>From {sourceLine(t.sourceRef)}{t.sourceRef.libraryTimestamp ? ` (library ${t.sourceRef.libraryTimestamp.slice(0, 10)})` : ''}</Text> : null}
+          {t.description ? <Text style={styles.desc}>{t.description}</Text> : null}
+          {t.accessoryOnly ? <Text style={styles.sub}>Accessory only: listed as other types' accessory, never offered as a device.</Text> : null}
+          {t.datasheetUrl ? (
+            <Pressable onPress={() => void Linking.openURL(t.datasheetUrl!)}>
+              <Text style={styles.link}>Datasheet ↗</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+      <View style={styles.row}>
       </View>
       <Field label="Model">
         <TextInput value={model} onChangeText={setModel} editable={!ro} style={styles.input} />
@@ -489,6 +504,8 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingVertical: 12 },
   title: { fontSize: 24, fontWeight: '600', flex: 1 },
   link: { color: '#1f6feb', fontSize: 16 },
+  source: { gap: 2, paddingBottom: 6 },
+  desc: { fontSize: 14, color: '#333' },
   danger: { color: '#b3261e', fontSize: 16 },
   review: { color: '#9a6700', fontSize: 16, fontWeight: '600' },
   note: { paddingHorizontal: 20, paddingBottom: 8, color: '#b3261e', fontSize: 14 },

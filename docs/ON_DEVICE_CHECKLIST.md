@@ -365,6 +365,21 @@ Decision D194 (Proposed): a line with no bubble is found by the geometry on text
 
 Decision D195 (Proposed): the riser's boxes are measured on the page as it is displayed (the Tower riser's pages are turned a quarter, `/Rotate 270`); the iPad turns them into PDF coordinates using the rotation the viewer reports, so the crop opens upright on the bubble with no new build. A cable accepted offline finds its riser by file name when it is shown, and nothing is written back to the cable. → Approve / change:
 
+## T111 — DaVinci library import  ·  Needs: no new build (JS update; server deploy first, and **every iPad on the new JS before the first upload** — an older iPad refuses the new columns on pull until it updates, nothing lost)
+
+**Why it matters:** ETC's whole catalogue becomes app-library drafts in one upload, so types are picked, not typed, and every project created afterwards starts with the accepted ones. Get `library.json` from the PC first: it is at `%LOCALAPPDATA%\ETC\DaVinci\library.json` after a DaVinci launch (≈ 49 MB); copy it and `fixtures/DaVinci_categories.xlsx` to iCloud Drive.
+
+- [ ] **Two files, one tap.** Any project → Setup → 3 Sources → **DaVinci library → Choose files…** → in Files select both `library.json` and `DaVinci_categories.xlsx` (tap Select, pick both, Open). The row reads "Uploading library.json and DaVinci_categories.xlsx…", then "Queued", then within a minute "Done: … new drafts, 0 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts". → saw:
+- [ ] **Only the library picked.** Choose files… again with only `library.json`: it uploads (the mapping is reused) and ends "Already imported — this library and mapping were imported before". → saw:
+- [ ] **The drafts arrive.** Sync, then Projects → **Device-type library**: Power Distribution, Equipment, Station, Touchscreen… groups full of DRAFT types ("added by <you> 10/16 ⚑"), and an **Accessories (not placeable)** group (P-LCD-FBB, ERP-FT-LVD, P-ACP-E Mk2…). Tap **P-NSPS-D**: "From DaVinci · Paradigm / Controllers · NSPS (library 2026-10-13)", the description, **Datasheet ↗** opens ETC's PDF in Safari, aliases `NSPS · 7182A1711`, Default cables U and N (no 120V — DaVinci has no Power port on it), Neuron ID "Needed". → saw:
+- [ ] **A touchscreen's back boxes.** Tap **P-TS7-E**: Default cables NG; Optional accessories list P-LCD-FBB, P-LCD-SBB, P-LCD-SLBB, P-LCD-SBB-5 (expected empty — the "one of these" rule is kept on the row for T113) and P-LCD-LC. Tap **ERn2-W-120 Mk2**: P-ACP-E Mk2 expected 1. → saw:
+- [ ] **Accessories are not devices.** On a plan, long-press → add device → the type picker: search "LVD" or "P-LCD" — nothing; "P-TS7" — the touchscreen (draft, flagged). → saw:
+- [ ] **Protocol drafts.** That project's Setup → Vocabulary → **Cable codes**: X N NG U F P UV 0-10V 120V accepted, then drafts such as EchoConnect, Aux Power Input, Contact, Sense, USB, DALI… Reject one; accept none yet (accepting is a decision, it makes no code). → saw:
+- [ ] **Accepted types stand.** Accept P-NSPS-D after adding its 120V row by hand. Back on the PC, regroup one row in the mapping sheet (e.g. move `Paradigm / Contact Interfaces` to Equipment) and upload `library.json` + the changed `.xlsx` again: the line reads "Done: 0 new drafts, … updated, …, 1 accepted or rejected left alone"; after a sync UHCI-WM sits under Equipment as a draft, P-NSPS-D is unchanged with its 120V row, and History on UHCI-WM shows the category change by "DaVinci library import". → saw:
+- [ ] **A hand-made model.** Make a draft type "P-TS7-PE" by hand in the app library, upload again (any newer file): the line ends "1 model clash"; your type is untouched. → saw:
+
+Decision D197 (Proposed): the import files its batch under the project you start it from (that project's Vocabulary takes the unmapped protocols as Cable codes drafts), writes the types to the app library as drafts with four new columns (description, datasheet, DaVinci provenance, accessory-only), keeps "one of these" accessory rules as a group on each row rather than an expected count, treats a model you already made by hand as a clash it reports and never merges, and never touches an accepted or rejected type on a re-run. → Approve / change:
+
 ---
 
 ## Rules for this file

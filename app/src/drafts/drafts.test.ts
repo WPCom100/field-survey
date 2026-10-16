@@ -511,6 +511,9 @@ describe('draft review server helpers (T44)', () => {
     expect(riserBlobFor(batches, 'riser.pdf')).toBe('new');
     expect(extractionLine('riser', riser)).toBe("Done: 93 device drafts (40 merged into the BOM's), 71 cable drafts, 0 far ends to pick · Claude $1.93");
     expect(extractionLine('bom', bom)).toBe('Done: 108 device drafts, 1 excluded lines, 9 flagged');
+    const davinci: Batch = { id: 'd1', kind: 'davinci', job_state: 'done', files: [{ name: 'library.json' }, { name: 'DaVinci_categories.xlsx' }], stats: { created: 1130, updated: 2, unchanged: 0, placeable: 501, accessory_only: 631, vocab_drafts: 33, kept_accepted: 1, kept_rejected: 0, clashes: [{ type_id: 'x', model: 'P-NSPS-D', held_by: null }] } };
+    expect(extractionLine('davinci', davinci)).toBe('Done: 1130 new drafts, 2 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts, 1 accepted or rejected left alone, 1 model clash');
+    expect(extractionLine('davinci', { ...davinci, job_state: 'skipped' })).toBe('Already imported — this library and mapping were imported before');
   });
 
   it('lists excluded lines and knows which were promoted', async () => {

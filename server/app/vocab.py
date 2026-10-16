@@ -59,7 +59,7 @@ REVIEW_STATE = ("open", "resolved", "dismissed")
 PROPOSAL_KIND = ("punch", "part", "cable", "status", "note")
 PROPOSAL_STATE = ("proposed", "accepted", "edited", "rejected", "superseded")
 FINDING_STATE = ("open", "resolved", "dismissed")
-IMPORT_KIND = ("bom", "riser", "plans", "master_xlsx", "floor_xlsx", "mss")
+IMPORT_KIND = ("bom", "riser", "plans", "master_xlsx", "floor_xlsx", "mss", "davinci")
 DRAFT_STATE = ("proposed", "accepted", "edited", "rejected")
 ID_SCHEME = ("level_number", "level_tag")
 LIBRARY_STATE = ("draft", "accepted", "rejected")
@@ -74,5 +74,7 @@ VOCAB_LIST = (
     "level_alias",
     "category",
     "type",
+    # T111 (D197): the cable codes; a DaVinci port protocol with no code lands here as a draft
+    "cable_code",
 )
 EXPORT_KIND = ("xlsx", "floor_pdf")

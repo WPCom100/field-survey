@@ -14,6 +14,7 @@ import { statements as m0006 } from './migrations/0006_sheet_features';
 import { statements as m0007 } from './migrations/0007_install';
 import { statements as m0008 } from './migrations/0008_vocab_state';
 import { statements as m0009 } from './migrations/0009_needs_neuron_id';
+import { statements as m0010 } from './migrations/0010_davinci_library';
 
 export interface Migration {
   version: number;
@@ -31,6 +32,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 7, name: 'install', statements: m0007 },
   { version: 8, name: 'vocab_state', statements: m0008 },
   { version: 9, name: 'needs_neuron_id', statements: m0009 },
+  { version: 10, name: 'davinci_library', statements: m0010 },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

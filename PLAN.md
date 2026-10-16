@@ -84,10 +84,10 @@ Bold = master column (name kept verbatim for export). `*` = server-assigned.
 | `ruling` | id, project, text, scope_levels, filter, action, standing, created_by/at, applied_at, op_count | §6.5 |
 | `proposal` | id, project, rule_id, subject, discriminator, kind ∈ {punch, part, cable, status, note}, payload, inputs_hash, state ∈ {proposed, accepted, edited, rejected, superseded}, decided_by/at | |
 | `finding` | id, project, level, lint_id, subject, message, state ∈ {open, resolved, dismissed}, dismissed_reason | |
-| `import_batch` | id, project, kind ∈ {bom, riser, plans, master_xlsx, floor_xlsx, mss}, files, job_state, stats, created_by/at | |
+| `import_batch` | id, project, kind ∈ {bom, riser, plans, master_xlsx, floor_xlsx, mss, davinci}, files, job_state, stats, created_by/at | A `davinci` batch is filed under the project that started it but writes the app library (D197) |
 | `draft_device` / `draft_cable` | per Phase 1f schema: level?, model/candidates[], category, qty, accessories[], source_ref{job, page, line|bbox}, level_basis, confidence, conflicts[], state ∈ {proposed, accepted, edited, rejected}, placed, not_on_sheet | |
-| `library_type` | id, project (**nullable: null = app-level library**), model, aliases[], category, id_scheme ∈ {level_number, level_tag}, default_cables[], optional_cables[], optional_accessories[], needs_neuron_id (null = category default: off for Equipment rack and NSPS), state ∈ {draft, accepted, rejected}, created_by, promoted_from | D43, D48, D65, D185 |
-| `vocab` | id, project, list ∈ {device_note, punch_item, punch_note, part_note, connection_note, photo_caption, model_map, level_alias, category, type}, value, canonical_of | |
+| `library_type` | id, project (**nullable: null = app-level library**), model, aliases[], category, id_scheme ∈ {level_number, level_tag}, default_cables[], optional_cables[], optional_accessories[], needs_neuron_id (null = category default: off for Equipment rack and NSPS), state ∈ {draft, accepted, rejected}, created_by, promoted_from, description, datasheet_url, source_ref{kind, type_id, …} (a catalogue import's provenance; re-runs match by it), accessory_only (another type's accessory, never offered as a device) | D43, D48, D65, D185, D197 |
+| `vocab` | id, project, list ∈ {device_note, punch_item, punch_note, part_note, connection_note, photo_caption, model_map, level_alias, category, type, cable_code}, value, canonical_of | `cable_code` seeds the nine codes; a DaVinci port protocol with no code lands there as a draft (D197) |
 | `export` | id, project, kind ∈ {xlsx, floor_pdf}, params{levels}, blob (SHA-256 of the file, stored as a blob), job_state, stats{filename, rows…}, created_by/at, diff_summary | Export history; a job row (D137) |
 
 ### 2.3 Numbering
@@ -303,7 +303,7 @@ Cover: "ETC Lighting Controls Survey — Level NN", "Surveyed <date>" only (R7),
 | `POST /ops` · `GET /ops?project&since` | push / pull (§3.2) |
 | `POST /blobs/{sha}` · `PUT …/chunks/{n}` · `GET /blobs/{sha}` · `POST …/complete` · `GET …/content` | resumable blobs |
 | `GET /projects` · `POST /projects` (+ levels, copy-from) | project list and creation (server-side so numbering groups exist before any op); the project, its groups, levels and copies are written as ops so an iPad pulls them (D127) |
-| `POST /imports` · `GET /imports/{id}` · `GET /imports/{id}/crop` | setup and seed jobs; drafts delivered as ops; a draft's source crop as PNG (T44) |
+| `POST /imports` · `GET /imports/{id}` · `GET /imports/{id}/crop` | setup and seed jobs; drafts delivered as ops; a draft's source crop as PNG (T44); `kind=davinci` (+ `categories`) seeds the app library from DaVinci's `library.json` (T111, `server/docs/library.md`) |
 | `POST /exports` · `GET /exports/{id}` · `GET /exports?project` · `POST /exports/{id}/cancel` | workbook / floor PDF jobs and history; one queued or running per project and kind, stage and counts in `stats`, Cancel (D166) |
 | `GET /me` | user upsert from JWT |
 | `GET /health` | |

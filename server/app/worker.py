@@ -11,7 +11,7 @@ import time
 from app import backup
 from app.config import settings
 from app.db import SessionLocal
-from app.jobs import bom, exports, plans, riser, runner
+from app.jobs import bom, davinci_library, exports, plans, riser, runner
 from app.storage import get_object_store
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -34,6 +34,9 @@ def main() -> None:
             plans.run_queued(SessionLocal, get_object_store(), limit=settings.worker_concurrency)
             bom.run_queued(SessionLocal, get_object_store(), limit=settings.worker_concurrency)
             riser.run_queued(SessionLocal, get_object_store(), limit=settings.worker_concurrency)
+            davinci_library.run_queued(
+                SessionLocal, get_object_store(), limit=settings.worker_concurrency
+            )
             exports.run_queued(SessionLocal, get_object_store(), limit=settings.worker_concurrency)
         except Exception as e:  # noqa: BLE001 - the loop must survive a bad database moment
             log.error(json.dumps({"event": "jobs_tick_failed", "error": repr(e)}))

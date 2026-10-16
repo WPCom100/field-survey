@@ -583,6 +583,13 @@ class LibraryType(Id, Synced, Base):
     # Provenance across op streams (a project type promoted to the app library, D184): a plain
     # id, no foreign key, so the library push never waits on the project's.
     promoted_from_id: Mapped[uuid.UUID | None]
+    # T111 (D197): what a catalogue import keeps on the type. `source_ref` = `{kind: "davinci",
+    # type_id, …}` (re-runs match by it); `accessory_only` = imported as another type's accessory,
+    # never offered as a device (null = placeable).
+    description: Mapped[str | None]
+    datasheet_url: Mapped[str | None]
+    source_ref: Mapped[dict[str, Any] | None]
+    accessory_only: Mapped[bool | None]
 
 
 class Vocab(Id, Synced, Base):

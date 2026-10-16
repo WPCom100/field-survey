@@ -25,7 +25,7 @@ field-survey/
                   and on the iPad (expo-sqlite) through one SqlDriver interface
   packages/rules/ TypeScript: pure rule engine over a snapshot - no DB, no React
   server/         Python 3.12, FastAPI, Postgres 16, S3-compatible storage
-    app/          api, sync, numbering, blobs, claude (the API client), jobs (seed import, plan sheets + grid calibration, BOM and riser extraction, exports)
+    app/          api, sync, numbering, blobs, claude (the API client), jobs (seed import, plan sheets + grid calibration, BOM and riser extraction, DaVinci library import, exports)
     tests/
     docker-compose.yml  Caddyfile
   fixtures/       golden inputs (private): Lighting_Control_Survey_Master_B2-06_4.xlsx,

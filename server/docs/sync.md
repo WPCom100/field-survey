@@ -204,7 +204,7 @@ logging its create) has no heads yet and takes them from its create as before.
 
 `POST /library/ops` (`{since, ops}`) and `GET /library/ops?since&limit` carry the app-level
 device-type library: the same op format, `Push` loop, field heads, conflict review and history
-as a project's `/ops`, in a log of its own (`app/api/library.py`, `Push(..., library=True)`).
+as a project's `/ops`, in a log of its own (`app/api/library.py`, `Push(..., library=True)`). The DaVinci library import (T111, `server/docs/library.md`) writes its draft types here the same way, server side.
 
 - Ops name `LIBRARY_STREAM` (`00000000-0000-7000-8000-00000000a11b`) as their `project_id` on
   the wire and on the iPad; Postgres stores them with `project_id` **null** and numbers them on
