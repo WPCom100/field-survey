@@ -10,9 +10,12 @@ import {
   parseGridSets,
   parseSheetFeatures,
   type GridSet,
+  type Role,
   type SheetFeatures,
   type Store,
 } from '@field-survey/core';
+
+import { loadDeviceTypes, roleOfDevice } from '../library/neuron';
 
 import type { Filterable } from './filters';
 
@@ -41,6 +44,8 @@ export type PlanDevice = Filterable & {
   /** `06M-04`, `01-S15`, or `06M-?` while the server has not numbered it (D93). */
   label: string;
   isNew: boolean;
+  /** What it is (T112, D201): its type's role, else its category's; shapes the pin. */
+  role: Role;
   device: string | null;
   /** The master's Type column ("Echo relay panel"), when the device has one. */
   type: string | null;
@@ -132,6 +137,7 @@ export async function loadLevelPlan(
     params: [levelId],
     includeDeleted: opts.includeDeleted,
   });
+  const types = await loadDeviceTypes(store, level.projectId);
 
   const photos = new Map<string, number>();
   for (const r of await store.db.query<{ device_id: string; n: number }>(
@@ -175,6 +181,7 @@ export async function loadLevelPlan(
       id,
       label: displayNumber('device', r, level.code),
       isNew: isNew('device', r),
+      role: roleOfDevice(types, r),
       category: str(r.category),
       status: str(r.status),
       device: str(r.device),

@@ -4,7 +4,7 @@
  * only plain data plus Skia objects. Pins keep a constant on-screen size: everything is drawn
  * in view points at the pin's projected position.
  *
- * Per pin (D64, Phase 3 §2.2): shape = category, fill = status (hollow red for `Not installed`),
+ * Per pin (D64, Phase 3 §2.2): shape = role (T112), fill = status (hollow red for `Not installed`),
  * a glyph inside as the non-colour signal, the ID label below (labels layer), a "+" corner mark
  * for field additions, a camera mark with the photo count (photos layer), a cyan ring when
  * selected, an amber ring while in review (Phase 3 §13). Side B of a pin conflict (T26) is a
@@ -25,9 +25,9 @@ const REVIEW = '#ff8f00';
 export type PinFonts = { glyph: SkFont; label: SkFont; badge: SkFont };
 export type PinDrawOptions = { labels: boolean; photos: boolean; selectedId: string | null };
 
-function shapeAt(category: string | null, cx: number, cy: number, size: number): SkPath {
+function shapeAt(role: string | null, cx: number, cy: number, size: number): SkPath {
   'worklet';
-  const shape = pinShape(category, size);
+  const shape = pinShape(role, size);
   const path = Skia.Path.Make();
   if (shape.kind === 'circle') {
     path.addCircle(cx, cy, shape.radius);
@@ -64,7 +64,7 @@ function centredText(canvas: SkCanvas, text: string, cx: number, baseline: numbe
 
 function drawPin(canvas: SkCanvas, pin: RenderPin, x: number, y: number, fonts: PinFonts, opts: PinDrawOptions) {
   'worklet';
-  const shape = shapeAt(pin.category, x, y, PIN_PX);
+  const shape = shapeAt(pin.role ?? pin.category, x, y, PIN_PX);
   const paint = Skia.Paint();
   paint.setAntiAlias(true);
   if (pin.id === opts.selectedId) {

@@ -14,6 +14,7 @@
 
 import type { EditBatch, EditContext, Editor, Op, Store } from '@field-survey/core';
 import { CABLE_CODES, DEVICE_CATEGORIES, hashUuid } from '@field-survey/rules';
+import { canonicalCategory, roleOfCategory, type Role } from '@field-survey/core';
 
 import {
   BULK_MIN,
@@ -40,7 +41,9 @@ export class DraftError extends Error {
 
 const ctx = (reason: string): EditContext => ({ change_type: 'Master edit', reason });
 
+// the D196 eleven; an extraction job's category (the master's spelling, D1) is read as its canonical value
 const CATEGORIES: readonly string[] = DEVICE_CATEGORIES;
+const known = (c: string | null | undefined): string | null => canonicalCategory(c);
 
 function wholePositive(n: unknown, what: string): number {
   if (typeof n !== 'number' || !Number.isInteger(n) || n < 1) throw new DraftError(`${what} must be a whole number, 1 or more.`);
@@ -73,7 +76,7 @@ export function deviceBlockers(d: DeviceDraftRow, choice: DeviceChoice = {}): st
   if (d.needs.model && !(choice.model && d.needs.model.options.includes(choice.model))) out.push(`Pick the model: ${d.needs.model.options.join(' or ')}.`);
   if (d.needs.qty && !(typeof choice.qty === 'number' && choice.qty >= 1)) out.push('Pick the quantity: BOM or riser.');
   if (d.needs.level && !(choice.levelId && d.needs.level.options.some((o) => o.id === choice.levelId))) out.push(`Pick the level: ${d.needs.level.options.map((o) => o.code).join(' or ')}.`);
-  if (d.needs.category && !(choice.category && CATEGORIES.includes(choice.category))) out.push('Pick a category.');
+  if (d.needs.category && !(known(choice.category) && CATEGORIES.includes(known(choice.category)!))) out.push('Pick a category.');
   if (!(choice.model ?? d.model)) out.push('The draft has no model: Edit… first.');
   return out;
 }
@@ -90,7 +93,7 @@ export async function acceptDevice(editor: Editor, d: DeviceDraftRow, choice: De
   if (d.needs.model && choice.model !== d.model) changes.model = choice.model;
   if (d.needs.qty && choice.qty !== d.qty) changes.qty = wholePositive(choice.qty, 'Quantity');
   if (d.needs.level && choice.levelId !== d.levelId) changes.level_id = choice.levelId;
-  if (d.needs.category) changes.category = choice.category;
+  if (d.needs.category) changes.category = known(choice.category);
   const qty = (changes.qty as number | undefined) ?? d.qty;
   const model = (changes.model as string | undefined) ?? d.model;
   return editor.group(ctx(`Draft review: accepted ${label({ ...d, model, qty })}`), async (g) => {
@@ -108,7 +111,7 @@ export async function editDevice(editor: Editor, d: DeviceDraftRow, f: DeviceFie
   if (d.placed > 0) throw new DraftError('Devices were already placed from this draft; edit them on the plan.');
   const model = f.model !== undefined ? f.model.trim() : d.model;
   if (!model) throw new DraftError('Model is required.');
-  const category = f.category !== undefined ? f.category : d.category;
+  const category = known(f.category !== undefined ? f.category : d.category);
   if (!category || !CATEGORIES.includes(category)) throw new DraftError(`Category must be one of: ${CATEGORIES.join(' · ')}.`);
   const qty = f.qty !== undefined && f.qty !== null ? wholePositive(f.qty, 'Quantity') : d.qty;
   const changes: Record<string, unknown> = { model, category, qty, name: f.name !== undefined ? f.name?.trim() || null : d.name };
@@ -149,7 +152,8 @@ export type NewDeviceDraft = { levelId: string | null; model: string; category: 
 export async function addDeviceDraft(editor: Editor, projectId: string, f: NewDeviceDraft): Promise<string> {
   const model = f.model.trim();
   if (!model) throw new DraftError('Model is required.');
-  if (!CATEGORIES.includes(f.category)) throw new DraftError(`Category must be one of: ${CATEGORIES.join(' · ')}.`);
+  const category = known(f.category);
+  if (!category || !CATEGORIES.includes(category)) throw new DraftError(`Category must be one of: ${CATEGORIES.join(' · ')}.`);
   const { id } = await editor.create(
     'draft_device',
     {
@@ -158,7 +162,7 @@ export async function addDeviceDraft(editor: Editor, projectId: string, f: NewDe
       model,
       model_raw: model,
       name: f.name?.trim() || null,
-      category: f.category,
+      category,
       qty: wholePositive(f.qty, 'Quantity'),
       level_basis: f.levelId ? 'manual' : 'project_pool',
       extraction: 'manual',
@@ -261,12 +265,12 @@ const SIGNAL_TO: Readonly<Record<string, string>> = {
 const SINGLE_ROW = new Set(['P', '0-10V', '120V']);
 
 /** An endpoint as a record: a device or a placeholder, with the From text it reads as. */
-export type RealEnd = { kind: 'device' | 'placeholder'; id: string; levelId: string | null; levelCode: string | null; text: string; category?: string | null };
+export type RealEnd = { kind: 'device' | 'placeholder'; id: string; levelId: string | null; levelCode: string | null; text: string; category?: string | null; role?: Role };
 
-/** A device reads as its panel tag, a rack as "Equipment rack", else its Device text (the master's From column). */
+/** A device reads as its panel tag, a rack (by role, T112) as "Equipment rack", else its Device text (the master's From column). */
 function deviceText(d: DraftReviewData['devicesLive'][number]): string {
   if (d.panelName) return d.panelName;
-  if (d.category === 'Equipment rack') return 'Equipment rack';
+  if (d.role === 'equipment_rack') return 'Equipment rack';
   return d.device ?? d.category ?? d.displayId ?? 'device';
 }
 
@@ -283,21 +287,22 @@ export function realEnd(data: DraftReviewData, e: Endpoint | null): RealEnd | nu
     const dd = data.devices.find((x) => x.id === e.id);
     dev = dd ? deviceForDraft(data, dd) : null;
   }
-  return dev ? { kind: 'device', id: dev.id, levelId: dev.levelId, levelCode: code(dev.levelId), text: deviceText(dev), category: dev.category } : null;
+  return dev ? { kind: 'device', id: dev.id, levelId: dev.levelId, levelCode: code(dev.levelId), text: deviceText(dev), category: dev.category, role: dev.role } : null;
 }
 
 /**
  * The library's one row per device for a riser line accepted as `0-10V` or `120V` (D194, R2c /
  * R2d, D52): a Relay panel's 0-10V run to its far end (`Fixtures`), an NSPS's or rack's 120V row
  * `120v Power` → `P-NSPS-D Power Supply` / `Equipment rack`. Null when the code, the device's
- * category or the ends (one device, one placeholder) do not fit the table.
+ * role (T112: its type's, else its category's) or the ends (one device, one placeholder) do not fit the table.
  */
 export function libraryRow(code: string, a: RealEnd, b: RealEnd): { device: RealEnd; far: RealEnd; from: string; to: string } | null {
   const [device, far] = a.kind === 'device' && b.kind === 'placeholder' ? [a, b] : b.kind === 'device' && a.kind === 'placeholder' ? [b, a] : [null, null];
   if (!device || !far) return null;
-  if (code === '0-10V' && device.category === 'Relay panel') return { device, far, from: device.text, to: far.text };
-  if (code === '120V' && device.category === 'NSPS') return { device, far, from: '120v Power', to: 'P-NSPS-D Power Supply' };
-  if (code === '120V' && device.category === 'Equipment rack') return { device, far, from: '120v Power', to: 'Equipment rack' };
+  const role = device.role ?? roleOfCategory(device.category);
+  if (code === '0-10V' && role === 'relay_panel') return { device, far, from: device.text, to: far.text };
+  if (code === '120V' && role === 'nsps') return { device, far, from: '120v Power', to: 'P-NSPS-D Power Supply' };
+  if (code === '120V' && role === 'equipment_rack') return { device, far, from: '120v Power', to: 'Equipment rack' };
   return null;
 }
 

@@ -92,6 +92,8 @@ export const IMPORT_KIND = ['bom', 'riser', 'plans', 'master_xlsx', 'floor_xlsx'
 export const DRAFT_STATE = ['proposed', 'accepted', 'edited', 'rejected'] as const;
 export const ID_SCHEME = ['level_number', 'level_tag'] as const;
 export const LIBRARY_STATE = ['draft', 'accepted', 'rejected'] as const;
+// T112 (D201): `library_type.role`; the same list as `ROLE` in roles.ts (kept here for the CHECK).
+export const LIBRARY_ROLE = ['relay_panel', 'foundry_panel', 'ebdk', 'equipment_rack', 'nsps', 'touchscreen', 'station', 'sensor', 'other'] as const;
 export const VOCAB_LIST = [
   'device_note',
   'punch_item',

@@ -8,17 +8,21 @@
  * No React or Expo imports: tested in Node.
  */
 
-import { LIBRARY_STREAM, OpError, type EditContext, type Editor, type Store } from '@field-survey/core';
-import { CABLE_CODES, neuronIdDefault, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
+import { DEVICE_CATEGORIES, LIBRARY_STREAM, OpError, ROLE, ROLE_LABEL, canonicalCategory, isRole, roleOf, roleOfCategory, type EditContext, type Editor, type Role, type Store } from '@field-survey/core';
+import { CABLE_CODES, neuronIdDefault, neuronIdDefaultForRole, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
 
 export const LIBRARY_CTX: EditContext = { change_type: 'Master edit', reason: 'Device-type library' };
 
-/** The eight categories (CLAUDE.md §3), the picker's order. */
-export const CATEGORIES = ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor'] as const;
+/** The D196 eleven (CLAUDE.md §3, core), the picker's order; a project's `vocab(category)` may add more. */
+export const CATEGORIES = DEVICE_CATEGORIES;
 
-export { CABLE_CODES, neuronIdDefault, type LibraryAccessory, type LibraryCable };
+/** The roles a type may carry (T112, D201), the picker's order, and how the picker names them. */
+export const ROLES = ROLE;
+export const ROLE_LABELS = ROLE_LABEL;
 
-/** D52: an NSPS kit carries its power supply, expected 1. Offered on NSPS types. */
+export { CABLE_CODES, neuronIdDefault, neuronIdDefaultForRole, roleOf, roleOfCategory, type LibraryAccessory, type LibraryCable, type Role };
+
+/** D52: an NSPS kit carries its power supply, expected 1. Offered on types whose role is `nsps`. */
 export const NSPS_POWER_SUPPLY: LibraryAccessory = { model: 'P-NSPS-D Power Supply', expected_qty: 1 };
 
 export type LibraryState = 'draft' | 'accepted' | 'rejected';
@@ -40,14 +44,18 @@ export interface LibraryType {
   model: string;
   aliases: string[];
   category: string | null;
-  /** null = the category's default (stations and sensors by tag letter, the rest numbered). */
+  /** Stored role (T112, D201); null = the category's role. */
+  role: Role | null;
+  /** What applies: the stored role, else the category's (`other` when the category names none). */
+  effectiveRole: Role;
+  /** null = the role's default (stations and sensors by tag letter, the rest numbered). */
   idScheme: IdScheme | null;
   defaultCables: LibraryCable[];
   optionalCables: LibraryCable[];
   optionalAccessories: LibraryAccessory[];
   /** Stored flag; null = the category's default (T68, D185). */
   needsNeuronId: boolean | null;
-  /** What applies: the flag, else the category's default (off for Equipment rack and NSPS). */
+  /** What applies: the flag, else the role's default (off for racks and NSPS). */
   neuronId: boolean;
   state: LibraryState;
   createdById: string | null;
@@ -95,13 +103,13 @@ export function parseAliases(text: string): string[] {
   return out;
 }
 
-/** The rules a type's devices are read by: R2c / R2d / R2e by category, R2g once it has default cables. */
-export function rulesForType(category: string | null, defaultCables: readonly LibraryCable[]): string[] {
+/** The rules a type's devices are read by: R2c / R2d / R2e by role (T112), R2g once it has default cables. */
+export function rulesForType(role: Role, defaultCables: readonly LibraryCable[]): string[] {
   const out: string[] = [];
   const governs = defaultCables.length > 0;
-  if (category === 'Relay panel' && !governs) out.push('R2c');
-  if ((category === 'NSPS' || category === 'Equipment rack') && !governs) out.push('R2d');
-  if (category === 'NSPS' || category === 'Equipment rack') out.push('R2e');
+  if (role === 'relay_panel' && !governs) out.push('R2c');
+  if ((role === 'nsps' || role === 'equipment_rack') && !governs) out.push('R2d');
+  if (role === 'nsps' || role === 'equipment_rack') out.push('R2e');
   if (governs) out.push('R2g');
   return out;
 }
@@ -123,12 +131,14 @@ function toType(r: Row): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | '
     model: String(r.model),
     aliases: Array.isArray(r.aliases) ? (r.aliases as unknown[]).filter((a): a is string => typeof a === 'string') : [],
     category: str(r.category),
+    role: isRole(r.role) ? r.role : null,
+    effectiveRole: roleOf({ role: r.role, category: str(r.category) }, null),
     idScheme: r.id_scheme === 'level_tag' || r.id_scheme === 'level_number' ? r.id_scheme : null,
     defaultCables: parseLibraryCables(r.default_cables),
     optionalCables: parseLibraryCables(r.optional_cables),
     optionalAccessories: parseLibraryAccessories(r.optional_accessories),
     needsNeuronId: typeof r.needs_neuron_id === 'boolean' ? r.needs_neuron_id : null,
-    neuronId: typeof r.needs_neuron_id === 'boolean' ? r.needs_neuron_id : neuronIdDefault(str(r.category)),
+    neuronId: typeof r.needs_neuron_id === 'boolean' ? r.needs_neuron_id : neuronIdDefaultForRole(roleOf({ role: r.role, category: str(r.category) }, null)),
     state: r.state === 'accepted' || r.state === 'rejected' ? r.state : 'draft',
     createdById: str(r.created_by_id),
     promotedFromId: str(r.promoted_from_id),
@@ -182,10 +192,11 @@ export async function loadLibrary(store: Store, scope: string | null): Promise<L
     const keys = new Set([t.model, ...t.aliases].map(modelKey));
     const count = devices.filter((d) => (d.library_type_id ? d.library_type_id === t.id : !!d.device && keys.has(modelKey(d.device)))).length;
     const first = (await store.opsFor(t.id))[0];
-    types.push({ ...t, createdAt: first?.client_ts ?? null, promotedAs: promoted.get(t.id) ?? null, devices: count, rules: rulesForType(t.category, t.defaultCables) });
+    types.push({ ...t, createdAt: first?.client_ts ?? null, promotedAs: promoted.get(t.id) ?? null, devices: count, rules: rulesForType(t.effectiveRole, t.defaultCables) });
   }
+  // the eleven in order (an old master spelling sorts with its canonical value), then the project's own
   const catIndex = (c: string | null) => {
-    const i = CATEGORIES.indexOf(c as (typeof CATEGORIES)[number]);
+    const i = CATEGORIES.indexOf(canonicalCategory(c) as (typeof CATEGORIES)[number]);
     return i < 0 ? CATEGORIES.length : i;
   };
   const rejected = (t: LibraryType) => Number(t.state === 'rejected');
@@ -227,6 +238,8 @@ export async function createType(editor: Editor, store: Store, scope: string | n
 export interface TypePatch {
   model?: string;
   category?: string | null;
+  /** null = the category's role (T112). */
+  role?: Role | null;
   aliases?: string[];
   idScheme?: IdScheme | null;
   defaultCables?: LibraryCable[];
@@ -258,6 +271,10 @@ export async function updateType(editor: Editor, store: Store, id: string, patch
     values.model = model;
   }
   if (patch.category !== undefined) values.category = clean(patch.category);
+  if (patch.role !== undefined) {
+    if (patch.role !== null && !isRole(patch.role)) throw new OpError(`"${String(patch.role)}" is not a role (${ROLE.join(', ')}).`);
+    values.role = patch.role;
+  }
   if (patch.aliases !== undefined) values.aliases = patch.aliases.length ? patch.aliases : null;
   if (patch.idScheme !== undefined) values.id_scheme = patch.idScheme;
   if (patch.defaultCables !== undefined) values.default_cables = checkCables(patch.defaultCables, 'Default cables');
@@ -346,6 +363,8 @@ export async function copyTypes(editor: Editor, store: Store, scope: string | nu
         ...(r.datasheet_url != null ? { datasheet_url: r.datasheet_url } : {}),
         ...(r.source_ref != null ? { source_ref: r.source_ref } : {}),
         ...(r.accessory_only != null ? { accessory_only: r.accessory_only } : {}),
+        // and the T112 role (migration 0011 / Alembic 0012)
+        ...(r.role != null ? { role: r.role } : {}),
         state: 'accepted',
         created_by_id: editor.userId,
         ...(scope === null && r.project_id ? { promoted_from_id: r.id } : {}),

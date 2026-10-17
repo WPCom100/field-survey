@@ -3,7 +3,7 @@
  * Exact strings from the master workbook. No React or Expo imports.
  */
 
-import { vocab } from '@field-survey/core';
+import { DEVICE_CATEGORIES, MASTER_CATEGORY_RENAME, vocab } from '@field-survey/core';
 
 import { STANDARD_PHRASES } from '../card/model';
 import { CONNECTION_PHRASES } from '../ends/model';
@@ -16,7 +16,7 @@ export const VOCAB_LISTS = [
   { list: 'punch_note', title: 'Punch notes', hint: 'Phrases for the Notes of a punch item.' },
   { list: 'part_note', title: 'Part notes', hint: 'Phrases for the Notes of a missing part.' },
   { list: 'photo_caption', title: 'Photo captions', hint: 'Chips on the photo caption.' },
-  { list: 'category', title: 'Device categories', hint: 'Device Category picker; a pin shape follows the category (D64).' },
+  { list: 'category', title: 'Device categories', hint: "Device Category picker (the D196 eleven). A pin shape follows the device's role, which its library type carries (D64, T112)." },
   { list: 'cable_code', title: 'Cable codes', hint: 'The codes a cable can carry (CLAUDE.md §3). A DaVinci port protocol with no code arrives here as a draft (T111); accepting it records a decision, it does not make a code yet.' },
 ] as const satisfies readonly { list: (typeof vocab.VOCAB_LIST)[number]; title: string; hint: string }[];
 
@@ -29,8 +29,17 @@ export const SEED_VOCAB: Readonly<Record<VocabListKey, readonly string[]>> = {
   punch_note: ['Waiting on DMX Termination Kits', 'Need to be ordered', 'Confirm whether on site'],
   part_note: ['Need to be ordered', 'Confirm whether on site', 'Confirm whether on site (provided in box)'],
   photo_caption: STANDARD_PHRASES,
-  category: ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor'],
+  category: DEVICE_CATEGORIES,
   cable_code: ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D'],
+};
+
+/**
+ * Old spellings seeded as variants of a seed value (`vocab.canonical_of`, D179): the master's
+ * category names the D196 eleven replaced (T112, D201). `loadStandard` records them; the
+ * vocabulary lint then flags each record still using one and offers the rename ruling.
+ */
+export const SEED_VOCAB_VARIANTS: Readonly<Partial<Record<VocabListKey, Readonly<Record<string, string>>>>> = {
+  category: MASTER_CATEGORY_RENAME,
 };
 
 export type PlaceholderKind = (typeof vocab.PLACEHOLDER_KIND)[number];

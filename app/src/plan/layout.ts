@@ -21,6 +21,8 @@ export type RenderPin = {
   x: number;
   y: number;
   category: string | null;
+  /** The device's role (T112): shapes the pin; a pin with only a category is shaped by that. */
+  role?: string | null;
   fill: string;
   hollow: boolean;
   glyph: string;

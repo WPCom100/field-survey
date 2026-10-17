@@ -208,6 +208,7 @@ function toRenderPin(d: PlanDevice, conflict: PinConflict | null): RenderPin {
     x: at.x,
     y: at.y,
     category: d.category,
+    role: d.role,
     fill: st.fill,
     hollow: st.hollow,
     glyph: st.glyph,

@@ -131,6 +131,19 @@ store knows neither the columns nor the list value): the library stream's pull l
 update applies everything. So deploy the server and let the iPads take the update (next cold
 launch) **before** the first import; nothing is lost either way.
 
+## Roles (T112, D201)
+
+A created type also gets a **role** (`library_type.role`: `relay_panel`, `foundry_panel`,
+`ebdk`, `equipment_rack`, `nsps`, `touchscreen`, `station`, `sensor`, `other`) from our
+category and DaVinci's family / name (`role_of_davinci`): `Power Distribution` is a relay panel
+unless DaVinci files it under Foundry; `Equipment` is an NSPS (P-NSPS-D…) or an ERn enclosure
+(`equipment_rack`) by name, else `other`; `Emergency Equipment` is an EBDK only for the
+Emergency Bypass Detection Kit; `Equipment Panels` is a rack only for DaVinci's Equipment Racks;
+`Equipment Rack`, `Touchscreen`, `Station` and `Sensor` name their role; accessories get none.
+The rules, the ID letters, the Punch List Device text and the pin shapes read the role, never
+the category string (`app/roles.py`, `packages/core/src/roles.ts`). **A re-run never writes
+`role`** (D199 (3)): a role corrected by hand in the library editor stands.
+
 With the whole ETC library in, the app library holds ≈ 500 placeable drafts and ≈ 630
 accessories. The Library screen lists them all in one scroll by category (T114 adds search and a
 filter); the field-addition picker offers the placeable ones (drafts flagged, D48).

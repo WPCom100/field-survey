@@ -527,6 +527,8 @@ class TypePlan:
     """The `library_type` fields (no id / state / created_by_id)."""
     unmapped: tuple[str, ...]
     """Port protocols with no cable code."""
+    role: str | None = None
+    """T112 (D199 (3)): the role a **created** type gets; a re-run never writes it."""
 
 
 @dataclass
@@ -635,6 +637,41 @@ def accessories_of(t: DType, model_of: dict[str, str]) -> list[dict[str, Any]]:
             row["group"] = {"label": g.label, "min": g.min_count, "max": g.max_count}
         out.append(row)
     return out
+
+
+def role_of_davinci(t: DType, category: str | None) -> str | None:
+    """The role (T112, D201) a type **created** by the import gets, from our category and the
+    DaVinci family / category / name: `Power Distribution` is a relay panel unless DaVinci files
+    it under Foundry; `Equipment` is an NSPS (P-NSPS-D…) or an ERn enclosure (`equipment_rack`)
+    by name, else `other`; `Emergency Equipment` is an EBDK only for the Emergency Bypass
+    Detection Kit; `Equipment Panels` is a rack only for DaVinci's Equipment Racks (a simple
+    network box is `other`); `Equipment Rack` (DIN rail enclosures), `Touchscreen`, `Station`
+    and `Sensor` name their role. None for an accessory or an ignored type."""
+    if not category or category == IGNORE:
+        return None
+    name = f"{t.model_pattern} {t.display_name}".upper()
+    match category:
+        case "Power Distribution":
+            return "foundry_panel" if t.category.startswith("Foundry") else "relay_panel"
+        case "Equipment":
+            if "NSPS" in name:
+                return "nsps"
+            if name.startswith("ERN") or " ERN" in name:
+                return "equipment_rack"
+            return "other"
+        case "Emergency Equipment":
+            return "ebdk" if t.category == "Emergency Bypass Detection Kit" else "other"
+        case "Equipment Panels":
+            return "equipment_rack" if t.category == "Equipment Racks" else "other"
+        case "Equipment Rack":
+            return "equipment_rack"
+        case "Touchscreen":
+            return "touchscreen"
+        case "Station":
+            return "station"
+        case "Sensor":
+            return "sensor"
+    return "other"
 
 
 def source_ref_of(t: DType, category: str, timestamp: str | None, filename: str) -> dict[str, Any]:
@@ -774,7 +811,14 @@ def build_plan(
             "source_ref": ref,
             "accessory_only": True if is_accessory else None,
         }
-        plan.types.append(TypePlan(type_id=tid, payload=payload, unmapped=tuple(cables.unmapped)))
+        plan.types.append(
+            TypePlan(
+                type_id=tid,
+                payload=payload,
+                unmapped=tuple(cables.unmapped),
+                role=None if is_accessory else role_of_davinci(t, category),
+            )
+        )
         if not is_accessory:
             by_category[category or "?"] += 1
     plan.stats = {
@@ -1058,6 +1102,7 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
                     "id_scheme": None,
                     "optional_cables": None,
                     **tp.payload,
+                    "role": tp.role,  # on create only (D199 (3)): a role edited by hand stands
                     "state": "draft",
                     "created_by_id": actor.id,
                 },

@@ -200,12 +200,12 @@ Pure TypeScript over an in-memory project snapshot (no DB, no React; the same pa
 | R1 | Device status or its ends/items change | Findings: "Installed, untested with outstanding wiring/termination" (suggest Issue); "Issue device with no open punch item"; "Complete used" while `completion_phase=false` |
 | R2a | End status set | No auto-filled Note (D172): "Not run" (Not installed) / "Run, not terminated" (+ "; no term kit" when X) are offered as chips; lint on mismatch |
 | R2b | End endpoint ≠ `riser_to_label` | Finding "To does not match the riser" |
-| R2c/R2d/R2e | Library | 0-10V single row To `Fixtures`; P single row To `EBDK panic wire`, default `Installed, untested`; 120V single row (NSPS `P-NSPS-D Power Supply`, rack `Equipment rack` — D52); one Unison pair per level `Stations & Sensors` ↔ NSPS (or rack where no NSPS) |
+| R2c/R2d/R2e | Library (by the device's **role**, T112 / D201: its type's, else its category's) | 0-10V single row To `Fixtures`; P single row To `EBDK panic wire`, default `Installed, untested`; 120V single row (NSPS `P-NSPS-D Power Supply`, rack `Equipment rack` — D52); one Unison pair per level `Stations & Sensors` ↔ NSPS (or rack where no NSPS) |
 | R2g | Accepted device type with default cables (T48, D183) | Each of the type's default cables a device lacks, as a `cable` draft with the type's From / To / far end; for that type's devices it replaces R2c/R2d (R2e's per-level Unison stays). A device's type is its `library_type`, else the type whose model or alias is its Device text |
 | R2f | Other end surveyed, this end not | Nothing is copied (D171): the end stays empty (`Unsurveyed`, D110/D138) until someone surveys it; far level out of scope → `Not started` |
 | R3a | End `Not installed` | Punch "Run <signal> to <other end>", `Cable not run`, `EC`, surveyed end only (E3) — one per wire: with both ends surveyed, on the start of the run (side A, D177); → Termination item when the end becomes Issue |
 | R3b | DMX end Issue "no term kit" | Device item `Terminate DMX to <far end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits" (the master's form, D175) |
-| R3c | Numbering group exists | "Missing all Device Neuron IDs", `Information`, `EC`, `sort_last`; Notes = IDs with null `neuron_id` among devices that need one (D185: type flag, else category — not Equipment rack / NSPS); auto-close when empty, reopen on a new device without ID (D49) |
+| R3c | Numbering group exists | "Missing all Device Neuron IDs", `Information`, `EC`, `sort_last`; Notes = IDs with null `neuron_id` among devices that need one (D185: type flag, else the role's default — not racks / NSPS; D201); auto-close when empty, reopen on a new device without ID (D49) |
 | R3d | Item text | Finding on "test"/"commission" |
 | R3e/f | Item editor | Phrase picker from `vocab(punch_item)`; lint "outside vocabulary" (dismissable) |
 | R4a–d | Part created / R3b accepted / saved | Owner `EC`; "DMX termination kit - <destination> run" Qty 1 Needed "Need to be ordered" with `part_source`; default Notes by kind; lint on re-pull/network-kit parts |
@@ -217,18 +217,18 @@ Pure TypeScript over an in-memory project snapshot (no DB, no React; the same pa
 
 ### 6.2 Library (seed, from this project's Connections)
 
-| Type | Generated cables |
+| Role (T112, D201) | Generated cables |
 |---|---|
-| Relay panel CTxxLCPA/B | 0-10V → Fixtures (single); P → its EBDK (single, paired by panel name) |
-| NSPS P-NSPS-D(-KIT) | 120V (single); U bus pair; accessory: power supply expected 1 for -KIT (D52) |
-| Equipment rack | 120V (single); U bus pair on levels without NSPS |
+| `relay_panel` (CTxxLCPA/B) | 0-10V → Fixtures (single); P → its EBDK (`ebdk`, single, paired by panel name) |
+| `nsps` (P-NSPS-D(-KIT)) | 120V (single); U bus pair; accessory: power supply expected 1 for -KIT (D52) |
+| `equipment_rack` | 120V (single); U bus pair on levels without NSPS |
 | Riser-run devices | cables come from riser drafts, not the library |
 
-Anything else enters as a draft (D43/D48).
+The role is the device's library type's `role`, else the role its type's category implies, else its own category's (`roleOf` in core): the master's eight categories each imply one role; of the D196 eleven only `Emergency Equipment`, `Equipment Panels`, `Equipment Rack`, `Touchscreen`, `Station` and `Sensor` do, so a `Power Distribution` or `Equipment` device needs a type to be read as a relay panel or an NSPS. Anything else enters as a draft (D43/D48).
 
 ### 6.3 Lint checks
 
-NSPS/rack without 120V · relay panel without P or 0-10V · Issue device without open item · item without Owner · Neuron ID item missing/not last · value outside vocabulary · cable with missing far end · ends with different code or incompatible statuses · To ≠ riser · duplicate Neuron ID · link to deleted device · pin outside sheet · level locked with unreviewed drafts · accessory found < expected.
+NSPS/rack without 120V (by role) · relay panel without P or 0-10V (by role) · Issue device without open item · item without Owner · Neuron ID item missing/not last · value outside vocabulary · cable with missing far end · ends with different code or incompatible statuses · To ≠ riser · duplicate Neuron ID · link to deleted device · pin outside sheet · level locked with unreviewed drafts · accessory found < expected.
 
 ### 6.4 Rulings
 

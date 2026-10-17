@@ -199,6 +199,18 @@ Monitoring: an external uptime monitor pings `https://survey.wpcom.cloud/health`
 - **Replace the temporary Claude API key.** The key now in `server/.env` and `server/.env.production` was pasted into a Claude Code chat on 2026-10-15 (so it has been through a transcript) and is marked `TEMPORARY` in both files. Rotate it per the runbook row above once T43 is deployed and working; it has not been copied to the Droplet yet — T43 has shipped, so do that now with the §1.6 `scp` + `docker compose up -d worker` (until then a riser upload on the Droplet lands its drafts without endpoints, `stats.claude = unavailable`). The T43 recording run on the PC spent about $2 of this key (26 band calls at effort high).
 - ~~**Install Tesseract on the PC.**~~ *(Done 2026-10-15 by Landry: `winget install UB-Mannheim.TesseractOCR` → `tesseract v5.4.0.20240606` at `C:\Program Files\Tesseract-OCR`. The OCR tests now run on the PC: 9 pass, 3 fail by one row — this build drops BOM p.3 line 630 (`P-DOC-C-SR-4`, qty 1, FLOOR 20) that the Linux `tesseract-ocr` of the image and CI reads → **T109**. The Droplet uses the image, so production is unaffected.)* `server/app/ocr.py` looks for `C:\Program Files\Tesseract-OCR\tesseract.exe` (or `TESSERACT_CMD`). The installer is already downloaded — `winget install UB-Mannheim.TesseractOCR` or https://github.com/UB-Mannheim/tesseract/wiki — but it needs a UAC prompt the Claude Code shell cannot show, so run it by hand. Until then the 4 OCR tests in `server/tests/test_bom.py` skip with that reason on the PC; they pass in the api container (`docker compose build api`, then run pytest inside it with `fixtures/`, `app/` and `tests/` mounted) and in CI.
 
+### 4.2 Moving a project to the D196 categories (T112, D201)
+
+The eleven categories replace the master's eight through a rename ruling applied **on the iPad**,
+not by the server. Per project, in this order: (1) run the DaVinci library import (T111) so the
+catalogue types with their roles exist; (2) Setup → Vocabulary → **Load standard values** — adds
+the eleven and marks `Relay panel`, `Foundry panel`, `EBDK`, `NSPS`, `Equipment rack` as old
+spellings; (3) Lint → Value outside vocabulary → **Fix all via ruling**, one rename per old
+spelling (standing, with who / when / reason). A device whose new category names no role
+(`Power Distribution`, `Equipment`) is read by its library type: on Centennial the 11 relay
+panels (`CTxxLCPA/B`, whose Device text is the panel tag) need their type picked on the card
+afterwards; the NSPS, EBDKs, rack and Foundry panels match by Device text or category.
+
 ## 5. iOS builds and TestFlight (T06b, D59, D70)
 
 All on the PC in `app/`, in **your own terminal** (EAS asks for the Apple ID password and 2FA code interactively). Needs the Apple Developer Program membership **active** (developer.apple.com → Account → Membership shows a Team ID). Nothing here needs a Mac. **Always run `eas` from `app/`**: from the repo root it writes a stray `eas.json`/`app.json` there and fails with "The `expo` package was not found". Apple team `H2CLZXHCH8`; commands that need it non-interactively take `--apple-team-id H2CLZXHCH8` (e.g. `eas device:list`).

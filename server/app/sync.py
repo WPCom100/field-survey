@@ -40,6 +40,7 @@ from app.numbering import (
     NUMBERED,
     TAG_PREFIX,
     DeviceNumberCache,
+    device_role,
     device_scheme,
     next_device_id,
     next_number,
@@ -917,7 +918,7 @@ class Push:
             return  # carries its ID, or a replayed create: never renumber
         prefix = ""
         if device_scheme(self.session, payload, self.head_value) == "level_tag":
-            prefix = TAG_PREFIX.get(payload.get("category"), "")
+            prefix = TAG_PREFIX.get(device_role(self.session, payload, self.head_value), "")
         level_id = payload.get("level_id")
         if (self.level_code_of(level_id), prefix) not in self.device_numbers:
             self.flush_ops()  # the first assignment per level code scans the op log

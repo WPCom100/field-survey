@@ -276,6 +276,36 @@ def test_the_library_type_scheme_wins_over_the_category(client, w):
     assert ids(w.push(client, [panel_tagged], since=4)) == {panel_tagged["entity_id"]: "06M-02"}
 
 
+def test_the_library_type_role_gives_the_tag_letter_when_the_category_names_none(client, w):
+    """T112 (D201): a station type filed under the D196 `Equipment` category still tags its
+    devices `S<n>`, by its role; the category alone (no type) names no role and is numbered."""
+    station_type = w.create(
+        w.ann,
+        "library_type",
+        {
+            "project_id": str(w.project.id),
+            "model": "UH10002",
+            "category": "Equipment",
+            "role": "station",
+        },
+    )
+    w.push(client, [station_type])
+    typed = new_device(
+        w, w.ann, w.l06m, category="Equipment", library_type_id=station_type["entity_id"]
+    )
+    loose = new_device(w, w.ann, w.l06m, category="Equipment")
+    by_text = new_device(w, w.bob, w.l06m, category="Equipment", device="UH10002")
+    renamed = new_device(w, w.bob, w.l06m, category="Equipment Panels")
+    got = ids(w.push(client, [typed, loose, by_text, renamed], since=1))
+    # by link: S; a bare category: numbered (the server does not match by Device text on create)
+    assert [got[o["entity_id"]] for o in (typed, loose, by_text, renamed)] == [
+        "06M-S1",
+        "06M-01",
+        "06M-02",
+        "06M-03",
+    ]
+
+
 def test_a_level_created_by_an_op_gives_its_code_from_the_log(client, w):
     lvl = w.create(w.ann, "level", {"numbering_group_id": str(w.group07.id), "level": "08"})
     d = new_device(w, w.ann, w.l06m)

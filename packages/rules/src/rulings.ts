@@ -18,7 +18,7 @@
  * `action {set: {field: value}}`; `parseRuling` reads both.
  */
 
-import { vocab as V, uuidv7 } from '@field-survey/core';
+import { DEVICE_CATEGORIES, vocab as V, uuidv7 } from '@field-survey/core';
 
 import type { RecordPlan } from './decide';
 import type { Rule, RuleContext } from './rule';
@@ -112,7 +112,8 @@ export interface RulingField {
 }
 
 const CABLE_CODES = ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D'] as const;
-const CATEGORIES = ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor'] as const;
+// the D196 eleven (T112); a project's `vocab(category)` may add more, so these are suggestions
+const CATEGORIES = DEVICE_CATEGORIES;
 
 const text = (field: string, label: string, extra: Partial<RulingField> = {}): RulingField => ({ field, label, type: 'text', settable: true, ...extra });
 const enumField = (field: string, label: string, options: readonly string[]): RulingField => ({ field, label, type: 'enum', options, strict: true, settable: true });

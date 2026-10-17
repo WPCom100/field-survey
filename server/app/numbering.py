@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Device, Level, LibraryType, NumberingGroup, Op
+from app.roles import is_role, role_of_category
 
 # entity_kind → (counter attribute, display field, formatter)
 NUMBERED: dict[str, tuple[str, str]] = {
@@ -86,15 +87,31 @@ def next_number(
 
 # ------------------------------------------------------------------ device IDs (D93)
 
-# Categories whose default scheme is `level_tag`, with their ID letter (stations S, sensors D).
-TAG_PREFIX = {"Station": "S", "Sensor": "D"}
-TAG_CATEGORIES = frozenset(TAG_PREFIX)
+# Roles whose default scheme is `level_tag`, with their ID letter (stations S, sensors D) — T112.
+TAG_PREFIX = {"station": "S", "sensor": "D"}
+
+
+def device_role(session: Session, payload: dict, head_value) -> str:
+    """The created device's role (T112, D201): its library type's `role` (from its row, else
+    from the op log), else the type's category's, else its own category's. Mirrors `roleOf`
+    in core."""
+    type_id = payload.get("library_type_id")
+    type_category = None
+    if type_id:
+        type_id = uuid.UUID(str(type_id))
+        lt = session.get(LibraryType, type_id)
+        role = lt.role if lt is not None else head_value(type_id, "role")
+        if is_role(role):
+            return role
+        type_category = lt.category if lt is not None else head_value(type_id, "category")
+    return role_of_category(type_category or payload.get("category"))
 
 
 def device_scheme(session: Session, payload: dict, head_value) -> str:
     """`level_number` or `level_tag` for a device create: the library type's `id_scheme`
-    wins (from its row, else from the op log), else Station/Sensor → `level_tag`, everything
-    else (category unknown included) → `level_number`. Mirrors `defaultIdScheme` in core."""
+    wins (from its row, else from the op log), else the device's role: station / sensor →
+    `level_tag`, everything else (category unknown included) → `level_number`. Mirrors
+    `deviceIdFor` in core."""
     type_id = payload.get("library_type_id")
     if type_id:
         type_id = uuid.UUID(str(type_id))
@@ -102,7 +119,8 @@ def device_scheme(session: Session, payload: dict, head_value) -> str:
         scheme = lt.id_scheme if lt is not None else head_value(type_id, "id_scheme")
         if scheme:
             return scheme
-    return "level_tag" if payload.get("category") in TAG_CATEGORIES else "level_number"
+    role = device_role(session, payload, head_value)
+    return "level_tag" if role in TAG_PREFIX else "level_number"
 
 
 def level_code(session: Session, level_id: uuid.UUID, head_value) -> str | None:

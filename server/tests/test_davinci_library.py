@@ -391,6 +391,16 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     assert [c["code"] for c in nsps.default_cables] == ["U", "N", "UV", "120V"]
     assert types[LVD].accessory_only is True and types[LVD].category is None
     assert types[ERN2].optional_accessories[4]["group"]["min"] == 2
+    # T112 (D201): a created type gets its role from our category and DaVinci's family / name
+    assert {k: types[k].role for k in (NSPS, EBDK, UHCI, ERN2, TS7, UH10002, LVD)} == {
+        NSPS: "nsps",
+        EBDK: "ebdk",
+        UHCI: "sensor",
+        ERN2: "equipment_rack",
+        TS7: "touchscreen",
+        UH10002: "station",
+        LVD: None,
+    }
     # the ops are in the app library's log, so every iPad pulls them
     ops = session.scalars(select(Op).where(Op.entity_kind == "library_type")).all()
     assert len(ops) == 37 and all(o.project_id is None and o.kind == "create" for o in ops)
@@ -419,6 +429,7 @@ def test_rerun_updates_drafts_by_type_id_and_leaves_accepted_types(
     types[NSPS].state = "accepted"
     types[NSPS].aliases = ["NSPS", "7182A1711", "P-NSPS-D-DIN"]
     types[EBDK].state = "rejected"
+    types[TS7].role = "other"  # a role corrected by hand on a draft (D199 (3))
     session.commit()
     # a newer library: the touchscreen's description changed, the NSPS's too, a type is new
     doc = json.loads(sample)
@@ -453,6 +464,8 @@ def test_rerun_updates_drafts_by_type_id_and_leaves_accepted_types(
     assert types[NSPS].description == "Paradigm Network Station Power Supply"  # accepted: untouched
     assert types[NSPS].aliases == ["NSPS", "7182A1711", "P-NSPS-D-DIN"]
     assert types[EBDK].state == "rejected" and types[new["typeId"]].model == "EBDK-2"
+    # the re-run never writes `role`: the hand-corrected draft keeps it; the new type gets one
+    assert types[TS7].role == "other" and types[new["typeId"]].role == "ebdk"
     sets = session.scalars(
         select(Op).where(
             Op.entity_kind == "library_type", Op.kind == "set", Op.entity_id == types[TS7].id

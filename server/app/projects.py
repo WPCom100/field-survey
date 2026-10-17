@@ -378,6 +378,7 @@ def _copy(
                 "optional_cables": t.optional_cables,
                 "optional_accessories": t.optional_accessories,
                 "needs_neuron_id": t.needs_neuron_id,
+                "role": t.role,  # T112
                 "state": "accepted",
                 "created_by_id": user.id,
             },

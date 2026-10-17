@@ -576,3 +576,61 @@ describe('the registry', () => {
     expect(empty).toMatchObject({ proposals: [], findings: [], upkeep: [], problems: [] });
   });
 });
+
+describe('roles (T112, D201): R2c / R2d / R2e and the Neuron ID default read the device role, not the category string', () => {
+  it("a type's role governs; the D196 categories with no type imply a role only where one is named", () => {
+    const b = new Build();
+    const { level, power } = floor(b);
+    // an NSPS of the D196 `Equipment` category: its type says what it is
+    const nspsType = b.libraryType('P-NSPS-D-KIT', 'Equipment', { role: 'nsps' });
+    const nsps = b.device(level, 'Equipment', { display_id: '06M-05', device: 'P-NSPS-D-KIT', library_type_id: nspsType.id });
+    // a gateway of the same category, no type: nothing is offered
+    b.device(level, 'Equipment', { display_id: '06M-06', device: 'RSN-DMX8-R' });
+    // a rack renamed to Equipment Panels with no type: the category names one role
+    const rack = b.device(level, 'Equipment Panels', { display_id: '06M-07', device: 'Equipment Rack 18U' });
+    const out = run(b, [R2d]);
+    expect(out.proposals.map((p) => [p.subject.entity_id, (p.payload.ends as Record<string, unknown>[])[0]!.to_text])).toEqual([
+      [nsps.id, 'P-NSPS-D Power Supply'],
+      [rack.id, 'Equipment rack'],
+    ]);
+    expect(out.proposals[0]!.why).toContain('is an NSPS with no 120V row');
+    expect(out.proposals.every((p) => (p.payload.ends as Record<string, unknown>[])[1]!.placeholder_id === power.id)).toBe(true);
+    // R2e: the NSPS hosts the bus by role
+    const bus = run(b, [R2e]).proposals[0]!;
+    expect((bus.payload.ends as Record<string, unknown>[])[0]).toMatchObject({ device_id: nsps.id, from_text: 'P-NSPS-D-KIT' });
+  });
+
+  it('R2c: a relay panel is one by role; a Foundry panel of the same Power Distribution category is not; the EBDK is paired by role', () => {
+    const b = new Build();
+    const { level } = floor(b);
+    const erp = b.libraryType('ERP24-FT', 'Power Distribution', { role: 'relay_panel', aliases: ['ERP-FT-241P'] });
+    b.libraryType('UFMP4', 'Power Distribution', { role: 'foundry_panel' });
+    const panel = b.device(level, 'Power Distribution', { display_id: '06M-01', device: 'ERP-FT-241P', panel_name: 'CT06LCPA' });
+    const ufmp = b.device(level, 'Power Distribution', { display_id: '06M-02', device: 'UFMP4' });
+    // the panel's EBDK, in the D196 category: `Emergency Equipment` names the ebdk role
+    const ebdk = b.device(level, 'Emergency Equipment', { display_id: '06M-03', device: 'EBDK', panel_name: 'CT06LCPA' });
+    // a Power Distribution device with no type and no matching model: no role, nothing offered
+    const loose = b.device(level, 'Power Distribution', { display_id: '06M-04', device: 'CT06LCPB', panel_name: 'CT06LCPB' });
+    const mine = new Set([panel.id, ufmp.id, ebdk.id, loose.id]);
+    const out = { proposals: run(b, [R2c]).proposals.filter((p) => mine.has(p.subject.entity_id)) };
+    expect(out.proposals.map((p) => [p.subject.entity_id, p.discriminator])).toEqual([
+      [panel.id, '0-10V'],
+      [panel.id, 'P'],
+    ]);
+    expect((out.proposals[1]!.payload.ends as Record<string, unknown>[])[1]).toMatchObject({ device_id: ebdk.id, from_text: 'EBDK panic wire' });
+    expect(out.proposals[0]!.why).toContain(`is a Relay panel`);
+    // the type was matched by alias (D183 (4)); its role, not its category, made it a relay panel
+    expect(erp.category).toBe('Power Distribution');
+  });
+
+  it('needsNeuronId: the type flag, else the role of the type (its role, else its category), else the device category', () => {
+    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: 'nsps' }, { category: 'Equipment' })).toBe(false);
+    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: 'other' }, { category: 'NSPS' })).toBe(true);
+    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: null }, { category: 'NSPS' })).toBe(true); // Equipment names no role
+    expect(needsNeuronId({ needs_neuron_id: true, category: null, role: 'equipment_rack' }, { category: 'Equipment Panels' })).toBe(true);
+    expect(needsNeuronId(null, { category: 'Equipment Panels' })).toBe(false);
+    expect(needsNeuronId(null, { category: 'Power Distribution' })).toBe(true);
+    expect(neuronIdDefault('Equipment Rack')).toBe(false);
+    expect(neuronIdDefault('Equipment')).toBe(true);
+  });
+});

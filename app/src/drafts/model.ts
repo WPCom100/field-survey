@@ -6,7 +6,9 @@
  * fallback) read the same way. Pure: a `Store` in, plain rows out; tested in Node.
  */
 
-import type { Store } from '@field-survey/core';
+import { roleOfCategory, type Role, type Store } from '@field-survey/core';
+
+import { loadDeviceTypes, roleOfDevice } from '../library/neuron';
 
 // ------------------------------------------------------------------ shapes
 
@@ -116,7 +118,7 @@ export type DraftReviewData = {
   cables: CableDraftRow[];
   placeholders: { id: string; label: string; kind: string; levelId: string | null }[];
   /** Live devices of the project, for the endpoint pickers. */
-  devicesLive: { id: string; levelId: string; label: string; displayId: string | null; panelName: string | null; category: string | null; device: string | null; baselineRef: string | null }[];
+  devicesLive: { id: string; levelId: string; label: string; displayId: string | null; panelName: string | null; category: string | null; role: Role; device: string | null; baselineRef: string | null }[];
 };
 
 /** The minimum for Accept all (Phase 3 §3.3); each accept is still recorded as a reviewed op. */
@@ -365,10 +367,11 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
   const rawDevices = await store.list<Record<string, unknown>>('draft_device', { where: 'project_id = ?', params: [projectId], includeDeleted: true });
   const rawCables = await store.list<Record<string, unknown>>('draft_cable', { where: 'project_id = ?', params: [projectId] });
   const live = await store.db.query<Record<string, unknown>>(
-    `SELECT d.id, d.level_id, d.display_id, d.panel_name, d.category, d.device, d.baseline_ref_id FROM device d JOIN level l ON l.id = d.level_id
+    `SELECT d.id, d.level_id, d.display_id, d.panel_name, d.category, d.device, d.library_type_id, d.baseline_ref_id FROM device d JOIN level l ON l.id = d.level_id
      WHERE l.project_id = ? AND d.deleted_at IS NULL`,
     [projectId],
   );
+  const types = await loadDeviceTypes(store, projectId);
   const placeholders = await store.list<{ id: string; label: string; kind: string; level_id: string | null }>('placeholder', {
     where: 'project_id = ? AND deleted_at IS NULL',
     params: [projectId],
@@ -525,6 +528,7 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
       displayId: str(d.display_id),
       panelName: str(d.panel_name),
       category: str(d.category),
+      role: roleOfDevice(types, d),
       device: str(d.device),
       baselineRef: str(d.baseline_ref_id),
       label: [str(d.display_id) ?? `${levelCode(String(d.level_id)) ?? '?'}-?`, str(d.panel_name) ?? str(d.device) ?? str(d.category)].filter(Boolean).join(' '),
@@ -642,7 +646,7 @@ export function deviceForDraft(data: Pick<DraftReviewData, 'devicesLive'>, d: Pi
   if (placed.length > 1 || !d.levelId) return null;
   const here = data.devicesLive.filter((x) => x.levelId === d.levelId);
   const tag = d.name?.replace(/\s+/g, '').toUpperCase();
-  if (tag && d.category !== 'Equipment rack') {
+  if (tag && roleOfCategory(d.category) !== 'equipment_rack') {
     const byTag = here.filter((x) => x.panelName?.replace(/\s+/g, '').toUpperCase() === tag);
     return byTag.length === 1 ? byTag[0]! : null;
   }

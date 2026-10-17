@@ -46,6 +46,7 @@ from app.models import (
     Project,
     PunchItem,
 )
+from app.roles import DeviceRoles, role_of_category
 from app.storage import ObjectMissing, ObjectStore, read_ordered
 
 DEFAULT_TITLE = "ETC Lighting Controls Survey"
@@ -302,21 +303,24 @@ def number_refs(numbers: list[int]) -> str:
     return ", ".join(parts)
 
 
-# D136, D151: named by their device alone (no room); so is any device with a panel name
-NAME_ONLY_CATEGORIES = ("Relay panel", "Equipment rack", "NSPS")
+# D136, D151: roles named by their device alone (no room); so is any device with a panel name
+NAME_ONLY_ROLES = ("relay_panel", "equipment_rack", "nsps")
 
 
-def default_device_text(dev: Device | None) -> str | None:
+def default_device_text(dev: Device | None, role: str | None = None) -> str | None:
     """The Device text of a punch item linked to `dev` (D136 format, D148, D151): `PI1002 S3 -
     Corridor …` for a station or sensor (model, tag, room), `UFMP4 - BH OBS RM 47 …` for a
     Foundry panel without a panel name; `CTB2LCPB` for a named panel, `EBDK (CTB2LCPB)` for an
-    EBDK, the model alone for a rack or NSPS. Mirrored by `defaultDeviceText` in packages/core."""
+    EBDK, the model alone for a rack or NSPS. The kind of device is its `role` (T112: its
+    type's, `DeviceRoles`); left out = its category's. Mirrored by `defaultDeviceText` in
+    packages/core."""
     if dev is None:
         return None
+    role = role or role_of_category(dev.category)
     name = dev.device or dev.type or dev.category or ""
-    if dev.category == "EBDK":
+    if role == "ebdk":
         return f"EBDK ({dev.panel_name})" if dev.panel_name else (name or None)
-    if dev.category in NAME_ONLY_CATEGORIES or dev.panel_name:
+    if role in NAME_ONLY_ROLES or dev.panel_name:
         return name or None
     tail = dev.display_id.split("-", 1)[1] if dev.display_id and "-" in dev.display_id else ""
     if re.fullmatch(r"[SD]\d+", tail):
@@ -326,11 +330,11 @@ def default_device_text(dev: Device | None) -> str | None:
     return name or None
 
 
-def punch_device_text(p: PunchItem, dev: Device | None) -> str | None:
+def punch_device_text(p: PunchItem, dev: Device | None, role: str | None = None) -> str | None:
     """The Punch List's Device column (D148, D150): derived from the linked device, so a rename
     follows with no op on the punch item; an item linked to no device keeps the master's text
     (`device_text`, e.g. the room or `All devices`)."""
-    return default_device_text(dev) if dev is not None else p.device_text
+    return default_device_text(dev, role) if dev is not None else p.device_text
 
 
 def load(
@@ -348,6 +352,7 @@ def load(
     if project is None:
         raise LookupError(f"unknown project {project_id}")
     settings = project.settings or {}
+    roles = DeviceRoles.load(session, project_id)  # T112: the devices' roles, by their types
     levels_all = [
         lv
         for lv in session.scalars(
@@ -512,7 +517,9 @@ def load(
         [
             code[p.level_id],
             p.number,
-            punch_device_text(p, dev_by_id.get(p.device_id)),
+            punch_device_text(
+                p, dev_by_id.get(p.device_id), roles.role_of(dev_by_id.get(p.device_id))
+            ),
             p.item,
             p.type,
             join_numbers(punch_photos.get(p.id, [])),

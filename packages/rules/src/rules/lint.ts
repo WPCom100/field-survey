@@ -9,10 +9,12 @@
  * finding reopens when its message changes (D178).
  */
 
+import { MASTER_CATEGORY_RENAME, ROLE_LABEL } from '@field-survey/core';
+
 import { DEVICE_CATEGORIES } from '../lints';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow, PunchItemRow } from '../snapshot';
-import { deviceNeedsNeuronId, governingCables } from './library';
+import { deviceNeedsNeuronId, deviceRole, governingCables } from './library';
 import { isNeuronItem } from './r3';
 import { SIGNAL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, NEURON_ITEM, signalOf, str, subjectOfDevice, subjectOfEnd } from './shared';
 
@@ -33,12 +35,13 @@ function levelNames(levels: readonly LevelRow[]): string {
 export const LintPower: Rule = {
   id: 'lint.power_120v',
   title: 'NSPS/rack without 120V row',
-  text: 'An NSPS or Equipment rack has a 120V row (PLAN §6.2, D52); one without is flagged. R2d offers the row as a draft.',
+  text: 'An NSPS or equipment rack (by role, D201) has a 120V row (PLAN §6.2, D52); one without is flagged. R2d offers the row as a draft.',
   run(ctx) {
     for (const d of ctx.index.device.values()) {
-      if (d.category !== 'NSPS' && d.category !== 'Equipment rack') continue;
+      const role = deviceRole(ctx, d);
+      if (role !== 'nsps' && role !== 'equipment_rack') continue;
       if (hasCode(ctx, d, '120V') || governingCables(ctx, d)) continue;
-      ctx.find({ subject: subjectOfDevice(d), message: `${deviceLabel(ctx, d)}: ${d.category} without a 120V row` });
+      ctx.find({ subject: subjectOfDevice(d), message: `${deviceLabel(ctx, d)}: ${ROLE_LABEL[role]} without a 120V row` });
     }
   },
 };
@@ -46,10 +49,10 @@ export const LintPower: Rule = {
 export const LintRelay: Rule = {
   id: 'lint.relay_cables',
   title: 'Relay panel without P or 0-10V row',
-  text: 'A Relay panel has a P row and a 0-10V row (PLAN §6.2); a missing one is flagged. R2c offers it as a draft.',
+  text: 'A relay panel (by role, D201) has a P row and a 0-10V row (PLAN §6.2); a missing one is flagged. R2c offers it as a draft.',
   run(ctx) {
     for (const d of ctx.index.device.values()) {
-      if (d.category !== 'Relay panel' || governingCables(ctx, d)) continue;
+      if (deviceRole(ctx, d) !== 'relay_panel' || governingCables(ctx, d)) continue;
       for (const code of ['P', '0-10V']) {
         if (!hasCode(ctx, d, code)) ctx.find({ subject: subjectOfDevice(d), discriminator: code, message: `${deviceLabel(ctx, d)}: Relay panel without a ${code} row` });
       }
@@ -155,8 +158,14 @@ export const LintVocab: Rule = {
         }
       }
     }
-    // Device category outside the list (CLAUDE.md §3 plus the project's own `category` entries).
-    const categories = new Set<string>([...DEVICE_CATEGORIES, ...vocab.filter((v) => v.list === 'category' && !v.canonical_of_id).map((v) => v.value)]);
+    // Device category outside the list: CLAUDE.md §3 (the D196 eleven), the master's own
+    // spellings (D1 — old spellings once the project's vocabulary says so, caught above) and the
+    // project's own `category` entries.
+    const categories = new Set<string>([
+      ...DEVICE_CATEGORIES,
+      ...Object.keys(MASTER_CATEGORY_RENAME),
+      ...vocab.filter((v) => v.list === 'category' && !v.canonical_of_id).map((v) => v.value),
+    ]);
     for (const d of ctx.index.device.values()) {
       const c = str(d.category);
       if (!c || categories.has(c) || seen.has(`${d.id}|category`)) continue;

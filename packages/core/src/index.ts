@@ -5,6 +5,18 @@ export type { SqlDriver, SqlParam, SqlRow } from './sql-driver';
 export type { Op, StoredOp } from './op';
 export { uuidv7, isUuid, setRandomSource, type RandomBytes } from './ids';
 export * as vocab from './vocab';
+export {
+  ROLE,
+  ROLE_LABEL,
+  DEVICE_CATEGORIES,
+  MASTER_CATEGORY_RENAME,
+  canonicalCategory,
+  isRole,
+  roleOfCategory,
+  roleOf,
+  type Role,
+  type RoleSource,
+} from './roles';
 export type {
   ChangeType,
   OpKind,
@@ -151,6 +163,7 @@ export {
   DeviceIdError,
   TAG_PREFIX,
   defaultIdScheme,
+  defaultIdSchemeForRole,
   parseDeviceId,
   tagDeviceId,
   deviceIdFor,

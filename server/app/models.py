@@ -566,6 +566,7 @@ class LibraryType(Id, Synced, Base):
     __table_args__ = (
         one_of("id_scheme", vocab.ID_SCHEME),
         one_of("state", vocab.LIBRARY_STATE),
+        one_of("role", vocab.LIBRARY_ROLE),
     )
 
     project_id: Mapped[uuid.UUID | None] = mapped_column(fk("project.id"), index=True)
@@ -590,6 +591,9 @@ class LibraryType(Id, Synced, Base):
     datasheet_url: Mapped[str | None]
     source_ref: Mapped[dict[str, Any] | None]
     accessory_only: Mapped[bool | None]
+    # T112 (D201): what its devices are (`app/roles.py`); null = the category's role. The ID
+    # scheme, the Punch List Device text and the floor PDF's pin shapes read it.
+    role: Mapped[str | None]
 
 
 class Vocab(Id, Synced, Base):

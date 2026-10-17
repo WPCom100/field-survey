@@ -141,7 +141,7 @@ export function isNeuronItem(p: PunchItemRow): boolean {
 export const R3c: Rule = {
   id: 'R3c',
   title: 'Missing all Device Neuron IDs',
-  text: 'Every numbering group ends with "Missing all Device Neuron IDs" (`Information`, `EC`, sorted last) whose Notes list the device IDs still missing, counting only devices whose type needs one (not Equipment racks or NSPS unless their type says so, D185). Once accepted the engine keeps it: Notes rewritten on each capture, Closed when the list is empty, reopened on a new device without an ID (D49, D170).',
+  text: 'Every numbering group ends with "Missing all Device Neuron IDs" (`Information`, `EC`, sorted last) whose Notes list the device IDs still missing, counting only devices whose type needs one (not racks or NSPS by role unless their type says so, D185 / D201). Once accepted the engine keeps it: Notes rewritten on each capture, Closed when the list is empty, reopened on a new device without an ID (D49, D170).',
   run(ctx) {
     for (const [groupId, group] of ctx.index.levelsByGroup) {
       const levels = group.slice().sort(compareLevels);

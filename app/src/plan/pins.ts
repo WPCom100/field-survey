@@ -1,24 +1,29 @@
 /**
- * Pin geometry and colours (D64): shape = Device Category, fill colour = Device Status,
- * with a glyph as the non-colour backup signal. Pure: no Skia here, so it runs in Node.
- * Shapes are described in screen pixels centred on the pin's sheet position; the
- * viewer scales them back by 1/zoom so pins keep a constant on-screen size. `pinShape` runs on
- * the UI thread too (the overlay draws there, D95), hence its `'worklet'` directive.
+ * Pin geometry and colours (D64, T112): shape = the device's **role** (its library type's, else
+ * its category's — D201), fill colour = Device Status, with a glyph as the non-colour backup
+ * signal. Pure: no Skia here, so it runs in Node. Shapes are described in screen pixels centred
+ * on the pin's sheet position; the viewer scales them back by 1/zoom so pins keep a constant
+ * on-screen size. `pinShape` runs on the UI thread too (the overlay draws there, D95), hence its
+ * `'worklet'` directive: it reads only plain data captured by value.
  */
+
+import { DEVICE_CATEGORIES, ROLE, roleOfCategory, type Role } from '@field-survey/core';
 
 import type { Point } from './viewport';
 
-export const DEVICE_CATEGORIES = [
-  'Relay panel',
-  'Foundry panel',
-  'EBDK',
-  'Equipment rack',
-  'NSPS',
-  'Touchscreen',
-  'Station',
-  'Sensor',
-] as const;
-export type DeviceCategory = (typeof DEVICE_CATEGORIES)[number];
+/** The D196 eleven (core); the picker's order. A project's `vocab(category)` may add more. */
+export { DEVICE_CATEGORIES };
+export type DeviceCategory = string;
+
+/**
+ * Role per category name, for a pin that only knows its category (a new-device preview, old
+ * data): the master's eight and the D196 names that imply one role; a plain object so the
+ * worklet can capture it by value.
+ */
+export const PIN_ROLE_OF_CATEGORY: Record<string, Role> = Object.fromEntries(
+  [...DEVICE_CATEGORIES, 'Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS'].map((c) => [c, roleOfCategory(c)] as const).filter(([, r]) => r !== 'other'),
+);
+export const PIN_ROLES: readonly string[] = ROLE;
 
 export const CONNECTION_STATUSES = [
   'Complete',
@@ -47,29 +52,31 @@ function regularPolygon(n: number, r: number): Point[] {
 }
 
 /**
- * Shape for a category at a given on-screen size (the square's side). A category outside the
- * eight (the category list is project vocabulary) gets an octagon, so it never looks like one
- * of the eight.
+ * Shape for a role at a given on-screen size (the square's side): Relay panel ■ · Foundry panel
+ * ▢ · EBDK ▬ · Equipment rack ⬢ · NSPS ⬟ · Touchscreen ▲ · Station ● · Sensor ◆ (D64), and the
+ * octagon for `other` — a type or category outside the eight never looks like one of them. The
+ * argument is a role, or a category name whose role is looked up (`other` when it names none).
  */
-export function pinShape(category: DeviceCategory | string | null, size: number): PinShape {
+export function pinShape(roleOrCategory: Role | string | null, size: number): PinShape {
   'worklet';
   const r = size / 2;
-  switch (category as DeviceCategory) {
-    case 'Relay panel':
+  const role: string = roleOrCategory == null ? 'other' : PIN_ROLES.includes(roleOrCategory) ? roleOrCategory : (PIN_ROLE_OF_CATEGORY[roleOrCategory] ?? 'other');
+  switch (role as Role) {
+    case 'relay_panel':
       return { kind: 'rect', width: size, height: size, radius: 0 };
-    case 'Foundry panel':
+    case 'foundry_panel':
       return { kind: 'rect', width: size, height: size, radius: size * 0.25 };
-    case 'EBDK':
+    case 'ebdk':
       return { kind: 'rect', width: size * 1.5, height: size * 0.7, radius: 0 };
-    case 'Equipment rack':
+    case 'equipment_rack':
       return { kind: 'polygon', points: regularPolygon(6, r * 1.1) };
-    case 'NSPS':
+    case 'nsps':
       return { kind: 'polygon', points: regularPolygon(5, r * 1.1) };
-    case 'Touchscreen':
+    case 'touchscreen':
       return { kind: 'polygon', points: regularPolygon(3, r * 1.2) };
-    case 'Station':
+    case 'station':
       return { kind: 'circle', radius: r };
-    case 'Sensor':
+    case 'sensor':
       return { kind: 'polygon', points: regularPolygon(4, r * 1.2) };
     default:
       return { kind: 'polygon', points: regularPolygon(8, r * 1.05) };
@@ -116,7 +123,7 @@ export function statusRank(status: string | null): number {
   return status && status in RANK ? RANK[status]! : 3;
 }
 
-export type DummyPin = { id: string; category: DeviceCategory; status: PinStatus; x: number; y: number };
+export type DummyPin = { id: string; category: DeviceCategory; role: Role; status: PinStatus; x: number; y: number };
 
 /** Deterministic PRNG so every run of the spike places the same 40 pins. */
 function mulberry32(seed: number): () => number {
@@ -138,15 +145,17 @@ export function dummyPins(count: number, width: number, height: number, seed = 6
   let sensors = 0;
   let panels = 0;
   for (let i = 0; i < count; i++) {
-    const category = DEVICE_CATEGORIES[i % DEVICE_CATEGORIES.length];
-    const status = CONNECTION_STATUSES[i % CONNECTION_STATUSES.length];
+    const category = DEVICE_CATEGORIES[i % DEVICE_CATEGORIES.length]!;
+    const role = ROLE[i % (ROLE.length - 1)]!; // every shape in turn; `other` is left out
+    const status = CONNECTION_STATUSES[i % CONNECTION_STATUSES.length]!;
     let id: string;
-    if (category === 'Station') id = `06M-S${++stations}`;
-    else if (category === 'Sensor') id = `06M-D${++sensors}`;
+    if (role === 'station') id = `06M-S${++stations}`;
+    else if (role === 'sensor') id = `06M-D${++sensors}`;
     else id = `06M-${String(++panels).padStart(2, '0')}`;
     pins.push({
       id,
       category,
+      role,
       status,
       x: Math.round(width * (0.05 + 0.9 * rand())),
       y: Math.round(height * (0.05 + 0.9 * rand())),

@@ -4,8 +4,10 @@
  * data plus the "fix all via ruling" hand-off to T37 (`rulingSeeds`).
  */
 
-/** Device categories (CLAUDE.md §3); the project's `vocab(category)` may add more. */
-export const DEVICE_CATEGORIES = ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor'] as const;
+import { DEVICE_CATEGORIES } from '@field-survey/core';
+
+/** Device categories (the D196 eleven, CLAUDE.md §3); the project's `vocab(category)` may add more. */
+export { DEVICE_CATEGORIES };
 
 export interface LintCheck {
   /** Stable id for screens (`power_120v`). */

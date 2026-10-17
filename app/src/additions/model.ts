@@ -12,7 +12,7 @@
  *   status empty (Unsurveyed); the draft type and the device are one group (`Field survey`, D96).
  */
 
-import { DeviceIdError, OpError, deviceIdFor, type Editor, type Op, type Store } from '@field-survey/core';
+import { DeviceIdError, OpError, defaultIdSchemeForRole, deviceIdFor, isRole, roleOf, type Editor, type Op, type Role, type Store } from '@field-survey/core';
 
 import { FIELD_SURVEY } from '../card/actions';
 
@@ -20,6 +20,8 @@ export type LibraryChoice = {
   id: string;
   model: string;
   category: string | null;
+  /** T112 (D201): what its devices are; null = the category's role. */
+  role: Role | null;
   aliases: string[];
   scheme: 'level_number' | 'level_tag' | null;
   /** `draft` types are usable at once, flagged until accepted (D48). */
@@ -45,6 +47,7 @@ export async function libraryChoices(store: Store, projectId: string, category?:
       id: String(r.id),
       model: String(r.model),
       category: str(r.category),
+      role: isRole(r.role) ? r.role : null,
       aliases: Array.isArray(r.aliases) ? (r.aliases as unknown[]).filter((a): a is string => typeof a === 'string') : [],
       scheme: r.id_scheme === 'level_tag' || r.id_scheme === 'level_number' ? r.id_scheme : null,
       state: r.state === 'accepted' ? 'accepted' : 'draft',
@@ -111,11 +114,12 @@ export async function addFieldDevice(editor: Editor, store: Store, input: FieldD
   const model = type?.model ?? typed!;
 
   // ID per D93 / T63 — through deviceIdFor, so the scheme is read exactly as the server reads it
-  // (a model typed freely has no type row yet: deviceIdFor then goes by the category)
+  // (a model typed freely has no type row yet: deviceIdFor then goes by the category's role)
   const proposal = await deviceIdFor(store, {
     projectId: input.projectId,
     levelId: input.levelId,
     category,
+    role: roleOf(type, { category }),
     libraryTypeId: type?.id ?? null,
     tag: input.tag ?? null,
   }).catch((e: unknown) => {
@@ -156,8 +160,8 @@ export async function addFieldDevice(editor: Editor, store: Store, input: FieldD
   return { deviceId, draftTypeId, displayId, takenBy, ops };
 }
 
-/** The ID scheme the form should ask for: the type's, else the category default. */
+/** The ID scheme the form should ask for: the type's, else its role's (the type's, else the category's — T112). */
 export function schemeFor(type: LibraryChoice | null, category: string | null): 'level_number' | 'level_tag' {
   if (type?.scheme) return type.scheme;
-  return category === 'Station' || category === 'Sensor' ? 'level_tag' : 'level_number';
+  return defaultIdSchemeForRole(roleOf(type, { category }));
 }

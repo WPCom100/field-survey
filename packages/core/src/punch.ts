@@ -17,14 +17,15 @@
 import type { Editor } from './editor';
 import type { Op } from './op';
 import { ReviewError, getReviewItem, officialHead, type Resolution, type ReviewItem } from './review';
+import { roleOfCategory, type Role } from './roles';
 
 /** `review_item.subject.lint_id` of an imported punch row linked to no device. */
 export const PUNCH_DEVICE_LINT = 'import.punch_device_unmatched';
 
-/** Named by their device alone (D136, D151); so is any device with a panel name. */
-const NAME_ONLY_CATEGORIES: readonly string[] = ['Relay panel', 'Equipment rack', 'NSPS'];
+/** Roles named by their device alone (D136, D151); so is any device with a panel name. */
+const NAME_ONLY_ROLES: readonly Role[] = ['relay_panel', 'equipment_rack', 'nsps'];
 
-/** The device columns the text is built from. */
+/** The device columns the text is built from, plus its role when the caller knows the type (T112). */
 export type DeviceForText = {
   display_id?: unknown;
   device?: unknown;
@@ -32,6 +33,8 @@ export type DeviceForText = {
   category?: unknown;
   panel_name?: unknown;
   room_location?: unknown;
+  /** The device's role (its type's, D201); left out = the category's role. */
+  role?: Role | null;
 };
 
 const s = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -39,15 +42,16 @@ const s = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 /**
  * `PI1002 S3 - Corridor …` for a station or sensor (model, tag, room), `UFMP4 - BH OBS RM 47` for
  * a Foundry panel without a panel name; `CTB2LCPB` for a named panel, `EBDK (CTB2LCPB)` for an
- * EBDK, the model alone for a rack or NSPS. Null when the device has nothing to show.
+ * EBDK, the model alone for a rack or NSPS. Null when the device has nothing to show. The kind
+ * of device is its role (T112): the type's, else the category's.
  */
 export function defaultDeviceText(dev: DeviceForText | null | undefined): string | null {
   if (!dev) return null;
   let name = s(dev.device) || s(dev.type) || s(dev.category);
-  const category = s(dev.category);
+  const role = dev.role ?? roleOfCategory(s(dev.category) || null);
   const panel = s(dev.panel_name);
-  if (category === 'EBDK') return panel ? `EBDK (${panel})` : name || null;
-  if (NAME_ONLY_CATEGORIES.includes(category) || panel) return name || null;
+  if (role === 'ebdk') return panel ? `EBDK (${panel})` : name || null;
+  if (NAME_ONLY_ROLES.includes(role) || panel) return name || null;
   const id = s(dev.display_id);
   const tail = id.includes('-') ? id.slice(id.indexOf('-') + 1) : '';
   if (/^[SD]\d+$/.test(tail)) name = `${name} ${tail}`.trim();

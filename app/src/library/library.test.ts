@@ -108,8 +108,9 @@ describe('device-type library editor (T48)', () => {
     expect(await store.opsFor(id)).toHaveLength(ops.length);
     await updateType(p.editor, store, id, { defaultCables: [] });
     expect(await store.get('library_type', id)).toMatchObject({ default_cables: null });
-    expect(rulesForType('NSPS', [])).toEqual(['R2d', 'R2e']);
-    expect(rulesForType('Relay panel', [])).toEqual(['R2c']);
+    expect(rulesForType('nsps', [])).toEqual(['R2d', 'R2e']);
+    expect(rulesForType('relay_panel', [])).toEqual(['R2c']);
+    expect(rulesForType('other', [])).toEqual([]);
     await expect(updateType(p.editor, store, id, { defaultCables: [{ ...blankCable('Z') }] })).rejects.toThrow(/not a cable code/);
     await expect(updateType(p.editor, store, id, { optionalAccessories: [{ model: ' ', expected_qty: 1 }] })).rejects.toThrow(/needs a model/);
     await expect(updateType(p.editor, store, id, { model: '' })).rejects.toThrow(/needs a model/);
@@ -290,5 +291,44 @@ describe('app-level library manager (T61, D65, D184)', () => {
       expect((await c.store.get('library_type', id))!.aliases).toEqual(['PI1002-W']);
       expect((await loadReviewList(c.store, LIBRARY_STREAM)).rows).toEqual([]);
     }
+  });
+});
+
+describe('library roles (T112, D201)', () => {
+  it('a type carries a role: the rules, the Neuron ID default, the card and the ID scheme read it; Copy from carries it', async () => {
+    const { store, project } = await setup();
+    const p = await project('Tower');
+    // an NSPS in the D196 `Equipment` category: the category names no role
+    const nspsType = await createType(p.editor, store, p.id, { model: 'P-NSPS-D-KIT', category: 'Equipment' });
+    let t = (await loadLibrary(store, p.id)).types.find((x) => x.id === nspsType)!;
+    expect([t.role, t.effectiveRole, t.neuronId, t.rules]).toEqual([null, 'other', true, []]);
+    await expect(updateType(p.editor, store, nspsType, { role: 'power supply' as never })).rejects.toThrow(/not a role/);
+    await updateType(p.editor, store, nspsType, { role: 'nsps' });
+    t = (await loadLibrary(store, p.id)).types.find((x) => x.id === nspsType)!;
+    expect([t.role, t.effectiveRole, t.neuronId, t.rules]).toEqual(['nsps', 'nsps', false, ['R2d', 'R2e']]);
+    // by link and by Device text (D183 (4)) the devices are NSPS: no Neuron ID
+    const linked = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-05', category: 'Equipment', device: 'P-NSPS-D-KIT', library_type_id: nspsType }, CTX);
+    const byText = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-06', category: 'Equipment', device: 'P-NSPS-D-KIT' }, CTX);
+    const gateway = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-07', category: 'Equipment', device: 'RSN-DMX8-R' }, CTX);
+    expect((await loadDeviceCard(store, linked.id))!.device.needsNeuronId).toBe(false);
+    expect((await loadDeviceCard(store, byText.id))!.device.needsNeuronId).toBe(false);
+    expect((await loadDeviceCard(store, gateway.id))!.device.needsNeuronId).toBe(true);
+    // a station type of a category that names no role: the role gives the tag scheme
+    const stationType = await createType(p.editor, store, p.id, { model: 'UH10002', category: 'Equipment' });
+    await updateType(p.editor, store, stationType, { role: 'station' });
+    const choice = (await libraryChoices(store, p.id)).find((c) => c.id === stationType)!;
+    expect(choice.role).toBe('station');
+    const added = await addFieldDevice(p.editor, store, { projectId: p.id, levelId: p.levelId, category: 'Equipment', libraryTypeId: stationType, tag: '7' });
+    expect(added.displayId).toBe('06M-S7');
+    // Copy from… carries the role
+    await acceptType(p.editor, nspsType);
+    const q = await project('Annex');
+    await copyTypes(q.editor, store, q.id, [nspsType]);
+    const copy = (await loadLibrary(store, q.id)).types.find((x) => x.model === 'P-NSPS-D-KIT')!;
+    expect([copy.role, copy.effectiveRole]).toEqual(['nsps', 'nsps']);
+    // the list sorts the D196 eleven in order, an old master spelling with its canonical value
+    await createType(p.editor, store, p.id, { model: 'ERP24-FT', category: 'Power Distribution' });
+    await createType(p.editor, store, p.id, { model: 'UFMP4', category: 'Foundry panel' });
+    expect((await loadLibrary(store, p.id)).types.map((x) => x.category)).toEqual(['Power Distribution', 'Foundry panel', 'Equipment', 'Equipment']);
   });
 });

@@ -26,6 +26,17 @@ describe('vocabulary editor (T40)', () => {
     expect(v.device_note.every((e) => !e.draft)).toBe(true);
     expect(v.cable_code.map((e) => e.value)).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D']); // T111 / D199: the codes, as a list
     expect(await loadStandard(editor, store)).toEqual({ values: 0, placeholders: 0 });
+    // T112 (D201): the master's renamed categories are recorded as old spellings of the D196 value
+    const rows = await store.list<{ id: string; value: string; canonical_of_id: string | null }>('vocab', { where: 'project_id = ? AND list = ?', params: [projectId, 'category'] });
+    const byValue = new Map(rows.map((r) => [r.value, r]));
+    const canonical = (v: string) => rows.find((r) => r.id === byValue.get(v)?.canonical_of_id)?.value ?? null;
+    expect(canonical('Relay panel')).toBe('Power Distribution');
+    expect(canonical('Foundry panel')).toBe('Power Distribution');
+    expect(canonical('EBDK')).toBe('Emergency Equipment');
+    expect(canonical('NSPS')).toBe('Equipment');
+    expect(canonical('Equipment rack')).toBe('Equipment Panels');
+    expect(byValue.get('Equipment Rack')?.canonical_of_id).toBeNull(); // the D196 DIN-rail category stands on its own
+    expect(v.category.map((e) => e.value)).not.toContain('Relay panel'); // variants are not listed
     const ph = await loadPlaceholders(store, projectId);
     expect(ph.find((p) => p.label === 'Stations & Sensors')!.kind).toBe('station_bus');
     expect(ph.filter((p) => p.kind === 'level_not_in_scope').map((p) => p.label).sort()).toEqual(['Level 09', 'Level 10', 'Level 11', 'Level 12']);
@@ -66,5 +77,29 @@ describe('vocabulary editor (T40)', () => {
     expect(await setEndPlaceholder(editor, free.id, ph)).toEqual([]); // same again writes nothing
     await expect(setEndPlaceholder(editor, onDevice.id, ph)).rejects.toThrow(/is a device/);
     await expect(setEndPlaceholder(editor, free.id, uuidv7())).rejects.toThrow(/not in this project/);
+  });
+});
+
+describe('category vocabulary on an existing project (T112, D201)', () => {
+  it("re-points the master's eight to the D196 eleven without touching the new `Equipment Rack`; idempotent", async () => {
+    const { store, editor, projectId } = await setup();
+    // an older seed: the master's spellings as plain accepted rows
+    for (const value of ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor']) {
+      await editor.create('vocab', { project_id: projectId, list: 'category', value, state: 'accepted' }, { change_type: 'Master edit', reason: 't' });
+    }
+    const before = await store.list<{ id: string; value: string }>('vocab', { where: 'project_id = ? AND list = ?', params: [projectId, 'category'] });
+    const first = await loadStandard(editor, store);
+    const rows = await store.list<{ id: string; value: string; canonical_of_id: string | null }>('vocab', { where: 'project_id = ? AND list = ?', params: [projectId, 'category'], orderBy: 'id' });
+    const byValue = new Map(rows.map((r) => [r.value, r]));
+    const canonical = (v: string) => rows.find((r) => r.id === byValue.get(v)?.canonical_of_id)?.value ?? null;
+    // the eight rows are the same rows (no duplicates), five of them now old spellings
+    for (const b of before) expect(byValue.get(b.value)?.id).toBe(b.id);
+    expect(['Relay panel', 'Foundry panel', 'EBDK', 'NSPS', 'Equipment rack'].map(canonical)).toEqual(['Power Distribution', 'Power Distribution', 'Emergency Equipment', 'Equipment', 'Equipment Panels']);
+    expect(['Touchscreen', 'Station', 'Sensor', 'Equipment Rack', 'Power Distribution'].map((v) => byValue.get(v)?.canonical_of_id)).toEqual([null, null, null, null, null]);
+    expect(rows).toHaveLength(8 + 8); // the eight, plus the eleven minus the three the master already spelled the same
+    expect(first.values).toBeGreaterThanOrEqual(8 + 5);
+    const view = await loadVocab(store, projectId);
+    expect(view.category.map((e) => e.value).sort()).toEqual([...SEED_VOCAB.category].sort());
+    expect(await loadStandard(editor, store)).toMatchObject({ values: 0 });
   });
 });

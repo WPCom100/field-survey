@@ -1,4 +1,4 @@
-import { OpError, type Editor, type Store } from '@field-survey/core';
+import { OpError, type Editor, type Role, type Store } from '@field-survey/core';
 import { useCallback, useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
@@ -6,6 +6,8 @@ import {
   CABLE_CODES,
   CATEGORIES,
   NSPS_POWER_SUPPLY,
+  ROLES,
+  ROLE_LABELS,
   acceptType,
   blankCable,
   copySources,
@@ -14,10 +16,12 @@ import {
   promoteType,
   describeCable,
   loadLibrary,
-  neuronIdDefault,
+  neuronIdDefaultForRole,
   parseAliases,
   rejectType,
   reopenType,
+  roleOf,
+  roleOfCategory,
   sourceLine,
   updateType,
   type CopySource,
@@ -268,6 +272,7 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
   const t = props.type;
   const [model, setModel] = useState(t.model);
   const [category, setCategory] = useState<string | null>(t.category);
+  const [role, setRole] = useState<Role | null>(t.role);
   const [aliases, setAliases] = useState(t.aliases.join(', '));
   const [scheme, setScheme] = useState<IdScheme | null>(t.idScheme);
   const [neuron, setNeuron] = useState<boolean | null>(t.needsNeuronId);
@@ -277,6 +282,7 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
   const dirty =
     model !== t.model ||
     category !== t.category ||
+    role !== t.role ||
     aliases !== t.aliases.join(', ') ||
     scheme !== t.idScheme ||
     neuron !== t.needsNeuronId ||
@@ -285,7 +291,7 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
     JSON.stringify(accessories) !== JSON.stringify(t.optionalAccessories);
   const save = () =>
     props.run(
-      (e, s) => updateType(e, s, t.id, { model, category, aliases: parseAliases(aliases), idScheme: scheme, needsNeuronId: neuron, defaultCables: defaults, optionalCables: optional, optionalAccessories: accessories }),
+      (e, s) => updateType(e, s, t.id, { model, category, role, aliases: parseAliases(aliases), idScheme: scheme, needsNeuronId: neuron, defaultCables: defaults, optionalCables: optional, optionalAccessories: accessories }),
       'Saved.',
     );
   const ro = !props.canEdit;
@@ -320,6 +326,15 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
       <Field label="Category">
         <Chips options={CATEGORIES} value={category} onPick={ro ? undefined : setCategory} />
       </Field>
+      <Field label="Role" hint="What its devices are to the rules, the ID scheme, the Punch List Device text and the pin shape (T112). Category default = the role the category names, if any.">
+        <View style={styles.wrap}>
+          {([null, ...ROLES] as const).map((v) => (
+            <Pressable key={v ?? 'default'} disabled={ro} onPress={() => setRole(v)} style={[styles.chip, role === v && styles.chipOn]}>
+              <Text style={role === v ? styles.chipTextOn : styles.chipText}>{v === null ? `Category default (${ROLE_LABELS[roleOfCategory(category)]})` : ROLE_LABELS[v]}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Field>
       <Field label="Aliases (BOM)" hint="Comma-separated. A device whose Device text is the model or an alias is of this type.">
         <TextInput value={aliases} onChangeText={setAliases} editable={!ro} placeholder="P-NSPS-D, P-NSPS-D-KIT" placeholderTextColor="#888" style={styles.input} />
       </Field>
@@ -337,7 +352,7 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
           {([null, true, false] as const).map((v) => (
             <Pressable key={String(v)} disabled={ro} onPress={() => setNeuron(v)} style={[styles.chip, neuron === v && styles.chipOn]}>
               <Text style={neuron === v ? styles.chipTextOn : styles.chipText}>
-                {v === null ? `Category default (${neuronIdDefault(category) ? 'needed' : 'not needed'})` : v ? 'Needed' : 'Not needed'}
+                {v === null ? `Role default (${neuronIdDefaultForRole(roleOf({ role, category }, null)) ? 'needed' : 'not needed'})` : v ? 'Needed' : 'Not needed'}
               </Text>
             </Pressable>
           ))}
@@ -369,7 +384,7 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
             <Pressable onPress={() => setAccessories([...accessories, { model: '', expected_qty: 1 }])}>
               <Text style={styles.link}>+ add</Text>
             </Pressable>
-            {category === 'NSPS' && !accessories.some((a) => a.model === NSPS_POWER_SUPPLY.model) ? (
+            {roleOf({ role, category }, null) === 'nsps' && !accessories.some((a) => a.model === NSPS_POWER_SUPPLY.model) ? (
               <Pressable onPress={() => setAccessories([...accessories, NSPS_POWER_SUPPLY])}>
                 <Text style={styles.link}>+ {NSPS_POWER_SUPPLY.model} (expected 1, D52)</Text>
               </Pressable>

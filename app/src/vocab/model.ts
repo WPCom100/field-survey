@@ -7,7 +7,7 @@
 
 import { OpError, type EditContext, type Editor, type Store } from '@field-survey/core';
 
-import { SEED_PLACEHOLDERS, SEED_VOCAB, VOCAB_LISTS, type PlaceholderKind, type VocabListKey } from './seed';
+import { SEED_PLACEHOLDERS, SEED_VOCAB, SEED_VOCAB_VARIANTS, VOCAB_LISTS, type PlaceholderKind, type VocabListKey } from './seed';
 
 type Row = Record<string, unknown>;
 
@@ -75,19 +75,49 @@ export async function removeValue(editor: Editor, id: string): Promise<void> {
   await editor.delete('vocab', id, VOCAB_CTX);
 }
 
-/** Create the standard values and placeholders the project does not have yet; returns counts. Idempotent. */
+/**
+ * Create the standard values and placeholders the project does not have yet; returns counts.
+ * Idempotent. The seed's old spellings (`SEED_VOCAB_VARIANTS`, T112) are recorded as variants of
+ * their canonical value: a row the project already has with that spelling is re-pointed, a
+ * missing one is created pointing at the canonical row — so the vocabulary lint flags the records
+ * still using it and the rename ruling can fix them all (counted under `values`).
+ */
 export async function loadStandard(editor: Editor, store: Store): Promise<{ values: number; placeholders: number }> {
-  const view = await loadVocab(store, editor.projectId);
-  const known = new Map(Object.entries(view).map(([l, es]) => [l, new Set(es.map((e) => e.value.toLowerCase()))]));
   const existing = new Set((await loadPlaceholders(store, editor.projectId)).map((p) => p.label.toLowerCase()));
+  // Every live row, variants included. A seed value matches a row spelled the same in any case
+  // ("sensor" stands for `Sensor`) — unless the row's spelling is itself another seed spelling:
+  // the master's `Equipment rack` (an old spelling of `Equipment Panels`) never stands for the
+  // D196 `Equipment Rack` (DIN rail enclosures).
+  const allRows = await store.list<Row>('vocab', { where: 'project_id = ?', params: [editor.projectId], orderBy: 'id' });
+  const seedSpellings = new Map(VOCAB_LISTS.map(({ list }) => [list, new Set<string>([...SEED_VOCAB[list], ...Object.keys(SEED_VOCAB_VARIANTS[list] ?? {})])]));
+  const rowOf = (list: string, value: string): Row | null => {
+    const same = (r: Row) => r.list === list && String(r.value) === value;
+    const loose = (r: Row) => r.list === list && String(r.value).toLowerCase() === value.toLowerCase() && !seedSpellings.get(list as VocabListKey)?.has(String(r.value));
+    return allRows.find(same) ?? allRows.find(loose) ?? null;
+  };
   let values = 0;
   let placeholders = 0;
   await editor.group(VOCAB_CTX, async (g) => {
+    const created = new Map<string, string>(); // `${list}|${value}` → id, for variants of a value created in this group
     for (const { list } of VOCAB_LISTS) {
       for (const value of SEED_VOCAB[list]) {
-        if (known.get(list)!.has(value.toLowerCase())) continue;
-        await g.create('vocab', { project_id: editor.projectId, list, value, state: 'accepted' });
+        if (rowOf(list, value)) continue;
+        const { id } = await g.create('vocab', { project_id: editor.projectId, list, value, state: 'accepted' });
+        created.set(`${list}|${value.toLowerCase()}`, id);
         values++;
+      }
+      for (const [variant, canonical] of Object.entries(SEED_VOCAB_VARIANTS[list] ?? {})) {
+        const canonicalRow = rowOf(list, canonical);
+        const canonicalId = created.get(`${list}|${canonical.toLowerCase()}`) ?? (canonicalRow && !canonicalRow.canonical_of_id ? String(canonicalRow.id) : null);
+        if (!canonicalId) continue;
+        const row = rowOf(list, variant);
+        if (!row) {
+          await g.create('vocab', { project_id: editor.projectId, list, value: variant, canonical_of_id: canonicalId, state: 'accepted' });
+          values++;
+        } else if (row.canonical_of_id !== canonicalId && String(row.id) !== canonicalId) {
+          await g.setFields('vocab', String(row.id), { canonical_of_id: canonicalId });
+          values++;
+        }
       }
     }
     for (const p of SEED_PLACEHOLDERS) {

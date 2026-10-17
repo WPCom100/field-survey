@@ -261,3 +261,40 @@ describe('Dismiss with a reason, over a store (D178)', () => {
     await expect(engine.reopen(f.id)).rejects.toThrow(/open/);
   });
 });
+
+describe('library cable lints by role (T112, D201)', () => {
+  it('reads the type role: an NSPS of the Equipment category is flagged, a gateway of it is not; a Foundry panel is never a relay panel', () => {
+    const b = new Build();
+    const l = b.level('06M');
+    const nspsType = b.libraryType('P-NSPS-D-KIT', 'Equipment', { role: 'nsps' });
+    const nsps = b.device(l, 'Equipment', { display_id: '06M-04', device: 'P-NSPS-D-KIT', library_type_id: nspsType.id });
+    b.device(l, 'Equipment', { display_id: '06M-06', device: 'RSN-DMX8-R' });
+    const rack = b.device(l, 'Equipment Panels', { display_id: '06M-05', device: 'Equipment Rack 18U' });
+    b.libraryType('UFMP4', 'Power Distribution', { role: 'foundry_panel' });
+    b.device(l, 'Power Distribution', { display_id: '06M-02', device: 'UFMP4' });
+    const erp = b.libraryType('ERP24-FT', 'Power Distribution', { role: 'relay_panel', state: 'draft' });
+    const panel = b.device(l, 'Power Distribution', { display_id: '06M-01', device: 'CT06LCPA', panel_name: 'CT06LCPA', library_type_id: erp.id });
+    expect(found(b, [LintPower, LintRelay])).toEqual([
+      ['lint.power_120v', nsps.id, '06M-04: NSPS without a 120V row'],
+      ['lint.power_120v', rack.id, '06M-05: Equipment rack without a 120V row'],
+      ['lint.relay_cables', panel.id, '06M-01: Relay panel without a P row'],
+      ['lint.relay_cables', panel.id, '06M-01: Relay panel without a 0-10V row'],
+    ]);
+  });
+
+  it("the vocabulary lint accepts the master's eight category spellings until the project's vocabulary marks them as old", () => {
+    const b = new Build();
+    const l = b.level('06M');
+    const d = b.device(l, 'Relay panel', { display_id: '06M-01' });
+    b.device(l, 'Power Distribution', { display_id: '06M-02' });
+    const odd = b.device(l, 'Dimmer rack', { display_id: '06M-03' });
+    expect(found(b, [LintVocab])).toEqual([['lint.vocab', odd.id, '06M-03: Category "Dimmer rack" is not in the vocabulary']]);
+    b.vocab('category', 'Power Distribution');
+    b.vocabVariant('category', 'Relay panel', 'Power Distribution');
+    expect(found(b, [LintVocab]).map((f) => f[2])).toEqual([
+      '06M-01: Category "Relay panel" is an old spelling of "Power Distribution"',
+      '06M-03: Category "Dimmer rack" is not in the vocabulary',
+    ]);
+    expect(evaluate(b.snap, [LintVocab], undefined, { now: NOW }).findings.find((f) => f.subject.entity_id === d.id)?.subject.fix).toEqual({ field: 'category', from: 'Relay panel', to: 'Power Distribution' });
+  });
+});

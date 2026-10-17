@@ -107,7 +107,9 @@ describe('pins', () => {
       expect(p.id).toMatch(/^06M-(\d\d|S\d+|D\d+)$/);
     }
     expect(new Set(a.map((p) => p.id)).size).toBe(40);
-    expect(a.filter((p) => p.category === 'Station').every((p) => p.id.startsWith('06M-S'))).toBe(true);
+    expect(a.filter((p) => p.role === 'station').every((p) => p.id.startsWith('06M-S'))).toBe(true);
+    expect(a.filter((p) => p.role === 'sensor').every((p) => p.id.startsWith('06M-D'))).toBe(true);
+    expect(new Set(a.map((p) => p.role)).size).toBe(8); // every shape but the octagon
   });
 
   it('hit-tests the nearest pin within a radius', () => {

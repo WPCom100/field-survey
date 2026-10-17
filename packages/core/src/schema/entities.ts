@@ -559,6 +559,9 @@ export const ENTITIES = {
       datasheet_url: t(),
       source_ref: j(),
       accessory_only: b(),
+      // T112 (D201): what kind of thing the type's devices are; null = the category's role
+      // (`roleOfCategory` in core). The rules, ID scheme, Device text and pin shapes read it.
+      role: enumCol(v.LIBRARY_ROLE),
     },
     [['project_id']],
   ),

@@ -10,7 +10,7 @@
  * the app library's) type whose model or alias equals the device's Device text is used.
  */
 
-import type { ConnectionStatus } from '@field-survey/core';
+import { roleOf, type ConnectionStatus, type Role } from '@field-survey/core';
 
 import type { Rule, RuleContext } from '../rule';
 import type { DeviceRow, LibraryTypeRow, PlaceholderRow } from '../snapshot';
@@ -108,24 +108,38 @@ export function typeOfDevice(ctx: RuleContext, d: DeviceRow): LibraryTypeRow | n
   return findDeviceType(ctx.index.libraryType, d);
 }
 
-/** Categories whose devices carry no Neuron ID unless their type says so (T68, D185). */
-export const NO_NEURON_CATEGORIES: readonly string[] = ['Equipment rack', 'NSPS'];
+/**
+ * The device's role (T112, D201): its type's `role`, else the role its type's category implies,
+ * else its own category's (`roleOf` in core). What R2c / R2d / R2e, the lints and the Neuron ID
+ * default key on instead of the master's category strings.
+ */
+export function deviceRole(ctx: RuleContext, d: DeviceRow): Role {
+  return roleOf(typeOfDevice(ctx, d), d);
+}
 
-/** A category's Neuron ID default: off for Equipment rack and NSPS, on otherwise (and with no category). */
+/** Roles whose devices carry no Neuron ID unless their type says so (T68, D185). */
+export const NO_NEURON_ROLES: readonly Role[] = ['equipment_rack', 'nsps'];
+
+/** A role's Neuron ID default: off for racks and NSPS, on otherwise. */
+export function neuronIdDefaultForRole(role: Role): boolean {
+  return !NO_NEURON_ROLES.includes(role);
+}
+
+/** A category's Neuron ID default for a device with no type: off for a rack or NSPS category, on otherwise. */
 export function neuronIdDefault(category: string | null | undefined): boolean {
-  return !category || !NO_NEURON_CATEGORIES.includes(category);
+  return neuronIdDefaultForRole(roleOf(null, { category: category ?? null }));
 }
 
 /**
  * Whether a device needs a Neuron ID (T68, D185): its type's `needs_neuron_id`, else the default of
- * the type's category, else of the device's own category (a device with no type).
+ * its role (the type's, else the type's category's, else the device's own category's — D201).
  */
 export function needsNeuronId(
-  type: { needs_neuron_id?: boolean | null; category?: string | null } | null,
+  type: { needs_neuron_id?: boolean | null; category?: string | null; role?: unknown } | null,
   d: { category: string | null },
 ): boolean {
   if (type?.needs_neuron_id != null) return type.needs_neuron_id;
-  return neuronIdDefault(type?.category ?? d.category);
+  return neuronIdDefaultForRole(roleOf(type, d));
 }
 
 /** `needsNeuronId` with the device's type looked up in the snapshot. */

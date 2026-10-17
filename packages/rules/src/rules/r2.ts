@@ -18,7 +18,7 @@ import { riserCheck } from '@field-survey/core';
 
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow } from '../snapshot';
-import { governingCables } from './library';
+import { deviceRole, governingCables } from './library';
 import { BUS_LABEL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, endLevel, endPlaceholder, noteHas, placeholderFor, str, subjectOfEnd } from './shared';
 
 // ------------------------------------------------------------------ R2a
@@ -98,10 +98,10 @@ function proposeCable(ctx: RuleContext, device: DeviceRow, code: string, cable: 
 export const R2c: Rule = {
   id: 'R2c',
   title: 'Relay panel library cables',
-  text: 'A Relay panel has a 0-10V run to `Fixtures` and a panic (P) run to `EBDK panic wire`, each a single row; P is always treated as run (`Installed, untested`). Offered as drafts to accept (D173).',
+  text: 'A relay panel (role `relay_panel`, D201) has a 0-10V run to `Fixtures` and a panic (P) run to `EBDK panic wire`, each a single row; P is always treated as run (`Installed, untested`). Offered as drafts to accept (D173).',
   run(ctx) {
     for (const d of ctx.index.device.values()) {
-      if (d.category !== 'Relay panel' || governingCables(ctx, d)) continue; // an accepted type's cables govern (R2g)
+      if (deviceRole(ctx, d) !== 'relay_panel' || governingCables(ctx, d)) continue; // an accepted type's cables govern (R2g)
       const label = deviceLabel(ctx, d);
       if (!hasCode(ctx, d, '0-10V')) {
         proposeCable(
@@ -116,7 +116,7 @@ export const R2c: Rule = {
       if (!hasCode(ctx, d, 'P')) {
         const name = panelName(d);
         const ebdk = (ctx.index.devicesByLevel.get(d.level_id) ?? [])
-          .filter((x) => x.category === 'EBDK' && name && str(x.panel_name) === name)
+          .filter((x) => name && str(x.panel_name) === name && deviceRole(ctx, x) === 'ebdk')
           .sort((a, b) => compareIds(a.display_id ?? '', b.display_id ?? ''))[0];
         const far: EndDraft = ebdk
           ? deviceEnd(ctx, ebdk, 'B', { from: 'EBDK panic wire', to: name })
@@ -137,42 +137,49 @@ export const R2c: Rule = {
 export const R2d: Rule = {
   id: 'R2d',
   title: '120V library cable',
-  text: 'An NSPS or Equipment rack has one 120V row, `120v Power` → `P-NSPS-D Power Supply` (NSPS) or `Equipment rack` (rack), D52. Offered as a draft to accept (D173).',
+  text: 'An NSPS or equipment rack (role `nsps` / `equipment_rack`, D201) has one 120V row, `120v Power` → `P-NSPS-D Power Supply` (NSPS) or `Equipment rack` (rack), D52. Offered as a draft to accept (D173).',
   run(ctx) {
     for (const d of ctx.index.device.values()) {
-      if (d.category !== 'NSPS' && d.category !== 'Equipment rack') continue;
+      const role = deviceRole(ctx, d);
+      if (role !== 'nsps' && role !== 'equipment_rack') continue;
       if (hasCode(ctx, d, '120V') || governingCables(ctx, d)) continue;
-      const to = d.category === 'NSPS' ? 'P-NSPS-D Power Supply' : 'Equipment rack';
+      const to = role === 'nsps' ? 'P-NSPS-D Power Supply' : 'Equipment rack';
       proposeCable(
         ctx,
         d,
         '120V',
         { qty: 1, single_row: true },
         [deviceEnd(ctx, d, 'A', { from: '120v Power', to }), placeholderEnd(ctx, 'power', '120v Power', 'B', { from: '120v Power' })],
-        `${deviceLabel(ctx, d)} is a${d.category === 'NSPS' ? 'n NSPS' : 'n Equipment rack'} with no 120V row (library: 120v Power → ${to}).`,
+        `${deviceLabel(ctx, d)} is a${role === 'nsps' ? 'n NSPS' : 'n Equipment rack'} with no 120V row (library: 120v Power → ${to}).`,
       );
     }
   },
 };
 
-function unisonHost(ctx: RuleContext, level: LevelRow): DeviceRow | null {
+/** The level's Unison host: its NSPS (by role, D201), else its equipment rack; lowest ID first. */
+function unisonHost(ctx: RuleContext, level: LevelRow): { host: DeviceRow; role: 'nsps' | 'equipment_rack' } | null {
   const devices = (ctx.index.devicesByLevel.get(level.id) ?? []).slice().sort((a, b) => compareIds(a.display_id ?? '', b.display_id ?? ''));
-  return devices.find((d) => d.category === 'NSPS') ?? devices.find((d) => d.category === 'Equipment rack') ?? null;
+  const roles = new Map(devices.map((d) => [d.id, deviceRole(ctx, d)] as const));
+  const nsps = devices.find((d) => roles.get(d.id) === 'nsps');
+  if (nsps) return { host: nsps, role: 'nsps' };
+  const rack = devices.find((d) => roles.get(d.id) === 'equipment_rack');
+  return rack ? { host: rack, role: 'equipment_rack' } : null;
 }
 
 export const R2e: Rule = {
   id: 'R2e',
   title: 'Unison bus per level',
-  text: 'Each level has one Unison pair: `Stations & Sensors` ↔ its NSPS (or the Equipment rack where the level has no NSPS). Offered as a draft to accept (D173).',
+  text: 'Each level has one Unison pair: `Stations & Sensors` ↔ its NSPS (or the equipment rack where the level has no NSPS; by role, D201). Offered as a draft to accept (D173).',
   run(ctx) {
     const levels = [...ctx.index.level.values()].filter((l) => l.in_scope).sort(compareLevels);
     for (const level of levels) {
-      const host = unisonHost(ctx, level);
-      if (!host) continue;
+      const found = unisonHost(ctx, level);
+      if (!found) continue;
+      const { host, role } = found;
       const hasBus = [...ctx.index.cableEnd.values()].some((e) => cableOf(ctx, e)?.cable === 'U' && endLevel(ctx, e)?.id === level.id);
       if (hasBus) continue;
-      const hostName = str(host.device) ?? (host.category === 'NSPS' ? 'P-NSPS-D' : 'Equipment rack');
-      const toHost = host.category === 'NSPS' ? 'Devices to P-NSPS-D' : 'Devices to equipment rack';
+      const hostName = str(host.device) ?? (role === 'nsps' ? 'P-NSPS-D' : 'Equipment rack');
+      const toHost = role === 'nsps' ? 'Devices to P-NSPS-D' : 'Devices to equipment rack';
       ctx.propose({
         subject: { entity_kind: 'level', entity_id: level.id, level_id: level.id },
         discriminator: 'U',

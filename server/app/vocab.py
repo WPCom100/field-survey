@@ -63,6 +63,18 @@ IMPORT_KIND = ("bom", "riser", "plans", "master_xlsx", "floor_xlsx", "mss", "dav
 DRAFT_STATE = ("proposed", "accepted", "edited", "rejected")
 ID_SCHEME = ("level_number", "level_tag")
 LIBRARY_STATE = ("draft", "accepted", "rejected")
+# T112 (D201): `library_type.role`; the same list as `ROLES` in app/roles.py (here for the CHECK).
+LIBRARY_ROLE = (
+    "relay_panel",
+    "foundry_panel",
+    "ebdk",
+    "equipment_rack",
+    "nsps",
+    "touchscreen",
+    "station",
+    "sensor",
+    "other",
+)
 VOCAB_LIST = (
     "device_note",
     "punch_item",

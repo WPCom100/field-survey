@@ -10,7 +10,9 @@
 import { uuidv7, type Op, type Store } from '@field-survey/core';
 
 import demoGrid from './demo-grid.json';
-import { DEVICE_CATEGORIES } from './pins';
+// The demo stands in for an imported project (Centennial): its devices carry the master's
+// category spellings (D1), each of which implies a role (T112), so every pin shape and rule shows.
+const DEVICE_CATEGORIES = ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor'] as const;
 
 export const DEMO_LEVEL_ID = '0190a5f0-0000-7000-8000-00000000d06e';
 const PROJECT = '0190a5f0-0000-7000-8000-00000000d000';
