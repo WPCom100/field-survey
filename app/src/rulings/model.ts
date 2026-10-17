@@ -20,6 +20,8 @@ import {
   type RulingDraft,
   type RulingEntity,
   type RulingPreview,
+  cableCodes,
+  loadRuleParams,
 } from '@field-survey/rules';
 
 import { describeSubject, levelCodes } from '../review/model';
@@ -51,6 +53,8 @@ export type RulingsView = {
   standing: number;
   applied: number;
   levels: { id: string; code: string }[];
+  /** The project's cable codes (`cableCodes`, T121): the Cable field's suggestions. */
+  cables: string[];
 };
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null);
@@ -87,6 +91,7 @@ export async function loadRulings(store: Store, projectId: string): Promise<Ruli
     standing: rows.filter((r) => r.standing).length,
     applied: rows.filter((r) => r.appliedAt).length,
     levels: [...codes].map(([id, code]) => ({ id, code })),
+    cables: cableCodes(await loadRuleParams(store, projectId)),
   };
 }
 

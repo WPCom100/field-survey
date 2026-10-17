@@ -22,6 +22,7 @@ import { DEVICE_CATEGORIES, vocab as V, uuidv7 } from '@field-survey/core';
 
 import type { RecordPlan } from './decide';
 import type { Rule, RuleContext } from './rule';
+import { CABLE_CODES } from './rules/library';
 import { VOCAB_FIELDS } from './rules/lint';
 import { appendPhrase } from './rules/quick';
 import { compareIds, compareLevels } from './rules/shared';
@@ -131,7 +132,6 @@ export interface RulingField {
   phrases?: boolean;
 }
 
-const CABLE_CODES = ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D'] as const;
 // the D196 eleven (T112); a project's `vocab(category)` may add more, so these are suggestions
 const CATEGORIES = DEVICE_CATEGORIES;
 
@@ -184,8 +184,13 @@ export const REWORD_FIELDS: Readonly<Partial<Record<RulingEntity, readonly strin
   missing_part: ['part', 'owner'],
 };
 
-export function fieldOf(entity: RulingEntity, field: string): RulingField | null {
-  return RULING_FIELDS[entity]?.find((f) => f.field === field) ?? null;
+/**
+ * A field of an entity. `codes`: the project's cable codes (`cableCodes`, T121) as the Cable
+ * field's suggestions; without them the master's ten.
+ */
+export function fieldOf(entity: RulingEntity, field: string, codes?: readonly string[]): RulingField | null {
+  const f = RULING_FIELDS[entity]?.find((x) => x.field === field) ?? null;
+  return f && codes && f.field === 'cable' ? { ...f, options: codes } : f;
 }
 
 /** Which actions an entity offers, and on which fields. */

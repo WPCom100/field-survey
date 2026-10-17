@@ -1,11 +1,12 @@
-import { Store, uuidv7, type Op } from '@field-survey/core';
+import { Editor, Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
+import { setRuleParam } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
 
 import { loadLevelPlan } from './data';
 import { DEMO_LEVEL_ID, ensureDemoLevel } from './demo';
 import { EMPTY_FILTER, matchesFilter } from './filters';
-import { loadLevelLists, rowMatches, searchIds, type ListRow } from './lists';
+import { connectionMatches, loadLevelLists, rowMatches, searchIds, type ListRow } from './lists';
 
 const ME = uuidv7();
 let ts = 1_760_000_000_000;
@@ -161,6 +162,26 @@ describe('side lists', () => {
     expect(await conns('NG')).toEqual(['NG']);
     expect(await conns('0-10v')).toEqual(['0-10V']);
     expect(await conns('ng rack')).toEqual(['NG']);
+  });
+
+  it("a project's own cable code is a cable-type term once its Rules name it (T121)", async () => {
+    const { store, plan, pid } = await demo();
+    for (const [code, to] of [['DX', 'Rack'], ['X', 'DX room']] as const) {
+      const cable = uuidv7();
+      await store.apply(op('cable', cable, 'create', pid, { project_id: pid, cable: code }));
+      await store.apply(op('cable_end', uuidv7(), 'create', pid, { cable_id: cable, side: 'A', level_id: DEMO_LEVEL_ID, device_id: plan.devices[0]!.id, to_text: to }));
+    }
+    const { lists } = await load(store, pid);
+    const conns = async (q: string) => {
+      const ids = (await searchIds(store, DEMO_LEVEL_ID, q, lists.connections))!;
+      return lists.connections.filter((c) => ids.has(c.id)).map((c) => c.cable).sort();
+    };
+    expect(await conns('dx')).toEqual(['DX', 'X']); // not a code yet: text, so "DX room" matches too
+    await setRuleParam(new Editor(store, { projectId: pid, userId: ME }), 'R3', 'signal', { DX: 'DALI-2' });
+    expect(await conns('dx')).toEqual(['DX']);
+    const row = { cable: 'X', label: 'C-01', text: 'c-01 dx room' };
+    expect(connectionMatches(['dx'], row)).toBe(true);
+    expect(connectionMatches(['dx'], row, ['X', 'DX'])).toBe(false);
   });
 
   it('searches connections by their C-nn number, exactly (D163)', async () => {

@@ -8,6 +8,7 @@
 
 import { Editor, Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
+import { CABLE_CODES, setRuleParam } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -375,12 +376,26 @@ describe('cable drafts (T44, D6, D191)', () => {
     expect(row((await loadDraftReview(store, PROJECT)).cables, ids.c2)).toMatchObject({ state: 'accepted', committed: true, confirmed: false });
   });
 
+  it("the project's own cable codes (T121): offered and accepted once its Rules give them a signal word", async () => {
+    const { store, editor, ids } = await setup();
+    await expect(setCableCode(editor, ids.c3, 'DX', (await loadDraftReview(store, PROJECT)).codes)).rejects.toThrow(/Cable code must be one of: X · N .* · D\.$/);
+    await setRuleParam(editor, 'R3', 'signal', { DX: 'DALI-2' });
+    const { codes } = await loadDraftReview(store, PROJECT);
+    expect(codes).toEqual([...CABLE_CODES, 'DX']);
+    await setCableCode(editor, ids.c3, 'DX', codes);
+    const hand = await addCableDraft(editor, PROJECT, { levelId: ids.l02, code: 'DX', fromLabel: 'CT02LCPA', toLabel: 'DALI-2 bus' }, codes);
+    await expect(addCableDraft(editor, PROJECT, { levelId: ids.l02, code: 'DX', fromLabel: 'a', toLabel: 'b' })).rejects.toThrow(/Cable code/); // the master's ten by default
+    const data = await loadDraftReview(store, PROJECT);
+    expect([row(data.cables, ids.c3).code, row(data.cables, hand).code]).toEqual(['DX', 'DX']);
+  });
+
   it('a code is chosen for a line without one; panic and single-row texts', async () => {
     const { store, editor, ids } = await setup();
     await expect(setCableCode(editor, ids.c3, 'Z')).rejects.toThrow(/Cable code/);
     await setCableCode(editor, ids.c3, 'NG');
     const data = await loadDraftReview(store, PROJECT);
     expect(row(data.cables, ids.c3).code).toBe('NG');
+    expect(data.codes).toEqual(CABLE_CODES);
     const a = realEnd(data, { kind: 'device', id: ids.panel, label: '', levelId: ids.l06m })!;
     const b = realEnd(data, { kind: 'placeholder', id: ids.lvl9, label: '', levelId: null })!;
     const p = cablePayload({ id: 'x', code: 'P', qty: null, origin: 'manual', levelId: ids.l06m, toLevelId: null, sourceRef: null }, a, b, { confirm: false });

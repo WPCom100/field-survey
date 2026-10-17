@@ -13,7 +13,7 @@
 import { vocab, type Store } from '@field-survey/core';
 
 import { deviceNeedsNeuron, loadNeuronTypes } from '../library/neuron';
-import { connectionMatches } from '../plan/lists';
+import { connectionMatches, projectCableCodes } from '../plan/lists';
 
 export const UNSURVEYED = 'Unsurveyed';
 
@@ -346,10 +346,11 @@ export async function searchProject(store: Store, projectId: string, query: stri
     [projectId],
   );
   const terms = q.toLowerCase().split(/\s+/);
+  const codes = await projectCableCodes(store, projectId);
   for (const e of ends) {
     const label = str(e.display_id) ?? 'NEW';
     const text = join(e.from_text, e.cable, e.to_text, e.status, e.note);
-    if (!connectionMatches(terms, { cable: str(e.cable), label, text: `${label} ${text}`.toLowerCase() })) continue;
+    if (!connectionMatches(terms, { cable: str(e.cable), label, text: `${label} ${text}`.toLowerCase() }, codes)) continue;
     out.cable_end.push({ kind: 'cable_end', id: String(e.id), ...lvl(e), label, text, deviceId: str(e.device_id) });
     if (out.cable_end.length >= limit) break;
   }

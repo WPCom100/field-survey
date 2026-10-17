@@ -643,6 +643,14 @@ Decision D217: kit chips are computed from `R4b.kit` (and a cable's own Terminat
 
 Decision D219: the Rules tab offers one reword ruling per field (not per new value); it writes, per record, what its rule now words, carries the rule parameters as they were so hand edits are told apart, names records the rule no longer words, and is never standing. → Approve / change:
 
+## T121 — The other cable-code lists read the project's codes  ·  Needs: no new build (JS update only)
+
+**Why it matters:** after T117 a project's own code (given a signal word in Rules) was known to the library, the card and the Cable / riser view, but Setup review, the ruling editor and the plan's search still knew only the master's ten.
+
+- [ ] **Setup review.** On a project whose Rules → **Signal words** name `DX` (`DALI-2`; add it on a scratch project if needed), open Setup → Review drafts → Cables → **Add a cable draft by hand**: the Code chips end with `… 120V · D · DX`; pick `DX` and add it — no "Cable code must be one of" error. A riser line with no code ("What is this cable?") offers `DX` too. → saw:
+- [ ] **Rulings.** New ruling → Where **Connection end** → condition on **Cable**: the suggestion chips end with `DX`. → saw:
+- [ ] **Search.** With a `DX` connection on the level, type `dx` in the plan's search: the Conns tab shows the DX run only (not a connection whose text merely contains "dx"). The dashboard's project search does the same. → saw:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

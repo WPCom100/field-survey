@@ -5,7 +5,7 @@
 
 import { Editor, Store, uuidv7 } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
-import { RULES, RuleEngine, checkRuling, draftFromSelection, type RulingDraft } from '@field-survey/rules';
+import { CABLE_CODES, RULES, RuleEngine, checkRuling, draftFromSelection, fieldOf, setRuleParam, type RulingDraft } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
 
 import { handRuling, takeRuling } from './handoff';
@@ -72,6 +72,12 @@ describe('Rulings read model', () => {
       createdBy: 'Landry',
       open: 1,
     });
+    expect(v.cables).toEqual(CABLE_CODES);
+    await setRuleParam(editor, 'R3', 'signal', { DX: 'DALI-2' });
+    const { cables } = await loadRulings(store, PROJECT);
+    expect(cables).toEqual([...CABLE_CODES, 'DX']); // T121: the Cable field's suggestions
+    expect(fieldOf('cable_end', 'cable', cables)?.options).toEqual(cables);
+    expect(fieldOf('cable', 'cable')?.options).toEqual(CABLE_CODES);
     const props = await loadRulingProposals(store, PROJECT, res.rulingId);
     expect(props).toEqual([
       expect.objectContaining({ levelCode: '03', subject: expect.stringContaining('03-?'), why: 'Standing ruling "Corridor is Corridor C-01": Room / Location "Corridor" → "Corridor C-01"', deviceId: ids.b, levelId: ids.l03 }),

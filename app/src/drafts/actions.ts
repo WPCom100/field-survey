@@ -185,8 +185,14 @@ export async function addDeviceDraft(editor: Editor, projectId: string, f: NewDe
 
 export type NewCableDraft = { levelId: string | null; code: string; fromLabel: string; toLabel: string; toLevelId?: string | null; qty?: number };
 
-export async function addCableDraft(editor: Editor, projectId: string, f: NewCableDraft): Promise<string> {
-  if (!CABLE_CODES.includes(f.code)) throw new DraftError(`Cable code must be one of: ${CABLE_CODES.join(' · ')}.`);
+/** A code of `codes` (the project's, `cableCodes` — T121), else why not. */
+function checkCode(code: string, codes: readonly string[]): void {
+  if (!codes.includes(code)) throw new DraftError(`Cable code must be one of: ${codes.join(' · ')}.`);
+}
+
+/** `codes`: the project's cable codes (`DraftReviewData.codes`); the master's ten by default. */
+export async function addCableDraft(editor: Editor, projectId: string, f: NewCableDraft, codes: readonly string[] = CABLE_CODES): Promise<string> {
+  checkCode(f.code, codes);
   if (!f.fromLabel.trim() || !f.toLabel.trim()) throw new DraftError('Say where it runs from and to.');
   const { id } = await editor.create(
     'draft_cable',
@@ -256,8 +262,8 @@ export async function setEndpoint(editor: Editor, store: Store, draftId: string,
   return editor.setField('draft_cable', draftId, 'candidates', withChosen(raw.candidates, side, pick), ctx(`Draft review: ${side} end ${pick ? `→ ${pick.label}` : 'cleared'}`));
 }
 
-export async function setCableCode(editor: Editor, draftId: string, code: string): Promise<Op | null> {
-  if (!CABLE_CODES.includes(code)) throw new DraftError(`Cable code must be one of: ${CABLE_CODES.join(' · ')}.`);
+export async function setCableCode(editor: Editor, draftId: string, code: string, codes: readonly string[] = CABLE_CODES): Promise<Op | null> {
+  checkCode(code, codes);
   return editor.setField('draft_cable', draftId, 'code', code, ctx(`Draft review: cable code ${code}`));
 }
 

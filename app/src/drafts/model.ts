@@ -7,6 +7,7 @@
  */
 
 import { canonicalCategory, isRole, roleOfCategory, type Role, type Store } from '@field-survey/core';
+import { cableCodes, loadRuleParams } from '@field-survey/rules';
 
 import { loadDeviceTypes, roleOfDevice } from '../library/neuron';
 
@@ -121,6 +122,8 @@ export type DraftReviewData = {
   placeholders: { id: string; label: string; kind: string; levelId: string | null }[];
   /** Live devices of the project, for the endpoint pickers. */
   devicesLive: { id: string; levelId: string; label: string; displayId: string | null; panelName: string | null; category: string | null; role: Role; device: string | null; baselineRef: string | null }[];
+  /** The project's cable codes (`cableCodes`: the master's, then any its Rules give a signal word — T121). */
+  codes: string[];
 };
 
 /** The minimum for Accept all (Phase 3 §3.3); each accept is still recorded as a reviewed op. */
@@ -524,6 +527,7 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
     levels: levelRows,
     devices,
     cables,
+    codes: cableCodes(await loadRuleParams(store, projectId)),
     placeholders: placeholders.map((p) => ({ id: p.id, label: p.label, kind: p.kind, levelId: p.level_id })),
     devicesLive: live.map((d) => ({
       id: String(d.id),

@@ -204,6 +204,7 @@ export default function RulingsScreen() {
                   draft={mode.draft}
                   source={mode.source}
                   codes={codes}
+                  cables={view?.cables ?? null}
                   busy={busy}
                   onChange={(draft) => setMode({ kind: 'edit', draft, source: mode.source })}
                   onPreview={() => preview(mode.draft, 'edit')}
@@ -269,6 +270,7 @@ function EditorPanel({
   draft: d,
   source,
   codes,
+  cables,
   busy,
   onChange,
   onPreview,
@@ -277,6 +279,8 @@ function EditorPanel({
   draft: RulingDraft;
   source: string | null;
   codes: readonly string[];
+  /** The project's cable codes, for the Cable field (T121). */
+  cables: readonly string[] | null;
   busy: boolean;
   onChange: (d: RulingDraft) => void;
   onPreview: () => void;
@@ -317,7 +321,7 @@ function EditorPanel({
         </View>
       ) : null}
       {d.filter.where.map((c, i) => (
-        <ConditionRow key={i} entity={entity} c={c} first={i === 0} onChange={(p) => onChange(withCondition(d, i, p))} onRemove={() => onChange(removeCondition(d, i))} />
+        <ConditionRow key={i} entity={entity} c={c} cables={cables} first={i === 0} onChange={(p) => onChange(withCondition(d, i, p))} onRemove={() => onChange(removeCondition(d, i))} />
       ))}
       <Pressable onPress={() => onChange(addCondition(d))}>
         <Text style={styles.link}>+ condition</Text>
@@ -348,7 +352,7 @@ function EditorPanel({
         <View style={styles.block}>
           <FieldChips fields={actionFields(entity, a.kind)} value={a.field} onPick={(field) => setAction({ field })} />
           {a.kind === 'set' ? (
-            <ValueInput field={fieldOf(entity, a.field)} value={a.value} onChange={(value) => setAction({ value })} placeholder="New value" />
+            <ValueInput field={fieldOf(entity, a.field, cables ?? undefined)} value={a.value} onChange={(value) => setAction({ value })} placeholder="New value" />
           ) : a.kind === 'rename' ? (
             <>
               <TextInput style={styles.input} value={a.from} onChangeText={(from) => setAction({ from })} placeholder="Old phrase (the whole value or one ; phrase)" />
@@ -384,8 +388,22 @@ function EditorPanel({
   );
 }
 
-function ConditionRow({ entity, c, first, onChange, onRemove }: { entity: RulingDraft['filter']['entity']; c: Condition; first: boolean; onChange: (p: Partial<Condition>) => void; onRemove: () => void }) {
-  const f = fieldOf(entity, c.field);
+function ConditionRow({
+  entity,
+  c,
+  cables,
+  first,
+  onChange,
+  onRemove,
+}: {
+  entity: RulingDraft['filter']['entity'];
+  c: Condition;
+  cables: readonly string[] | null;
+  first: boolean;
+  onChange: (p: Partial<Condition>) => void;
+  onRemove: () => void;
+}) {
+  const f = fieldOf(entity, c.field, cables ?? undefined);
   return (
     <View style={styles.cond}>
       <View style={styles.condHead}>

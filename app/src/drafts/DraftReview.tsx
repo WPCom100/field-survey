@@ -1,5 +1,5 @@
 import { Editor, type Store } from '@field-survey/core';
-import { CABLE_CODES, DEVICE_CATEGORIES } from '@field-survey/rules';
+import { DEVICE_CATEGORIES } from '@field-survey/rules';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -232,7 +232,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
             tab === 'devices' ? (
               <AddDevice levels={data.levels} levelId={level.levelId} onAdd={(f) => run(() => addDeviceDraft(editor, projectId, f).then((id) => (setSelected(id), setAdding(false), 'Draft added')))} />
             ) : (
-              <AddCable levels={data.levels} levelId={level.levelId} onAdd={(f) => run(() => addCableDraft(editor, projectId, f).then((id) => (setSelected(id), setAdding(false), 'Draft added')))} />
+              <AddCable levels={data.levels} codes={data.codes} levelId={level.levelId} onAdd={(f) => run(() => addCableDraft(editor, projectId, f, data.codes).then((id) => (setSelected(id), setAdding(false), 'Draft added')))} />
             )
           ) : selDevice ? (
             <DevicePanel key={selDevice.id} d={selDevice} data={data} batches={batches} identity={identity} editor={editor} run={run} />
@@ -546,8 +546,8 @@ function CablePanel({
             </Text>
           ) : null}
           <View style={styles.chips}>
-            {CABLE_CODES.map((k) => (
-              <Chip key={k} label={k === c.codeGuess?.value && c.code !== k ? `${k} ?` : k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, c.id, k))} />
+            {data.codes.map((k) => (
+              <Chip key={k} label={k === c.codeGuess?.value && c.code !== k ? `${k} ?` : k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, c.id, k, data.codes))} />
             ))}
           </View>
           <Text style={styles.dim}>Not a cable to survey (a load or sense feed)? Reject it with a reason. A 0-10V or 120V line becomes the device’s library row, never a second one.</Text>
@@ -663,7 +663,17 @@ function AddDevice({ levels, levelId, onAdd }: { levels: DraftReviewData['levels
   );
 }
 
-function AddCable({ levels, levelId, onAdd }: { levels: DraftReviewData['levels']; levelId: string | null; onAdd: (f: { levelId: string | null; code: string; fromLabel: string; toLabel: string; toLevelId: string | null }) => void }) {
+function AddCable({
+  levels,
+  codes,
+  levelId,
+  onAdd,
+}: {
+  levels: DraftReviewData['levels'];
+  codes: readonly string[];
+  levelId: string | null;
+  onAdd: (f: { levelId: string | null; code: string; fromLabel: string; toLabel: string; toLevelId: string | null }) => void;
+}) {
   const [code, setCode] = useState<string | null>(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -674,7 +684,7 @@ function AddCable({ levels, levelId, onAdd }: { levels: DraftReviewData['levels'
       <Text style={styles.dim}>Then pick its two ends and Confirm endpoint, as for a riser cable.</Text>
       <Text style={w.label}>Code</Text>
       <View style={styles.chips}>
-        {CABLE_CODES.map((k) => (
+        {codes.map((k) => (
           <Chip key={k} label={k} on={code === k} onPress={() => setCode(k)} />
         ))}
       </View>

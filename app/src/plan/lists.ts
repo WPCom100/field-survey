@@ -15,12 +15,15 @@
  */
 
 import { displayNumber, isNew, punchDeviceText, type Store } from '@field-survey/core';
+import { cableCodes, loadRuleParams } from '@field-survey/rules';
 
 import type { PlanDevice } from './data';
 import { ownerMatches, statusKey, type PlanFilter } from './filters';
 
-/** Cable codes (CLAUDE.md §3). A search term equal to one matches the cable type exactly. */
-export const CABLE_CODES: readonly string[] = ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D'];
+/** The project's cable codes (`cableCodes`, T121): a search term equal to one matches that cable type exactly. */
+export async function projectCableCodes(store: Store, projectId: string | null): Promise<string[]> {
+  return projectId ? cableCodes(await loadRuleParams(store, projectId)) : cableCodes();
+}
 
 export type Tab = 'devices' | 'connections' | 'punch' | 'parts';
 export const TABS: readonly Tab[] = ['devices', 'connections', 'punch', 'parts'];
@@ -304,8 +307,10 @@ export async function searchIds(
   const ids = new Set(hits.map((h) => h.entity_id));
   const terms = q.toLowerCase().split(/\s+/);
   const byNumber = terms.some((t) => connectionNumber(t) !== undefined);
+  const level = await store.get<{ project_id: string }>('level', levelId);
+  const codes = await projectCableCodes(store, level?.project_id ?? null);
   for (const c of connections) {
-    if (!connectionMatches(terms, c)) continue;
+    if (!connectionMatches(terms, c, codes)) continue;
     ids.add(c.id);
     if (byNumber) {
       if (c.deviceId) ids.add(c.deviceId);
@@ -320,12 +325,13 @@ const connectionNumber = (t: string): string | undefined => /^(?:c-?)?(\d+)$/.ex
 
 /**
  * Does a connection row match every search term? Shared by the side lists and the dashboard's
- * project search (T38). `text` is the row's lower-case searched text.
+ * project search (T38). `text` is the row's lower-case searched text; `codes` the project's cable
+ * codes (`projectCableCodes`), the master's ten by default.
  */
-export function connectionMatches(terms: readonly string[], c: { cable: string | null; label: string; text: string }): boolean {
+export function connectionMatches(terms: readonly string[], c: { cable: string | null; label: string; text: string }, codes: readonly string[] = cableCodes()): boolean {
   return terms.every((t) => {
-    // A term that is a cable code ("n", "ng", "0-10v") means that cable type, not the letter anywhere.
-    if (CABLE_CODES.some((k) => k.toLowerCase() === t)) return c.cable?.toLowerCase() === t;
+    // A term that is a cable code ("n", "ng", "0-10v", a project's own) means that cable type, not the letter anywhere.
+    if (codes.some((k) => k.toLowerCase() === t)) return c.cable?.toLowerCase() === t;
     // A term shaped like a connection number ("c-14", "c14", "14") means that C-nn exactly (D163), so
     // "14" does not find C-140 or a "14" inside the text. A NEW end has no number and never matches.
     const n = connectionNumber(t);
