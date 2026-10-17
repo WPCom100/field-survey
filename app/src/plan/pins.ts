@@ -1,6 +1,6 @@
 /**
  * Pin geometry and colours (D64, T112): shape = the device's **role** (its library type's, else
- * its category's — D201), fill colour = Device Status, with a glyph as the non-colour backup
+ * its category's — D201) through the app library's shape per role (T104), fill colour = Device Status, with a glyph as the non-colour backup
  * signal. Pure: no Skia here, so it runs in Node. Shapes are described in screen pixels centred
  * on the pin's sheet position; the viewer scales them back by 1/zoom so pins keep a constant
  * on-screen size. `pinShape` runs on the UI thread too (the overlay draws there, D95), hence its
@@ -51,32 +51,58 @@ function regularPolygon(n: number, r: number): Point[] {
   return pts;
 }
 
+/** The shapes a pin can take (D64), in the default order of `ROLE`: name, glyph, label. */
+export const PIN_SHAPE_NAMES = ['square', 'rounded_square', 'wide_rectangle', 'hexagon', 'pentagon', 'triangle', 'circle', 'diamond', 'octagon'] as const;
+export type PinShapeName = (typeof PIN_SHAPE_NAMES)[number];
+export const PIN_SHAPE_LABEL: Readonly<Record<PinShapeName, { glyph: string; label: string }>> = {
+  square: { glyph: '■', label: 'Square' },
+  rounded_square: { glyph: '▢', label: 'Rounded square' },
+  wide_rectangle: { glyph: '▬', label: 'Wide rectangle' },
+  hexagon: { glyph: '⬢', label: 'Hexagon' },
+  pentagon: { glyph: '⬟', label: 'Pentagon' },
+  triangle: { glyph: '▲', label: 'Triangle' },
+  circle: { glyph: '●', label: 'Circle' },
+  diamond: { glyph: '◆', label: 'Diamond' },
+  octagon: { glyph: '⯃', label: 'Octagon' },
+};
+
+/** Role → shape (T104): a plain object so the worklet can capture it by value. */
+export type PinShapeMap = Readonly<Record<string, PinShapeName>>;
+
 /**
- * Shape for a role at a given on-screen size (the square's side): Relay panel ■ · Foundry panel
- * ▢ · EBDK ▬ · Equipment rack ⬢ · NSPS ⬟ · Touchscreen ▲ · Station ● · Sensor ◆ (D64), and the
- * octagon for `other` — a type or category outside the eight never looks like one of them. The
- * argument is a role, or a category name whose role is looked up (`other` when it names none).
+ * Default shape per role (D64): Relay panel ■ · Foundry panel ▢ · EBDK ▬ · Equipment rack ⬢ ·
+ * NSPS ⬟ · Touchscreen ▲ · Station ● · Sensor ◆, and the octagon for `other` — a type or
+ * category outside the eight never looks like one of them. The app library can move a role to
+ * another shape (T104, D214; `vocab/pinShapes.ts`).
  */
-export function pinShape(roleOrCategory: Role | string | null, size: number): PinShape {
+export const DEFAULT_PIN_SHAPE: Readonly<Record<Role, PinShapeName>> = Object.fromEntries(ROLE.map((r, i) => [r, PIN_SHAPE_NAMES[i]!])) as Record<Role, PinShapeName>;
+
+/**
+ * Shape for a role at a given on-screen size (the square's side). The argument is a role, or a
+ * category name whose role is looked up (`other` when it names none); `shapes` is the app
+ * library's role → shape map (`loadPinShapes`), the defaults when absent.
+ */
+export function pinShape(roleOrCategory: Role | string | null, size: number, shapes?: PinShapeMap | null): PinShape {
   'worklet';
   const r = size / 2;
   const role: string = roleOrCategory == null ? 'other' : PIN_ROLES.includes(roleOrCategory) ? roleOrCategory : (PIN_ROLE_OF_CATEGORY[roleOrCategory] ?? 'other');
-  switch (role as Role) {
-    case 'relay_panel':
+  const shape: PinShapeName = shapes?.[role] ?? DEFAULT_PIN_SHAPE[role as Role] ?? 'octagon';
+  switch (shape) {
+    case 'square':
       return { kind: 'rect', width: size, height: size, radius: 0 };
-    case 'foundry_panel':
+    case 'rounded_square':
       return { kind: 'rect', width: size, height: size, radius: size * 0.25 };
-    case 'ebdk':
+    case 'wide_rectangle':
       return { kind: 'rect', width: size * 1.5, height: size * 0.7, radius: 0 };
-    case 'equipment_rack':
+    case 'hexagon':
       return { kind: 'polygon', points: regularPolygon(6, r * 1.1) };
-    case 'nsps':
+    case 'pentagon':
       return { kind: 'polygon', points: regularPolygon(5, r * 1.1) };
-    case 'touchscreen':
+    case 'triangle':
       return { kind: 'polygon', points: regularPolygon(3, r * 1.2) };
-    case 'station':
+    case 'circle':
       return { kind: 'circle', radius: r };
-    case 'sensor':
+    case 'diamond':
       return { kind: 'polygon', points: regularPolygon(4, r * 1.2) };
     default:
       return { kind: 'polygon', points: regularPolygon(8, r * 1.05) };

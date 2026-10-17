@@ -642,7 +642,8 @@ class Vocab(Id, Synced, Base):
     __tablename__ = "vocab"
     __table_args__ = (one_of("list", vocab.VOCAB_LIST), one_of("state", vocab.LIBRARY_STATE))
 
-    project_id: Mapped[uuid.UUID] = mapped_column(fk("project.id"), index=True)
+    # null = the app library's value (T104, D214), on `/library/ops` like suggestions
+    project_id: Mapped[uuid.UUID | None] = mapped_column(fk("project.id"), index=True)
     list: Mapped[str]
     value: Mapped[str]
     canonical_of_id: Mapped[uuid.UUID | None] = mapped_column(fk("vocab.id"))

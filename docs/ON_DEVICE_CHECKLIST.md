@@ -579,6 +579,23 @@ Decision D212: suggestion chips are one `suggestion` table (your choice); new ch
 
 Decision D213: kits per cable code (`X`, `F`, `N`, `NG` on by default) with a per-cable Yes / No; one kit at each **device** end on an in-scope floor (none for Fixtures, spares or out-of-scope floors; the far end waits for its floor's survey); the far end's kit is sourced to its connection, not the Run item (whose number belongs to the other floor); a network kit is a part wherever kits are on; imported kits with no connection are matched to a run by their text. → Approve / change:
 
+## T104 — Vocabulary follow-ups: model map, level aliases, device types, pin shapes, app-level vocabulary  ·  Needs: no new build (JS update; server deploy first — Alembic 0017 lets `vocab` rows have no project; **every iPad on the new JS before anyone edits the app library's vocabulary or a pin shape**, an older iPad refuses those ops on pull until it updates, nothing lost)
+
+**Why it matters:** the BOM import reads the model map and level aliases, the card's Type now has chips, pin shapes can follow how Landry wants the floor to read, and values Landry trusts can be offered to every new project.
+
+- [ ] **Model map.** Vocabulary → **Model map & levels** → Model map: type `P-DOC-W-WD` → `P-DOC-W`, Add. It shows as `Model: P-DOC-W  draft` with `← P-DOC-W-WD  draft` under it. Add `P-DOC-W-4Z` → `p-doc-w`: it joins the same model (no second `P-DOC-W`). Adding `p-doc-w-wd` again is refused ("already in this list"). → saw:
+- [ ] **Level aliases.** Same tab → Level aliases: `Level 5` → `06M`, Add; Accept both rows. → saw:
+- [ ] **Remove a model.** Remove `P-DOC-W`: its spellings go with it. → saw:
+- [ ] **Device types and the card.** Lists → **Device types**: add `Echo relay panel`, Accept. Open a device's card → **Type** → Edit…: the chip `Echo relay panel` is under the box; tap it, Save. The card's header shows the new type; the pin's label (Labels layer) shows it too; History has the change as Field survey. → saw:
+- [ ] **Pin shapes.** Vocabulary → **Pin shapes**: nine roles, each with nine shape chips, the current one highlighted. Give **Station** the **Square**: the line says "shares its shape with another role" on Relay panel and Station. Open a plan with stations: their pins are squares, fill colours unchanged. Put Station back to **Circle**. → saw:
+- [ ] **Pin shapes on the floor PDF.** With Station set to Square, export a floor PDF of a level with stations: the cover sheet and the crops draw stations as squares. Put it back. → saw:
+- [ ] **Pin shapes on a second iPad.** Change a shape on one iPad and sync both: the other iPad's plan shows the new shape after its sync, with no project-level setting anywhere. → saw:
+- [ ] **App library vocabulary.** Vocabulary → **App library** → Lists: add a device note `Stuck buttons`: it shows `draft`. **Load standard lists** here: "Added n drafts to the app library"; no Placeholders tab in this scope. Back in **This project**, the note is not in the project's list. → saw:
+- [ ] **Promote.** In **This project**, an accepted value shows **Promote**; tap it on a model-map spelling: the App library's Model map now has the model and that spelling as drafts. Promote it again: "The app library already has …". → saw:
+- [ ] **Copy from app library.** In the App library accept the promoted model and spelling. On another project → Vocabulary → **Copy from app library**: "Copied n values"; they are accepted there; tapping it again copies nothing. A new project made from Projects → New gets the accepted app values too. → saw:
+
+Decision D214: app-level vocabulary is `vocab` with no project on the library stream (drafts for Landry; new projects and "Copy from app library" take the accepted ones; a project reads only its own rows), and pin shapes are one app-library setting per role that applies to every project at once, on the iPad and in the floor PDF (no per-project shapes, no draft). → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

@@ -1,4 +1,4 @@
-import { Editor, OpError, Store, uuidv7, type Op } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, OpError, Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
@@ -23,6 +23,7 @@ import {
   setFound,
   setNotes,
   setStatus,
+  setType,
 } from './actions';
 import { STANDARD_PHRASES, accessoryGroupLine, cableDraftTitle, formatValue, loadDeviceCard, optionalCableOffers } from './model';
 import { NOT_WIRED } from './proposals';
@@ -191,6 +192,21 @@ describe('device card read model', () => {
 });
 
 describe('device card edits', () => {
+  it("Type (T104): the project's type vocabulary as chips; Save is one Field survey op", async () => {
+    const { store, pid, editor, byLabel } = await setup();
+    const dev = byLabel('06M-01');
+    await store.applyRemoteMany([
+      pulled('vocab', uuidv7(), pid, { project_id: pid, list: 'type', value: 'Echo relay panel' }),
+      pulled('vocab', uuidv7(), LIBRARY_STREAM, { project_id: null, list: 'type', value: 'App only' }),
+    ]);
+    expect((await loadDeviceCard(store, dev.id))!.typeChips).toEqual(['Echo relay panel']);
+    const op = (await setType(editor, dev.id, '  Echo   relay panel '))!;
+    expect(op).toMatchObject({ field: 'type', now: 'Echo relay panel', change_type: 'Field survey' });
+    expect(await setType(editor, dev.id, 'Echo relay panel')).toBeNull();
+    expect((await loadDeviceCard(store, dev.id))!.device.type).toBe('Echo relay panel');
+    expect((await setType(editor, dev.id, ' '))!.now).toBeNull();
+  });
+
   it('a status tap is one Field survey op; the same status again writes nothing', async () => {
     const { store, editor, byLabel } = await setup();
     const dev = byLabel('06M-01');

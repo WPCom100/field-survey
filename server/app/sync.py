@@ -42,15 +42,15 @@ log = logging.getLogger("sync")
 SERVER_INSTALL_ID = uuid.uuid5(uuid.NAMESPACE_URL, "field-survey:server")
 # The app-library op log (T61, D184): ops pushed to `/library/ops` name this stream id as their
 # `project_id`; they are stored with `project_id` null, numbered on their own and pulled from
-# `/library/ops`. Only `library_type`, `rule_param` (T102) and `suggestion` (T99) rows of the app
-# library (project null) live there, plus
+# `/library/ops`. Only `library_type`, `rule_param` (T102), `suggestion` (T99) and `vocab` (T104)
+# rows of the app library (project null) live there, plus
 # the review items of their conflicts (stored with project_id null; on the wire and on the iPad
 # both carry LIBRARY_STREAM, whose `review_item.project_id` column is NOT NULL — `op_to_json`).
 LIBRARY_STREAM = uuid.UUID("00000000-0000-7000-8000-00000000a11b")
-LIBRARY_KINDS = frozenset({"library_type", "rule_param", "suggestion", "review_item"})
+LIBRARY_KINDS = frozenset({"library_type", "rule_param", "suggestion", "vocab", "review_item"})
 # Records that exist at both scopes: `project_id` null in the library stream, the project's own
-# id in a project's (T61, T102, T99).
-SCOPED_KINDS = frozenset({"library_type", "rule_param", "suggestion"})
+# id in a project's (T61, T102, T99, T104).
+SCOPED_KINDS = frozenset({"library_type", "rule_param", "suggestion", "vocab"})
 # Serialises library pushes as the project row lock serialises a project's (arbitrary key).
 LIBRARY_LOCK = 0x11B0A11B
 MAX_OPS_PER_PUSH = 500
@@ -225,14 +225,16 @@ def validate_op(
         raise ValueError(f"unknown entity_kind {op.entity_kind!r}")
     if library and op.entity_kind not in LIBRARY_KINDS:
         raise ValueError(
-            "the app library holds library types, rule defaults and suggestions only, "
+            "the app library holds library types, rule defaults, suggestions and vocabulary only, "
             f"not {op.entity_kind}"
         )
     if op.entity_kind in SCOPED_KINDS and op.kind == "create":
         owner = (op.payload or {}).get("project_id")
-        noun = {"library_type": "type", "rule_param": "rule parameter"}.get(
-            op.entity_kind, op.entity_kind
-        )
+        noun = {
+            "library_type": "type",
+            "rule_param": "rule parameter",
+            "vocab": "vocabulary value",
+        }.get(op.entity_kind, op.entity_kind)
         if library and owner is not None:
             raise ValueError(f"an app-library {noun} has no project_id")
         if not library and (owner is None or str(owner) != str(project_id)):

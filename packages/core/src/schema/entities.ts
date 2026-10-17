@@ -605,10 +605,11 @@ export const ENTITIES = {
     [['project_id'], ['ref']],
   ),
 
+  // T104 (D214): `project_id` null = the app library's value (library stream, D184).
   vocab: record(
     'vocab',
     {
-      project_id: id(),
+      project_id: t(),
       list: enumCol(v.VOCAB_LIST, { notNull: true }),
       value: t({ notNull: true }),
       canonical_of_id: t(),

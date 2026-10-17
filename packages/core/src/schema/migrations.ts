@@ -20,6 +20,7 @@ import { statements as m0012 } from './migrations/0012_draft_device_role';
 import { statements as m0013 } from './migrations/0013_rule_param';
 import { statements as m0014 } from './migrations/0014_suggestion';
 import { statements as m0015 } from './migrations/0015_cable_term_kit';
+import { statements as m0016 } from './migrations/0016_vocab_app_level';
 
 export interface Migration {
   version: number;
@@ -43,6 +44,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 13, name: 'rule_param', statements: m0013 },
   { version: 14, name: 'suggestion', statements: m0014 },
   { version: 15, name: 'cable_term_kit', statements: m0015 },
+  { version: 16, name: 'vocab_app_level', statements: m0016 },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

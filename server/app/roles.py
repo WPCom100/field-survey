@@ -24,7 +24,7 @@ from typing import Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Device, LibraryType
+from app.models import Device, LibraryType, RuleParam
 
 ROLES = (
     "relay_panel",
@@ -50,6 +50,42 @@ ROLE_LABEL = {
     "sensor": "Sensor",
     "other": "Other",
 }
+
+# Pin shapes (D64, T104, D214): one per role by default; the app library's `rule_param`
+# (`pin`, `shape`, project null) maps a role to another shape, for every project at once.
+PIN_SHAPES = (
+    "square",
+    "rounded_square",
+    "wide_rectangle",
+    "hexagon",
+    "pentagon",
+    "triangle",
+    "circle",
+    "diamond",
+    "octagon",
+)
+DEFAULT_PIN_SHAPE = dict(zip(ROLES, PIN_SHAPES, strict=True))
+PIN_SHAPE_RULE, PIN_SHAPE_KEY = "pin", "shape"
+
+
+def pin_shapes(session: Session) -> dict[str, str]:
+    """Role -> shape: the defaults with the app library's accepted overrides over them."""
+    shapes = dict(DEFAULT_PIN_SHAPE)
+    row = session.scalars(
+        select(RuleParam).where(
+            RuleParam.project_id.is_(None),
+            RuleParam.rule_id == PIN_SHAPE_RULE,
+            RuleParam.key == PIN_SHAPE_KEY,
+            RuleParam.state == "accepted",
+            RuleParam.deleted_at.is_(None),
+        )
+    ).first()
+    if row is not None and isinstance(row.value, dict):
+        for role, shape in row.value.items():
+            if role in shapes and shape in PIN_SHAPES:
+                shapes[role] = shape
+    return shapes
+
 
 # `vocab(category)` as seeded (D196; CLAUDE.md §3).
 DEVICE_CATEGORIES = (

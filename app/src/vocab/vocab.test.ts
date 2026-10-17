@@ -1,8 +1,10 @@
-import { Editor, Store, uuidv7 } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, Store, uuidv7 } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
-import { acceptValue, addPlaceholder, addValue, cleanValue, editPlaceholder, loadPlaceholders, loadStandard, loadVocab, removePlaceholder, removeValue, renameValue } from './model';
+import { DEFAULT_PIN_SHAPE, pinShape } from '../plan/pins';
+import { acceptValue, addPair, addPlaceholder, addValue, cleanValue, copyAppVocab, editPlaceholder, loadPairs, loadPlaceholders, loadStandard, loadVocab, promoteValue, removePlaceholder, removeValue, renameValue } from './model';
+import { loadPinShapes, pinShapeRowId, resolvePinShapes, setPinShape, sharedShapes } from './pinShapes';
 import { setEndPlaceholder } from '../ends/actions';
 import { SEED_PLACEHOLDERS, SEED_VOCAB } from './seed';
 
@@ -101,5 +103,105 @@ describe('category vocabulary on an existing project (T112, D201)', () => {
     const view = await loadVocab(store, projectId);
     expect(view.category.map((e) => e.value).sort()).toEqual([...SEED_VOCAB.category].sort());
     expect(await loadStandard(editor, store)).toMatchObject({ values: 0 });
+  });
+});
+
+describe('vocabulary follow-ups (T104, D187, D214)', () => {
+  async function scopes() {
+    const base = await setup();
+    let clock = 1_760_400_000_000;
+    const library = new Editor(base.store, { projectId: LIBRARY_STREAM, userId: uuidv7(), now: () => new Date((clock += 1000)).toISOString() });
+    return { ...base, library };
+  }
+
+  it('model map and level aliases: pairs on a canonical row, drafts, refusals, removal with the variants', async () => {
+    const { store, editor, projectId } = await setup();
+    const a = await addPair(editor, store, 'model_map', ' P-DOC-W-WD ', 'P-DOC-W');
+    const b = await addPair(editor, store, 'model_map', 'P-DOC-W-4Z', 'p-doc-w'); // the same canonical, any case
+    await addPair(editor, store, 'level_alias', 'Level 5', '06M');
+    const pairs = await loadPairs(store, projectId);
+    expect(pairs.model_map).toEqual([{ id: expect.any(String), value: 'P-DOC-W', draft: true, variants: [{ id: a, value: 'P-DOC-W-WD', draft: true }, { id: b, value: 'P-DOC-W-4Z', draft: true }] }]);
+    expect(pairs.level_alias.map((p) => [p.value, p.variants.map((v) => v.value)])).toEqual([['06M', ['Level 5']]]);
+    // the rows are D187's shape: a variant's canonical_of_id is the canonical row
+    expect(await store.get('vocab', a)).toMatchObject({ project_id: projectId, list: 'model_map', canonical_of_id: pairs.model_map[0]!.id, state: 'draft' });
+    await expect(addPair(editor, store, 'model_map', 'p-doc-w-wd', 'X')).rejects.toThrow(/already/);
+    await expect(addPair(editor, store, 'model_map', 'P-DOC-W', 'P-DOC-W')).rejects.toThrow(/the same/);
+    await expect(addPair(editor, store, 'model_map', '', 'X')).rejects.toThrow(/both/);
+    await expect(renameValue(editor, store, b, 'P-DOC-W-WD')).rejects.toThrow(/already/);
+    expect((await loadVocab(store, projectId)).category).toEqual([]); // pairs are not on the plain lists
+    await removeValue(editor, pairs.model_map[0]!.id, store);
+    expect((await loadPairs(store, projectId)).model_map).toEqual([]);
+    expect((await store.get<{ deleted_at: string | null }>('vocab', a))!.deleted_at).not.toBeNull(); // soft-deleted with its canonical
+  });
+
+  it('device types are a plain list (chips on the card)', async () => {
+    const { store, editor, projectId } = await setup();
+    await addValue(editor, store, 'type', 'Echo relay panel');
+    expect((await loadVocab(store, projectId)).type.map((e) => e.value)).toEqual(['Echo relay panel']);
+  });
+
+  it('app library: drafts on the library stream, standard values as drafts, no placeholders; projects never see them', async () => {
+    const { store, library, projectId } = await scopes();
+    const id = await addValue(library, store, 'type', 'Echo relay panel');
+    expect(await store.get('vocab', id)).toMatchObject({ project_id: null, state: 'draft' });
+    const [op] = await store.opsFor(id);
+    expect(op).toMatchObject({ project_id: LIBRARY_STREAM, entity_kind: 'vocab', kind: 'create' });
+    const n = await loadStandard(library, store);
+    expect(n.placeholders).toBe(0);
+    expect(n.values).toBeGreaterThan(20);
+    const app = await loadVocab(store, null);
+    expect(app.category.length).toBe(SEED_VOCAB.category.length);
+    expect(app.category.every((e) => e.draft)).toBe(true);
+    expect(await loadStandard(library, store)).toEqual({ values: 0, placeholders: 0 });
+    expect((await loadVocab(store, projectId)).type).toEqual([]);
+    expect(await loadPlaceholders(store, projectId)).toEqual([]);
+  });
+
+  it('promote a project value (with its pair) to the app library as drafts; copy accepted app values into a project', async () => {
+    const { store, editor, library, projectId } = await scopes();
+    const variant = await addPair(editor, store, 'model_map', 'P-DOC-W-WD', 'P-DOC-W');
+    const canonical = (await loadPairs(store, projectId)).model_map[0]!.id;
+    await expect(promoteValue(library, store, variant)).rejects.toThrow(/Accept/);
+    await acceptValue(editor, variant);
+    await acceptValue(editor, canonical);
+    await expect(promoteValue(editor, store, variant)).rejects.toThrow(/app library/);
+    expect(await promoteValue(library, store, variant)).toBe(2);
+    const app = (await loadPairs(store, null)).model_map;
+    expect(app.map((p) => [p.value, p.draft, p.variants.map((v) => [v.value, v.draft])])).toEqual([['P-DOC-W', true, [['P-DOC-W-WD', true]]]]);
+    await expect(promoteValue(library, store, canonical)).rejects.toThrow(/already has/);
+
+    // copy: only accepted app values, canonicals first, onto what the project has
+    const other = uuidv7();
+    let clock = 1_760_500_000_000;
+    const otherEditor = new Editor(store, { projectId: other, userId: uuidv7(), now: () => new Date((clock += 1000)).toISOString() });
+    expect(await copyAppVocab(otherEditor, store, other)).toBe(0); // all drafts so far
+    await acceptValue(library, app[0]!.id);
+    await acceptValue(library, app[0]!.variants[0]!.id);
+    await addValue(library, store, 'type', 'Still a draft');
+    await otherEditor.create('vocab', { project_id: other, list: 'model_map', value: 'p-doc-w', state: 'accepted' }, { change_type: 'Master edit', reason: 't' });
+    expect(await copyAppVocab(otherEditor, store, other)).toBe(1); // the variant, onto the project's own canonical
+    const got = (await loadPairs(store, other)).model_map;
+    expect(got.map((p) => [p.value, p.variants.map((v) => [v.value, v.draft])])).toEqual([['p-doc-w', [['P-DOC-W-WD', false]]]]);
+    expect(await copyAppVocab(otherEditor, store, other)).toBe(0);
+  });
+
+  it('pin shapes: one app-library row, only the moved roles stored, applied at once and read by the plan', async () => {
+    const { store, editor, library } = await scopes();
+    expect(await loadPinShapes(store)).toEqual(DEFAULT_PIN_SHAPE);
+    await expect(setPinShape(editor, store, 'station', 'square')).rejects.toThrow(/app library/);
+    expect(await setPinShape(library, store, 'station', 'square')).toBe(1);
+    expect(await setPinShape(library, store, 'station', 'square')).toBe(0);
+    const row = await store.get<{ project_id: string | null; rule_id: string; key: string; value: unknown; state: string }>('rule_param', pinShapeRowId());
+    expect(row).toMatchObject({ project_id: null, rule_id: 'pin', key: 'shape', value: { station: 'square' }, state: 'accepted' });
+    const shapes = await loadPinShapes(store);
+    expect(shapes.station).toBe('square');
+    expect(sharedShapes(shapes)).toEqual(['relay_panel', 'station']);
+    expect(pinShape('station', 20, shapes)).toEqual({ kind: 'rect', width: 20, height: 20, radius: 0 });
+    expect(pinShape('Station', 20)).toEqual({ kind: 'circle', radius: 10 }); // no map = the defaults
+    await setPinShape(library, store, 'station', 'circle'); // back to the default: nothing stored
+    expect((await store.get<{ value: unknown }>('rule_param', pinShapeRowId()))!.value).toBeNull();
+    expect(await loadPinShapes(store)).toEqual(DEFAULT_PIN_SHAPE);
+    expect(resolvePinShapes({ station: 'blob', nobody: 'square', sensor: 'circle' })).toEqual({ ...DEFAULT_PIN_SHAPE, sensor: 'circle' });
+    await expect(setPinShape(library, store, 'station', 'blob' as never)).rejects.toThrow(/Unknown/);
   });
 });

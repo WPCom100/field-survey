@@ -1103,6 +1103,7 @@ export function PlanScreen(props: PlanScreenProps) {
                       : null
                   }
                   gridMarks={gridOpen ? gridMarks : null}
+                  shapes={plan.shapes}
                 />
               ) : null}
               {drawing ? (

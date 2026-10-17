@@ -51,7 +51,7 @@ from app.models import (
     PunchItem,
     Sheet,
 )
-from app.roles import DeviceRoles
+from app.roles import DEFAULT_PIN_SHAPE, DeviceRoles, pin_shapes
 from app.storage import ObjectMissing, ObjectStore, read_ordered
 
 PDF_MIME = "application/pdf"
@@ -133,6 +133,7 @@ class FloorData:
     parts: list[list[Any]] = field(default_factory=list)
     photos: list[FloorPhoto] = field(default_factory=list)
     checks: list[str] = field(default_factory=list)
+    shapes: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_PIN_SHAPE))
 
 
 def pin_label(type_: str | None, device: str | None, category: str | None) -> str:
@@ -199,6 +200,7 @@ def load(
         ).all()
 
     roles = DeviceRoles.load(session, project_id)  # T112: the devices' roles, by their types
+    data.shapes = pin_shapes(session)  # T104: the app library's shape per role
     devices = live(Device)
     punches = live(PunchItem)
     parts = live(MissingPart)
@@ -389,8 +391,10 @@ def draw_pin(
     size: float,
     label: str | None = None,
     ring: bool = False,
+    shapes: dict[str, str] | None = None,
 ) -> None:
-    """One pin as the app draws it (pins.ts): shape by role (T112), fill by status, glyph inside."""
+    """One pin as the app draws it (pins.ts): shape by role (T112) through the app library's
+    shape per role (T104), fill by status, glyph inside."""
     fill_hex, hollow, glyph = STATUS_STYLE.get(status, STATUS_STYLE[None])
     color = _rgb(fill_hex)
     fill = (255, 255, 255) if hollow else color
@@ -402,9 +406,11 @@ def draw_pin(
         draw.ellipse(
             (x - rr, y - rr, x + rr, y + rr), outline=(255, 152, 0), width=max(3, round(size / 6))
         )
-    if role == "relay_panel":
+    key = role if role in DEFAULT_PIN_SHAPE else "other"
+    shape = (shapes or DEFAULT_PIN_SHAPE).get(key) or DEFAULT_PIN_SHAPE[key]
+    if shape == "square":
         draw.rectangle((x - r, y - r, x + r, y + r), fill=fill, outline=outline, width=width)
-    elif role == "foundry_panel":
+    elif shape == "rounded_square":
         draw.rounded_rectangle(
             (x - r, y - r, x + r, y + r),
             radius=size * 0.25,
@@ -412,22 +418,22 @@ def draw_pin(
             outline=outline,
             width=width,
         )
-    elif role == "ebdk":
+    elif shape == "wide_rectangle":
         draw.rectangle(
             (x - r * 1.5, y - r * 0.7, x + r * 1.5, y + r * 0.7),
             fill=fill,
             outline=outline,
             width=width,
         )
-    elif role == "station":
+    elif shape == "circle":
         draw.ellipse((x - r, y - r, x + r, y + r), fill=fill, outline=outline, width=width)
     else:
         n, k = {
-            "equipment_rack": (6, 1.1),
-            "nsps": (5, 1.1),
-            "touchscreen": (3, 1.2),
-            "sensor": (4, 1.2),
-        }.get(role or "", (8, 1.05))  # the octagon for `other`
+            "hexagon": (6, 1.1),
+            "pentagon": (5, 1.1),
+            "triangle": (3, 1.2),
+            "diamond": (4, 1.2),
+        }.get(shape, (8, 1.05))  # the octagon
         draw.polygon(_polygon(n, r * k, x, y), fill=fill, outline=outline, width=width)
     font = _font(max(8, round(size * (0.42 if len(glyph) > 1 else 0.6))))
     draw.text((x, y), glyph, font=font, fill=color if hollow else (255, 255, 255), anchor="mm")
@@ -479,7 +485,14 @@ def cover_image(data: FloorData, base: Image.Image) -> bytes:
     for d in data.devices:
         if d.pin:
             draw_pin(
-                draw, d.pin[0] * px_per_pt, d.pin[1] * px_per_pt, d.role, d.status, 20, d.label
+                draw,
+                d.pin[0] * px_per_pt,
+                d.pin[1] * px_per_pt,
+                d.role,
+                d.status,
+                20,
+                d.label,
+                shapes=data.shapes,
             )
     return _jpeg(img)
 
@@ -501,9 +514,19 @@ def crop_image(
             continue
         x, y = (d.pin[0] - x0) * scale, (d.pin[1] - y0) * scale
         if -20 <= x <= img.width + 20 and -20 <= y <= img.height + 20 and d is not subject:
-            draw_pin(draw, x, y, d.role, d.status, 16)
+            draw_pin(draw, x, y, d.role, d.status, 16, shapes=data.shapes)
     sx, sy = (subject.pin[0] - x0) * scale, (subject.pin[1] - y0) * scale
-    draw_pin(draw, sx, sy, subject.role, subject.status, 20, subject.display_id, ring=True)
+    draw_pin(
+        draw,
+        sx,
+        sy,
+        subject.role,
+        subject.status,
+        20,
+        subject.display_id,
+        ring=True,
+        shapes=data.shapes,
+    )
     return _jpeg(img)
 
 

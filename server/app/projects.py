@@ -38,6 +38,7 @@ from app.models import (
     User,
     Vocab,
 )
+from app.roles import PIN_SHAPE_RULE
 from app.rule_params import rule_param_id
 from app.sync import SERVER_INSTALL_ID, OpIn, Push, PushError, jsonable
 
@@ -414,32 +415,12 @@ def _copy(
     )
 
     _copy_rule_params(session, ops, project_id, source if flags and flags.rule_params else None)
+    with_vocab = source is not None and flags is not None and flags.vocabulary
+    counts["vocab"] = _copy_vocab(session, ops, project_id, source if with_vocab else None)
     counts["rule_params"] = sum(1 for o in ops.ops if o.entity_kind == "rule_param")
 
     if source is None or flags is None:
         return counts
-
-    if flags.vocabulary:
-        rows = list(
-            session.scalars(
-                select(Vocab).where(Vocab.project_id == source.id, Vocab.deleted_at.is_(None))
-            )
-        )
-        new_ids = {v.id: uuid7() for v in rows}
-        # Canonicals before their variants, so `canonical_of` always points at an existing row.
-        for v in sorted(rows, key=lambda v: v.canonical_of_id is not None):
-            canonical = new_ids.get(v.canonical_of_id) if v.canonical_of_id else None
-            ops.create(
-                "vocab",
-                {
-                    "id": new_ids[v.id],
-                    "project_id": project_id,
-                    "list": v.list,
-                    "value": v.value,
-                    "canonical_of_id": canonical,
-                },
-            )
-            counts["vocab"] += 1
 
     if flags.rulings:
         for r in session.scalars(
@@ -531,6 +512,50 @@ def _copy_suggestions(
     return n
 
 
+def _copy_vocab(
+    session: Session, ops: "_Ops", project_id: uuid.UUID, source: Project | None
+) -> int:
+    """The new project's vocabulary (T104, D214): the app library's accepted values, then every
+    live value of the source project (copied accepted, as before T104), leaving out a spelling
+    (any case) the app library already gave. Canonicals before their variants, so `canonical_of`
+    always points at a row of the new project: a source variant whose canonical the app library
+    already gave points at that copy; an app variant whose canonical is not accepted is left out."""
+    scopes: list[tuple[Any, bool]] = [(Vocab.project_id.is_(None), True)]
+    if source is not None:
+        scopes.append((Vocab.project_id == source.id, False))
+    prior: dict[tuple[str, str], uuid.UUID] = {}  # (list, spelling) -> new id, earlier scopes
+    n = 0
+    for where, app in scopes:
+        copied: dict[tuple[str, str], uuid.UUID] = {}
+        query = select(Vocab).where(where, Vocab.deleted_at.is_(None))
+        if app:
+            query = query.where(Vocab.state == "accepted")
+        rows = list(session.scalars(query.order_by(Vocab.id)))
+        new_ids: dict[uuid.UUID, uuid.UUID] = {}
+        for v in sorted(rows, key=lambda v: v.canonical_of_id is not None):
+            key = (v.list, v.value.strip().casefold())
+            if key in prior:
+                new_ids[v.id] = prior[key]
+                continue
+            canonical = new_ids.get(v.canonical_of_id) if v.canonical_of_id else None
+            if v.canonical_of_id is not None and canonical is None:
+                continue
+            new_ids[v.id] = copied[key] = uuid7()
+            ops.create(
+                "vocab",
+                {
+                    "id": new_ids[v.id],
+                    "project_id": project_id,
+                    "list": v.list,
+                    "value": v.value,
+                    "canonical_of_id": canonical,
+                },
+            )
+            n += 1
+        prior.update(copied)
+    return n
+
+
 def _copy_rule_params(
     session: Session, ops: "_Ops", project_id: uuid.UUID, source: Project | None
 ) -> None:
@@ -549,7 +574,8 @@ def _copy_rule_params(
             .order_by(RuleParam.rule_id, RuleParam.key)
         )
         for r in rows:
-            if r.value is not None:
+            # the app library's pin shapes (T104, D214) hold for every project: never copied
+            if r.value is not None and r.rule_id != PIN_SHAPE_RULE:
                 values[(r.rule_id, r.key)] = r.value
     for (rule_id, key), value in values.items():
         ops.create(

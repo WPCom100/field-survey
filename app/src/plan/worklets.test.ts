@@ -92,6 +92,9 @@ describe('plan worklets on the UI runtime', () => {
     for (const cat of [...pinsModule.DEVICE_CATEGORIES, 'Unknown']) {
       expect(ui<typeof pinsModule.pinShape>('pinShape')(cat, 26)).toEqual(pinsModule.pinShape(cat, 26));
     }
+    // T104: the app library's shape per role, captured by value
+    const shapes = { ...pinsModule.DEFAULT_PIN_SHAPE, station: 'square' as const };
+    expect(ui<typeof pinsModule.pinShape>('pinShape')('Station', 26, shapes)).toEqual({ kind: 'rect', width: 26, height: 26, radius: 0 });
   });
 
   it('the ink layer (T24) is drawn under the sheet → view matrix from its code string', () => {

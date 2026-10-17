@@ -31,6 +31,7 @@ import {
   setFound,
   setNotes,
   setStatus,
+  setType,
 } from './actions';
 import { accessoryGroupLine, loadDeviceCard, type CardDraft, type DeviceCard as Card, type HistoryEntry, type JumpTarget } from './model';
 import { QUICK_ACTIONS, type ProposalDecider, type QuickActionKey } from './proposals';
@@ -229,6 +230,8 @@ export function DeviceCard(props: DeviceCardProps) {
         </Section>
 
         <NotesSection card={card} readOnly={readOnly} run={run} />
+
+        <TypeSection card={card} readOnly={readOnly} run={run} />
 
         {card.accessories.length || card.accessoryOffers.length ? (
           <Section title="Accessories" marks="">
@@ -456,6 +459,54 @@ function NotesSection({ card, readOnly, run }: { card: Card; readOnly: boolean; 
             </Pressable>
           ) : null}
         </View>
+      )}
+    </Section>
+  );
+}
+
+/**
+ * The master's Type column (T104): the stored text, Edit… opens a box with the project's `type`
+ * vocabulary as chips (a chip replaces the text); free typing stays. Save writes one op.
+ */
+function TypeSection({ card, readOnly, run }: { card: Card; readOnly: boolean; run: Run }) {
+  const d = card.device;
+  const [typing, setTyping] = useState<string | null>(null);
+  const save = (text: string) => void run((e) => setType(e, d.id, text)).then((ok) => ok && setTyping(null));
+  return (
+    <Section title="Type" marks={marks(card, 'type')} collapsed={!d.type && !card.typeChips.length}>
+      {typing === null ? (
+        <View style={styles.rowWrap}>
+          <Text style={[styles.flex, card.inReview.has('type') && styles.review]}>{d.type ?? '—'}</Text>
+          {readOnly ? null : <SmallButton label="Edit…" onPress={() => setTyping(d.type ?? '')} />}
+        </View>
+      ) : (
+        <>
+          <TextInput
+            style={styles.input}
+            value={typing}
+            onChangeText={setTyping}
+            placeholder="Type (e.g. Echo relay panel)"
+            placeholderTextColor="#888"
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={() => save(typing)}
+          />
+          {card.typeChips.length ? (
+            <View style={styles.rowWrap}>
+              {card.typeChips.map((c) => (
+                <Pressable key={c} style={styles.phrase} onPress={() => setTyping(c)}>
+                  <Text style={styles.phraseText} numberOfLines={1}>
+                    {c}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+          <View style={styles.rowWrap}>
+            <SmallButton label="Save" onPress={() => save(typing)} />
+            <SmallButton label="Cancel" onPress={() => setTyping(null)} />
+          </View>
+        </>
       )}
     </Section>
   );

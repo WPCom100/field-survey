@@ -28,6 +28,12 @@ export function setNotes(editor: Editor, deviceId: string, text: string): Promis
   return editor.setField('device', deviceId, 'notes', t === '' ? null : t, FIELD_SURVEY);
 }
 
+/** The master's Type column (T104): trimmed, empty → none. One op, or none if unchanged. */
+export function setType(editor: Editor, deviceId: string, text: string): Promise<Op | null> {
+  const t = text.replace(/\s+/g, ' ').trim();
+  return editor.setField('device', deviceId, 'type', t === '' ? null : t, FIELD_SURVEY);
+}
+
 /**
  * Notes after tapping a vocabulary chip: the phrase on its own, or appended with "; " (the
  * master's separator). A phrase the note already ends with is not added twice.

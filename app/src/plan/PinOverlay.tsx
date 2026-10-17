@@ -7,6 +7,7 @@ import { drawInkLayer } from './drawInk';
 import { drawBoundaries, drawGridMarks, type BoundaryLabel, type BoundaryLine, type GridMark } from './drawLayers';
 import { drawPins, type PinFonts } from './drawPins';
 import { layoutPins, type RenderPin } from './layout';
+import type { PinShapeMap } from './pins';
 import type { Affine } from './viewport';
 
 type Props = {
@@ -25,6 +26,8 @@ type Props = {
   boundaries?: { lines: readonly BoundaryLine[]; labels: readonly BoundaryLabel[] } | null;
   /** Grid bubbles of the calibration, shown while the Grid panel is open (T45); null = hidden. */
   gridMarks?: readonly GridMark[] | null;
+  /** The app library's shape per role (T104, D214); the defaults when absent. */
+  shapes?: PinShapeMap | null;
 };
 
 /**
@@ -34,7 +37,7 @@ type Props = {
  * scroll callback (`useUiViewport`, T64), so this mapper runs in the same run-loop turn. Takes no
  * touches: pinch, pan and tap belong to PDFKit underneath.
  */
-export const PinOverlay = memo(function PinOverlay({ matrix, pins, selectedId, showPins, labels, photos, width, height, ink, boundaries, gridMarks }: Props) {
+export const PinOverlay = memo(function PinOverlay({ matrix, pins, selectedId, showPins, labels, photos, width, height, ink, boundaries, gridMarks, shapes }: Props) {
   const fonts = useMemo<PinFonts>(
     () => ({
       glyph: matchFont({ fontFamily: 'Helvetica', fontSize: 11, fontWeight: 'bold' }),
@@ -72,13 +75,13 @@ export const PinOverlay = memo(function PinOverlay({ matrix, pins, selectedId, s
     if (m && showPins && pins.length > 0) {
       // An exception on the UI thread ends a release build: degrade to an empty pin layer.
       try {
-        drawPins(canvas, pins, layoutPins(pins, m, width, height), fonts, { labels, photos, selectedId });
+        drawPins(canvas, pins, layoutPins(pins, m, width, height), fonts, { labels, photos, selectedId, shapes });
       } catch (e) {
         console.error(`[plan] pin layer failed: ${String(e)}`);
       }
     }
     return recorder.finishRecordingAsPicture();
-  }, [pins, selectedId, showPins, labels, photos, width, height, fonts, ink, boundaries, gridMarks]);
+  }, [pins, selectedId, showPins, labels, photos, width, height, fonts, ink, boundaries, gridMarks, shapes]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">

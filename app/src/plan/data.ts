@@ -16,8 +16,10 @@ import {
 } from '@field-survey/core';
 
 import { loadDeviceTypes, roleOfDevice } from '../library/neuron';
+import { loadPinShapes } from '../vocab/pinShapes';
 
 import type { Filterable } from './filters';
+import type { PinShapeMap } from './pins';
 
 export type PlanLevel = {
   id: string;
@@ -64,7 +66,8 @@ export type PlanDevice = Filterable & {
   inReview: boolean;
 };
 
-export type LevelPlan = { level: PlanLevel; sheet: PlanSheet | null; devices: PlanDevice[] };
+/** `shapes`: the app library's pin shape per role (T104, D214). */
+export type LevelPlan = { level: PlanLevel; sheet: PlanSheet | null; devices: PlanDevice[]; shapes?: PinShapeMap };
 
 type Row = Record<string, unknown>;
 
@@ -199,7 +202,7 @@ export async function loadLevelPlan(
     };
   });
   devices.sort((a, b) => compareLabels(a.label, b.label) || a.id.localeCompare(b.id));
-  return { level, sheet, devices };
+  return { level, sheet, devices, shapes: await loadPinShapes(store) };
 }
 
 /** Levels with a display sheet, for the temporary level picker on the home screen (T18 replaces it). */

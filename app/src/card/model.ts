@@ -241,6 +241,8 @@ export type DeviceCard = {
    * (T99), then the project's `device_note` vocabulary, else `STANDARD_PHRASES`.
    */
   phrases: readonly string[];
+  /** Chips under Type (T104): the project's `type` vocabulary. */
+  typeChips: readonly string[];
 };
 
 type Row = Record<string, unknown>;
@@ -630,6 +632,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
   const chipRows = await loadChipRows(store, projectId, [type?.id]);
   const chipCtx = { typeId: type?.id ?? null, category: str(d.category) };
   const deviceNotes = await vocabOf('device_note');
+  const typeChips = await vocabOf('type');
   const phrases = chipsFor(chipRows, chipCtx, 'device_note', deviceNotes.length ? deviceNotes : STANDARD_PHRASES);
   // a draft on one of the device's ends (or a far end) also offers that cable's code chips
   const codeOfEnd = new Map<string, string | null>();
@@ -660,5 +663,6 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     inReview,
     pending,
     phrases,
+    typeChips,
   };
 }

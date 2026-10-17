@@ -125,8 +125,8 @@ def test_two_users_on_one_field_raise_a_library_review_item(client, session):
 
 def test_the_library_log_takes_app_library_types_only(client, session):
     w = Lib(session)
-    # not a library type
-    w.push(client, [w.op(w.ann, "create", uuid7(), entity_kind="vocab", payload={})], status=422)
+    # not a library record (vocab rides the library stream since T104)
+    w.push(client, [w.op(w.ann, "create", uuid7(), entity_kind="device", payload={})], status=422)
     # a library type naming a project
     eid = uuid7()
     owned = {"id": str(eid), "project_id": str(uuid7()), "model": "X", "state": "draft"}

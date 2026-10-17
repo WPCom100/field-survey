@@ -14,7 +14,7 @@
 import { PaintStyle, Skia, type SkCanvas, type SkFont, type SkPath } from '@shopify/react-native-skia';
 
 import type { PinLayout, RenderPin } from './layout';
-import { pinShape } from './pins';
+import { pinShape, type PinShapeMap } from './pins';
 
 export const PIN_PX = 26;
 const SELECT = '#00bcd4';
@@ -23,11 +23,12 @@ const INK = '#111111';
 const REVIEW = '#ff8f00';
 
 export type PinFonts = { glyph: SkFont; label: SkFont; badge: SkFont };
-export type PinDrawOptions = { labels: boolean; photos: boolean; selectedId: string | null };
+/** `shapes`: the app library's role → shape (T104); the defaults when absent. */
+export type PinDrawOptions = { labels: boolean; photos: boolean; selectedId: string | null; shapes?: PinShapeMap | null };
 
-function shapeAt(role: string | null, cx: number, cy: number, size: number): SkPath {
+function shapeAt(role: string | null, cx: number, cy: number, size: number, shapes?: PinShapeMap | null): SkPath {
   'worklet';
-  const shape = pinShape(role, size);
+  const shape = pinShape(role, size, shapes);
   const path = Skia.Path.Make();
   if (shape.kind === 'circle') {
     path.addCircle(cx, cy, shape.radius);
@@ -64,7 +65,7 @@ function centredText(canvas: SkCanvas, text: string, cx: number, baseline: numbe
 
 function drawPin(canvas: SkCanvas, pin: RenderPin, x: number, y: number, fonts: PinFonts, opts: PinDrawOptions) {
   'worklet';
-  const shape = shapeAt(pin.role ?? pin.category, x, y, PIN_PX);
+  const shape = shapeAt(pin.role ?? pin.category, x, y, PIN_PX, opts.shapes);
   const paint = Skia.Paint();
   paint.setAntiAlias(true);
   if (pin.id === opts.selectedId) {
