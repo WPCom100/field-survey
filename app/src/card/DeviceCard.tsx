@@ -524,9 +524,10 @@ function NeuronSection({ card, store, readOnly, run }: { card: Card; store: Stor
 /**
  * One rule draft (Phase 3 §4.3): Accept, Edit (a small form over the payload's text fields,
  * then "Save & accept"), Reject, and "why?" from the engine's `explain()` (T33). A decision is
- * one op group; the card reloads through `onDecided`.
+ * one op group; the card reloads through `onDecided`. The Lint view lists the drafts no card
+ * shows with it too (T100).
  */
-function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardDraft; decider: ProposalDecider; readOnly: boolean; onDecided: () => void }) {
+export function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardDraft; decider: ProposalDecider; readOnly: boolean; onDecided: () => void }) {
   const [why, setWhy] = useState<string | null>(null);
   const [editing, setEditing] = useState<Record<string, string> | null>(null);
   const [busy, setBusy] = useState(false);

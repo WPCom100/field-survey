@@ -178,6 +178,21 @@ export type CardDraft = {
   editable: string[];
 };
 
+/** A proposal row as the card's draft row (also the Lint view's drafts without a device, T100). */
+export function cardDraftOf(p: Row): CardDraft {
+  const pl = p.payload && typeof p.payload === 'object' ? (p.payload as Row) : {};
+  return {
+    id: String(p.id),
+    ruleId: String(p.rule_id),
+    kind: String(p.kind),
+    title: p.kind === 'cable' ? cableDraftTitle(pl) : (str(pl.item) ?? str(pl.part) ?? str(pl.text) ?? str(pl.now) ?? String(p.kind)),
+    sub: [p.kind === 'part' ? 'part' : p.kind === 'cable' ? 'cable' : str(pl.type), str(pl.owner), str(pl.part_status) ?? str(pl.tracking_status)].filter(Boolean).join(' · '),
+    why: str(pl.why),
+    payload: pl,
+    editable: editableKeys(p.kind as Parameters<typeof editableKeys>[0], pl),
+  };
+}
+
 export type CardFinding = { id: string; lintId: string; message: string };
 
 export type HistoryEntry = {
@@ -584,19 +599,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
       params: subjects,
       orderBy: 'rule_id, id',
     })
-  ).map((p): CardDraft => {
-    const pl = p.payload && typeof p.payload === 'object' ? (p.payload as Row) : {};
-    return {
-      id: String(p.id),
-      ruleId: String(p.rule_id),
-      kind: String(p.kind),
-      title: p.kind === 'cable' ? cableDraftTitle(pl) : (str(pl.item) ?? str(pl.part) ?? str(pl.text) ?? str(pl.now) ?? String(p.kind)),
-      sub: [p.kind === 'part' ? 'part' : p.kind === 'cable' ? 'cable' : str(pl.type), str(pl.owner), str(pl.part_status) ?? str(pl.tracking_status)].filter(Boolean).join(' · '),
-      why: str(pl.why),
-      payload: pl,
-      editable: editableKeys(p.kind as Parameters<typeof editableKeys>[0], pl),
-    };
-  });
+  ).map(cardDraftOf);
   const findings = (
     await store.list<Row>('finding', {
       where: `state = 'open' AND json_extract(subject, '$.entity_id') = ?`,

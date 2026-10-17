@@ -2,13 +2,16 @@
  * Read model of the Lint view (T36, Phase 3 §9): the project's findings grouped by check (PLAN
  * §6.3, `LINT_CHECKS`) or by level, open and — on request — dismissed, the "fix all via ruling"
  * seeds of the vocabulary check (handed to T37), and this iPad's records the server has not
- * numbered (T13 → T36: refused or unnumbered creates; local, never a synced finding). Reads only;
- * Dismiss / Reopen go through `RuleEngine.dismiss` / `reopen`. No React or Expo imports.
+ * numbered (T13 → T36: refused or unnumbered creates; local, never a synced finding), and the rule
+ * drafts no device card shows (T100, D209). Reads only; Dismiss / Reopen go through
+ * `RuleEngine.dismiss` / `reopen`, a draft's Accept / Edit / Reject through the card's
+ * `ProposalDecider`. No React or Expo imports.
  */
 
 import { unnumbered, type Store } from '@field-survey/core';
 import { checkOf, checkOrder, rulingSeeds, type RulingSeed } from '@field-survey/rules';
 
+import { cardDraftOf, type CardDraft } from '../card/model';
 import { describeSubject, levelCodes } from '../review/model';
 
 type Row = Record<string, unknown>;
@@ -44,12 +47,35 @@ export type LintGroup = {
 /** A record this iPad holds that the server has not numbered and why (never synced). */
 export type LocalRow = { id: string; kind: string; levelCode: string | null; reason: 'refused' | 'unnumbered'; text: string };
 
+/**
+ * An open rule draft no device card lists (T100, D209): its subject is a numbering group (R3c's
+ * Neuron ID item), a level (R2e's Unison pair) or a punch item with no device (R4b's part). The
+ * card shows drafts on a device and its ends only; ruling proposals stay on the Rulings screen.
+ */
+export type LintDraft = CardDraft & {
+  levelId: string | null;
+  levelCode: string | null;
+  /** "Levels 06/06M", "Level 03", "Punch #12 …". */
+  subject: string;
+  /** The device the draft writes on (R2e's host NSPS / rack), for its label and Open card. */
+  deviceId: string | null;
+  /** "03-01 NSPS"; null when the draft names no device. */
+  device: string | null;
+  /** The finding that points at the same subject (`lint.neuron_item` names the group). */
+  findingIds: string[];
+};
+
+/** Subjects a device card lists drafts for; anything else is listed in the Lint view. */
+const CARD_SUBJECTS = ['device', 'cable_end'];
+
 export type LintView = {
   open: number;
   dismissed: number;
   groups: LintGroup[];
   levels: { id: string; code: string }[];
   local: LocalRow[];
+  /** Drafts without a device, in floor order (open view only; filtered by level). */
+  drafts: LintDraft[];
 };
 
 export type LintQuery = { levelId?: string | null; groupBy?: 'check' | 'level'; dismissed?: boolean };
@@ -164,7 +190,40 @@ export async function loadLintView(store: Store, projectId: string, q: LintQuery
     if (q.levelId && u.level_id !== q.levelId) continue;
     local.push({ id: u.id, kind: u.entity_kind.replace(/_/g, ' '), levelCode: u.level_id ? (codes.get(u.level_id) ?? null) : null, reason: u.reason, text: LOCAL_TEXT[u.reason] });
   }
-  return { open, dismissed, groups: sorted, levels, local };
+  const drafts = q.dismissed ? [] : await loadDrafts(store, projectId, codes, all, q.levelId ?? null);
+  return { open, dismissed, groups: sorted, levels, local, drafts };
+}
+
+/** The project's open drafts on a subject no card shows (T100). */
+async function loadDrafts(store: Store, projectId: string, codes: ReadonlyMap<string, string>, findings: readonly LintRow[], levelId: string | null): Promise<LintDraft[]> {
+  const rows = await store.list<Row>('proposal', {
+    where: `project_id = ? AND state = 'proposed' AND rule_id <> 'ruling' AND deleted_at IS NULL AND COALESCE(json_extract(subject, '$.entity_kind'), '') NOT IN (${CARD_SUBJECTS.map(() => '?').join(', ')})`,
+    params: [projectId, ...CARD_SUBJECTS],
+    orderBy: 'rule_id, id',
+  });
+  const order = new Map([...codes.keys()].map((id, i) => [id, i] as const));
+  const out: LintDraft[] = [];
+  for (const p of rows) {
+    const s = (p.subject && typeof p.subject === 'object' ? p.subject : {}) as Row;
+    const kind = typeof s.entity_kind === 'string' ? s.entity_kind : '';
+    const entityId = typeof s.entity_id === 'string' ? s.entity_id : '';
+    const d = kind && entityId ? await subjectLabel(store, kind, entityId, codes) : null;
+    const lvl = typeof s.level_id === 'string' ? s.level_id : (d?.levelId ?? null);
+    if (levelId && lvl !== levelId) continue;
+    const draft = cardDraftOf(p);
+    const deviceId = typeof draft.payload.device_id === 'string' ? draft.payload.device_id : null;
+    out.push({
+      ...draft,
+      deviceId,
+      device: deviceId ? (await describeSubject(store, 'device', deviceId, codes)).label : null,
+      levelId: lvl,
+      levelCode: lvl ? (codes.get(lvl) ?? null) : null,
+      subject: d?.label ?? '—',
+      findingIds: findings.filter((f) => f.state === 'open' && f.entityKind === kind && f.entityId === entityId).map((f) => f.id),
+    });
+  }
+  const rank = (d: LintDraft) => (d.levelId ? (order.get(d.levelId) ?? 999) : 1000);
+  return out.sort((a, b) => rank(a) - rank(b) || a.ruleId.localeCompare(b.ruleId) || a.id.localeCompare(b.id));
 }
 
 /** "06M-04 · NSPS without a 120V row" style detail title. */

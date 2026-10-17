@@ -512,6 +512,17 @@ Decision D208: answered 2026-10-16, **Approved** (anyone assigns; several people
 - [ ] **Same report.** Open it: the cover's counts and plan, findings with up to four thumbnails each, then the tables, then the photos in number order with their captions (spot-check Photo 1 and the last one); no blank picture boxes. → saw:
 - [ ] **Cancel.** Generate it again and tap Cancel while the card says `Photos`: the card goes to Cancelled within a few seconds, and a new Generate starts at once. → saw:
 
+## T100 — Drafts with no device in Lint  ·  Needs: no new build
+
+**Why it matters:** the Neuron ID item (R3c) and a level's Unison pair (R2e) were drafted by the rules but no screen showed them, so they could never be accepted.
+
+- [ ] **They are listed.** On a level group where a station has no Neuron ID and no "Missing all Device Neuron IDs" item exists (or on a level with an NSPS and no Unison row), open **Lint**: the title ends `· n drafts`, and **Drafts with no device (n)** heads the list with rows like `Levels 06/06M` → `DRAFT ⚑ R3c Missing all Device Neuron IDs`, `Information · EC · Open`, and `Level 03 · 03-01 …` → `DRAFT ⚑ R2e U → Unison from stations & sensors`. → saw:
+- [ ] **why? and Open card.** Tap **why?** on the R3c row: the rule's text and the count of devices with no Neuron ID. On the R2e row tap **Open card ▸**: the plan opens on that level with the NSPS's card. → saw:
+- [ ] **Accept / Edit / Reject.** Edit the R3c draft's notes, **Save & accept**: the draft leaves the list, the "Neuron ID item missing" finding goes, and the level's punch list has the item. Reject the R2e draft: it leaves the list and does not come back on the next sync unless that level's devices change. → saw:
+- [ ] **Level filter.** Tap a level chip: only that level's drafts show (the R3c draft is under the first level of its group, e.g. 06, not 06M). **Dismissed** shows no drafts. → saw:
+
+Decision D209: drafts that no device card lists (Neuron ID item, Unison pair, a part on an item with no device) live in the Lint view, decided in place with the card's buttons. → Approve / change:
+
 ---
 
 ## Rules for this file

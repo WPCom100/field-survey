@@ -4,13 +4,14 @@ import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { DraftRow } from '../card/DeviceCard';
 import { openAppStore } from '../db';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
 import { useCurrentUser } from '../identity/IdentityGate';
-import { detailTitle, loadLintView, seedSummary, type LintGroup, type LintRow, type LintView } from '../lint/model';
+import { detailTitle, loadLintView, seedSummary, type LintDraft, type LintGroup, type LintRow, type LintView } from '../lint/model';
 import { logTo } from '../log';
-import { bumpRulesVersion, engineFor } from '../rules/engine';
+import { bumpRulesVersion, engineFor, ruleDecider } from '../rules/engine';
 import { useRulesVersion } from '../rules/useRulesVersion';
 import { handRuling } from '../rulings/handoff';
 import { syncDataKey } from '../sync/dataKey';
@@ -26,8 +27,10 @@ type Item = { type: 'group'; group: LintGroup; collapsed: boolean } | { type: 'r
  * open by default, dismissed ones on a toggle. The panel shows the finding, what to do about it,
  * Open card, and Dismiss… (a reason is required; the finding comes back when its facts change,
  * D178) or Reopen. The vocabulary check offers "Fix all via ruling" per value, which opens the
- * ruling editor (T37) pre-filled with the records. "This iPad" lists records the server has
- * not numbered (local, never synced). `?project=` names the project.
+ * ruling editor (T37) pre-filled with the records. "Drafts with no device" heads the open list:
+ * the rule drafts no card shows (R3c's Neuron ID item, R2e's Unison pair, R4b's part on an item
+ * with no device), decided in place through the card's `DraftRow` (T100, D209). "This iPad"
+ * lists records the server has not numbered (local, never synced). `?project=` names the project.
  */
 export default function LintScreen() {
   const params = useLocalSearchParams<{ project?: string }>();
@@ -90,6 +93,7 @@ export default function LintScreen() {
   const codes = useMemo(() => new Map((view?.levels ?? []).map((l) => [l.id, l.code] as const)), [view]);
 
   const engine = useMemo(() => (store && projectId ? engineFor(store, projectId, user.id) : null), [store, projectId, user.id]);
+  const decider = useMemo(() => (store && projectId ? ruleDecider(store, projectId, user.id) : null), [store, projectId, user.id]);
 
   const act = useCallback(
     (what: 'dismiss' | 'reopen', r: LintRow, reason?: string) => {
@@ -125,7 +129,7 @@ export default function LintScreen() {
     [codes, projectId],
   );
 
-  const title = view ? `Lint (${view.open} open · ${view.dismissed} dismissed)` : 'Lint';
+  const title = view ? `Lint (${view.open} open · ${view.dismissed} dismissed${view.drafts.length ? ` · ${view.drafts.length} draft${view.drafts.length === 1 ? '' : 's'}` : ''})` : 'Lint';
 
   return (
     <View style={styles.root}>
@@ -197,6 +201,7 @@ export default function LintScreen() {
               </Pressable>
             )
           }
+          ListHeaderComponent={view?.drafts.length && decider ? <Drafts drafts={view.drafts} decider={decider} onDecided={() => setTick((n) => n + 1)} /> : null}
           ListEmptyComponent={<Text style={styles.empty}>{view ? (dismissed ? 'Nothing dismissed.' : 'No open findings.') : 'Loading…'}</Text>}
           ListFooterComponent={
             view?.local.length && !dismissed ? (
@@ -219,6 +224,45 @@ export default function LintScreen() {
           {note ? <Text style={styles.note}>{note}</Text> : null}
         </ScrollView>
       </View>
+    </View>
+  );
+}
+
+/** Rule drafts on a numbering group, a level or an item with no device (T100): no card lists them. */
+function Drafts({ drafts, decider, onDecided }: { drafts: LintDraft[]; decider: ReturnType<typeof ruleDecider>; onDecided: () => void }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <View>
+      <Pressable style={[styles.groupHead, styles.groupHeadDraft]} onPress={() => setOpen((o) => !o)}>
+        <Text style={styles.groupTitle}>
+          {open ? '▾' : '▸'} Drafts with no device ({drafts.length})
+        </Text>
+      </Pressable>
+      {open
+        ? drafts.map((d) => (
+            <View key={d.id} style={styles.draftBox}>
+              <View style={styles.seedRow}>
+                <Text style={[styles.rowTitle, styles.grow]} numberOfLines={1}>
+                  {d.subject}
+                  {d.device ? ` · ${d.device}` : ''}
+                </Text>
+                {d.levelId ? (
+                  <Pressable
+                    onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: d.levelId!, ...(d.deviceId ? { device: d.deviceId } : {}) } })}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.link}>{d.deviceId ? 'Open card ▸' : 'Open level ▸'}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <Text style={styles.rowSub}>
+                {d.levelCode ? `Level ${d.levelCode}` : 'No level'}
+                {d.findingIds.length ? ' · a finding below names the same subject' : ''}
+              </Text>
+              <DraftRow draft={d} decider={decider} readOnly={false} onDecided={onDecided} />
+            </View>
+          ))
+        : null}
     </View>
   );
 }
@@ -303,10 +347,13 @@ const styles = StyleSheet.create({
   list: { width: '46%', flexGrow: 0, borderRightWidth: 1, borderRightColor: '#e1e4e8' },
   groupHead: { paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#f4f5f7', borderBottomWidth: 1, borderBottomColor: '#e1e4e8' },
   groupTitle: { fontSize: 15, fontWeight: '700', color: '#333' },
+  groupHeadDraft: { backgroundColor: '#f3ecfb' },
+  draftBox: { paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#eef0f3', gap: 4 },
   groupTitleLocal: { fontSize: 15, fontWeight: '700', color: '#333', padding: 12, backgroundColor: '#fff4e5' },
   seeds: { paddingHorizontal: 16, paddingVertical: 6, gap: 6, backgroundColor: '#fafbfc' },
   seedRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   seedText: { fontSize: 14, flex: 1 },
+  grow: { flex: 1 },
   row: { paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
   rowOn: { backgroundColor: '#dce8fb' },
   rowTitle: { fontSize: 15, fontWeight: '600' },
