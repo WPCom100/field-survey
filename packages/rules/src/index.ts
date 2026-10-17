@@ -132,6 +132,7 @@ export {
   UNARY_OPS,
   ACTION_LABEL,
   RULING_FIELDS,
+  REWORD_FIELDS,
   RULING_RULE_ID,
   RulingRule,
   fieldOf,
@@ -166,6 +167,8 @@ export {
   type RulingRecord,
   type PreviewRow,
   type RulingPreview,
+  type RewordParam,
+  type RewordEffects,
 } from './rulings';
 // T102 (D176, D211): rule parameters — the catalogue, the resolved values, the store edits and the Rules tab's model.
 export {
@@ -192,6 +195,6 @@ export {
   type RuleParamRow,
 } from './params';
 export { loadRuleParamRows, loadRuleParams, setRuleParam, decideRuleParam, compactValue, RULE_PARAM_REASON } from './params-store';
-// T116: accepted items a changed parameter words differently, as pre-filled rulings.
-export { retrofitGroups, retrofitDraft, describeRetrofit, retrofitReason, type RetrofitGroup, type RetrofitEntity } from './retrofit';
+// T116, T120: accepted items a changed parameter words differently, as pre-filled `reword` rulings.
+export { retrofitGroups, rewordEffects, rewordParams, paramRowsOf, retrofitDraft, describeRetrofit, retrofitReason, type RetrofitGroup, type RetrofitEntity } from './retrofit';
 export { paramGroups, ruleTitle, codeValue, withCode, describeValue, type ParamGroup, type ParamItem } from './params-view';

@@ -32,7 +32,8 @@ import { engineFor } from './engine';
  * null for the app-level defaults (Projects → Rule defaults: each change is a draft until
  * accepted; new projects copy the accepted ones). Every change is one op through `editor`.
  * On a project, a change that words accepted items differently offers **Review accepted items ▸**:
- * one pre-filled `set` ruling per (field, new value) over those items (T116, `retrofitGroups`).
+ * one pre-filled `reword` ruling per field over those items (T116, T120, `retrofitGroups`): each
+ * record gets what its rule now words, so a template with `<far end>` in it is one ruling.
  */
 export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Store; editor: Editor; scope: string | null; dataKey: unknown }) {
   const app = scope == null;
@@ -41,7 +42,7 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
   const [onlySet, setOnlySet] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [retrofit, setRetrofit] = useState<{ reason: string; groups: RetrofitGroup[] } | null>(null);
+  const [retrofit, setRetrofit] = useState<{ reason: string; before: RuleParamRow[]; groups: RetrofitGroup[] } | null>(null);
   // The last change's rows as they were before it: back from a ruling, the offer lists what is left.
   const lastChange = useRef<{ reason: string; before: RuleParamRow[] } | null>(null);
   const findRetrofit = useCallback(async () => {
@@ -49,7 +50,7 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
     if (app || !scope || !c) return;
     try {
       const groups = await engineFor(store, scope, editor.userId).retrofit(c.before);
-      setRetrofit(groups.length ? { reason: c.reason, groups } : null);
+      setRetrofit(groups.length ? { reason: c.reason, before: c.before, groups } : null);
     } catch (e) {
       console.warn('[rules] retrofit', e); // only the offer is lost
     }
@@ -109,9 +110,9 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
     [run, editor, app, store, scope, findRetrofit],
   );
   const review = useCallback(
-    (g: RetrofitGroup, reason: string) => {
+    (g: RetrofitGroup, reason: string, before: readonly RuleParamRow[]) => {
       if (!scope) return;
-      handRuling(scope, retrofitDraft(g, reason), `Rules: ${describeRetrofit(g)}`);
+      handRuling(scope, retrofitDraft(g, reason, before), `Rules: ${describeRetrofit(g)}`);
       router.push({ pathname: '/rulings', params: { project: scope, from: 'handoff' } });
     },
     [scope],
@@ -159,11 +160,11 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
             Accepted items still read the old wording. Review accepted items ▸ opens a ruling over them, pre-filled; untick any in its preview.
           </Text>
           {retrofit.groups.slice(0, RETROFIT_SHOWN).map((g) => (
-            <Btn key={`${g.entity}|${g.field}|${g.value}`} title={`Review accepted items ▸  ${describeRetrofit(g)}`} small onPress={() => review(g, retrofit.reason)} />
+            <Btn key={`${g.entity}|${g.field}`} title={`Review accepted items ▸  ${describeRetrofit(g)}`} small onPress={() => review(g, retrofit.reason, retrofit.before)} />
           ))}
           {retrofit.groups.length > RETROFIT_SHOWN ? (
             <Text style={styles.small}>
-              +{retrofit.groups.length - RETROFIT_SHOWN} more wordings, one ruling each: they show here as these are done.
+              +{retrofit.groups.length - RETROFIT_SHOWN} more fields, one ruling each: they show here as these are done.
             </Text>
           ) : null}
         </View>

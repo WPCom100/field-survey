@@ -116,6 +116,25 @@ describe('editor steps', () => {
       'Unticked rows are remembered: this ruling never changes or proposes them.',
     ]);
   });
+
+  it('a reword (T120) is never standing and its footer names what it leaves', () => {
+    let d = withEntity(emptyDraft(), 'punch_item');
+    d = withActionKind(d, 'reword');
+    expect(d).toMatchObject({ action: { kind: 'reword', field: 'item' }, standing: false });
+    expect(withEntity(d, 'cable_end').action).toMatchObject({ kind: 'set' }); // no reword on ends
+    const p = {
+      rows: [{}] as never[], matched: 5, excepted: 0, levels: 1, vocab: null, note: null, problems: [], byHand: 1,
+      unworded: [{ id: 'a', ref: '#4', levelCode: '06' }, { id: 'b', ref: 'NEW', levelCode: '06M' }],
+    };
+    expect(previewFooter(p, { ...d, text: 'Reword' })).toEqual([
+      'Each ticked row becomes one Change Log line: Change = Ruling, Reason = the ruling text.',
+      '1 matching record is already right.',
+      '1 record changed by hand since the rule wrote it: left as it is.',
+      '2 records their rule no longer words, left as they are: 06 #4, 06M NEW.',
+      'Each row reads what its rule now words, the rule parameters as they stand.',
+      'Unticked rows are remembered: this ruling never changes or proposes them.',
+    ]);
+  });
 });
 
 describe('hand-off', () => {

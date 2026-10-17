@@ -12,7 +12,7 @@
  * | `text` | the reason, the Change Log's Reason |
  * | `scope_levels` | level **codes** (as the seed import writes them, D50); null or empty = all levels |
  * | `filter` | `{ entity, where: [{field, op, value}], ids?, except? }` — `ids` limits it to chosen records (multi-select, lint), `except` holds the records unticked in a preview, which the ruling never touches or proposes again |
- * | `action` | `{kind: 'set', field, value}` · `{kind: 'rename', field, from, to}` (a whole value or one "; " phrase) · `{kind: 'append', field, text}` (a phrase, once) · `{kind: 'item', item, type, owner, notes?}` (a punch item per device or connection end) |
+ * | `action` | `{kind: 'set', field, value}` · `{kind: 'rename', field, from, to}` (a whole value or one "; " phrase) · `{kind: 'append', field, text}` (a phrase, once) · `{kind: 'item', item, type, owner, notes?}` (a punch item per device or connection end) · `{kind: 'reword', field, before?}` (what each record's rule now words, T120; `before` = the rule parameters as they were) |
  *
  * The seed import's D50 ruling uses the older `filter {entity, field, values}` and
  * `action {set: {field: value}}`; `parseRuling` reads both.
@@ -74,7 +74,26 @@ export type RulingAction =
   | { kind: 'set'; field: string; value: string }
   | { kind: 'rename'; field: string; from: string; to: string }
   | { kind: 'append'; field: string; text: string }
-  | { kind: 'item'; item: string; type: string; owner: string; notes?: string | null };
+  | { kind: 'item'; item: string; type: string; owner: string; notes?: string | null }
+  | { kind: 'reword'; field: string; before?: RewordParam[] | null };
+
+/**
+ * A rule parameter as it was before the change a `reword` ruling follows (T120): the project's
+ * accepted `rule_param` rows, kept on the ruling so its preview tells a field changed by hand
+ * (neither the old wording nor the one it was accepted with) from one its rule wrote.
+ */
+export interface RewordParam {
+  rule_id: string;
+  key: string;
+  value: unknown;
+}
+
+/**
+ * Per record id and field, what its rule words (T120, `retrofit.ts` `rewordEffects`): `next` now
+ * (null: its rule no longer words it), `old` under the `before` parameters, `accepted` the
+ * proposal it was accepted from. The engine computes it; the preview reads it.
+ */
+export type RewordEffects = ReadonlyMap<string, Readonly<Record<string, { next: string | null; old: string | null; accepted: string | null }>>>;
 
 export type ActionKind = RulingAction['kind'];
 
@@ -83,6 +102,7 @@ export const ACTION_LABEL: Readonly<Record<ActionKind, string>> = {
   rename: 'Rename phrase',
   append: 'Append note',
   item: 'Generate item',
+  reword: 'Reword from the rule',
 };
 
 /** A ruling as the editor holds it, before or after it is stored. */
@@ -158,6 +178,12 @@ export const RULING_FIELDS: Readonly<Record<RulingEntity, readonly RulingField[]
   ],
 };
 
+/** The fields a `reword` ruling may write: what the rules word on the items they make (T120). */
+export const REWORD_FIELDS: Readonly<Partial<Record<RulingEntity, readonly string[]>>> = {
+  punch_item: ['item', 'owner', 'device_text'],
+  missing_part: ['part', 'owner'],
+};
+
 export function fieldOf(entity: RulingEntity, field: string): RulingField | null {
   return RULING_FIELDS[entity]?.find((f) => f.field === field) ?? null;
 }
@@ -174,6 +200,8 @@ export function actionFields(entity: RulingEntity, kind: ActionKind): RulingFiel
       return fields.filter((f) => f.settable && f.phrases);
     case 'item':
       return [];
+    case 'reword':
+      return fields.filter((f) => REWORD_FIELDS[entity]?.includes(f.field));
   }
 }
 
@@ -181,6 +209,7 @@ export function actionsFor(entity: RulingEntity): ActionKind[] {
   const out: ActionKind[] = ['set', 'rename'];
   if (actionFields(entity, 'append').length) out.push('append');
   if (entity === 'device' || entity === 'cable_end') out.push('item');
+  if (actionFields(entity, 'reword').length) out.push('reword');
   return out;
 }
 
@@ -226,6 +255,13 @@ export function parseAction(raw: unknown): RulingAction | null {
       return typeof a.field === 'string' ? { kind: 'append', field: a.field, text: strOf(a.text) } : null;
     case 'item':
       return { kind: 'item', item: strOf(a.item), type: strOf(a.type), owner: strOf(a.owner), notes: a.notes == null ? null : String(a.notes) };
+    case 'reword': {
+      if (typeof a.field !== 'string') return null;
+      const before = Array.isArray(a.before)
+        ? (a.before as Record<string, unknown>[]).filter((p) => p && typeof p.rule_id === 'string' && typeof p.key === 'string').map((p) => ({ rule_id: String(p.rule_id), key: String(p.key), value: p.value }))
+        : null;
+      return { kind: 'reword', field: a.field, before };
+    }
   }
   if (a.set && typeof a.set === 'object') {
     const [field, value] = Object.entries(a.set as Record<string, unknown>)[0] ?? [];
@@ -268,6 +304,10 @@ export function checkRuling(d: RulingDraft): string[] {
   const f = actionFields(entity, a.kind).find((x) => x.field === a.field);
   if (!f) {
     out.push(`${ACTION_LABEL[a.kind]}: pick a field.`);
+    return out;
+  }
+  if (a.kind === 'reword') {
+    if (d.standing) out.push('A reword ruling is applied once: it cannot be standing.');
     return out;
   }
   if (a.kind === 'set') {
@@ -431,6 +471,10 @@ export interface RulingPreview {
   vocab: { list: string; from: string; to: string } | null;
   note: string | null;
   problems: string[];
+  /** A reword: matched records their rule no longer words (or never worded this field), left as they are. */
+  unworded?: { id: string; ref: string; levelCode: string | null }[];
+  /** A reword: matched records whose field was changed by hand, left as they are. */
+  byHand?: number;
 }
 
 function hasItemText(index: SnapshotIndex, deviceId: string | null, endId: string | null, item: string): boolean {
@@ -440,6 +484,7 @@ function hasItemText(index: SnapshotIndex, deviceId: string | null, endId: strin
 
 /** What the action changes on one record; null when it is already right (or out of reach). */
 export function effectOf(index: SnapshotIndex, a: RulingAction, r: RulingRecord): Omit<PreviewRow, 'key' | 'entity' | 'id' | 'levelId' | 'levelCode' | 'ref'> | null {
+  if (a.kind === 'reword') return null; // read from the rule's wording in `previewRuling`
   if (a.kind === 'item') {
     if (r.entity !== 'device' && r.entity !== 'cable_end') return null;
     const level = r.levels[0];
@@ -530,8 +575,25 @@ export function vocabPlan(snap: Snapshot, change: NonNullable<RulingPreview['voc
   return plan;
 }
 
-/** The preview of a draft over a snapshot (Phase 3 §8): one row per record it would change. */
-export function previewRuling(snap: Snapshot, index: SnapshotIndex, d: RulingDraft): RulingPreview {
+/**
+ * A reword on one record (T120): what its rule now words, when the record does not read it yet
+ * and still reads the old wording or the one it was accepted with. `unworded` / `hand` say why not.
+ */
+function rewordOf(a: Extract<RulingAction, { kind: 'reword' }>, r: RulingRecord, effects: RewordEffects | undefined): ReturnType<typeof effectOf> | 'unworded' | 'hand' {
+  const f = fieldOf(r.entity, a.field);
+  const e = effects?.get(r.id)?.[a.field];
+  if (!f || !e?.next) return 'unworded';
+  const cur = strOf(r.value(a.field));
+  if (cur === e.next) return null;
+  if (cur !== (e.old ?? '') && cur !== (e.accepted ?? '')) return 'hand';
+  return { field: a.field, label: f.label, was: cur || null, now: e.next };
+}
+
+/**
+ * The preview of a draft over a snapshot (Phase 3 §8): one row per record it would change. A
+ * `reword` reads `opts.reword` (the engine's `rewordEffects`); without it nothing is reworded.
+ */
+export function previewRuling(snap: Snapshot, index: SnapshotIndex, d: RulingDraft, opts: { reword?: RewordEffects } = {}): RulingPreview {
   const problems = checkRuling(d);
   const { change, note } = vocabEffect(snap, d);
   if (problems.length) return { rows: [], matched: 0, excepted: 0, levels: 0, vocab: null, note: null, problems };
@@ -539,6 +601,8 @@ export function previewRuling(snap: Snapshot, index: SnapshotIndex, d: RulingDra
   const rows: { row: PreviewRow; level: LevelRow | null }[] = [];
   let matched = 0;
   let excepted = 0;
+  const unworded: { level: LevelRow | null; row: NonNullable<RulingPreview['unworded']>[number] }[] = [];
+  let byHand = 0;
   for (const r of rulingRecords(index, d.filter.entity)) {
     if (!inRuling(d, r)) continue;
     matched++;
@@ -546,14 +610,26 @@ export function previewRuling(snap: Snapshot, index: SnapshotIndex, d: RulingDra
       excepted++;
       continue;
     }
-    const e = effectOf(index, d.action, r);
-    if (!e) continue;
     const level = r.levels.slice().sort(compareLevels)[0] ?? null;
+    let e: ReturnType<typeof effectOf>;
+    if (d.action.kind === 'reword') {
+      const w = rewordOf(d.action, r, opts.reword);
+      if (w === 'unworded') unworded.push({ level, row: { id: r.id, ref: r.ref, levelCode: level?.level ?? null } });
+      if (w === 'hand') byHand++;
+      e = w === 'unworded' || w === 'hand' ? null : w;
+    } else e = effectOf(index, d.action, r);
+    if (!e) continue;
     rows.push({ row: { key: r.id, entity: r.entity, id: r.id, levelId: level?.id ?? null, levelCode: level?.level ?? null, ref: r.ref, ...e }, level });
   }
   rows.sort((a, b) => (a.level && b.level ? compareLevels(a.level, b.level) : a.level ? -1 : b.level ? 1 : 0) || compareIds(a.row.ref, b.row.ref));
   const levels = new Set(rows.map((r) => r.row.levelId ?? 'none')).size;
-  return { rows: rows.map((r) => r.row), matched, excepted, levels, vocab: change, note, problems };
+  const out: RulingPreview = { rows: rows.map((r) => r.row), matched, excepted, levels, vocab: change, note, problems };
+  if (d.action.kind === 'reword') {
+    unworded.sort((a, b) => (a.level && b.level ? compareLevels(a.level, b.level) : 0) || compareIds(a.row.ref, b.row.ref));
+    out.unworded = unworded.map((u) => u.row);
+    out.byHand = byHand;
+  }
+  return out;
 }
 
 // ------------------------------------------------------------------ words
@@ -575,6 +651,7 @@ export function describeAction(entity: RulingEntity, a: RulingAction): string {
   if (a.kind === 'item') return `generate item "${a.item}" (${a.type}, ${a.owner})`;
   const label = fieldOf(entity, a.field)?.label ?? a.field;
   if (a.kind === 'set') return `set ${label} = "${a.value}"`;
+  if (a.kind === 'reword') return `reword ${label} from its rule`;
   if (a.kind === 'rename') return `rename ${label} "${a.from}" → "${a.to}"`;
   return `append "${a.text}" to ${label}`;
 }

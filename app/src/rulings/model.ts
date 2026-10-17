@@ -8,6 +8,7 @@
 import type { Store } from '@field-survey/core';
 import {
   actionFields,
+  actionsFor,
   describeAction,
   describeFilter,
   parseRuling,
@@ -144,6 +145,8 @@ export function defaultAction(entity: RulingEntity, kind: ActionKind): RulingAct
       return { kind, field, text: '' };
     case 'item':
       return { kind, item: '', type: 'Information', owner: 'EC', notes: '' };
+    case 'reword':
+      return { kind, field };
   }
 }
 
@@ -154,11 +157,12 @@ export function emptyDraft(entity: RulingEntity = 'cable_end'): RulingDraft {
 /** Another entity: its own fields, so conditions, chosen records and the action start over. */
 export function withEntity(d: RulingDraft, entity: RulingEntity): RulingDraft {
   if (d.filter.entity === entity) return d;
-  return { ...d, filter: { entity, where: [blankCondition(entity)] }, action: defaultAction(entity, d.action.kind === 'item' && entity !== 'device' && entity !== 'cable_end' ? 'set' : d.action.kind) };
+  return { ...d, filter: { entity, where: [blankCondition(entity)] }, action: defaultAction(entity, actionsFor(entity).includes(d.action.kind) ? d.action.kind : 'set') };
 }
 
+/** Another action; a reword (T120) is applied once, so it is never standing. */
 export function withActionKind(d: RulingDraft, kind: ActionKind): RulingDraft {
-  return d.action.kind === kind ? d : { ...d, action: defaultAction(d.filter.entity, kind) };
+  return d.action.kind === kind ? d : { ...d, action: defaultAction(d.filter.entity, kind), ...(kind === 'reword' ? { standing: false } : {}) };
 }
 
 export function withCondition(d: RulingDraft, i: number, c: Partial<Condition>): RulingDraft {
@@ -196,12 +200,22 @@ export function previewTitle(p: RulingPreview, ticked: number): string {
   return ticked === n ? head : `${head} · ${n - ticked} unticked`;
 }
 
+const UNWORDED_SHOWN = 12;
+
 /** What the preview's footer says beside Apply. */
 export function previewFooter(p: RulingPreview, d: RulingDraft): string[] {
   const out = ['Each ticked row becomes one Change Log line: Change = Ruling, Reason = the ruling text.'];
   if (p.excepted) out.push(p.excepted === 1 ? '1 record unticked in an earlier preview stays as it is.' : `${p.excepted} records unticked in an earlier preview stay as they are.`);
-  if (p.matched > p.rows.length + p.excepted) out.push(`${p.matched - p.rows.length - p.excepted} matching record${p.matched - p.rows.length - p.excepted === 1 ? ' is' : 's are'} already right.`);
+  const right = p.matched - p.rows.length - p.excepted - (p.byHand ?? 0) - (p.unworded?.length ?? 0);
+  if (right > 0) out.push(`${right} matching record${right === 1 ? ' is' : 's are'} already right.`);
   if (p.note) out.push(p.note);
+  if (p.byHand) out.push(`${p.byHand} record${p.byHand === 1 ? '' : 's'} changed by hand since the rule wrote ${p.byHand === 1 ? 'it' : 'them'}: left as ${p.byHand === 1 ? 'it is' : 'they are'}.`);
+  if (p.unworded?.length) {
+    const n = p.unworded.length;
+    const refs = p.unworded.slice(0, UNWORDED_SHOWN).map((u) => `${u.levelCode ?? '—'} ${u.ref}`).join(', ');
+    out.push(`${n} record${n === 1 ? '' : 's'} ${n === 1 ? 'its' : 'their'} rule no longer words, left as ${n === 1 ? 'it is' : 'they are'}: ${refs}${n > UNWORDED_SHOWN ? `, +${n - UNWORDED_SHOWN} more` : ''}.`);
+  }
+  if (d.action.kind === 'reword') out.push('Each row reads what its rule now words, the rule parameters as they stand.');
   if (d.standing) out.push('Standing: records that match later get this change as a proposal (Accept / Reject on the card or here).');
   out.push('Unticked rows are remembered: this ruling never changes or proposes them.');
   return out;

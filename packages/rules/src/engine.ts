@@ -30,8 +30,8 @@ import {
   type Subject,
 } from './snapshot';
 import type { RuleParamRow } from './params';
-import { retrofitGroups, type RetrofitGroup } from './retrofit';
-import { checkRuling, parseRuling, previewRuling, vocabPlan, RULING_RULE_ID, type RulingDraft, type RulingPreview } from './rulings';
+import { paramRowsOf, retrofitGroups, rewordEffects, type RetrofitGroup } from './retrofit';
+import { checkRuling, parseRuling, previewRuling, vocabPlan, RULING_RULE_ID, type RewordEffects, type RulingDraft, type RulingPreview } from './rulings';
 
 export type RuleLog = (level: 'info' | 'warn' | 'error', event: string, data?: Record<string, unknown>) => void;
 
@@ -379,7 +379,13 @@ export class RuleEngine {
   /** The preview of a draft (Phase 3 §8) over the project as it stands. */
   async previewRuling(draft: RulingDraft): Promise<RulingPreview> {
     const s = await this.loadSnapshot();
-    return previewRuling(s, indexSnapshot(s), draft);
+    return previewRuling(s, indexSnapshot(s), draft, { reword: this.rewordFor(s, draft) });
+  }
+
+  /** A `reword` ruling's effects (T120): what the rules word on the rule-made items, as they are and under its `before`. */
+  private rewordFor(s: Snapshot, d: RulingDraft): RewordEffects | undefined {
+    if (d.action.kind !== 'reword') return undefined;
+    return rewordEffects(s, this.rules, d.action.before ? paramRowsOf(d.action.before, this.projectId) : null, { now: this.now() });
   }
 
   /**
@@ -399,7 +405,7 @@ export class RuleEngine {
     const problems = checkRuling(d);
     if (problems.length) throw new DecideError(problems.join(' '));
     const s = await this.loadSnapshot();
-    const preview = previewRuling(s, indexSnapshot(s), d);
+    const preview = previewRuling(s, indexSnapshot(s), d, { reword: this.rewordFor(s, d) });
     const skip = new Set(opts.skip ?? []);
     const ticked = preview.rows.filter((r) => !skip.has(r.key));
     const skipped = preview.rows.filter((r) => skip.has(r.key)).map((r) => r.id);
@@ -449,6 +455,7 @@ export class RuleEngine {
   async setRulingStanding(rulingId: string, standing: boolean): Promise<number> {
     const row = await this.store.get<RulingRow>('ruling', rulingId);
     if (!row || row.deleted_at) throw new DecideError('Unknown ruling');
+    if (standing && parseRuling(row)?.action.kind === 'reword') throw new DecideError('A reword ruling is applied once: it cannot be standing');
     const ops = await this.editor.group({ change_type: 'Ruling', reason: `${standing ? 'Standing' : 'No longer standing'}: ${row.text}`.slice(0, 500), ruling_id: row.id }, (g) =>
       g.setFields('ruling', row.id, { standing }),
     );

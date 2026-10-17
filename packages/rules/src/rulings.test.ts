@@ -13,6 +13,8 @@ import { RuleEngine } from './engine';
 import { rulingSeeds } from './lints';
 import { RULES } from './rules';
 import {
+  actionFields,
+  actionsFor,
   checkRuling,
   describeRuling,
   draftFromSeed,
@@ -126,6 +128,21 @@ describe('filter, action and words (pure)', () => {
     ]);
     expect(checkRuling({ ...fixtures(), filter: { entity: 'punch_item', where: [{ field: 'item', op: 'eq', value: 'x' }] }, action: { kind: 'item', item: 'Land 0-10V control wiring', type: 'Wiring', owner: 'EC' } })).toEqual(['Items are generated on devices or connection ends.']);
     expect(checkRuling(fixtures())).toEqual([]);
+  });
+
+  it('reword (T120): on the fields the rules word, stored with its parameters, never standing', () => {
+    expect(actionsFor('punch_item')).toContain('reword');
+    expect(actionsFor('cable_end')).not.toContain('reword');
+    expect(actionFields('punch_item', 'reword').map((f) => f.field)).toEqual(['item', 'owner', 'device_text']);
+    expect(actionFields('missing_part', 'reword').map((f) => f.field)).toEqual(['part', 'owner']);
+    const before = [{ rule_id: 'R3a', key: 'run.owner', value: { '*': 'ETC' } }];
+    const row = { id: 'r1', text: 'Reword', scope_levels: null, filter: { entity: 'punch_item', where: [], ids: ['p1'] }, action: { kind: 'reword', field: 'item', before }, standing: false };
+    const d = parseRuling(row as never)!;
+    expect(d.action).toEqual({ kind: 'reword', field: 'item', before });
+    expect(describeRuling(d)).toBe('Punch item · 1 chosen record → reword Item from its rule');
+    expect(checkRuling(d)).toEqual([]);
+    expect(checkRuling({ ...d, standing: true })).toEqual(['A reword ruling is applied once: it cannot be standing.']);
+    expect(checkRuling({ ...d, action: { kind: 'reword', field: 'notes' } })).toEqual(['Reword from the rule: pick a field.']);
   });
 });
 

@@ -601,10 +601,10 @@ Decision D214: app-level vocabulary is `vocab` with no project on the library st
 **Why it matters:** a changed owner or wording follows on open drafts but leaves accepted items as they were (D176). The Rules tab now offers a ruling, already filled in, for the accepted items the change words differently, so the punch list can be brought in line without hunting for them.
 
 - [ ] **The offer.** On a level with at least one accepted "Run DMX to …" item, in Setup → Rules → R3a → **Run item owner**, set *Any other code* to `ETC`. Under the "saved" notice a yellow box lists **Review accepted items ▸  n punch items: Owner → "ETC"**, n = the accepted Run items still reading `EC`. → saw:
-- [ ] **The pre-filled ruling.** Tap it: Rulings opens on the editor with Punch item · n chosen records, the level(s) as scope, **Set field Owner = ETC** and the reason "Rule parameter R3a · … changed: accepted items reworded to match". Preview: one row per item, `EC` → `ETC`. Untick one, Apply. The items read `ETC` on the plan; History shows the change as Ruling with that reason. → saw:
+- [ ] **The pre-filled ruling.** Tap it: Rulings opens on the editor with Punch item · n chosen records, the level(s) as scope, **Reword from the rule · Owner** (since T120; was Set field Owner = ETC) and the reason "Rule parameter R3a · … changed: accepted items reworded to match". Preview: one row per item, `EC` → `ETC`. Untick one, Apply. The items read `ETC` on the plan; History shows the change as Ruling with that reason. → saw:
 - [ ] **What is left.** Back in Setup → Rules: the box now lists only the item you unticked (1 punch item). → saw:
 - [ ] **Hand edits stay out.** Change one accepted Run item's Owner by hand to `EC/ETC`, then in Rules set *Any other code* back with **Reset to default**: that item is not in the box's count. → saw:
-- [ ] **A wording change.** Set R3a → **Run item text** *Any other code* to `Pull <signal> to <far end>`: the box lists one entry per item ("1 punch item: Item → "Pull DMX to …""), at most 8 and "+n more". Reset to default afterwards. → saw:
+- [ ] **A wording change.** Set R3a → **Run item text** *Any other code* to `Pull <signal> to <far end>`: since T120 the box lists **one** entry for the field ("n punch items: Item reworded (n wordings)"); the T120 section below goes on from here. → saw:
 
 Decision D215: accepted items are only changed by a ruling you apply; the Rules tab offers one pre-filled ruling per (field, new value) over the accepted items the change words differently, leaving out fields someone changed by hand; a wording with the far end in it means one ruling per item until a "reword" ruling action exists (T120). → Approve / change:
 
@@ -630,6 +630,18 @@ Decision D216: a scope's cable codes are the master's ten plus every code its ow
 - [ ] **One cable's own setting.** On an `N` cable with the code's kits off, set its Termination kits to **Yes**: its end editor offers "; no term kit" again; set **No** on a DMX cable: its end editor no longer does. → saw:
 
 Decision D217: kit chips are computed from `R4b.kit` (and a cable's own Termination kits), not seeded; a code that takes kits offers "Run, not terminated; no term kit" and its kit Part chip (from the R4b Part text); a cable that takes none offers no "no term kit" Note; a network code offers Part chips only where its kits are on. → Approve / change:
+
+## T120 — One ruling rewords accepted items from the rule  ·  Needs: no new build (JS update only)
+
+**Why it matters:** a changed template with the far end in it (`Pull <signal> to <far end>`) used to need one ruling per item; now one ruling writes each item's own new wording, and leaves alone what someone changed by hand.
+
+- [ ] **One entry per field.** On a level with two or more accepted "Run … to …" items, in Setup → Rules → R3a → **Run item text**, set *Any other code* to `Pull <signal> to <far end>`. The yellow box shows one **Review accepted items ▸  n punch items: Item reworded (n wordings)** (or `Item → "…"` when there is only one). → saw:
+- [ ] **The reword ruling.** Tap it: the editor shows Punch item · n chosen records, **Reword from the rule · Item** with a line saying each record gets what its rule now words, and no Standing switch. Preview: one row per item, each with its own far end ("Run DMX to 06-02" → "Pull DMX to 06-02"). → saw:
+- [ ] **Hand edits and gone wordings.** Before applying, back out; change one of those items' Item by hand on its card, and mark one of the runs pulled (its end to `Installed, untested`). Preview again: the hand-edited item and the pulled run's item are not rows; the footer says "1 record changed by hand … left as it is" and "1 record its rule no longer words … : <level> #<n>". → saw:
+- [ ] **Apply.** Apply: each remaining item reads its new text on the plan's punch list; History shows Change = Ruling with the reason. Back in Setup → Rules the box is gone (or lists only what you unticked). Reset Run item text to default afterwards, and use the box once more to put them back. → saw:
+- [ ] **Stored.** In Rulings, open the applied reword ruling: its action reads "reword Item from its rule", no Standing switch; **Preview again** shows nothing to change. → saw:
+
+Decision D219: the Rules tab offers one reword ruling per field (not per new value); it writes, per record, what its rule now words, carries the rule parameters as they were so hand edits are told apart, names records the rule no longer words, and is never standing. → Approve / change:
 
 ## Rules for this file
 

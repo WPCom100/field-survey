@@ -354,13 +354,19 @@ function EditorPanel({
               <TextInput style={styles.input} value={a.from} onChangeText={(from) => setAction({ from })} placeholder="Old phrase (the whole value or one ; phrase)" />
               <TextInput style={styles.input} value={a.to} onChangeText={(to) => setAction({ to })} placeholder="New phrase" />
             </>
+          ) : a.kind === 'reword' ? (
+            <Text style={styles.sub}>
+              Each record gets what its rule now words (Setup → Rules as it stands). A field changed by hand, or one no rule words any more, is left as it is; the preview names them.
+            </Text>
           ) : (
             <TextInput style={styles.input} value={a.text} onChangeText={(text) => setAction({ text })} placeholder="Phrase to append (once, after '; ')" />
           )}
         </View>
       )}
 
-      <Chip label={`${d.standing ? '☑' : '☐'} Standing: propose on future matches`} on={d.standing} onPress={() => onChange({ ...d, standing: !d.standing })} />
+      {a.kind === 'reword' ? null : (
+        <Chip label={`${d.standing ? '☑' : '☐'} Standing: propose on future matches`} on={d.standing} onPress={() => onChange({ ...d, standing: !d.standing })} />
+      )}
       {problems.length ? (
         <View style={styles.problems}>
           {problems.map((p) => (
@@ -561,7 +567,9 @@ function DetailPanel({
         {r.appliedAt ? ` · applied ${r.appliedAt.slice(0, 16).replace('T', ' ')}` : ' · not applied on this project (copied)'}
         {r.createdBy ? ` · by ${r.createdBy}` : ''}
       </Text>
-      <Chip label={`${r.standing ? '☑' : '☐'} Standing: propose on future matches`} on={r.standing} onPress={() => onStanding(!r.standing)} />
+      {r.draft?.action.kind === 'reword' ? null : (
+        <Chip label={`${r.standing ? '☑' : '☐'} Standing: propose on future matches`} on={r.standing} onPress={() => onStanding(!r.standing)} />
+      )}
       <View style={styles.btnRow}>
         <Btn label="Preview again ▸" onPress={onPreview} disabled={!r.draft} />
         <Btn label="Copy as new" onPress={onCopy} disabled={!r.draft} secondary />
