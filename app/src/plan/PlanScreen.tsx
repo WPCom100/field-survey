@@ -27,6 +27,11 @@
  *   anyone's strokes, saved into the owner's layer and merged by stroke id (T72, D129) —
  *   and two fingers pan and zoom the plan (T69, D129: the patched PDF view captures the single
  *   touch, `ink/touches.ts`). The layer is saved a second after the last stroke and on Done.
+ * - Place devices (T46, Phase 3 §3.4): "⊕ Place" (or `initialPlacing`, from Setup → 5 Place devices
+ *   and Needs review) shows the level's unplaced list in the side panel; a row is selected, then a
+ *   tap on the plan (or a drag of its handle onto the plan) chooses the spot, and the confirm form
+ *   places it. The sheet's panel tags propose dashed pins for unplaced panels; tapping one selects
+ *   it with that spot. Nothing is placed until Place ✓.
  * - A pin-position conflict (T26, Phase 3 §6) opened from Needs review (`reviewItemId`) draws
  *   side A solid at the device and side B dashed, both kept out of clusters, with Choose A /
  *   Choose B under the plan. Devices with an open review item have an amber ring (§13).
@@ -76,6 +81,8 @@ import { movePin } from '../card/actions';
 import { DeviceCard } from '../card/DeviceCard';
 import { EndEditor } from '../ends/EndEditor';
 import { AddDevicePanel } from '../additions/AddDevicePanel';
+import { PlacePanel } from '../placement/PlacePanel';
+import { loadUnplaced, tagProposals, type LevelUnplaced, type Proposal } from '../placement/model';
 import { INK_COLORS, photoMarkAt } from '../ink/geometry';
 import { InkCapture, type InkTool } from '../ink/InkCapture';
 import { createInkBus } from '../ink/touches';
@@ -157,6 +164,9 @@ const ROW_H = 52;
 const LONG_PRESS_TAP_GUARD_MS = 900;
 /** The placeholder pin of a device being added (never a real id). */
 const NEW_PIN_ID = '__adding__';
+/** The spot of an item being placed (T46), and the dashed proposals from the sheet's tags. */
+const PLACE_PIN_ID = '__placing__';
+const PROPOSAL_PREFIX = '__proposal__:';
 /** Side B of a pin conflict (never a real id). */
 const REVIEW_B_PIN_ID = '__review_b__';
 /** Grid calibration edits on `sheet.grid_sets` (T45): project setup, not a survey finding. */
@@ -192,6 +202,8 @@ export type PlanScreenProps = {
   reviewItemId?: string;
   /** Called after Choose A / Choose B on that item. */
   onReviewResolved?: (itemId: string) => void;
+  /** Open with the Place devices panel (T46): from Setup → 5 Place devices or Needs review. */
+  initialPlacing?: boolean;
   /** Multi-select in the side lists → "Apply as ruling…" (T37): open the ruling editor with this draft. */
   onApplyAsRuling?: (projectId: string, draft: RulingDraft, source: string) => void;
 };
@@ -253,6 +265,14 @@ export function PlanScreen(props: PlanScreenProps) {
   pressOpen.current = !!press;
   /** "+ Device": the form in the side panel and the grey pin at the spot. */
   const [adding, setAdding] = useState<{ at: Point; category: string | null } | null>(null);
+  /** Place devices (T46): the panel is open; the selected row; its spot on the sheet; a drag in plan-view points. */
+  const [placing, setPlacing] = useState(!!props.initialPlacing);
+  const [unplaced, setUnplaced] = useState<LevelUnplaced | null>(null);
+  const [placeKey, setPlaceKey] = useState<string | null>(null);
+  const [placeSpot, setPlaceSpot] = useState<Point | null>(null);
+  const [dragAt, setDragAt] = useState<Point | null>(null);
+  const planBox = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const planRef = useRef<View>(null);
   /** The Grid panel (T45) in the side panel, with its test / three-tap calibration modes. */
   const [gridOpen, setGridOpen] = useState(false);
   const [gridMode, setGridMode] = useState<GridPanelMode>('idle');
@@ -332,6 +352,38 @@ export function PlanScreen(props: PlanScreenProps) {
     [store, projectId, userId],
   );
   const onEdited = useCallback(() => setEdits((n) => n + 1), []);
+
+  // --- Place devices (T46): the level's unplaced list while the panel is open
+  useEffect(() => {
+    if (!placing || !projectId) return setUnplaced(null);
+    let active = true;
+    loadUnplaced(store, projectId, levelId).then(
+      (u) => {
+        if (!active) return;
+        setUnplaced(u);
+        console.log(`[plan] place: ${u?.items.length ?? 0} unplaced, ${u?.flagged.length ?? 0} flagged`);
+      },
+      (e: unknown) => console.warn('[plan] unplaced list not loaded', e),
+    );
+    return () => {
+      active = false;
+    };
+  }, [store, projectId, levelId, placing, edits, reloadKey]);
+  const startPlacing = useCallback(() => {
+    setPlacing(true);
+    setGridOpen(false);
+    setCardOpen(false);
+    setEndView(null);
+    setAdding(null);
+    setMoving(null);
+    setPress(null);
+  }, []);
+  const stopPlacing = useCallback(() => {
+    setPlacing(false);
+    setPlaceKey(null);
+    setPlaceSpot(null);
+    setDragAt(null);
+  }, []);
   // Accept / Edit / Reject of rule drafts on the card (T33); read-only without an editor.
   const decider = useMemo(() => (editor ? ruleDecider(store, editor.projectId, editor.userId) : NOT_WIRED), [store, editor]);
   // The rule engine wrote or decided proposal rows: the card reloads its drafts.
@@ -470,6 +522,12 @@ export function PlanScreen(props: PlanScreenProps) {
     return m;
   }, [tabData]);
   const placed = useMemo(() => visible.filter((d) => d.pin), [visible]);
+  /** Dashed pins at the sheet's panel tags for unplaced panels (T46); every pinned device's spot counts as taken. */
+  const proposals = useMemo((): Proposal[] => {
+    if (!placing || !unplaced || !plan?.sheet) return [];
+    const pins = plan.devices.filter((d) => d.pin).map((d) => d.pin!);
+    return tagProposals(plan.sheet.features, unplaced.items, pins);
+  }, [placing, unplaced, plan]);
   const renderPins = useMemo(() => {
     const pins = placed.map((d) => toRenderPin(d, pinConflict));
     const conflictDevice = pinConflict ? (plan?.devices.find((d) => d.id === pinConflict.deviceId) ?? null) : null;
@@ -492,6 +550,19 @@ export function PlanScreen(props: PlanScreenProps) {
         solo: true,
       });
     }
+    if (placing && unplaced) {
+      const st = pinStyleFor(null);
+      const itemOf = new Map(unplaced.items.map((i) => [i.key, i]));
+      for (const p of proposals) {
+        const item = itemOf.get(p.itemKey);
+        if (!item || (placeKey === p.itemKey && placeSpot && placeSpot.x === p.at.x && placeSpot.y === p.at.y)) continue;
+        pins.push({ id: `${PROPOSAL_PREFIX}${p.key}`, x: p.at.x, y: p.at.y, category: item.category, role: item.role, fill: st.fill, hollow: false, glyph: '?', label: `${item.title}?`, plus: false, isNew: true, photos: 0, rank: 97, ghost: true, solo: true });
+      }
+      const sel = placeKey ? itemOf.get(placeKey) : undefined;
+      if (placeSpot && sel) {
+        pins.push({ id: PLACE_PIN_ID, x: placeSpot.x, y: placeSpot.y, category: sel.category, role: sel.role, fill: st.fill, hollow: false, glyph: '+', label: sel.title, plus: true, isNew: true, photos: 0, rank: 99, solo: true });
+      }
+    }
     if (adding) {
       const st = pinStyleFor(null);
       pins.push({
@@ -510,7 +581,7 @@ export function PlanScreen(props: PlanScreenProps) {
       });
     }
     return pins;
-  }, [placed, adding, plan, pinConflict]);
+  }, [placed, adding, plan, pinConflict, placing, unplaced, proposals, placeKey, placeSpot]);
   const categories = useMemo(() => {
     const extra = new Set((plan?.devices ?? []).map((d) => d.category).filter((c): c is string => !!c));
     return [...DEVICE_CATEGORIES, ...[...extra].filter((c) => !(DEVICE_CATEGORIES as readonly string[]).includes(c)).sort()];
@@ -613,6 +684,21 @@ export function PlanScreen(props: PlanScreenProps) {
       setMenu(null);
       if (Date.now() - lastLongPress.current < LONG_PRESS_TAP_GUARD_MS) return; // the long press's own lift
       if (press) return setPress(null);
+      // Place devices (T46): a dashed proposal selects its item and spot; with an item selected a tap is its spot.
+      if (vp && placing && plan?.sheet) {
+        const at = apply(viewToSheet(vp), { x, y });
+        const hit = prefs.layers.pins ? hitTest(layoutPins(renderPins, sheetToView(vp), size.width, size.height), x, y, HIT_PX) : null;
+        const id = hit?.kind === 'pin' ? renderPins[hit.index]!.id : null;
+        const proposal = id?.startsWith(PROPOSAL_PREFIX) ? proposals.find((p) => `${PROPOSAL_PREFIX}${p.key}` === id) : undefined;
+        if (proposal) {
+          setPlaceKey(proposal.itemKey);
+          setPlaceSpot(proposal.at);
+          return;
+        }
+        const whole = sheetRect(vp);
+        if (placeKey && at.x >= 0 && at.y >= 0 && at.x <= whole.width && at.y <= whole.height) setPlaceSpot(at);
+        return;
+      }
       // Grid panel (T45): a test tap reads its Drawing Position; a calibration tap waits for its label.
       if (vp && gridOpen && gridMode !== 'idle' && plan?.sheet) {
         const at = apply(viewToSheet(vp), { x, y });
@@ -677,7 +763,7 @@ export function PlanScreen(props: PlanScreenProps) {
         focusSheetRect(focusRect(points, size, REVEAL_ZOOM), true);
       }
     },
-    [renderPins, size, prefs.layers.pins, prefs.layers.ink, select, focusSheetRect, moving, editor, plan, onEdited, press, adding, ink.others, ink.mine, props.blobs, pinConflict, gridOpen, gridMode, gridPending, deviceById],
+    [renderPins, size, prefs.layers.pins, prefs.layers.ink, select, focusSheetRect, moving, editor, plan, onEdited, press, adding, ink.others, ink.mine, props.blobs, pinConflict, gridOpen, gridMode, gridPending, deviceById, placing, proposals, placeKey],
   );
 
   /** Where a long press is, as the menu needs it; null off the sheet. */
@@ -706,7 +792,7 @@ export function PlanScreen(props: PlanScreenProps) {
    */
   const onPageLongPress = useCallback(
     (_page: number, x: number, y: number) => {
-      if (moving || !plan?.sheet) return;
+      if (moving || placing || !plan?.sheet) return;
       const p = pressAt(x, y);
       if (!p) return;
       pressHolding.current = true;
@@ -716,7 +802,7 @@ export function PlanScreen(props: PlanScreenProps) {
       setMenu(null);
       setPress(p);
     },
-    [moving, plan, pressAt],
+    [moving, placing, plan, pressAt],
   );
   const onPageLongPressMove = useCallback(
     (_page: number, x: number, y: number) => {
@@ -775,6 +861,20 @@ export function PlanScreen(props: PlanScreenProps) {
     [select, onOpenLevel],
   );
 
+  /** The selected item's handle dragged onto the plan (T46): the drop is its spot. */
+  const onPlaceDrag = useCallback((pageX: number, pageY: number, end: boolean) => {
+    const box = planBox.current;
+    const vp = vpRef.current;
+    const local = box ? { x: pageX - box.x, y: pageY - box.y } : null;
+    const inside = !!local && !!box && local.x >= 0 && local.y >= 0 && local.x <= box.width && local.y <= box.height;
+    if (!end) return setDragAt(inside ? local : null);
+    setDragAt(null);
+    if (!inside || !vp || !local) return;
+    const at = apply(viewToSheet(vp), local);
+    const whole = sheetRect(vp);
+    if (at.x >= 0 && at.y >= 0 && at.x <= whole.width && at.y <= whole.height) setPlaceSpot(at);
+  }, []);
+
   // --- TP-6 bench: 100 zoom cycles between fit and ×4 around the sheet centre (dev only)
   const [cycles, setCycles] = useState<number | null>(null);
   useEffect(() => {
@@ -799,6 +899,10 @@ export function PlanScreen(props: PlanScreenProps) {
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setSize({ width, height });
+    // where the plan is in the window, for a drag from the side panel (T46)
+    planRef.current?.measureInWindow((x, y, w, h) => {
+      planBox.current = { x, y, width: w, height: h };
+    });
   };
 
   /** Every layer as one picture in sheet coordinates (others a little faded), drawn by the overlay. */
@@ -888,7 +992,7 @@ export function PlanScreen(props: PlanScreenProps) {
   };
 
   const filtering = isFiltering(prefs.filter);
-  const unplaced = visible.length - placed.length;
+  const notOnPlan = visible.length - placed.length;
 
   return (
     <View style={styles.root}>
@@ -934,7 +1038,7 @@ export function PlanScreen(props: PlanScreenProps) {
 
       <View style={styles.body}>
         {/* plan */}
-        <View style={styles.plan} onLayout={onLayout}>
+        <View style={styles.plan} onLayout={onLayout} ref={planRef}>
           {error ? (
             <Centered text={error} />
           ) : !plan ? (
@@ -1124,7 +1228,18 @@ export function PlanScreen(props: PlanScreenProps) {
                   </Pressable>
                 </View>
               ) : null}
+              {dragAt ? <View pointerEvents="none" style={[styles.dragDot, { left: dragAt.x - 14, top: dragAt.y - 14 }]} /> : null}
+              {placing && !placeKey ? (
+                <View style={styles.moveBanner} pointerEvents="none">
+                  <Text style={styles.moveText}>Pick a device in the list on the right, then tap where it is on the plan — or tap a dashed pin.</Text>
+                </View>
+              ) : null}
               <View style={styles.planTools}>
+                {editor && !drawing && !placing ? (
+                  <Pressable style={styles.tool} onPress={startPlacing}>
+                    <Text style={styles.toolText}>⊕ Place</Text>
+                  </Pressable>
+                ) : null}
                 {canInk && !drawing ? (
                   <Pressable style={styles.tool} onPress={() => startDrawing('pen')}>
                     <Text style={styles.toolText}>✎ Ink</Text>
@@ -1158,7 +1273,43 @@ export function PlanScreen(props: PlanScreenProps) {
 
         {/* side lists */}
         <View style={styles.side}>
-          {gridOpen && plan?.sheet ? (
+          {placing && plan?.sheet && sheetUri ? (
+            <PlacePanel
+              store={store}
+              editor={editor}
+              levelId={levelId}
+              levelCode={plan.level.code}
+              sheetId={plan.sheet.id}
+              data={unplaced}
+              proposals={proposals.length}
+              selectedKey={placeKey}
+              spot={placeSpot}
+              defaults={
+                placeSpot
+                  ? {
+                      drawingPosition: drawingPosition(plan.sheet.gridSets, placeSpot),
+                      room: (() => {
+                        const r = nearestRoom(plan.sheet.features, placeSpot);
+                        return r ? roomText(r) : null;
+                      })(),
+                    }
+                  : null
+              }
+              onSelect={(key) => {
+                setPlaceKey(key);
+                setPlaceSpot(null);
+              }}
+              onClearSpot={() => setPlaceSpot(null)}
+              onPlaced={() => {
+                setPlaceKey(null);
+                setPlaceSpot(null);
+                onEdited();
+              }}
+              onEdited={onEdited}
+              onClose={stopPlacing}
+              onDrag={onPlaceDrag}
+            />
+          ) : gridOpen && plan?.sheet ? (
             <GridPanel
               levelCode={plan.level.code}
               sets={plan.sheet.gridSets}
@@ -1292,7 +1443,7 @@ export function PlanScreen(props: PlanScreenProps) {
             />
           ) : null}
           {/* The lists stay mounted under an open card, so their scroll position survives. */}
-          <View style={[styles.lists, adding || endView || gridOpen || (cardOpen && selectedId) ? styles.hidden : null]}>
+          <View style={[styles.lists, (placing && plan?.sheet && sheetUri) || adding || endView || gridOpen || (cardOpen && selectedId) ? styles.hidden : null]}>
           <View style={styles.tabs}>
             {TABS.map((t) => {
               const n = t === 'devices' ? visible.length : rowsByTab[t].length;
@@ -1333,8 +1484,13 @@ export function PlanScreen(props: PlanScreenProps) {
               <Text style={styles.sideNote} numberOfLines={1}>
                 {filtering || hits ? 'Filtered' : 'All'} · {tabData.length}
                 {tab === 'devices' && plan ? ` of ${plan.devices.length}` : ''}
-                {tab === 'devices' && unplaced > 0 ? ` · ${unplaced} not on the plan` : ''}
+                {tab === 'devices' && notOnPlan > 0 ? ` · ${notOnPlan} not on the plan` : ''}
               </Text>
+              {tab === 'devices' && notOnPlan > 0 && editor && sheetUri ? (
+                <Pressable onPress={startPlacing} hitSlop={8}>
+                  <Text style={styles.sideLink}>Place ▸</Text>
+                </Pressable>
+              ) : null}
               {props.onApplyAsRuling && userId ? (
                 <Pressable onPress={() => setPicked(new Set())} hitSlop={8}>
                   <Text style={styles.sideLink}>Select</Text>
@@ -1765,6 +1921,7 @@ const styles = StyleSheet.create({
   toolText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   lists: { flex: 1 },
   hidden: { display: 'none' },
+  dragDot: { position: 'absolute', width: 28, height: 28, borderRadius: 14, borderWidth: 3, borderColor: '#1565c0', backgroundColor: 'rgba(21,101,192,0.25)' },
   moveBanner: {
     position: 'absolute',
     top: 12,

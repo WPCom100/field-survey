@@ -10,18 +10,20 @@ import { SourcesStep } from '../../setup/SourcesStep';
 import { BaselineDialog } from '../../setup/BaselineDialog';
 import { DraftReview } from '../../drafts/DraftReview';
 import { loadLockTable, lockWarnings, type LockLevel } from '../../setup/lock';
+import { loadPlacementProgress, type PlacementProgress } from '../../placement/model';
 import { useSyncStatus } from '../../sync/useSyncStatus';
 import { syncDataKey } from '../../sync/dataKey';
 
-type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'lock';
-const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'lock'];
+type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock';
+const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'place', 'lock'];
 
 /**
  * Setup of an existing project (Phase 3 §3.1 steps 1–2): the project's fields and the levels
  * table. Every change is an op (`SetupActions`), so this works offline. Sources is the seed
  * import (T28), floor plans (T45) and the BOM / riser extraction (T44); Review drafts is the
- * Phase 3 §3.3 review (T44, `?step=drafts&draft=<id>` opens one draft); Place devices lights up
- * with T46; Lock baseline is the Phase 3 §3.5 table (T47), whose Lock / Unlock is also on each
+ * Phase 3 §3.3 review (T44, `?step=drafts&draft=<id>` opens one draft); Place devices is the
+ * progress per level with Place ▸ into the level's plan in placing mode (T46, Phase 3 §3.4); Lock
+ * baseline is the Phase 3 §3.5 table (T47, T46's columns), whose Lock / Unlock is also on each
  * Levels row.
  */
 export default function ProjectSetupScreen() {
@@ -36,6 +38,7 @@ export default function ProjectSetupScreen() {
   const [setup, setSetup] = useState<ProjectSetup | null>(null);
   const [actions, setActions] = useState<SetupActions | null>(null);
   const [locks, setLocks] = useState<Map<string, LockLevel>>(new Map());
+  const [placement, setPlacement] = useState<PlacementProgress | null>(null);
   const [dialog, setDialog] = useState<LockLevel | null>(null);
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +53,10 @@ export default function ProjectSetupScreen() {
       const store = await openAppStore();
       const s = await loadProjectSetup(store, projectId);
       const table = await loadLockTable(store, projectId);
+      const progress = await loadPlacementProgress(store, projectId);
       if (!live) return;
       setSetup(s);
+      setPlacement(progress);
       setLocks(new Map(table.map((l) => [l.id, l])));
       setActions((a) => a ?? new SetupActions(store, projectId, user.id));
     })().catch((e: unknown) => console.warn('[setup] load', e));
@@ -106,9 +111,9 @@ export default function ProjectSetupScreen() {
         <Pressable onPress={() => setStep('drafts')} style={[styles.step, step === 'drafts' && styles.stepOn]}>
           <Text style={styles.stepText}>4 Review drafts</Text>
         </Pressable>
-        <View style={styles.step}>
-          <Text style={[styles.stepText, styles.stepDim]}>5 Place devices</Text>
-        </View>
+        <Pressable onPress={() => setStep('place')} style={[styles.step, step === 'place' && styles.stepOn]}>
+          <Text style={styles.stepText}>5 Place devices</Text>
+        </Pressable>
         <Pressable onPress={() => setStep('lock')} style={[styles.step, step === 'lock' && styles.stepOn]}>
           <Text style={styles.stepText}>6 Lock baseline</Text>
         </Pressable>
@@ -130,6 +135,8 @@ export default function ProjectSetupScreen() {
             <ProjectStep setup={setup} run={run} />
           ) : step === 'sources' ? (
             <SourcesStep projectId={projectId} />
+          ) : step === 'place' ? (
+            <PlaceStep progress={placement} />
           ) : step === 'lock' ? (
             <LockStep levels={setup.levels.map((l) => locks.get(l.id)).filter((l): l is LockLevel => !!l)} onLock={setDialog} />
           ) : (
@@ -187,7 +194,64 @@ function ProjectStep({ setup, run }: { setup: ProjectSetup; run: Run }) {
   );
 }
 
-/** Phase 3 §3.5: per level what a lock would leave open, and Lock / Unlock. Drafts and flags come with T44/T46. */
+/**
+ * Phase 3 §3.4 progress (T46): per in-scope level the devices on the plan, those not on it, the
+ * draft units still to place and the flagged drafts; Place ▸ opens the level's plan with the
+ * Place devices panel. The pool's units are placed from any level's plan.
+ */
+function PlaceStep({ progress }: { progress: PlacementProgress | null }) {
+  if (!progress) return <Text style={styles.empty}>Loading…</Text>;
+  const levels = progress.levels.filter((l) => l.inScope);
+  return (
+    <Section title="Place devices">
+      <Text style={styles.hint}>
+        Put every device on its level's plan: the master's devices without a pin and the units of accepted drafts (Review drafts). Place ▸ opens
+        the plan with the unplaced list; panels found in the sheet's text are proposed as dashed pins. A draft that is not on the sheet can be
+        flagged.
+      </Text>
+      <View style={styles.head}>
+        <Text style={[styles.cCode, w.label]}>Level</Text>
+        <Text style={[styles.cLockNum, w.label]}>Placed</Text>
+        <Text style={[styles.cLockNum, w.label]}>Not on plan</Text>
+        <Text style={[styles.cLockNum, w.label]}>From drafts</Text>
+        <Text style={[styles.cLockNum, w.label]}>Flagged</Text>
+        <Text style={[styles.cActions, w.label]}> </Text>
+      </View>
+      {levels.map((l) => {
+        const done = l.unplacedDevices === 0 && l.draftUnits === 0;
+        return (
+          <View key={l.levelId} style={styles.row}>
+            <Text style={[styles.cCode, styles.code]}>{l.code}</Text>
+            <Text style={styles.cLockNum}>
+              {l.placed}/{l.devices}
+              {done && l.devices > 0 ? ' ✓' : ''}
+            </Text>
+            <Text style={styles.cLockNum}>{l.unplacedDevices}</Text>
+            <Text style={styles.cLockNum}>{l.draftUnits}</Text>
+            <Text style={styles.cLockNum}>{l.flagged}</Text>
+            <View style={[styles.cActions, styles.actions]}>
+              <Btn
+                title={done ? 'Open plan ▸' : 'Place ▸'}
+                small
+                primary={!done}
+                onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: l.levelId, place: '1' } })}
+              />
+            </View>
+          </View>
+        );
+      })}
+      {levels.length === 0 ? <Text style={styles.empty}>No levels in scope yet.</Text> : null}
+      {progress.pool.draftUnits + progress.pool.flagged > 0 ? (
+        <Text style={styles.hint}>
+          Pool (drafts with no level): {progress.pool.draftUnits} unit{progress.pool.draftUnits === 1 ? '' : 's'} to place from any level's plan
+          {progress.pool.flagged ? `, ${progress.pool.flagged} flagged` : ''}.
+        </Text>
+      ) : null}
+    </Section>
+  );
+}
+
+/** Phase 3 §3.5: per level what a lock would leave open, and Lock / Unlock; Drafts, Flagged and Cables ⚑ from T46. */
 function LockStep({ levels, onLock }: { levels: LockLevel[]; onLock: (l: LockLevel) => void }) {
   return (
     <Section title="Lock baseline">
@@ -198,6 +262,9 @@ function LockStep({ levels, onLock }: { levels: LockLevel[]; onLock: (l: LockLev
       <View style={styles.head}>
         <Text style={[styles.cCode, w.label]}>Level</Text>
         <Text style={[styles.cLockNum, w.label]}>Placed</Text>
+        <Text style={[styles.cLockNum, w.label]}>Drafts</Text>
+        <Text style={[styles.cLockNum, w.label]}>Flagged</Text>
+        <Text style={[styles.cLockNum, w.label]}>Cables ⚑</Text>
         <Text style={[styles.cLockNum, w.label]}>In review</Text>
         <Text style={[styles.cLockState, w.label]}>State</Text>
         <Text style={[styles.cActions, w.label]}> </Text>
@@ -209,8 +276,12 @@ function LockStep({ levels, onLock }: { levels: LockLevel[]; onLock: (l: LockLev
             <>
               <Text style={styles.cLockNum}>
                 {l.placed}/{l.devices}
-                {l.devices > 0 && l.placed === l.devices ? ' ✓' : ''}
+                {l.devices > 0 && l.placed === l.devices && l.toPlace === 0 ? ' ✓' : ''}
+                {l.toPlace ? ` +${l.toPlace}` : ''}
               </Text>
+              <Text style={styles.cLockNum}>{l.drafts}</Text>
+              <Text style={styles.cLockNum}>{l.flagged}</Text>
+              <Text style={styles.cLockNum}>{l.cablesUnconfirmed}</Text>
               <Text style={styles.cLockNum}>{l.inReview}</Text>
               <Text style={styles.cLockState}>{l.locked ? `🔒 Locked${l.lockedAt ? ` ${l.lockedAt.slice(0, 10)}` : ''}` : 'Setup'}</Text>
               <View style={[styles.cActions, styles.actions]}>
@@ -451,7 +522,7 @@ const styles = StyleSheet.create({
   cDate: { width: 112 },
   cSheet: { width: 140, fontSize: 13, color: '#555' },
   cActions: { flex: 1 },
-  cLockNum: { width: 90, fontSize: 15 },
+  cLockNum: { width: 82, fontSize: 15 },
   cLockState: { width: 170, fontSize: 14 },
   cFar: { flex: 1, fontSize: 14, color: '#777' },
   actions: { flexDirection: 'row', gap: 6, justifyContent: 'flex-end' },

@@ -6,6 +6,7 @@ import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 import { AddDevicePanel } from '../additions/AddDevicePanel';
 import { openAppStore } from '../db';
 import { flaggedDraftCounts } from '../drafts/model';
+import { loadPlacementProgress, type LevelPlacement } from '../placement/model';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
 import { useCurrentUser } from '../identity/IdentityGate';
@@ -101,6 +102,20 @@ export default function NeedsReviewScreen() {
     };
   }, [store, projectId, tick, dataKey]);
 
+  // Devices not on their plan yet (T46, M3 round A-4): one line per level, into its plan's Place devices panel.
+  const [toPlace, setToPlace] = useState<LevelPlacement[]>([]);
+  useEffect(() => {
+    if (!store || !projectId || projectId === LIBRARY_STREAM) return setToPlace([]);
+    let active = true;
+    loadPlacementProgress(store, projectId).then(
+      (p) => active && setToPlace(p.levels.filter((l) => l.inScope && l.unplacedDevices + l.draftUnits > 0)),
+      () => undefined,
+    );
+    return () => {
+      active = false;
+    };
+  }, [store, projectId, tick, dataKey]);
+
   useEffect(() => {
     if (!store || !selected) return setDetail(null);
     let active = true;
@@ -162,7 +177,7 @@ export default function NeedsReviewScreen() {
   );
 
   const total = list?.tabs.find((t) => t.kind === 'all')?.count ?? 0;
-  const draftLine =
+  const extractionLine =
     drafts && drafts.devices + drafts.cables > 0 && (kind === 'all' || kind === 'extraction') && projectId && projectId !== LIBRARY_STREAM ? (
       <Pressable onPress={() => router.push({ pathname: '/setup/[projectId]', params: { projectId, step: 'drafts' } })} style={styles.row}>
         <Text style={styles.rowTitle}>
@@ -170,6 +185,27 @@ export default function NeedsReviewScreen() {
         </Text>
         <Text style={styles.link}>Open Setup → Review drafts ▸</Text>
       </Pressable>
+    ) : null;
+  const placeLines =
+    kind === 'all' || kind === 'extraction'
+      ? toPlace
+          .filter((l) => !levelId || l.levelId === levelId)
+          .map((l) => (
+            <Pressable key={l.levelId} onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: l.levelId, place: '1' } })} style={styles.row}>
+              <Text style={styles.rowTitle}>
+                Not on the plan, {l.code}: {l.unplacedDevices} device{l.unplacedDevices === 1 ? '' : 's'}
+                {l.draftUnits ? ` and ${l.draftUnits} to place from drafts` : ''}
+              </Text>
+              <Text style={styles.link}>Place on the {l.code} plan ▸</Text>
+            </Pressable>
+          ))
+      : [];
+  const draftLine =
+    extractionLine || placeLines.length ? (
+      <View>
+        {extractionLine}
+        {placeLines}
+      </View>
     ) : null;
 
   return (

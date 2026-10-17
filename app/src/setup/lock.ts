@@ -5,11 +5,15 @@
  * offline, sync like any edit and stay in the level's op log, which the device History reads
  * to show where change logging starts. No React or Expo imports: tested in Node.
  *
- * The "locked with unreviewed drafts" warning waits for T46 (drafts and flags come with T44/T46).
+ * T46 adds the §3.5 Drafts (open extraction drafts), Flagged (drafts not on this sheet) and
+ * Cables ⚑ (cables with an end on the level and the endpoint not confirmed, D6) columns, and the
+ * draft units still to place and the unreviewed drafts to the warnings (the lint is
+ * `lint.locked_drafts`, T36).
  */
 
 import { Editor, type Store, type StoredOp } from '@field-survey/core';
 
+import { loadPlacementProgress } from '../placement/model';
 import { SetupError } from './model';
 
 export const LOCK_REASON = 'Lock baseline';
@@ -26,6 +30,14 @@ export type LockLevel = {
   placed: number;
   /** Open review items on the level. */
   inReview: number;
+  /** Units still to place from the level's accepted device drafts (T46; flagged ones left out). */
+  toPlace: number;
+  /** Open (unreviewed) device and cable drafts of the level. */
+  drafts: number;
+  /** Device drafts flagged not on this sheet, with units left. */
+  flagged: number;
+  /** Cables with an end on the level whose endpoint is not confirmed (⚑, D6). */
+  cablesUnconfirmed: number;
 };
 
 type Row = Record<string, unknown>;
@@ -50,6 +62,23 @@ export async function loadLockTable(store: Store, projectId: string): Promise<Lo
     `SELECT level_id, count(*) AS n FROM review_item WHERE deleted_at IS NULL AND state = 'open' AND level_id IS NOT NULL GROUP BY level_id`,
     [],
   );
+  const drafts = await counts(
+    store,
+    `SELECT level_id, count(*) AS n FROM (
+       SELECT level_id FROM draft_device WHERE project_id = ? AND deleted_at IS NULL AND state = 'proposed' AND level_id IS NOT NULL
+       UNION ALL
+       SELECT level_id FROM draft_cable WHERE project_id = ? AND deleted_at IS NULL AND state = 'proposed' AND level_id IS NOT NULL
+     ) GROUP BY level_id`,
+    [projectId, projectId],
+  );
+  const unconfirmed = await counts(
+    store,
+    `SELECT e.level_id AS level_id, count(DISTINCT c.id) AS n FROM cable c JOIN cable_end e ON e.cable_id = c.id
+      WHERE c.project_id = ? AND c.deleted_at IS NULL AND e.deleted_at IS NULL AND c.endpoint_confirmed = 0 AND e.level_id IS NOT NULL
+      GROUP BY e.level_id`,
+    [projectId],
+  );
+  const placement = new Map((await loadPlacementProgress(store, projectId)).levels.map((p) => [p.levelId, p]));
   return levels.map((l) => {
     const id = String(l.id);
     return {
@@ -62,6 +91,10 @@ export async function loadLockTable(store: Store, projectId: string): Promise<Lo
       devices: devices.get(id) ?? 0,
       placed: placed.get(id) ?? 0,
       inReview: reviews.get(id) ?? 0,
+      toPlace: placement.get(id)?.draftUnits ?? 0,
+      drafts: drafts.get(id) ?? 0,
+      flagged: placement.get(id)?.flagged ?? 0,
+      cablesUnconfirmed: unconfirmed.get(id) ?? 0,
     };
   });
 }
@@ -77,6 +110,8 @@ export function lockWarnings(l: LockLevel): string[] {
   const out: string[] = [];
   const unplaced = l.devices - l.placed;
   if (unplaced > 0) out.push(`${plural(unplaced, 'device', 'devices')} not placed`);
+  if (l.toPlace > 0) out.push(`${plural(l.toPlace, 'draft device', 'draft devices')} to place`);
+  if (l.drafts > 0) out.push(`${plural(l.drafts, 'unreviewed draft', 'unreviewed drafts')}`);
   if (l.inReview > 0) out.push(`${plural(l.inReview, 'item', 'items')} in review`);
   return out;
 }

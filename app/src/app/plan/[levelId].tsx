@@ -20,9 +20,10 @@ import { describeSync, useSyncStatus } from '../../sync/useSyncStatus';
  * Photos taken here go to the app's blob queue (T21); the top bar shows "N photos waiting".
  * `?review=` draws that pin-position conflict on the plan with Choose A / Choose B (T26).
  * Select in the side lists → "Apply as ruling…" opens the ruling editor over the chosen records (T37).
+ * `?place=1` opens with the Place devices panel (T46: Setup → 5 Place devices, Needs review).
  */
 export default function LevelPlanRoute() {
-  const { levelId, device, review } = useLocalSearchParams<{ levelId: string; device?: string; review?: string }>();
+  const { levelId, device, review, place } = useLocalSearchParams<{ levelId: string; device?: string; review?: string; place?: string }>();
   const user = useCurrentUser();
   const [store, setStore] = useState<Store | null>(null);
   const [blobs, setBlobs] = useState<BlobQueue | null>(null);
@@ -68,6 +69,7 @@ export default function LevelPlanRoute() {
       resolveBlobUri={resolveBlobUri}
       initialDeviceId={device}
       reviewItemId={review}
+      initialPlacing={place === '1'}
       onReviewResolved={() => (router.canGoBack() ? router.back() : router.replace('/review'))}
       blobs={blobs}
       onOpenLevel={(other, deviceId) => router.push({ pathname: '/plan/[levelId]', params: { levelId: other, device: deviceId } })}
