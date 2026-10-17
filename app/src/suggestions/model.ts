@@ -11,6 +11,7 @@
  */
 
 import { LIBRARY_STREAM, OpError, canonicalCategory, type EditBatch, type EditContext, type Editor, type Store, type vocab } from '@field-survey/core';
+import { DEFAULT_PARAMS, RuleParams, fillTemplate, loadRuleParamRows, textParam } from '@field-survey/rules';
 
 import { SUGGESTION_SEED } from './seed';
 
@@ -28,8 +29,37 @@ export const TARGETS: readonly { target: SuggestionTarget; label: string }[] = [
   { target: 'part', label: 'Part' },
 ];
 
-/** R4: network terminations are never missing parts, so a network code offers no Part chips. */
-export const NO_PART_CODES: readonly string[] = ['N', 'NG'];
+/** The network codes: their terminations are missing parts only where they take kits (R4, D213). */
+export const NETWORK_CODES: readonly string[] = ['N', 'NG'];
+
+/** The end-Note chip of a run pulled but waiting on its kits (CLAUDE.md §3): offered only on a cable that takes kits (R2a lints it elsewhere). */
+export const NO_TERM_KIT = 'Run, not terminated; no term kit';
+
+/** Does a cable of `code` take termination kits (T118, D213)? The cable's own `term_kit` when set, else the code's `R4b.kit`. */
+export function codeTakesKits(params: RuleParams, code: string | null | undefined, termKit?: boolean | null): boolean {
+  if (termKit != null) return termKit;
+  return !!code && params.flagCode('R4b', 'kit', code);
+}
+
+/**
+ * Does a cable code offer Part chips (R4, D213)? Every code does, except a network code whose
+ * kits are off (in the scope's `R4b.kit`, or on the one cable through `termKit`).
+ */
+export function offersPartChips(params: RuleParams, code: string, termKit?: boolean | null): boolean {
+  const c = code.toUpperCase();
+  return !NETWORK_CODES.includes(c) || codeTakesKits(params, c, termKit);
+}
+
+/**
+ * The kit's Part chip for a code: the scope's `R4b.part` up to its far end ("DMX termination kit",
+ * "Network termination kit"), else "<Signal> termination kit".
+ */
+export function kitPartChip(params: RuleParams, code: string): string {
+  const word = params.code('R3', 'signal', code);
+  const cut = textParam(params, 'R4b', 'part', code).split('<far end>')[0]!;
+  const text = fillTemplate(cut, { signal: word }).replace(/[\s\-–—:,(]+$/, '').trim() || `${word} termination kit`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 export interface Suggestion {
   id: string;
@@ -93,12 +123,19 @@ export interface ChipContext {
   typeId?: string | null;
   category?: string | null;
   codes?: readonly (string | null | undefined)[];
+  /** The scope's rule parameters the kit chips follow (`R4b.kit`, `R4b.part`, `R3.signal`); absent = the built-in defaults. */
+  params?: RuleParams;
+  /** The one cable's own Termination kits setting (`cable.term_kit`), over its code's; null = the code's. */
+  termKit?: boolean | null;
 }
 
 /**
  * The chips one field offers (D174 (2)): the type's, then the category's, then the codes', then
  * `fallback` (the project's `vocab` list), most specific first; the same phrase once (the first
- * place wins, ignoring case and spacing); rejected rows never.
+ * place wins, ignoring case and spacing); rejected rows never. Kits follow D213 (T118): a code
+ * that takes kits also offers the "; no term kit" end Note and its kit's Part chip; with codes
+ * given and none taking kits, no "no term kit" Note is offered; a network code with kits off
+ * offers no Part chips.
  */
 export function chipsFor(rows: readonly Suggestion[], ctx: ChipContext, target: SuggestionTarget, fallback: readonly string[] = []): string[] {
   const live = rows.filter((r) => r.target === target && r.state !== 'rejected');
@@ -106,12 +143,24 @@ export function chipsFor(rows: readonly Suggestion[], ctx: ChipContext, target: 
   if (ctx.typeId) ordered.push(...live.filter((r) => r.scope === 'type' && r.ref === ctx.typeId).map((r) => r.text));
   const category = ctx.category;
   if (category) ordered.push(...live.filter((r) => r.scope === 'category' && sameRef('category', r.ref, category)).map((r) => r.text));
-  for (const code of ctx.codes ?? []) if (code) ordered.push(...live.filter((r) => r.scope === 'code' && sameRef('code', r.ref, code)).map((r) => r.text));
+  const params = ctx.params ?? DEFAULT_PARAMS;
+  const codes = (ctx.codes ?? []).filter((c): c is string => !!c);
+  const listed = new Set(fallback.map(key));
+  for (const code of codes) {
+    if (target === 'part' && !offersPartChips(params, code, ctx.termKit)) continue;
+    ordered.push(...live.filter((r) => r.scope === 'code' && sameRef('code', r.ref, code)).map((r) => r.text));
+    if (!codeTakesKits(params, code, ctx.termKit)) continue;
+    // the kit chips, unless the project's list offers them already (its order stands)
+    const kit = target === 'connection_note' ? NO_TERM_KIT : target === 'part' ? kitPartChip(params, code) : null;
+    if (kit && !listed.has(key(kit))) ordered.push(kit);
+  }
   ordered.push(...fallback);
+  const noKits = codes.length > 0 && !codes.some((c) => codeTakesKits(params, c, ctx.termKit));
   const seen = new Set<string>();
   return ordered.filter((t) => {
     const k = key(t);
     if (!k || seen.has(k)) return false;
+    if (noKits && /no term kit/i.test(t)) return false;
     seen.add(k);
     return true;
   });
@@ -124,13 +173,18 @@ export interface SuggestionInput {
   text: string;
 }
 
-function check(input: SuggestionInput): SuggestionInput {
+/** The accepted rule parameters of a library (a project's, or the app library's): what its kit settings read. */
+async function libraryParams(store: Store, library: string | null): Promise<RuleParams> {
+  return new RuleParams(await loadRuleParamRows(store, library));
+}
+
+function check(input: SuggestionInput, params: RuleParams): SuggestionInput {
   const text = input.text.trim().replace(/\s+/g, ' ');
   const ref = refOf(input.scope, input.ref);
   if (!text) throw new OpError('Type the phrase first.');
   if (!ref) throw new OpError('Pick what the chip is for.');
-  if (input.scope === 'code' && input.target === 'part' && NO_PART_CODES.includes(ref.toUpperCase()))
-    throw new OpError(`A ${ref} cable offers no Part chips: network terminations are never missing parts (R4). Offer it as an End Note or a Punch item.`);
+  if (input.scope === 'code' && input.target === 'part' && !offersPartChips(params, ref))
+    throw new OpError(`A ${ref} cable offers no Part chips: its termination kits are off in the Rules (R4b), so network terminations are never missing parts (R4). Offer it as an End Note or a Punch item.`);
   return { scope: input.scope, ref, target: input.target, text };
 }
 
@@ -140,7 +194,7 @@ function duplicate(list: readonly Suggestion[], s: SuggestionInput, exceptId: st
 
 /** "+ add": a draft chip in `library` (the editor writes to that library's stream). A chip already there is refused. */
 export async function addSuggestion(editor: Editor, store: Store, library: string | null, input: SuggestionInput): Promise<string> {
-  const s = check(input);
+  const s = check(input, await libraryParams(store, library));
   const clash = duplicate(await loadSuggestions(store, library), s);
   if (clash) throw new OpError(`"${clash.text}" is already offered there.`);
   const { id } = await editor.create('suggestion', { project_id: library, ...s, state: 'draft', created_by_id: editor.userId }, SUGGESTION_CTX);
@@ -151,7 +205,7 @@ export async function editSuggestion(editor: Editor, store: Store, id: string, t
   const row = await store.get<Row>('suggestion', id);
   if (!row || row.deleted_at) throw new OpError('That chip is gone.');
   const cur = toSuggestion(row);
-  const s = check({ ...cur, text });
+  const s = check({ ...cur, text }, await libraryParams(store, cur.projectId));
   if (s.text === cur.text) return;
   const clash = duplicate(await loadSuggestions(store, cur.projectId), s, id);
   if (clash) throw new OpError(`"${clash.text}" is already offered there.`);

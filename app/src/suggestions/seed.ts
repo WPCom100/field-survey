@@ -2,7 +2,8 @@
  * The app library's standard suggestion chips (T99, D174 (3), D212): a seed per category and
  * cable code, loaded as drafts for Landry to accept, edit or reject. The phrases are the master's
  * standard phrases (CLAUDE.md §3) placed where they belong, plus the three Landry named in D172 /
- * D174. A network termination is a note or punch phrase, never a part (R4). No React or Expo imports.
+ * D174. The kit chips ("; no term kit", "<Signal> termination kit") are not seeded: `chipsFor` computes
+ * them from the project's `R4b.kit` (T118, D217). No React or Expo imports.
  */
 
 import type { SuggestionInput } from './model';

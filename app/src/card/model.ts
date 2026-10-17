@@ -545,7 +545,8 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     (a, b) => Number(a.label === 'NEW') - Number(b.label === 'NEW') || a.label.localeCompare(b.label, 'en', { numeric: true }) || a.id.localeCompare(b.id),
   );
 
-  const cableOffers = optionalCableOffers(type, connections.map((c) => c.cable), cableCodes(await loadRuleParams(store, projectId)));
+  const ruleParams = await loadRuleParams(store, projectId);
+  const cableOffers = optionalCableOffers(type, connections.map((c) => c.cable), cableCodes(ruleParams));
   const accessoryOffers = optionalAccessoryOffers(type, accessories.map((a) => a.model));
   const accessoryOfferGroups = accessoryOfferBlocks(type, accessoryOffers, accessories);
 
@@ -635,13 +636,15 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
   const typeChips = await vocabOf('type');
   const phrases = chipsFor(chipRows, chipCtx, 'device_note', deviceNotes.length ? deviceNotes : STANDARD_PHRASES);
   // a draft on one of the device's ends (or a far end) also offers that cable's code chips
-  const codeOfEnd = new Map<string, string | null>();
-  for (const e of [...ends, ...others.values()]) codeOfEnd.set(String(e.id), str(cables.get(String(e.cable_id))?.cable));
+  // (and its kit chips, by the project's R4b.kit and the cable's own setting — T118, D213)
+  const cableOfEnd = new Map<string, Row | undefined>();
+  for (const e of [...ends, ...others.values()]) cableOfEnd.set(String(e.id), cables.get(String(e.cable_id)));
   const punchItems = drafts.some((dr) => dr.kind === 'punch') ? await vocabOf('punch_item') : [];
   for (const dr of drafts) {
     const field = dr.kind === 'punch' ? 'item' : dr.kind === 'part' ? 'part' : null;
     if (!field || !dr.editable.includes(field)) continue;
-    const ctx = { ...chipCtx, codes: [codeOfEnd.get(dr.subjectId ?? '') ?? null] };
+    const cable = cableOfEnd.get(dr.subjectId ?? '');
+    const ctx = { ...chipCtx, codes: [str(cable?.cable)], params: ruleParams, termKit: cable?.term_kit == null ? null : !!cable.term_kit };
     const chips = dr.kind === 'punch' ? chipsFor(chipRows, ctx, 'punch_item', punchItems) : chipsFor(chipRows, ctx, 'part');
     if (chips.length) dr.chips = { [field]: chips };
   }

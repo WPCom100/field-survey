@@ -6,6 +6,7 @@
 
 import { Editor, LIBRARY_STREAM, Store, uuidv7, type EditContext, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
+import { RuleParams, setRuleParam, type RuleParamRow } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
 
 import { STANDARD_PHRASES, loadDeviceCard } from '../card/model';
@@ -13,6 +14,7 @@ import { CONNECTION_PHRASES, loadCableEnds } from '../ends/model';
 import { acceptType, copyTypes, createType, loadLibrary, promoteType } from '../library/model';
 import {
   acceptSuggestion,
+  NO_TERM_KIT,
   addSuggestion,
   chipsFor,
   copyAppSuggestions,
@@ -27,6 +29,16 @@ import { SUGGESTION_SEED } from './seed';
 
 const CTX: EditContext = { change_type: 'Master edit', reason: 't' };
 const ME = uuidv7();
+
+/** A project's rule parameters with these accepted values (`rule|key` → value). */
+function params(values: Record<string, unknown>): RuleParams {
+  return new RuleParams(
+    Object.entries(values).map(([ref, value]): RuleParamRow => {
+      const [rule_id, key] = ref.split('|') as [string, string];
+      return { id: ref, project_id: 'p', rule_id, key, value, state: 'accepted', deleted_at: null };
+    }),
+  );
+}
 
 function row(scope: Suggestion['scope'], ref: string, target: Suggestion['target'], text: string, state: Suggestion['state'] = 'accepted'): Suggestion {
   return { id: uuidv7(), projectId: 'p', scope, ref, target, text, state, promotedFromId: null };
@@ -80,6 +92,43 @@ describe('suggestion chips: the union (T99, D174 (2))', () => {
     expect(chipsFor([], {}, 'part', ['a', 'A ', ' a'])).toEqual(['a']);
   });
 
+  it("kit chips follow R4b.kit per code and the cable's own setting (T118, D213)", () => {
+    const rows = [
+      row('code', 'N', 'part', 'Network patch cord'),
+      row('code', 'U', 'part', 'Unison terminal block'),
+      row('code', 'X', 'connection_note', 'Waiting on DMX Termination Kits'),
+    ];
+    const list = ['Not run', NO_TERM_KIT];
+    // the defaults: X, F, N and NG take kits; the project's list keeps its own order
+    expect(chipsFor(rows, { codes: ['X'] }, 'connection_note', ['Not run'])).toEqual(['Waiting on DMX Termination Kits', NO_TERM_KIT, 'Not run']);
+    expect(chipsFor(rows, { codes: ['X'] }, 'connection_note', list)).toEqual(['Waiting on DMX Termination Kits', 'Not run', NO_TERM_KIT]);
+    for (const code of ['F', 'N', 'NG']) expect(chipsFor(rows, { codes: [code] }, 'connection_note', ['Not run'])).toEqual([NO_TERM_KIT, 'Not run']);
+    expect(chipsFor(rows, { codes: ['U'] }, 'connection_note', list)).toEqual(['Not run']);
+    expect(chipsFor(rows, { codes: ['X'] }, 'part')).toEqual(['DMX termination kit']);
+    expect(chipsFor(rows, { codes: ['F'] }, 'part')).toEqual(['Fiber termination kit']);
+    expect(chipsFor(rows, { codes: ['N'] }, 'part')).toEqual(['Network patch cord', 'Network termination kit']);
+    expect(chipsFor(rows, { codes: ['NG'] }, 'part')).toEqual(['Network termination kit']);
+    expect(chipsFor(rows, { codes: ['U'] }, 'part')).toEqual(['Unison terminal block']);
+    // no code (a device's own draft): nothing computed, the list stands
+    expect(chipsFor(rows, { codes: [null] }, 'connection_note', list)).toEqual(list);
+
+    // a project that turns network kits off and Unison and DALI on, with its own part wording
+    const p = params({ 'R4b|kit': { N: false, NG: false, U: true, D: true }, 'R4b|part': { U: 'Unison term kit for <far end>' } });
+    expect(chipsFor(rows, { codes: ['N'], params: p }, 'part')).toEqual([]);
+    expect(chipsFor(rows, { codes: ['NG'], params: p }, 'part')).toEqual([]);
+    expect(chipsFor(rows, { codes: ['N'], params: p }, 'connection_note', list)).toEqual(['Not run']);
+    expect(chipsFor(rows, { codes: ['U'], params: p }, 'part')).toEqual(['Unison terminal block', 'Unison term kit for']);
+    expect(chipsFor(rows, { codes: ['U'], params: p }, 'connection_note', ['Not run'])).toEqual([NO_TERM_KIT, 'Not run']);
+    expect(chipsFor(rows, { codes: ['D'], params: p }, 'part')).toEqual(['DALI termination kit']);
+    expect(chipsFor(rows, { codes: ['X'], params: params({ 'R4b|kit': { X: false } }) }, 'part')).toEqual([]);
+
+    // one cable's own Termination kits over its code's
+    expect(chipsFor(rows, { codes: ['X'], termKit: false }, 'connection_note', list)).toEqual(['Waiting on DMX Termination Kits', 'Not run']);
+    expect(chipsFor(rows, { codes: ['N'], termKit: false }, 'part')).toEqual([]);
+    expect(chipsFor(rows, { codes: ['N'], params: p, termKit: true }, 'part')).toEqual(['Network patch cord', 'Network termination kit']);
+    expect(chipsFor(rows, { codes: ['U'], termKit: true }, 'part')).toEqual(['Unison terminal block', 'Unison termination kit']);
+  });
+
   it('the device card and the end editor offer the type, category and code chips before the project lists', async () => {
     const { store, project } = await setup();
     const p = await project('Tower');
@@ -119,6 +168,30 @@ describe('suggestion chips: the union (T99, D174 (2))', () => {
     const card = (await loadDeviceCard(store, panel.id))!;
     expect(card.drafts.find((d) => d.kind === 'punch')!.chips).toEqual({ item: ['Missing DMX termination kit', 'Missing all Device Neuron IDs'] });
     expect(card.drafts.find((d) => d.kind === 'part')!.chips).toEqual({ part: ['ERP-FT-LVD card'] });
+  });
+
+  it("the card and the end editor read the project's R4b.kit and the cable's own setting (T118)", async () => {
+    const { store, project } = await setup();
+    const p = await project('Tower');
+    const panel = await p.editor.create('device', { level_id: p.levelId, category: 'Relay panel', device: 'ERP' }, CTX);
+    const rack = await p.editor.create('device', { level_id: p.levelId, category: 'Equipment Rack', device: 'Rack' }, CTX);
+    const net = await p.editor.create('cable', { project_id: p.id, cable: 'N' }, CTX);
+    const netA = await p.editor.create('cable_end', { cable_id: net.id, side: 'A', endpoint_kind: 'device', device_id: panel.id, level_id: p.levelId }, CTX);
+    await p.editor.create('cable_end', { cable_id: net.id, side: 'B', endpoint_kind: 'device', device_id: rack.id, level_id: p.levelId }, CTX);
+    await store.applyRemoteMany([
+      pulled('proposal', uuidv7(), p.id, { project_id: p.id, rule_id: 'R4b', kind: 'part', subject: { entity: 'cable_end', entity_id: netA.id }, discriminator: 'k', payload: { part: 'Network termination kit - Rack run', owner: 'EC' } }),
+    ]);
+    const partChips = async () => (await loadDeviceCard(store, panel.id))!.drafts.find((d) => d.kind === 'part')!.chips;
+    const phrases = async () => (await loadCableEnds(store, netA.id))!.phrases;
+    expect(await partChips()).toEqual({ part: ['Network termination kit'] });
+    expect(await phrases()).toEqual(CONNECTION_PHRASES);
+    await setRuleParam(p.editor, 'R4b', 'kit', { N: false });
+    expect(await partChips()).toBeUndefined();
+    expect(await phrases()).toEqual(CONNECTION_PHRASES.filter((t) => t !== NO_TERM_KIT));
+    // the cable's own Yes wins over its code
+    await p.editor.setField('cable', net.id, 'term_kit', true, CTX);
+    expect(await partChips()).toEqual({ part: ['Network termination kit'] });
+    expect(await phrases()).toEqual(CONNECTION_PHRASES);
   });
 });
 
@@ -170,7 +243,7 @@ describe('suggestion chips: the library (T99, D174 (3))', () => {
     expect((await loadSuggestions(store, b.id)).filter((s) => s.scope === 'code').map((s) => [s.ref, s.target, s.text, s.state])).toEqual([['N', 'punch_item', 'Missing network termination', 'accepted']]);
   });
 
-  it('refuses an empty phrase, a chip already there, and a Part chip on a network code (R4); the seed offers none', async () => {
+  it('refuses an empty phrase, a chip already there, and a Part chip on a network code whose kits are off (R4, D213); the seed offers none', async () => {
     const { store, project } = await setup();
     const p = await project('Tower');
     await expect(addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'X', target: 'connection_note', text: '  ' })).rejects.toThrow(/phrase first/);
@@ -180,9 +253,18 @@ describe('suggestion chips: the library (T99, D174 (3))', () => {
     await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'X', target: 'punch_item', text: 'Missing DMX termination kit' });
     await removeSuggestion(p.editor, id);
     await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'X', target: 'connection_note', text: 'Missing DMX termination kit' });
+    // network kits are parts by default (D213); a project that turns them off refuses the Part chip
+    await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'N', target: 'part', text: 'Network termination kit' });
+    expect((await loadLibrary(store, p.id)).noPartCodes).toEqual([]);
+    await setRuleParam(p.editor, 'R4b', 'kit', { N: false, NG: false, U: false });
     for (const code of ['N', 'ng']) {
-      await expect(addSuggestion(p.editor, store, p.id, { scope: 'code', ref: code, target: 'part', text: 'Network termination kit' })).rejects.toThrow(/never missing parts \(R4\)/);
+      await expect(addSuggestion(p.editor, store, p.id, { scope: 'code', ref: code, target: 'part', text: 'Network patch cord' })).rejects.toThrow(/never missing parts \(R4\)/);
     }
+    expect((await loadLibrary(store, p.id)).noPartCodes).toEqual(['N', 'NG']);
+    // the app library reads its own Rules: its N kits are still on
+    expect((await loadLibrary(store, null)).noPartCodes).toEqual([]);
+    // a non-network code with kits off still offers Part chips
+    await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'U', target: 'part', text: 'Unison terminal block' });
     expect(SUGGESTION_SEED.filter((s) => s.target === 'part')).toEqual([]);
     expect(SUGGESTION_SEED.filter((s) => /network termination/i.test(s.text)).map((s) => s.target)).toEqual(['connection_note', 'punch_item', 'connection_note', 'punch_item']);
     // a category chip is stored under its D196 name

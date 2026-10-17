@@ -11,7 +11,7 @@
 import { DEVICE_CATEGORIES, LIBRARY_STREAM, OpError, ROLE, ROLE_LABEL, canonicalCategory, isRole, roleOf, roleOfCategory, type EditContext, type Editor, type Role, type Store } from '@field-survey/core';
 import { CABLE_CODES, RuleParams, cableCodes, loadRuleParamRows, neuronIdDefault, neuronIdDefaultForRole, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
 
-import { copyTypeChips } from '../suggestions/model';
+import { copyTypeChips, offersPartChips } from '../suggestions/model';
 
 export const LIBRARY_CTX: EditContext = { change_type: 'Master edit', reason: 'Device-type library' };
 
@@ -85,11 +85,17 @@ export interface LibraryView {
   inReview: number;
   /** The cable codes this scope's types may name: the master's, then its Rules' own (T117). */
   codes: string[];
+  /** The codes that offer no Part chips here: network codes whose kits this scope's Rules turn off (T118, D213). */
+  noPartCodes: string[];
 }
 
 /** The cable codes a scope accepts (`cableCodes` over its accepted Rules: a project's, or the app library's). */
 export async function scopeCableCodes(store: Store, scope: string | null): Promise<string[]> {
-  return cableCodes(new RuleParams(await loadRuleParamRows(store, scope)));
+  return cableCodes(await scopeParams(store, scope));
+}
+
+async function scopeParams(store: Store, scope: string | null): Promise<RuleParams> {
+  return new RuleParams(await loadRuleParamRows(store, scope));
 }
 
 type Row = Record<string, unknown>;
@@ -181,7 +187,9 @@ export function sourceLine(ref: SourceRef | null): string | null {
 export async function loadLibrary(store: Store, scope: string | null): Promise<LibraryView> {
   const { where, params } = scopeWhere(scope);
   const rows = await store.list<Row>('library_type', { where, params, orderBy: 'id' });
-  const codes = await scopeCableCodes(store, scope);
+  const ruleParams = await scopeParams(store, scope);
+  const codes = cableCodes(ruleParams);
+  const noPartCodes = codes.filter((c) => !offersPartChips(ruleParams, c));
   // devices of the project, to count each type's (by link, else by Device text = model or alias)
   const devices = scope
     ? await store.db.query<{ library_type_id: string | null; device: string | null }>(
@@ -222,7 +230,7 @@ export async function loadLibrary(store: Store, scope: string | null): Promise<L
     params: [scope ?? LIBRARY_STREAM],
   });
   const inReview = open.filter((i) => i.subject?.entity_kind === 'library_type').length;
-  return { types, drafts: types.filter((t) => t.state === 'draft').length, inReview, codes };
+  return { types, drafts: types.filter((t) => t.state === 'draft').length, inReview, codes, noPartCodes };
 }
 
 async function assertFreeModel(store: Store, scope: string | null, model: string, exceptId: string | null): Promise<void> {

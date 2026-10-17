@@ -221,7 +221,7 @@ export function LibraryScreen(props: {
           ) : pane?.kind === 'copy' && store ? (
             <CopyFrom store={store} scope={scope} run={run} onDone={() => setPane(null)} />
           ) : pane?.kind === 'suggestions' ? (
-            <SuggestionsPane rows={chips} codes={view?.codes ?? CABLE_CODES} library={scope} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
+            <SuggestionsPane rows={chips} codes={view?.codes ?? CABLE_CODES} noPartCodes={view?.noPartCodes ?? []} library={scope} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
           ) : selected ? (
             <TypeEditor
               key={`${selected.id}:${tick}`}

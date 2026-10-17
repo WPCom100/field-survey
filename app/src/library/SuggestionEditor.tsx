@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
-  NO_PART_CODES,
   TARGETS,
   acceptSuggestion,
   addSuggestion,
@@ -34,9 +33,11 @@ export function SuggestionList(props: {
   canEdit: boolean;
   run: RunFn;
   libraryEditor: Editor | null;
+  /** A network code whose kits are off in this scope's Rules: no Part chips (R4, D213). */
+  noPart?: boolean;
 }) {
   const { scope, refKey } = props;
-  const targets = TARGETS.filter((t) => !(scope === 'code' && t.target === 'part' && NO_PART_CODES.includes(refKey.toUpperCase())));
+  const targets = TARGETS.filter((t) => !(scope === 'code' && t.target === 'part' && props.noPart));
   const [target, setTarget] = useState<SuggestionTarget>(scope === 'code' ? 'connection_note' : 'device_note');
   const [text, setText] = useState('');
   const add = () =>
@@ -123,7 +124,7 @@ function ChipRow(props: { row: Suggestion; canEdit: boolean; run: RunFn; library
  * "Suggestions…" (T99): the chips of a category or a cable code. The app library offers "Load
  * standard suggestions" (the seed as drafts, D174 (3)); a project "Copy from app library".
  */
-export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: readonly string[]; library: string | null; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
+export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: readonly string[]; noPartCodes: readonly string[]; library: string | null; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
   const [pick, setPick] = useState<{ scope: 'category' | 'code'; ref: string }>({ scope: 'category', ref: CATEGORIES[0]! });
   const count = (scope: SuggestionScope, ref: string) => props.rows.filter((r) => r.scope === scope && r.ref.toUpperCase() === ref.toUpperCase() && r.state !== 'rejected').length;
   const rows = props.rows.filter((r) => r.scope === pick.scope && r.ref.toUpperCase() === pick.ref.toUpperCase());
@@ -174,7 +175,7 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
         ))}
       </View>
       <Text style={styles.heading}>{pick.scope === 'code' ? `Cable ${pick.ref}` : pick.ref}</Text>
-      <SuggestionList key={`${pick.scope}:${pick.ref}`} rows={rows} scope={pick.scope} refKey={pick.ref} library={props.library} canEdit={props.canEdit} run={props.run} libraryEditor={props.libraryEditor} />
+      <SuggestionList key={`${pick.scope}:${pick.ref}`} rows={rows} scope={pick.scope} refKey={pick.ref} library={props.library} canEdit={props.canEdit} run={props.run} libraryEditor={props.libraryEditor} noPart={pick.scope === 'code' && props.noPartCodes.includes(pick.ref)} />
     </View>
   );
 }

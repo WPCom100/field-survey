@@ -620,6 +620,17 @@ Decision D215: accepted items are only changed by a ruling you apply; the Rules 
 
 Decision D216: a scope's cable codes are the master's ten plus every code its own accepted Rules give a signal word; the app library reads its own accepted rule parameters; a project skips a library run whose code it does not name; the Cable / riser view names a project code by its signal word. → Approve / change:
 
+## T118 — Suggestion chips follow the termination-kit setting  ·  Needs: no new build (JS update only)
+
+**Why it matters:** since T103 the project decides which cable codes take termination kits; the chips still offered "; no term kit" on DMX only and never let a network cable have a Part chip, so they contradicted the Rules tab.
+
+- [ ] **Kit Note on fiber and network.** Open an `F` (or `N`) connection's end editor: the Note chips include "Run, not terminated; no term kit". On a `U` or `120V` end they do not. → saw:
+- [ ] **Kit Part chip.** On a device card with a draft kit part on a DMX / network end, tap the Part field: a "DMX termination kit" / "Network termination kit" chip is offered. → saw:
+- [ ] **Turning network kits off.** Setup → Rules → R4b **Takes termination kits**: turn `N` off. The `N` end editor stops offering "; no term kit"; Library → Suggestions → Cable code `N` shows no Part group and "+ add" as Part is refused with the R4 message. Turn it back on and both return. → saw:
+- [ ] **One cable's own setting.** On an `N` cable with the code's kits off, set its Termination kits to **Yes**: its end editor offers "; no term kit" again; set **No** on a DMX cable: its end editor no longer does. → saw:
+
+Decision D217: kit chips are computed from `R4b.kit` (and a cable's own Termination kits), not seeded; a code that takes kits offers "Run, not terminated; no term kit" and its kit Part chip (from the R4b Part text); a cable that takes none offers no "no term kit" Note; a network code offers Part chips only where its kits are on. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

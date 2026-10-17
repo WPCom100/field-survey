@@ -168,7 +168,8 @@ export async function loadCableEnds(store: Store, endId: string): Promise<CableV
   const other = others[0] ? await endView(store, others[0], fromLevel) : null;
 
   const project = String(cable.project_id);
-  const codeKits = (await loadRuleParams(store, project)).flagCode('R4b', 'kit', str(cable.cable));
+  const ruleParams = await loadRuleParams(store, project);
+  const codeKits = ruleParams.flagCode('R4b', 'kit', str(cable.cable));
   const ownKits = cable.term_kit == null ? null : !!cable.term_kit;
   const vocabRows = await store.list<Row>('vocab', {
     where: `project_id = ? AND list = 'connection_note' AND canonical_of_id IS NULL`,
@@ -187,7 +188,8 @@ export async function loadCableEnds(store: Store, endId: string): Promise<CableV
     ends: [mine, other],
     // The riser governs the cable's To (R2): the A end's To text, else whichever end has one.
     riser: riserCheck(str(cable.riser_to_label), [mine, other].find((e) => e?.side === 'A' && e.toText)?.toText ?? mine.toText ?? other?.toText ?? null),
-    // the cable code's suggestion chips first (T99, D174 (2)), then the project's list
-    phrases: chipsFor(await loadChipRows(store, project), { codes: [str(cable.cable)] }, 'connection_note', vocabRows.length ? vocabRows.map((v) => String(v.value)) : CONNECTION_PHRASES),
+    // the cable code's suggestion chips first (T99, D174 (2)), then the project's list; the
+    // "; no term kit" Note only on a cable that takes kits (T118, D213)
+    phrases: chipsFor(await loadChipRows(store, project), { codes: [str(cable.cable)], params: ruleParams, termKit: ownKits }, 'connection_note', vocabRows.length ? vocabRows.map((v) => String(v.value)) : CONNECTION_PHRASES),
   };
 }
