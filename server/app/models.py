@@ -597,6 +597,22 @@ class LibraryType(Id, Synced, Base):
     role: Mapped[str | None]
 
 
+class RuleParam(Id, Synced, Base):
+    """A rule's setting — an owner, a wording, a status (T102, D176, D211). `project_id` null = the
+    app-level default (a `draft` until accepted; project creation copies the accepted ones), else
+    the project's own value. `value` null = the built-in default (`PARAMS` in packages/rules). The
+    id is a hash of (scope, rule_id, key) (`app/rule_params.py`), the same on every iPad."""
+
+    __tablename__ = "rule_param"
+    __table_args__ = (one_of("state", vocab.LIBRARY_STATE),)
+
+    project_id: Mapped[uuid.UUID | None] = mapped_column(fk("project.id"), index=True)
+    rule_id: Mapped[str]
+    key: Mapped[str]
+    value: Mapped[Any | None] = mapped_column(JSONB)
+    state: Mapped[str] = mapped_column(default="accepted", server_default="accepted")
+
+
 class Vocab(Id, Synced, Base):
     __tablename__ = "vocab"
     __table_args__ = (one_of("list", vocab.VOCAB_LIST), one_of("state", vocab.LIBRARY_STATE))

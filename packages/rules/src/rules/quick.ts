@@ -9,9 +9,15 @@
  * | E7 "Non-ETC device" (make) | device Status `Not installed`, Notes appended "Not Installed; installed <category> at location appears to be a <make>, confirm."; `Information` item `EC` "Confirm existing <category> at location is a <make>, not a <model>" (the master's 02 #22 / 02-D4) |
  * | E9 "Relocated" (new room) | Room / Location = "<new room>; moved from <old room>" |
  * | "Not found on site" | `found_on_site = false`, Status `Not installed`, Notes appended "Not Installed."; no item (R2/R3 make the items from the status) and the device stays in the baseline (D210, T101) |
+ *
+ * The wordings and owners are the project's rule parameters (T102, `E6.*`, `E7.*`, `E9.room`,
+ * `not_found.note`); the table gives their defaults.
  */
 
 import { OpError, type EditContext, type Editor, type Op } from '@field-survey/core';
+
+import { fillTemplate, ownerParam, textParam, type RuleParams } from '../params';
+import { loadRuleParams } from '../params-store';
 
 export type QuickAction = { kind: 'E6'; found?: string | null } | { kind: 'E7'; make: string } | { kind: 'E9'; room: string } | { kind: 'not_found' };
 
@@ -39,8 +45,18 @@ export interface QuickActionResult {
   punchItemId: string | null;
 }
 
-/** Run one quick action on a device, as one `Field survey` group. */
-export async function runQuickAction(editor: Editor, deviceId: string, action: QuickAction, now: () => string = () => new Date().toISOString()): Promise<QuickActionResult> {
+/**
+ * Run one quick action on a device, as one `Field survey` group. `params` defaults to the
+ * project's rule parameters read from the store.
+ */
+export async function runQuickAction(
+  editor: Editor,
+  deviceId: string,
+  action: QuickAction,
+  now: () => string = () => new Date().toISOString(),
+  params?: RuleParams,
+): Promise<QuickActionResult> {
+  const p = params ?? (await loadRuleParams(editor.store, editor.projectId));
   const device = await editor.store.get<Row>('device', deviceId);
   if (!device) throw new OpError('This device is not on this iPad.');
   if (device.deleted_at) throw new OpError('This device is deleted; restore it first.');
@@ -57,12 +73,12 @@ export async function runQuickAction(editor: Editor, deviceId: string, action: Q
         const r = await g.create('punch_item', {
           level_id: levelId,
           device_id: deviceId,
-          item: found ? `Spot check: ${found}` : 'Spot check',
+          item: fillTemplate(textParam(p, 'E6', 'item'), { found }),
           type: 'Information',
-          owner: 'ETC',
+          owner: ownerParam(p, 'E6', 'owner'),
           tracking_status: 'Closed',
           date_closed: now().slice(0, 10),
-          notes: 'Reterminated - all good',
+          notes: textParam(p, 'E6', 'notes'),
           rule_id: 'E6',
         });
         punchItemId = r.id;
@@ -73,14 +89,14 @@ export async function runQuickAction(editor: Editor, deviceId: string, action: Q
         if (!make) throw new OpError('Say what make the device is.');
         await g.setFields('device', deviceId, {
           status: 'Not installed',
-          notes: appendPhrase(s(device.notes), `Not Installed; installed ${noun} at location appears to be a ${make}, confirm.`),
+          notes: appendPhrase(s(device.notes), fillTemplate(textParam(p, 'E7', 'device_note'), { category: noun, make })),
         });
         const r = await g.create('punch_item', {
           level_id: levelId,
           device_id: deviceId,
-          item: `Confirm existing ${noun} at location is a ${make}, not a ${model}`,
+          item: fillTemplate(textParam(p, 'E7', 'item'), { category: noun, make, model }),
           type: 'Information',
-          owner: 'EC',
+          owner: ownerParam(p, 'E7', 'owner'),
           tracking_status: 'Open',
           rule_id: 'E7',
         });
@@ -91,14 +107,15 @@ export async function runQuickAction(editor: Editor, deviceId: string, action: Q
         const room = s(action.room);
         if (!room) throw new OpError('Say where the device is now.');
         const old = s(device.room_location);
-        await g.setField('device', deviceId, 'room_location', old ? `${room}; moved from ${old}` : room);
+        // With no old room there is nothing to say it moved from: the new room alone.
+        await g.setField('device', deviceId, 'room_location', old ? fillTemplate(textParam(p, 'E9', 'room'), { 'new room': room, 'old room': old }) : room);
         break;
       }
       case 'not_found': {
         await g.setFields('device', deviceId, {
           found_on_site: false,
           status: 'Not installed',
-          notes: appendPhrase(s(device.notes), 'Not Installed.'),
+          notes: appendPhrase(s(device.notes), textParam(p, 'not_found', 'note')),
         });
         break;
       }

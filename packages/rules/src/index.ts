@@ -88,6 +88,7 @@ export {
   DMX_KITS_NOTE,
   BUS_LABEL,
   signalOf,
+  signal,
   targetOf,
   terminationItem,
   waitsForSurvey,
@@ -162,3 +163,28 @@ export {
   type PreviewRow,
   type RulingPreview,
 } from './rulings';
+// T102 (D176, D211): rule parameters — the catalogue, the resolved values, the store edits and the Rules tab's model.
+export {
+  PARAMS,
+  NO_STATUS,
+  DEFAULT_PARAMS,
+  RuleParams,
+  paramSpec,
+  isByCode,
+  ruleParamId,
+  resolveValue,
+  validEntry,
+  fillTemplate,
+  templatePattern,
+  ownerParam,
+  textParam,
+  statusParam,
+  flagParam,
+  type ParamKind,
+  type ParamSpec,
+  type ParamValue,
+  type ParamRef,
+  type RuleParamRow,
+} from './params';
+export { loadRuleParamRows, loadRuleParams, setRuleParam, decideRuleParam, compactValue, RULE_PARAM_REASON } from './params-store';
+export { paramGroups, ruleTitle, codeValue, withCode, describeValue, type ParamGroup, type ParamItem } from './params-view';

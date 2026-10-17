@@ -12,10 +12,14 @@
  *   `library.ts`, T48); R2e's bus stays per level.
  * - R2f: nothing is copied between ends (D171); an unsurveyed end stays empty (`Unsurveyed`).
  *   An end on an out-of-scope level, or whose far end is, is offered `Not started` (D171).
+ *
+ * The library cables' From / To texts and starting statuses, and R2f's status, are rule
+ * parameters (T102, `../params.ts`); the texts above are their defaults.
  */
 
 import { riserCheck } from '@field-survey/core';
 
+import { statusParam, textParam, type ParamRef } from '../params';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow } from '../snapshot';
 import { deviceRole, governingCables } from './library';
@@ -84,13 +88,20 @@ function placeholderEnd(ctx: RuleContext, kind: string, label: string, side: 'A'
   return { side, endpoint_kind: p ? 'placeholder' : null, placeholder_id: p?.id ?? null, level_id: levelId, from_text: text.from ?? null, to_text: text.to ?? null };
 }
 
-function proposeCable(ctx: RuleContext, device: DeviceRow, code: string, cable: Record<string, unknown>, ends: EndDraft[], why: string): void {
+/** A starting status for a library end (`R2c.panic.status`…): the fields, or none for `Unsurveyed`. */
+function startStatus(ctx: RuleContext, rule: string, key: string): EndDraft {
+  const status = statusParam(ctx.params, rule, key);
+  return status ? { status, status_source: 'derived' } : {};
+}
+
+function proposeCable(ctx: RuleContext, device: DeviceRow, code: string, cable: Record<string, unknown>, ends: EndDraft[], why: string, params: readonly ParamRef[]): void {
   ctx.propose({
     subject: { entity_kind: 'device', entity_id: device.id, level_id: device.level_id },
     discriminator: code,
     kind: 'cable',
     payload: { cable: { cable: code, origin: 'library', endpoint_confirmed: true, ...cable }, ends },
     inputs: { device: device.id, code },
+    params,
     why,
   });
 }
@@ -104,13 +115,15 @@ export const R2c: Rule = {
       if (deviceRole(ctx, d) !== 'relay_panel' || governingCables(ctx, d)) continue; // an accepted type's cables govern (R2g)
       const label = deviceLabel(ctx, d);
       if (!hasCode(ctx, d, '0-10V')) {
+        const to = textParam(ctx.params, 'R2c', 'fixtures.to');
         proposeCable(
           ctx,
           d,
           '0-10V',
           { qty: 1, single_row: true },
-          [deviceEnd(ctx, d, 'A', { to: 'Fixtures' }), placeholderEnd(ctx, 'fixtures', 'Fixtures', 'B', { from: 'Fixtures' })],
-          `${label} is a Relay panel with no 0-10V run (library: 0-10V → Fixtures).`,
+          [deviceEnd(ctx, d, 'A', { to }, startStatus(ctx, 'R2c', 'fixtures.status')), placeholderEnd(ctx, 'fixtures', 'Fixtures', 'B', { from: 'Fixtures' })],
+          `${label} is a Relay panel with no 0-10V run (library: 0-10V → ${to}).`,
+          [['R2c', 'fixtures.to'], ['R2c', 'fixtures.status']],
         );
       }
       if (!hasCode(ctx, d, 'P')) {
@@ -118,16 +131,18 @@ export const R2c: Rule = {
         const ebdk = (ctx.index.devicesByLevel.get(d.level_id) ?? [])
           .filter((x) => name && str(x.panel_name) === name && deviceRole(ctx, x) === 'ebdk')
           .sort((a, b) => compareIds(a.display_id ?? '', b.display_id ?? ''))[0];
+        const to = textParam(ctx.params, 'R2c', 'panic.to');
         const far: EndDraft = ebdk
-          ? deviceEnd(ctx, ebdk, 'B', { from: 'EBDK panic wire', to: name })
-          : { side: 'B', endpoint_kind: null, level_id: d.level_id, from_text: 'EBDK panic wire', to_text: name };
+          ? deviceEnd(ctx, ebdk, 'B', { from: to, to: name })
+          : { side: 'B', endpoint_kind: null, level_id: d.level_id, from_text: to, to_text: name };
         proposeCable(
           ctx,
           d,
           'P',
           { qty: 1, single_row: true },
-          [deviceEnd(ctx, d, 'A', { to: 'EBDK panic wire' }, { status: 'Installed, untested', status_source: 'derived' }), far],
-          `${label} is a Relay panel with no panic (P) run (library: P → EBDK panic wire${ebdk ? `, its EBDK ${deviceLabel(ctx, ebdk)}` : ''}).`,
+          [deviceEnd(ctx, d, 'A', { to }, startStatus(ctx, 'R2c', 'panic.status')), far],
+          `${label} is a Relay panel with no panic (P) run (library: P → ${to}${ebdk ? `, its EBDK ${deviceLabel(ctx, ebdk)}` : ''}).`,
+          [['R2c', 'panic.to'], ['R2c', 'panic.status']],
         );
       }
     }
@@ -143,14 +158,17 @@ export const R2d: Rule = {
       const role = deviceRole(ctx, d);
       if (role !== 'nsps' && role !== 'equipment_rack') continue;
       if (hasCode(ctx, d, '120V') || governingCables(ctx, d)) continue;
-      const to = role === 'nsps' ? 'P-NSPS-D Power Supply' : 'Equipment rack';
+      const toKey = role === 'nsps' ? 'nsps.to' : 'rack.to';
+      const to = textParam(ctx.params, 'R2d', toKey);
+      const from = textParam(ctx.params, 'R2d', 'from');
       proposeCable(
         ctx,
         d,
         '120V',
         { qty: 1, single_row: true },
-        [deviceEnd(ctx, d, 'A', { from: '120v Power', to }), placeholderEnd(ctx, 'power', '120v Power', 'B', { from: '120v Power' })],
-        `${deviceLabel(ctx, d)} is a${role === 'nsps' ? 'n NSPS' : 'n Equipment rack'} with no 120V row (library: 120v Power → ${to}).`,
+        [deviceEnd(ctx, d, 'A', { from, to }, startStatus(ctx, 'R2d', 'status')), placeholderEnd(ctx, 'power', '120v Power', 'B', { from: '120v Power' })],
+        `${deviceLabel(ctx, d)} is a${role === 'nsps' ? 'n NSPS' : 'n Equipment rack'} with no 120V row (library: ${from} → ${to}).`,
+        [['R2d', 'from'], ['R2d', toKey], ['R2d', 'status']],
       );
     }
   },
@@ -179,7 +197,8 @@ export const R2e: Rule = {
       const hasBus = [...ctx.index.cableEnd.values()].some((e) => cableOf(ctx, e)?.cable === 'U' && endLevel(ctx, e)?.id === level.id);
       if (hasBus) continue;
       const hostName = str(host.device) ?? (role === 'nsps' ? 'P-NSPS-D' : 'Equipment rack');
-      const toHost = role === 'nsps' ? 'Devices to P-NSPS-D' : 'Devices to equipment rack';
+      const busKey = role === 'nsps' ? 'bus.to_nsps' : 'bus.to_rack';
+      const toHost = textParam(ctx.params, 'R2e', busKey);
       ctx.propose({
         subject: { entity_kind: 'level', entity_id: level.id, level_id: level.id },
         discriminator: 'U',
@@ -187,12 +206,13 @@ export const R2e: Rule = {
         payload: {
           cable: { cable: 'U', qty: null, origin: 'library', single_row: false, endpoint_confirmed: true },
           ends: [
-            deviceEnd(ctx, host, 'A', { from: hostName, to: 'Unison from stations & sensors' }),
+            deviceEnd(ctx, host, 'A', { from: hostName, to: textParam(ctx.params, 'R2e', 'host.to') }, startStatus(ctx, 'R2e', 'status')),
             placeholderEnd(ctx, 'station_bus', BUS_LABEL, 'B', { from: BUS_LABEL, to: toHost }, level.id),
           ],
           device_id: host.id,
         },
         inputs: { level: level.id, host: host.id },
+        params: [['R2e', 'host.to'], ['R2e', busKey], ['R2e', 'status']],
         why: `Level ${level.level} has no Unison bus row (library: ${BUS_LABEL} ↔ ${deviceLabel(ctx, host)}).`,
       });
     }
@@ -229,11 +249,14 @@ export const R2f: Rule = {
 };
 
 function propose(ctx: RuleContext, e: CableEndRow, why: string): void {
+  const now = statusParam(ctx.params, 'R2f', 'status');
+  if (!now) return; // set to "no status": nothing to offer
   ctx.propose({
     subject: subjectOfEnd(ctx, e),
     kind: 'status',
-    payload: { now: 'Not started', extra: { status_source: 'derived' } },
+    payload: { now, extra: { status_source: 'derived' } },
     inputs: { status: e.status, why },
+    params: [['R2f', 'status']],
     why: `${endLabel(ctx, e)}: ${why}`,
   });
 }

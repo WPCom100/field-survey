@@ -531,6 +531,21 @@ Decision D209: drafts that no device card lists (Neuron ID item, Unison pair, a 
 - [ ] **No item, still in the baseline.** The card's punch items gain nothing from the tap itself (rule drafts for its wires may appear as usual); the device is not deleted and its pin stays. History shows one group, "Quick action not_found: Not found on site". Tap it again: Notes do not get a second "Not Installed.". → saw:
 - [ ] **Dashboard.** Dashboard → As-found: `never found` went up by one; tap it and the list holds the device. → saw:
 
+## T102 — Rule settings per project and app-level defaults  ·  Needs: no new build (JS update; server deploy first — Alembic 0014 adds `rule_param`; **every iPad on the new JS before anyone changes a setting**, an older iPad refuses those ops on pull until it updates, nothing lost)
+
+**Why it matters:** owners, item wording and starting statuses (D175's readings) were fixed in the code; some projects give terminations to the EC, some to ETC (D176). They are now settings per project, with defaults for new projects.
+
+- [ ] **Nothing moves on the update.** After the JS update, open a level you know: its drafts and punch items read as before (`Run DMX to …`, owners `EC`, DMX kits `EC/ETC`), and no rejected draft has come back. → saw:
+- [ ] **The Rules tab.** Setup → **Rules** (below Assignments): groups with the rule's text (Signal words, R3a Cable not run, R3b …, Quick action: Spot-check fixed …), each value with what it changes; "All on the built-in defaults." at the top. Turn on **Only what is changed**: the list is empty. → saw:
+- [ ] **A changed owner follows on drafts, not on accepted items.** Pick a level with an open "Terminate network to …" draft and an accepted Termination item. In Rules → R3a → **Termination item owner**, set `N` to `EC`. Back on the plan (after the rules run, a second or two): the open draft's Owner is `EC`; the accepted item still reads `ETC`. The row in Rules is highlighted "changed" with "Default: …" and **Reset to default**. → saw:
+- [ ] **A rejected draft comes back once its wording changes.** Reject a "Run DMX to …" draft, then in R3a → **Run item text** change *Any other code* to `Pull <signal> to <far end>` (tap out of the box to save): the draft is offered again as "Pull DMX to …". **Reset to default**: it reads "Run DMX to …" again. → saw:
+- [ ] **Per code and quick actions.** In Signal words add a code `ZZ` = `test signal`: the row appears in every per-code table. Set Quick action: Spot-check fixed → Owner `EC`, run Spot-check fixed on a device: the new item's Owner is `EC`. Reset both. → saw:
+- [ ] **Second iPad.** With a second iPad on the project, sync both: the other iPad's Rules tab shows the same change, and its drafts follow it after its own rules run. → saw:
+- [ ] **App-level defaults.** Projects → **Rule defaults**: the same list with "A change is a draft until accepted". Set R3b → Owner `ETC`: the row shows `draft` with **Accept** / **Reject**; tap **Accept**. Create a throw-away project (New project, copy from nothing): its Rules tab shows R3b Owner `ETC` changed; the Tower project's Rules still say `EC/ETC`. Reset the default afterwards (and Accept), delete nothing. → saw:
+- [ ] **Copy from.** New project with **Copy from** the throw-away project and **Rule settings** ticked: its Rules match the source's. → saw:
+
+Decision D211: rule settings are a `rule_param` table (your choice), owners per project and cable code (not per level); a project reads only its own values — app-level defaults are copied when a project is created and never change an existing project; only values set away from the default can bring back a rejected draft; Punch Type, part status and the `Stations & Sensors` label stay fixed. → Approve / change:
+
 ---
 
 ## Rules for this file

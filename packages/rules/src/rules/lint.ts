@@ -17,7 +17,8 @@ import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow, PunchItemRow } from '../snapshot';
 import { deviceNeedsNeuronId, deviceRole, governingCables, parseLibraryAccessories, typeOfDevice, type LibraryAccessory } from './library';
 import { isNeuronItem } from './r3';
-import { SIGNAL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, NEURON_ITEM, signalOf, str, subjectOfDevice, subjectOfEnd } from './shared';
+import { cableOf, compareIds, compareLevels, deviceLabel, endLabel, signal, str, subjectOfDevice, subjectOfEnd } from './shared';
+import { textParam } from '../params';
 
 function hasCode(ctx: RuleContext, d: DeviceRow, code: string): boolean {
   return (ctx.index.endsByDevice.get(d.id) ?? []).some((e) => cableOf(ctx, e)?.cable === code);
@@ -84,14 +85,15 @@ export const LintNeuronItem: Rule = {
       const levels = group.slice().sort(compareLevels);
       const first = levels[0];
       if (!first) continue;
-      const items = levels.flatMap((l) => ctx.index.punchByLevel.get(l.id) ?? []).filter(isNeuronItem);
+      const neuron = textParam(ctx.params, 'R3c', 'item');
+      const items = levels.flatMap((l) => ctx.index.punchByLevel.get(l.id) ?? []).filter((p) => isNeuronItem(p, neuron));
       for (const p of items) {
-        if (!p.sort_last) ctx.find({ subject: { entity_kind: 'punch_item', entity_id: p.id, level_id: p.level_id }, message: `${levelNames(levels)}: "${NEURON_ITEM}" is not sorted last` });
+        if (!p.sort_last) ctx.find({ subject: { entity_kind: 'punch_item', entity_id: p.id, level_id: p.level_id }, message: `${levelNames(levels)}: "${neuron}" is not sorted last` });
       }
       if (items.length) continue;
       const missing = levels.some((l) => (ctx.index.devicesByLevel.get(l.id) ?? []).some((d) => !str(d.neuron_id) && deviceNeedsNeuronId(ctx, d)));
       if (missing) {
-        ctx.find({ subject: { entity_kind: 'numbering_group', entity_id: groupId, level_id: first.id }, message: `${levelNames(levels)}: no "${NEURON_ITEM}" item` });
+        ctx.find({ subject: { entity_kind: 'numbering_group', entity_id: groupId, level_id: first.id }, message: `${levelNames(levels)}: no "${neuron}" item` });
       }
     }
   },
@@ -180,7 +182,7 @@ export const LintVocab: Rule = {
     // Cable code outside the master's codes.
     for (const cable of ctx.index.cable.values()) {
       const code = str(cable.cable);
-      if (code && SIGNAL[code]) continue;
+      if (code && Object.prototype.hasOwnProperty.call(ctx.param('R3', 'signal'), code)) continue; // the project's codes (T102)
       const ends = (ctx.index.endsByCable.get(cable.id) ?? []).slice().sort((a, b) => a.side.localeCompare(b.side));
       const end = ends[0];
       const where = end ? `${endLabel(ctx, end)}: ` : '';
@@ -209,15 +211,15 @@ export const LintFarEnd: Rule = {
       const ends = (ctx.index.endsByCable.get(cable.id) ?? []).slice().sort((a, b) => a.side.localeCompare(b.side));
       if (!ends.length) continue;
       const anchored = ends.find(hasEndpoint) ?? ends[0]!;
-      const signal = signalOf(cable.cable);
+      const word = signal(ctx, cable.cable);
       if (ends.length < 2) {
-        ctx.find({ subject: subjectOfEnd(ctx, anchored), message: `${endLabel(ctx, anchored)}: ${signal} cable has no far end` });
+        ctx.find({ subject: subjectOfEnd(ctx, anchored), message: `${endLabel(ctx, anchored)}: ${word} cable has no far end` });
         continue;
       }
       const missing = ends.filter((e) => !hasEndpoint(e));
       if (!missing.length) continue;
       const text = missing.length === 2 ? 'neither end names a device or placeholder' : `the far end${str(missing[0]!.from_text) ? ` "${str(missing[0]!.from_text)}"` : ''} names no device or placeholder`;
-      ctx.find({ subject: subjectOfEnd(ctx, anchored), message: `${endLabel(ctx, anchored)}: ${signal} cable, ${text}` });
+      ctx.find({ subject: subjectOfEnd(ctx, anchored), message: `${endLabel(ctx, anchored)}: ${word} cable, ${text}` });
     }
   },
 };
@@ -304,7 +306,7 @@ export const LintDeletedLink: Rule = {
     }
     for (const e of ctx.index.cableEnd.values()) {
       const d = gone(e.device_id);
-      if (d) ctx.find({ subject: subjectOfEnd(ctx, e), message: `${e.display_id ?? `${signalOf(cableOf(ctx, e)?.cable)} end`}: endpoint is deleted device ${label(d)}` });
+      if (d) ctx.find({ subject: subjectOfEnd(ctx, e), message: `${e.display_id ?? `${signal(ctx, cableOf(ctx, e)?.cable)} end`}: endpoint is deleted device ${label(d)}` });
     }
     for (const ph of ctx.snap.photos ?? []) {
       if (ph.deleted_at != null) continue;

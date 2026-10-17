@@ -28,7 +28,7 @@ export { isDmxKitItem, isNeuronItem, actionableEnds } from './r3';
 export { LINT_RULES, VOCAB_FIELDS } from './lint';
 export { defaultPartNotes, partProblem } from './r4';
 export { LAND_0_10V } from './e5';
-export { SIGNAL, NEURON_ITEM, DMX_KITS_NOTE, BUS_LABEL, signalOf, targetOf, terminationItem, waitsForSurvey, compareIds, compareLevels } from './shared';
+export { SIGNAL, NEURON_ITEM, DMX_KITS_NOTE, BUS_LABEL, signalOf, signal, targetOf, terminationItem, waitsForSurvey, compareIds, compareLevels } from './shared';
 export { runQuickAction, appendPhrase, QUICK_ACTION_TEXT, type QuickAction, type QuickActionResult } from './quick';
 export {
   CABLE_CODES,

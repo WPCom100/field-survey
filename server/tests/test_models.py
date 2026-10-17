@@ -42,6 +42,7 @@ PLAN_ENTITIES = {
     "draft_device",
     "draft_cable",
     "library_type",
+    "rule_param",
     "vocab",
     "export",
     "install",

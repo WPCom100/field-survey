@@ -54,6 +54,17 @@ export function ownedLintIds(rules: readonly Rule[]): Set<string> {
   return out;
 }
 
+/**
+ * What a proposal's `inputs_hash` covers: its `inputs` (else its payload), plus the parameters it
+ * was worded from that are set away from their default (D211). With none, the hash is the one
+ * T34 wrote, so a project on the defaults keeps its rejected drafts rejected.
+ */
+function hashInputs(p: ProposalInput, index: SnapshotIndex): unknown {
+  const base = p.inputs === undefined ? p.payload : p.inputs;
+  const params = p.params?.length ? index.params.overrides(p.params) : {};
+  return Object.keys(params).length ? { inputs: base, params } : base;
+}
+
 export function evaluate(snap: Snapshot, rules: readonly Rule[], index: SnapshotIndex = indexSnapshot(snap), opts: EvalOptions = {}): EvalOutput {
   const proposals = new Map<string, ProposalOutput>();
   const findings = new Map<string, FindingOutput>();
@@ -66,6 +77,8 @@ export function evaluate(snap: Snapshot, rules: readonly Rule[], index: Snapshot
       index,
       now,
       today: () => now.slice(0, 10),
+      params: index.params,
+      param: (rule, key, code) => (code !== undefined ? index.params.code(rule, key, code) : index.params.get(rule, key)),
       propose(p: ProposalInput) {
         const key = proposalKey(rule.id, p.subject, p.discriminator);
         if (proposals.has(key)) {
@@ -82,7 +95,7 @@ export function evaluate(snap: Snapshot, rules: readonly Rule[], index: Snapshot
           discriminator: p.discriminator ?? null,
           kind: p.kind,
           payload,
-          inputs_hash: inputsHash(p.inputs === undefined ? p.payload : p.inputs),
+          inputs_hash: inputsHash(hashInputs(p, index)),
           why: p.why ?? null,
         });
       },

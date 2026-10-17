@@ -29,7 +29,7 @@ export default function NewProjectScreen() {
   const [disclaimer, setDisclaimer] = useState('');
   const [sources, setSources] = useState<HomeProject[]>([]);
   const [copyFrom, setCopyFrom] = useState<string | null>(null);
-  const [flags, setFlags] = useState({ vocabulary: true, library: true, rulings: true, placeholders: false });
+  const [flags, setFlags] = useState({ vocabulary: true, library: true, rulings: true, rule_params: true, placeholders: false });
   const [levels, setLevels] = useState<DraftLevel[]>([]);
   const [newCode, setNewCode] = useState('');
   const [range, setRange] = useState('');
@@ -163,10 +163,11 @@ export default function NewProjectScreen() {
               <Check label="Vocabulary" value={flags.vocabulary} onChange={(v) => setFlags({ ...flags, vocabulary: v })} />
               <Check label="Device-type library" value={flags.library} onChange={(v) => setFlags({ ...flags, library: v })} />
               <Check label="Standing rulings" value={flags.rulings} onChange={(v) => setFlags({ ...flags, rulings: v })} />
+              <Check label="Rule settings" value={flags.rule_params} onChange={(v) => setFlags({ ...flags, rule_params: v })} />
               <Check label="Placeholders" value={flags.placeholders} onChange={(v) => setFlags({ ...flags, placeholders: v })} />
             </View>
           ) : (
-            <Text style={styles.hint}>The app library's accepted device types are copied in either way (D65).</Text>
+            <Text style={styles.hint}>The app library's accepted device types and rule defaults are copied in either way (D65, D176).</Text>
           )}
           <Field label="Export title" value={exportTitle} onChange={setExportTitle} />
           <Field label="Disclaimer" value={disclaimer} onChange={setDisclaimer} placeholder="Based on submittal drawings rev F …" multiline />

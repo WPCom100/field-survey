@@ -87,6 +87,7 @@ Bold = master column (name kept verbatim for export). `*` = server-assigned.
 | `import_batch` | id, project, kind ∈ {bom, riser, plans, master_xlsx, floor_xlsx, mss, davinci}, files, job_state, stats, created_by/at | A `davinci` batch is filed under the project that started it but writes the app library (D197) |
 | `draft_device` / `draft_cable` | per Phase 1f schema: level?, model/candidates[], category, role (device drafts, T115), qty, accessories[], source_ref{job, page, line|bbox}, level_basis, confidence, conflicts[], state ∈ {proposed, accepted, edited, rejected}, placed, not_on_sheet | |
 | `library_type` | id, project (**nullable: null = app-level library**), model, aliases[], category, id_scheme ∈ {level_number, level_tag}, default_cables[], optional_cables[], optional_accessories[], needs_neuron_id (null = category default: off for Equipment rack and NSPS), state ∈ {draft, accepted, rejected}, created_by, promoted_from, description, datasheet_url, source_ref{kind, type_id, …} (a catalogue import's provenance; re-runs match by it), accessory_only (another type's accessory, never offered as a device) | D43, D48, D65, D185, D197 |
+| `rule_param` | id (hash of scope, rule_id, key), project (**nullable: null = app-level default**), rule_id, key, value (JSON; null = the built-in default), state ∈ {draft, accepted, rejected} | A rule's owner, wording or status (T102); a project reads its own rows only; creation copies the accepted app defaults (D176, D211) |
 | `vocab` | id, project, list ∈ {device_note, punch_item, punch_note, part_note, connection_note, photo_caption, model_map, level_alias, category, type, cable_code}, value, canonical_of | `cable_code` seeds the nine codes; a DaVinci port protocol with no code lands there as a draft (D197) |
 | `export` | id, project, kind ∈ {xlsx, floor_pdf}, params{levels}, blob (SHA-256 of the file, stored as a blob), job_state, stats{filename, rows…}, created_by/at, diff_summary | Export history; a job row (D137) |
 
@@ -216,6 +217,8 @@ Pure TypeScript over an in-memory project snapshot (no DB, no React; the same pa
 | E6/E7/E9 | Quick actions | Closed Information "Reterminated - all good"; Not installed + Information "Confirm …"; append "; moved from <room>" |
 | E12 | MSS import (M7) | Disagreement → `Missed Survey` "check" item |
 
+The owners, item / note / part wordings, the library cables' From / To and starting statuses, R2f's status, the R5 gate and the quick actions' wording above are the **built-in defaults of rule parameters** (§6.5); a project may set each differently.
+
 ### 6.2 Library (seed, from this project's Connections)
 
 | Role (T112, D201) | Generated cables |
@@ -234,6 +237,10 @@ NSPS/rack without 120V (by role) · relay panel without P or 0-10V (by role) · 
 ### 6.4 Rulings
 
 `ruling{text, scope_levels, filter, action, standing}`. Preview = computed op list (Level · Ref · Field · Was → Now), untickable. Apply emits ops `change_type=Ruling`, `reason=text`, `ruling_id`. Standing rulings re-evaluate on new matches and raise proposals. Rename rulings update `vocab.canonical_of`. Stored shape, untick (`except`), the vocabulary rule and the standing proposals: D179, `packages/rules/docs/engine.md` (T37).
+
+### 6.5 Rule parameters (T102, D176, D211)
+
+The catalogue (`PARAMS`, `packages/rules/src/params.ts`) lists every parameter with its default (the §6.1 texts as D175 / D177 / D210 read them). Rules read them through `ctx.param(rule, key[, code])`, never a constant; a proposal names the parameters it was worded from, and those set away from their default join its `inputs_hash`: a change rewrites open drafts and re-offers rejected ones it words differently, accepted records keep their text (a ruling retrofits them). Two scopes, like the library (D65): the app-level defaults (`/library/ops`, drafts until accepted) and each project's own values (Setup → Rules, `Master edit`, apply at once). A project reads only its own rows; `POST /projects` copies the accepted app defaults, then the source project's values. Owners vary per project and cable code, not per level.
 
 ## 7. Import, extraction, export
 

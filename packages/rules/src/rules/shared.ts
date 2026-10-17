@@ -1,34 +1,32 @@
 /**
  * Helpers the rule files share (T34). Everything here reads the snapshot index only. The strings
- * are the master workbook's (CLAUDE.md §3 and `fixtures/…Master…xlsx`): signal words as the
- * master's punch items spell them ("Run DMX to …", "Run network to …", "Run Unison to …",
- * "Run fiber to …", "Run 120V to …").
+ * are the master workbook's (CLAUDE.md §3 and `fixtures/…Master…xlsx`) as the built-in defaults
+ * of the rule parameters (T102, `../params.ts`): signal words as the master's punch items spell
+ * them ("Run DMX to …", "Run network to …", "Run Unison to …", "Run fiber to …", "Run 120V to …").
  */
 
+import { DEFAULT_PARAMS, fillTemplate, flagParam, ownerParam, textParam, type ParamRef } from '../params';
 import type { RuleContext } from '../rule';
 import type { CableEndRow, CableRow, DeviceRow, LevelRow, PlaceholderRow, PunchItemRow, Subject } from '../snapshot';
 
-/** The signal word per cable code, as the master's items use it. */
-export const SIGNAL: Readonly<Record<string, string>> = {
-  X: 'DMX',
-  N: 'network',
-  NG: 'network & ground',
-  U: 'Unison',
-  F: 'fiber',
-  P: 'panic',
-  UV: 'UHCI-WM partition sensor',
-  '0-10V': '0-10V',
-  '120V': '120V',
-  // D199 (T111): DALI loops, from the DaVinci library's DALI ports
-  D: 'DALI',
-};
+/** The default signal word per cable code, as the master's items use it (the `R3.signal` parameter). */
+export const SIGNAL: Readonly<Record<string, string>> = DEFAULT_PARAMS.get('R3', 'signal') as Record<string, string>;
 
-export const NEURON_ITEM = 'Missing all Device Neuron IDs';
-export const DMX_KITS_NOTE = 'Waiting on DMX Termination Kits';
+/** The parameters' defaults under the names T34 gave them (tests and docs). */
+export const NEURON_ITEM = textParam(DEFAULT_PARAMS, 'R3c', 'item');
+export const DMX_KITS_NOTE = textParam(DEFAULT_PARAMS, 'R3b', 'notes');
 export const BUS_LABEL = 'Stations & Sensors';
 
+/** The default signal word of a code (no project parameters); `signal(ctx, code)` reads the project's. */
 export function signalOf(code: string | null | undefined): string {
   return (code && SIGNAL[code]) || code || 'cable';
+}
+
+/** The project's signal word for a cable code (`R3.signal`), else the code itself. */
+export function signal(ctx: RuleContext, code: string | null | undefined): string {
+  if (!code) return 'cable';
+  const map = ctx.param('R3', 'signal') as Record<string, string>;
+  return map[code] || code;
 }
 
 export const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
@@ -65,7 +63,7 @@ export function deviceLabel(ctx: RuleContext, d: DeviceRow): string {
 export function endLabel(ctx: RuleContext, end: CableEndRow): string {
   if (end.display_id) return end.display_id;
   const d = endDevice(ctx, end);
-  return d ? `${deviceLabel(ctx, d)} ${signalOf(cableOf(ctx, end)?.cable)} end` : 'NEW';
+  return d ? `${deviceLabel(ctx, d)} ${signal(ctx, cableOf(ctx, end)?.cable)} end` : 'NEW';
 }
 
 /**
@@ -118,9 +116,11 @@ export function hasOpenItemText(ctx: RuleContext, deviceId: string | null, endId
 
 /**
  * R5: far-end items wait for that floor's survey. An end on a level whose `Surveyed` date is not
- * set, and that nobody has surveyed on an iPad, raises no R3a / R3b / R4b item yet.
+ * set, and that nobody has surveyed on an iPad, raises no R3a / R3b / R4b item yet. The gate is a
+ * parameter (`R5.enabled`, T102); off, nothing waits.
  */
 export function waitsForSurvey(ctx: RuleContext, end: CableEndRow): boolean {
+  if (!flagParam(ctx.params, 'R5', 'enabled')) return false;
   const level = endLevel(ctx, end);
   if (!level) return false;
   return level.surveyed == null && end.surveyed_at == null && end.status_source !== 'surveyed';
@@ -167,16 +167,16 @@ export function placeholderFor(ctx: RuleContext, kind: string, label?: string): 
 }
 
 /** The Termination item an `Issue` end gets once its run is pulled (R3a), or null when none applies. */
-export function terminationItem(ctx: RuleContext, end: CableEndRow): { item: string; owner: 'EC' | 'ETC' | 'EC/ETC' } | null {
+export function terminationItem(
+  ctx: RuleContext,
+  end: CableEndRow,
+): { item: string; owner: 'EC' | 'ETC' | 'EC/ETC'; params: ParamRef[] } | null {
   if (end.status !== 'Issue') return null;
   const code = cableOf(ctx, end)?.cable ?? null;
   if (!code) return null;
   if (!noteHas(end.note, /not terminated|not landed|needs landing/i)) return null;
   if (code === 'X' && noteHas(end.note, /no term kit/i)) return null; // R3b's case
-  if (code === '0-10V') return { item: 'Land 0-10V control wiring', owner: 'EC' };
-  if (code === '120V') return { item: 'Land 120V power', owner: 'EC' };
-  const target = targetOf(ctx, end);
-  const item = target ? `Terminate ${signalOf(code)} to ${target}` : `Terminate ${signalOf(code)}`;
-  const owner = code === 'N' || code === 'NG' || code === 'U' ? 'ETC' : code === 'F' || code === 'X' ? 'EC/ETC' : 'EC';
-  return { item, owner };
+  const item = fillTemplate(textParam(ctx.params, 'R3a', 'terminate.item', code), { signal: signal(ctx, code), 'far end': targetOf(ctx, end) });
+  const owner = ownerParam(ctx.params, 'R3a', 'terminate.owner', code);
+  return { item, owner, params: [['R3a', 'terminate.item', code], ['R3a', 'terminate.owner', code], ['R3', 'signal', code]] };
 }

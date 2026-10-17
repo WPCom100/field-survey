@@ -7,10 +7,12 @@
  * - Acc: any accessory found < expected is a finding on the device (D52).
  */
 
+import { ownerParam, textParam } from '../params';
 import type { Rule } from '../rule';
 import type { AccessoryRow } from '../snapshot';
 import { cableOf, deviceLabel, endLabel, hasOpenItemText, subjectOfDevice, subjectOfEnd, terminationItem } from './shared';
 
+/** The default item text (the `E5.item` parameter, T102). */
 export const LAND_0_10V = 'Land 0-10V control wiring';
 
 function short(a: AccessoryRow): boolean {
@@ -40,14 +42,16 @@ export const E5: Rule = {
         });
       }
       // The Termination item of an Issue "Not landed" 0-10V end (R3a) is the same text; raise it once.
-      if (ends.some((e) => terminationItem(ctx, e)?.item === LAND_0_10V)) continue;
-      if (hasOpenItemText(ctx, d.id, null, LAND_0_10V) || ends.some((e) => hasOpenItemText(ctx, null, e.id, LAND_0_10V))) continue;
+      const item = textParam(ctx.params, 'E5', 'item');
+      if (ends.some((e) => terminationItem(ctx, e)?.item === item)) continue;
+      if (hasOpenItemText(ctx, d.id, null, item) || ends.some((e) => hasOpenItemText(ctx, null, e.id, item))) continue;
       ctx.propose({
         subject: subjectOfDevice(d),
         discriminator: 'E5',
         kind: 'punch',
-        payload: { item: LAND_0_10V, type: 'Wiring', owner: 'EC', device_id: d.id, cable_end_id: ends[0]?.id ?? null, level_id: d.level_id },
+        payload: { item, type: 'Wiring', owner: ownerParam(ctx.params, 'E5', 'owner'), device_id: d.id, cable_end_id: ends[0]?.id ?? null, level_id: d.level_id },
         inputs: { found, expected },
+        params: [['E5', 'item'], ['E5', 'owner']],
         why: `${deviceLabel(ctx, d)}: ERP-FT-LVD found ${found} of ${expected}; the 0-10V control wiring waits for the card.`,
       });
     }

@@ -22,6 +22,8 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | `src/rules/lint.ts` | The PLAN §6.3 checks the rules above do not raise (T36), `LINT_RULES`, `VOCAB_FIELDS`. |
 | `src/lints.ts` | `LINT_CHECKS` (every lint id under its §6.3 check, with a hint, in the lint view's order), `checkOf`, `rulingSeeds` (the "fix all via ruling" hand-off to T37). |
 | `src/rulings.ts` | Rulings (T37, PLAN §6.4): `RulingDraft` (filter, action, scope, standing), `RULING_FIELDS`, `parseRuling` (incl. the D50 import form), `checkRuling`, `previewRuling`, `vocabPlan`, `describeRuling`, the hand-off drafts (`draftFromSeed`, `draftFromSelection`) and `RulingRule` (standing rulings). |
+| `src/params.ts` | Rule parameters (T102, D176, D211): `PARAMS` (the catalogue and its defaults), `RuleParams` (a project's values over the defaults; `get`, `code`, `overrides`), `ruleParamId`, `fillTemplate`, `templatePattern`. |
+| `src/params-store.ts`, `src/params-view.ts` | Reading and editing `rule_param` rows through the `Editor` (`setRuleParam`, `decideRuleParam`, `loadRuleParams`), and the Rules tab's model (`paramGroups`). |
 | `src/rules/quick.ts` | Quick actions E6 / E7 / E9 and Not found on site: `runQuickAction(editor, deviceId, action)` writes the records at once (a person tapped). |
 | `src/testing/sample.ts`, `src/testing/build.ts` | A two-device snapshot with two sample rules, and the snapshot builder the rule tests use. |
 
@@ -192,6 +194,23 @@ starts a core `DebouncedTrigger` (500 ms after the last commit or pull) over eve
 the store, logs under `rules`, and bumps a version the plan screen's card reloads on. Rows of
 rules this build does not register are left alone (and can still be accepted or rejected: the
 demo level's seeded drafts).
+
+## Rule parameters (T102, D176, D211)
+
+Every owner, wording and starting status a rule writes is a parameter: `ctx.param(rule, key)` (a
+per-code parameter's map) or `ctx.param(rule, key, code)` (one code's entry, else `*`), typed
+through `ownerParam` / `textParam` / `statusParam` / `flagParam`. A rule that words a proposal from
+parameters lists them in `params: [[rule, key, code?], …]`; `evaluate` adds the ones set away from
+their default to the hash (`{inputs, params}`), so a project on the defaults hashes as before and a
+changed value re-offers rejected drafts it words differently. Open drafts follow the payload
+anyway (reconcile compares payloads); accepted records are never touched.
+
+A project's values are its own `rule_param` rows (`accepted`); the snapshot loads them and
+`indexSnapshot` resolves them once per run (`index.params`). App-level rows (`project_id` null,
+on the library stream) are drafts until accepted and are read only by the Rule defaults screen
+and by `POST /projects`, which copies the accepted ones. Adding a parameter: an entry in `PARAMS`
+whose default is today's constant, the rule reads it and lists it in `params`, and the golden
+tests (TP-8) still pass on the defaults.
 
 ## Rulings (T37, PLAN §6.4, D179)
 

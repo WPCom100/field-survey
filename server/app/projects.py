@@ -5,7 +5,8 @@ push locks it, and numbering groups must exist before any op — PLAN §8), then
 project starts with is written as **trusted ops** through the push loop (`app.sync.Push`): the
 project itself, one `numbering_group` per group of levels (06 and 06M share, D33), the levels
 in floor order, and the copies the caller asked for — vocabulary, device-type library (the app
-library always, D65), standing rulings and, optionally, placeholders. An iPad therefore gets
+library always, D65), standing rulings, the rule parameters (the app-level defaults always, then
+a source project's values; T102, D176) and, optionally, placeholders. An iPad therefore gets
 the whole project, its own `project` row included, from its first pull, and a replay of the
 op log reproduces it. Numbering-group counters live outside the log, so `materialise.replay`
 leaves `project` and `numbering_group` rows in place.
@@ -25,7 +26,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ids import uuid7
-from app.models import Level, LibraryType, NumberingGroup, Placeholder, Project, Ruling, User, Vocab
+from app.models import (
+    Level,
+    LibraryType,
+    NumberingGroup,
+    Placeholder,
+    Project,
+    RuleParam,
+    Ruling,
+    User,
+    Vocab,
+)
+from app.rule_params import rule_param_id
 from app.sync import SERVER_INSTALL_ID, OpIn, Push, PushError, jsonable
 
 DEFAULT_EXPORT_TITLE = "ETC Lighting Controls Survey"
@@ -62,6 +74,8 @@ class CopyFrom(BaseModel):
     vocabulary: bool = True
     library: bool = True
     rulings: bool = True
+    # T102: the source project's rule parameters, over the app-level defaults
+    rule_params: bool = True
     placeholders: bool = False
 
 
@@ -336,7 +350,7 @@ def _copy(
     flags: CopyFrom | None,
 ) -> dict[str, int]:
     """Copies as new rows (new ids, `canonical_of` remapped); counts per kind."""
-    counts = {"vocab": 0, "library_types": 0, "rulings": 0, "placeholders": 0}
+    counts = {"vocab": 0, "library_types": 0, "rulings": 0, "rule_params": 0, "placeholders": 0}
     now = datetime.now(UTC)
 
     # The app library (D65) always seeds the project's library; a source project's accepted
@@ -384,6 +398,9 @@ def _copy(
             },
         )
         counts["library_types"] += 1
+
+    _copy_rule_params(session, ops, project_id, source if flags and flags.rule_params else None)
+    counts["rule_params"] = sum(1 for o in ops.ops if o.entity_kind == "rule_param")
 
     if source is None or flags is None:
         return counts
@@ -446,6 +463,40 @@ def _copy(
             counts["placeholders"] += 1
 
     return counts
+
+
+def _copy_rule_params(
+    session: Session, ops: "_Ops", project_id: uuid.UUID, source: Project | None
+) -> None:
+    """The new project's rule parameters (T102, D176 (2)): every accepted app-level default that
+    sets a value, then the source project's own values over them. A parameter on its built-in
+    default (`value` null) is not copied: no row reads as the default. Ids hash (project, rule,
+    key) like the iPad's, so a later edit on an iPad sets the copied row."""
+    values: dict[tuple[str, str], Any] = {}
+    scopes = [RuleParam.project_id.is_(None)]
+    if source is not None:
+        scopes.append(RuleParam.project_id == source.id)
+    for where in scopes:
+        rows = session.scalars(
+            select(RuleParam)
+            .where(where, RuleParam.state == "accepted", RuleParam.deleted_at.is_(None))
+            .order_by(RuleParam.rule_id, RuleParam.key)
+        )
+        for r in rows:
+            if r.value is not None:
+                values[(r.rule_id, r.key)] = r.value
+    for (rule_id, key), value in values.items():
+        ops.create(
+            "rule_param",
+            {
+                "id": rule_param_id(project_id, rule_id, key),
+                "project_id": project_id,
+                "rule_id": rule_id,
+                "key": key,
+                "value": value,
+                "state": "accepted",
+            },
+        )
 
 
 # -------------------------------------------------------------------- read

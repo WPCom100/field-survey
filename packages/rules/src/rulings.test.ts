@@ -8,6 +8,7 @@ import { Editor, Store, uuidv7, type EditContext, type StoredOp } from '@field-s
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_PARAMS } from './params';
 import { RuleEngine } from './engine';
 import { rulingSeeds } from './lints';
 import { RULES } from './rules';
@@ -319,7 +320,7 @@ describe('standing rulings re-evaluate on new matches (PLAN §6.4)', () => {
     const b = new Build();
     b.device(b.level('01'), 'Station');
     const out = { n: 0 };
-    RulingRule.run({ snap: b.snap, index: indexSnapshot(b.snap), now: '', today: () => '', propose: () => out.n++, find: () => out.n++, maintain: () => out.n++ });
+    RulingRule.run({ snap: b.snap, index: indexSnapshot(b.snap), now: '', today: () => '', params: DEFAULT_PARAMS, param: (r, k) => DEFAULT_PARAMS.get(r, k), propose: () => out.n++, find: () => out.n++, maintain: () => out.n++ });
     expect(out.n).toBe(0);
   });
 });

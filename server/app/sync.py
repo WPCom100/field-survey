@@ -42,11 +42,15 @@ log = logging.getLogger("sync")
 SERVER_INSTALL_ID = uuid.uuid5(uuid.NAMESPACE_URL, "field-survey:server")
 # The app-library op log (T61, D184): ops pushed to `/library/ops` name this stream id as their
 # `project_id`; they are stored with `project_id` null, numbered on their own and pulled from
-# `/library/ops`. Only `library_type` rows of the app library (project null) live there, plus
+# `/library/ops`. Only `library_type` and `rule_param` (T102) rows of the app library (project
+# null) live there, plus
 # the review items of their conflicts (stored with project_id null; on the wire and on the iPad
 # both carry LIBRARY_STREAM, whose `review_item.project_id` column is NOT NULL — `op_to_json`).
 LIBRARY_STREAM = uuid.UUID("00000000-0000-7000-8000-00000000a11b")
-LIBRARY_KINDS = frozenset({"library_type", "review_item"})
+LIBRARY_KINDS = frozenset({"library_type", "rule_param", "review_item"})
+# Records that exist at both scopes: `project_id` null in the library stream, the project's own
+# id in a project's (T61, T102).
+SCOPED_KINDS = frozenset({"library_type", "rule_param"})
 # Serialises library pushes as the project row lock serialises a project's (arbitrary key).
 LIBRARY_LOCK = 0x11B0A11B
 MAX_OPS_PER_PUSH = 500
@@ -220,14 +224,17 @@ def validate_op(
     if op.entity_kind not in OP_TARGETS:
         raise ValueError(f"unknown entity_kind {op.entity_kind!r}")
     if library and op.entity_kind not in LIBRARY_KINDS:
-        raise ValueError(f"the app library holds library types only, not {op.entity_kind}")
-    if op.entity_kind == "library_type" and op.kind == "create":
+        raise ValueError(
+            f"the app library holds library types and rule defaults only, not {op.entity_kind}"
+        )
+    if op.entity_kind in SCOPED_KINDS and op.kind == "create":
         owner = (op.payload or {}).get("project_id")
+        noun = "type" if op.entity_kind == "library_type" else "rule parameter"
         if library and owner is not None:
-            raise ValueError("an app-library type has no project_id")
+            raise ValueError(f"an app-library {noun} has no project_id")
         if not library and (owner is None or str(owner) != str(project_id)):
             raise ValueError(
-                "a project's library type names its project; app-library types go to /library/ops"
+                f"a project's {noun} names its project; app-library ones go to /library/ops"
             )
     if op.kind not in CLIENT_OP_KINDS:
         raise ValueError(f"bad op kind {op.kind!r} (assign is server-only)")

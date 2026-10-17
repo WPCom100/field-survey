@@ -568,6 +568,23 @@ export const ENTITIES = {
     [['project_id']],
   ),
 
+  // T102 (D176, D211): a rule's setting — an owner, a wording, a status — at two scopes like the
+  // device-type library (D65): `project_id` null = the app-level default (a `draft` until
+  // accepted; project creation copies the accepted ones), else the project's own (`accepted`).
+  // `value` null = the built-in default (`PARAMS` in packages/rules). The id is a hash of
+  // (scope, rule_id, key), so two iPads setting one parameter make one row (D169).
+  rule_param: record(
+    'rule_param',
+    {
+      project_id: t(),
+      rule_id: t({ notNull: true }),
+      key: t({ notNull: true }),
+      value: j(),
+      state: enumCol(v.LIBRARY_STATE, { notNull: true, default: 'accepted' }),
+    },
+    [['project_id']],
+  ),
+
   vocab: record(
     'vocab',
     {

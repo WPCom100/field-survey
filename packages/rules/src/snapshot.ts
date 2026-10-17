@@ -8,6 +8,10 @@
 
 import type { ConnectionStatus, DeviceStatus, Owner, PartStatus, PunchType, TrackingStatus } from '@field-survey/core';
 
+import { RuleParams, type RuleParamRow } from './params';
+
+export type { RuleParamRow } from './params';
+
 export interface Deletable {
   deleted_at: string | null;
 }
@@ -272,6 +276,8 @@ export interface Snapshot {
   drafts: DraftRow[];
   /** Rulings (T37); the standing ones propose on new matches. */
   rulings: RulingRow[];
+  /** The project's `rule_param` rows (T102); absent or empty = the built-in defaults. */
+  ruleParams?: RuleParamRow[];
 }
 
 /** An empty snapshot; tests and the engine start from it. */
@@ -297,6 +303,7 @@ export function emptySnapshot(projectId: string): Snapshot {
     photos: [],
     drafts: [],
     rulings: [],
+    ruleParams: [],
   };
 }
 
@@ -340,6 +347,8 @@ export interface SnapshotIndex {
   sourcesByPart: Map<string, PartSourceRow[]>;
   libraryType: Map<string, LibraryTypeRow>;
   sheet: Map<string, SheetRow>;
+  /** The project's rule parameters over the defaults (T102). */
+  params: RuleParams;
   /** Live punch items and parts by the proposal they were accepted from. */
   recordsByProposal: Map<string, (PunchItemRow | MissingPartRow)[]>;
   /** The other end of a cable end (null when the cable has one end so far). */
@@ -384,6 +393,7 @@ export function indexSnapshot(s: Snapshot): SnapshotIndex {
     sourcesByPart: groupBy(live(s.partSources), (ps) => ps.missing_part_id),
     libraryType: byId(live(s.libraryTypes)),
     sheet: byId(live(s.sheets ?? [])),
+    params: new RuleParams((s.ruleParams ?? []).filter((r) => r.project_id === s.projectId)),
     recordsByProposal,
     otherEnd(end) {
       const pair = endsByCable.get(end.cable_id) ?? [];

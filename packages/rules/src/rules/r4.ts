@@ -7,11 +7,14 @@
  *   one kit per run.
  * - R4c: default Notes by kind for the part editor — `defaultPartNotes`.
  * - R4d: re-pulled wire and network termination kits are never parts; flagged.
+ *
+ * The parts' owner, the part text and its Notes are rule parameters (T102, `../params.ts`).
  */
 
+import { fillTemplate, ownerParam, templatePattern, textParam } from '../params';
 import type { Rule } from '../rule';
 import type { MissingPartRow } from '../snapshot';
-import { isOpen, targetOf } from './shared';
+import { isOpen, signal, targetOf } from './shared';
 import { isDmxKitItem } from './r3';
 
 export const R4a: Rule = {
@@ -19,9 +22,10 @@ export const R4a: Rule = {
   title: 'Parts are the EC\'s',
   text: 'Missing parts have Owner `EC`; another owner is flagged.',
   run(ctx) {
+    const owner = ownerParam(ctx.params, 'R4a', 'owner');
     for (const m of ctx.index.missingPart.values()) {
-      if (m.owner === 'EC') continue;
-      ctx.find({ subject: { entity_kind: 'missing_part', entity_id: m.id, level_id: m.level_id }, message: `Owner ${m.owner ?? '(none)'}: missing parts are the EC's` });
+      if (m.owner === owner) continue;
+      ctx.find({ subject: { entity_kind: 'missing_part', entity_id: m.id, level_id: m.level_id }, message: `Owner ${m.owner ?? '(none)'}: missing parts are the ${owner}'s` });
     }
   },
 };
@@ -37,10 +41,16 @@ export const R4b: Rule = {
       if (!ctx.index.missingPart.has(partId)) continue;
       for (const s of sources) if (s.target_kind === 'punch') sourced.add(s.target_id);
     }
+    const kitNotes = textParam(ctx.params, 'R3b', 'notes');
+    // The destination as the kit item names it: the project's R3b template, then the default's.
+    const itemTemplate = textParam(ctx.params, 'R3b', 'item').split('<signal>').join(signal(ctx, 'X'));
+    const patterns = [templatePattern(itemTemplate, 'far end'), /^Terminate DMX to (.+)$/i];
+    const owner = ownerParam(ctx.params, 'R4a', 'owner');
+    const notes = textParam(ctx.params, 'R4b', 'notes');
     for (const p of ctx.index.punchItem.values()) {
-      if (!isOpen(p) || !isDmxKitItem(p) || sourced.has(p.id)) continue;
+      if (!isOpen(p) || !isDmxKitItem(p, kitNotes) || sourced.has(p.id)) continue;
       const end = p.cable_end_id ? ctx.index.cableEnd.get(p.cable_end_id) : null;
-      const fromItem = p.item ? /^Terminate DMX to (.+)$/i.exec(p.item)?.[1] : null;
+      const fromItem = p.item ? patterns.map((re) => re.exec(p.item!)?.[1]).find((m) => m) : null;
       const destination = fromItem?.trim() || (end ? targetOf(ctx, end) : null) || 'missing';
       const device = p.device_id ? ctx.index.device.get(p.device_id) : null;
       ctx.propose({
@@ -48,16 +58,17 @@ export const R4b: Rule = {
         discriminator: p.id,
         kind: 'part',
         payload: {
-          part: `DMX termination kit - ${destination} run`,
+          part: fillTemplate(textParam(ctx.params, 'R4b', 'part'), { 'far end': destination }),
           qty: 1,
-          owner: 'EC',
+          owner,
           part_status: 'Needed',
-          notes: 'Need to be ordered',
+          notes,
           device_id: p.device_id,
           level_id: p.level_id,
           sources: [{ target_kind: 'punch', target_id: p.id }],
         },
         inputs: { item: p.id, destination },
+        params: [['R4a', 'owner'], ['R4b', 'part'], ['R4b', 'notes']],
         why: `${p.number != null ? `#${p.number} ` : ''}"${p.item}" waits on a DMX termination kit: one kit per run (R4b).`,
       });
     }

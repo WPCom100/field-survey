@@ -8,6 +8,7 @@ import { SetupActions, SetupError, loadProjectSetup, type ProjectSetup, type Set
 import { Btn, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
 import { SourcesStep } from '../../setup/SourcesStep';
 import { AssignmentsStep } from '../../setup/AssignmentsStep';
+import { RulesStep } from '../../setup/RulesStep';
 import { BaselineDialog } from '../../setup/BaselineDialog';
 import { DraftReview } from '../../drafts/DraftReview';
 import { loadLockTable, lockWarnings, type LockLevel } from '../../setup/lock';
@@ -15,8 +16,8 @@ import { loadPlacementProgress, type PlacementProgress } from '../../placement/m
 import { useSyncStatus } from '../../sync/useSyncStatus';
 import { syncDataKey } from '../../sync/dataKey';
 
-type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock' | 'assignments';
-const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'place', 'lock', 'assignments'];
+type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock' | 'assignments' | 'rules';
+const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'place', 'lock', 'assignments', 'rules'];
 
 /**
  * Setup of an existing project (Phase 3 §3.1 steps 1–2): the project's fields and the levels
@@ -25,8 +26,9 @@ const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'pla
  * Phase 3 §3.3 review (T44, `?step=drafts&draft=<id>` opens one draft); Place devices is the
  * progress per level with Place ▸ into the level's plan in placing mode (T46, Phase 3 §3.4); Lock
  * baseline is the Phase 3 §3.5 table (T47, T46's columns), whose Lock / Unlock is also on each
- * Levels row. Assignments (T97, D168) assigns levels to team names; it sits below the numbered
- * steps because it changes all through the survey, not once.
+ * Levels row. Assignments (T97, D168) assigns levels to team names, and Rules (T102, D176) sets the
+ * rules' owners, wordings and statuses; both sit below the numbered steps because they change all
+ * through the survey, not once.
  */
 export default function ProjectSetupScreen() {
   const { projectId, step: stepParam, draft } = useLocalSearchParams<{ projectId: string; step?: string; draft?: string }>();
@@ -123,6 +125,9 @@ export default function ProjectSetupScreen() {
         <Pressable onPress={() => setStep('assignments')} style={[styles.step, step === 'assignments' && styles.stepOn]}>
           <Text style={styles.stepText}>Assignments</Text>
         </Pressable>
+        <Pressable onPress={() => setStep('rules')} style={[styles.step, step === 'rules' && styles.stepOn]}>
+          <Text style={styles.stepText}>Rules</Text>
+        </Pressable>
         <View style={{ flex: 1 }} />
         <Pressable onPress={() => router.push({ pathname: '/', params: { project: projectId } })}>
           <Text style={styles.back}>Open the levels screen ▸</Text>
@@ -145,6 +150,8 @@ export default function ProjectSetupScreen() {
             <PlaceStep progress={placement} />
           ) : step === 'assignments' ? (
             <AssignmentsStep projectId={projectId} dataKey={dataKey} />
+          ) : step === 'rules' ? (
+            <RulesStep projectId={projectId} dataKey={dataKey} />
           ) : step === 'lock' ? (
             <LockStep levels={setup.levels.map((l) => locks.get(l.id)).filter((l): l is LockLevel => !!l)} onLock={setDialog} />
           ) : (

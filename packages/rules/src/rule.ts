@@ -11,6 +11,7 @@
  */
 
 import { hashOf, hashUuid } from './hash';
+import type { ParamRef, ParamValue, RuleParams } from './params';
 import type { FindingRow, ProposalKind, ProposalRow, Snapshot, SnapshotIndex, Subject } from './snapshot';
 
 export interface ProposalInput {
@@ -24,6 +25,12 @@ export interface ProposalInput {
   inputs?: unknown;
   /** One sentence for "why?" on the card, naming the facts. */
   why?: string;
+  /**
+   * The rule parameters the proposal was worded from (T102). Those set away from their default
+   * join `inputs_hash` (D211): changing one re-offers a rejected draft it words differently,
+   * while a project on the defaults hashes as before.
+   */
+  params?: readonly ParamRef[];
 }
 
 export interface FindingInput {
@@ -71,6 +78,10 @@ export interface RuleContext {
   /** The run's clock (ISO 8601); `today()` is its date. Never put it in `inputs`. */
   readonly now: string;
   today(): string;
+  /** The project's rule parameters (T102, D176): its own values over the built-in defaults. */
+  readonly params: RuleParams;
+  /** `params.get` / `params.code`: a parameter's value, one code's entry when `code` is given. */
+  param(rule: string, key: string, code?: string | null): ParamValue;
   propose(p: ProposalInput): void;
   find(f: FindingInput): void;
   maintain(u: UpkeepInput): void;

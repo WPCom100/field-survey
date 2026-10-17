@@ -56,7 +56,13 @@ def test_create_project_rows_and_ops(client, session):
         "export_title": DEFAULT_EXPORT_TITLE,
         "disclaimer": "Based on submittal drawings rev F",
     }
-    assert out["copied"] == {"vocab": 0, "library_types": 0, "rulings": 0, "placeholders": 0}
+    assert out["copied"] == {
+        "vocab": 0,
+        "library_types": 0,
+        "rulings": 0,
+        "rule_params": 0,
+        "placeholders": 0,
+    }
     levels = out["levels"]
     assert [lv["level"] for lv in levels] == ["B2", "B1", "01", "06", "06M", "09"]
     assert [lv["floor_order"] for lv in levels] == [1, 2, 3, 4, 5, 6]
@@ -232,7 +238,13 @@ def test_copy_from(client, session):
             "levels": [{"level": "02"}],
         },
     )
-    assert out["copied"] == {"vocab": 2, "library_types": 2, "rulings": 1, "placeholders": 1}
+    assert out["copied"] == {
+        "vocab": 2,
+        "library_types": 2,
+        "rulings": 1,
+        "rule_params": 0,
+        "placeholders": 1,
+    }
     assert out["copied_from_id"] == sid
     pid = out["id"]
     vocab = session.scalars(select(Vocab).where(Vocab.project_id == pid)).all()
@@ -269,7 +281,13 @@ def test_copy_from(client, session):
             },
         },
     )
-    assert plain["copied"] == {"vocab": 0, "library_types": 1, "rulings": 0, "placeholders": 0}
+    assert plain["copied"] == {
+        "vocab": 0,
+        "library_types": 1,
+        "rulings": 0,
+        "rule_params": 0,
+        "placeholders": 0,
+    }
     # No copy-from at all: the app library still seeds the project (D65).
     fresh = create(client, {"name": "Fresh"})
     assert fresh["copied"]["library_types"] == 1

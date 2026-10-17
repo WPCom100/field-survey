@@ -38,7 +38,7 @@ export type NewProjectBody = {
   site?: string;
   parties?: { ec?: string; etc?: string; gc?: string };
   settings?: { export_title?: string; disclaimer?: string };
-  copy_from?: { project_id: string; vocabulary: boolean; library: boolean; rulings: boolean; placeholders: boolean };
+  copy_from?: { project_id: string; vocabulary: boolean; library: boolean; rulings: boolean; rule_params?: boolean; placeholders: boolean };
   levels: NewLevel[];
 };
 

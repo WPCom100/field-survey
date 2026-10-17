@@ -142,6 +142,7 @@ export class RuleEngine {
       list<Snapshot['findings'][number]>('finding', 'project_id = ?'),
     ]);
     s.rulings = await list<Snapshot['rulings'][number]>('ruling', 'project_id = ?');
+    s.ruleParams = await list<NonNullable<Snapshot['ruleParams']>[number]>('rule_param', 'project_id = ?');
     // T36 lints: sheets (pin outside the sheet), unreviewed drafts (locked level), and only the
     // live photos whose device is deleted (deleted link) — not the project's thousands of photos.
     const [sheets, draftDevices, draftCables, photos] = await Promise.all([

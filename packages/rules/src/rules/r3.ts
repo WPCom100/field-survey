@@ -14,8 +14,12 @@
  *   (D49, D170).
  * - R3d: an item that says "test" or "commission" is flagged (no test or commissioning items).
  * - R3f: an item outside the project's `punch_item` vocabulary is flagged (dismissable).
+ *
+ * Owners, item texts, notes and the end that holds a Run item are rule parameters (T102,
+ * `../params.ts`); the texts above are their defaults.
  */
 
+import { fillTemplate, ownerParam, textParam } from '../params';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, LevelRow, PunchItemRow } from '../snapshot';
 import {
@@ -30,7 +34,7 @@ import {
   hasOpenItemText,
   isOpen,
   noteHas,
-  signalOf,
+  signal,
   str,
   subjectOfEnd,
   targetOf,
@@ -53,14 +57,15 @@ export const R3a: Rule = {
       if (!level) continue;
       if (e.status === 'Not installed') {
         if (waitsForSurvey(ctx, e) || !carriesRunItem(ctx, e)) continue;
-        const target = targetOf(ctx, e);
-        const item = code === '0-10V' ? 'Run and land 0-10V control wiring' : target ? `Run ${signalOf(code)} to ${target}` : `Run ${signalOf(code)}`;
+        const item = fillTemplate(textParam(ctx.params, 'R3a', 'run.item', code), { signal: signal(ctx, code), 'far end': targetOf(ctx, e) });
         if (hasOpenItemText(ctx, e.device_id, e.id, item) || otherEndHasRunItem(ctx, e)) continue;
+        const owner = ownerParam(ctx.params, 'R3a', 'run.owner', code);
         ctx.propose({
           subject: subjectOfEnd(ctx, e),
           kind: 'punch',
-          payload: { item, type: 'Cable not run', owner: 'EC', device_id: e.device_id, cable_end_id: e.id, level_id: level.id },
+          payload: { item, type: 'Cable not run', owner, device_id: e.device_id, cable_end_id: e.id, level_id: level.id },
           inputs: { status: e.status, item },
+          params: [['R3a', 'run.item', code], ['R3a', 'run.owner', code], ['R3', 'signal', code]],
           why: `${endLabel(ctx, e)}${e.to_text ? ` (${e.to_text})` : ''} is Not installed: the wire has not been pulled.`,
         });
       } else if (e.status === 'Issue') {
@@ -73,6 +78,7 @@ export const R3a: Rule = {
           kind: 'punch',
           payload: { item: term.item, type: 'Termination', owner: term.owner, device_id: e.device_id, cable_end_id: e.id, level_id: level.id },
           inputs: { status: e.status, item: term.item },
+          params: term.params,
           why: `${endLabel(ctx, e)} is Issue "${e.note}": the wire is run and waits for its termination.`,
         });
       }
@@ -83,13 +89,14 @@ export const R3a: Rule = {
 /**
  * One "Run …" item per wire (R3): when both ends are surveyed `Not installed`, the item goes on
  * the **start of the run** — side A, the lower floor in the master, the riser's origin once the
- * riser is imported (D177, Landry: "the start of the run holds the item"). An end whose other
- * end is unsurveyed, or waits for its floor's survey (R5), carries it alone.
+ * riser is imported (D177, Landry: "the start of the run holds the item"; the `R3a.run.end`
+ * parameter can name side B instead). An end whose other end is unsurveyed, or waits for its
+ * floor's survey (R5), carries it alone.
  */
 function carriesRunItem(ctx: RuleContext, e: CableEndRow): boolean {
   const other = ctx.index.otherEnd(e);
   if (!other || other.status !== 'Not installed' || waitsForSurvey(ctx, other)) return true;
-  return e.side === 'A';
+  return e.side === ctx.param('R3a', 'run.end');
 }
 
 /** A Run item the rule made on the other end (accepted before this end was surveyed) stands for the wire. */
@@ -101,9 +108,16 @@ function otherEndHasRunItem(ctx: RuleContext, e: CableEndRow): boolean {
 
 // ------------------------------------------------------------------ R3b
 
-/** The master's DMX-kit item: `Terminate DMX to <far end>` / Missing part / EC/ETC / "Waiting on DMX Termination Kits". */
-export function isDmxKitItem(p: PunchItemRow): boolean {
-  return p.rule_id === 'R3b' || (p.type === 'Missing part' && noteHas(p.notes, /Waiting on DMX Termination Kits/i));
+/**
+ * The master's DMX-kit item: `Terminate DMX to <far end>` / Missing part / EC/ETC / "Waiting on
+ * DMX Termination Kits" — made by R3b, or a `Missing part` item whose Notes carry the kit note
+ * (the project's `R3b.notes`, or the default).
+ */
+export function isDmxKitItem(p: PunchItemRow, notes: string = DMX_KITS_NOTE): boolean {
+  if (p.rule_id === 'R3b') return true;
+  if (p.type !== 'Missing part' || !p.notes) return false;
+  const have = p.notes.toLowerCase();
+  return [notes, DMX_KITS_NOTE].some((n) => have.includes(n.toLowerCase()));
 }
 
 export const R3b: Rule = {
@@ -116,16 +130,18 @@ export const R3b: Rule = {
       if (waitsForSurvey(ctx, e)) continue;
       const level = endLevel(ctx, e);
       if (!level) continue;
-      const target = targetOf(ctx, e);
-      const item = target ? `Terminate DMX to ${target}` : 'Terminate DMX';
+      const item = fillTemplate(textParam(ctx.params, 'R3b', 'item'), { signal: signal(ctx, 'X'), 'far end': targetOf(ctx, e) });
       if (hasOpenItemText(ctx, e.device_id, e.id, item)) continue;
       const device = e.device_id ? ctx.index.device.get(e.device_id) : null;
+      const owner = ownerParam(ctx.params, 'R3b', 'owner');
+      const notes = textParam(ctx.params, 'R3b', 'notes');
       ctx.propose({
         subject: device ? { entity_kind: 'device', entity_id: device.id, level_id: device.level_id } : subjectOfEnd(ctx, e),
         discriminator: e.id,
         kind: 'punch',
-        payload: { item, type: 'Missing part', owner: 'EC/ETC', notes: DMX_KITS_NOTE, device_id: e.device_id, cable_end_id: e.id, level_id: level.id },
+        payload: { item, type: 'Missing part', owner, notes, device_id: e.device_id, cable_end_id: e.id, level_id: level.id },
         inputs: { status: e.status, item },
+        params: [['R3b', 'item'], ['R3b', 'owner'], ['R3b', 'notes'], ['R3', 'signal', 'X']],
         why: `${endLabel(ctx, e)} is Issue "${e.note}": the DMX run waits for a termination kit.`,
       });
     }
@@ -134,8 +150,9 @@ export const R3b: Rule = {
 
 // ------------------------------------------------------------------ R3c
 
-export function isNeuronItem(p: PunchItemRow): boolean {
-  return p.rule_id === 'R3c' || p.item === NEURON_ITEM;
+/** R3c's item: made by the rule, or an item with the Neuron text (the project's `R3c.item`, or the default). */
+export function isNeuronItem(p: PunchItemRow, text: string = NEURON_ITEM): boolean {
+  return p.rule_id === 'R3c' || p.item === text || p.item === NEURON_ITEM;
 }
 
 export const R3c: Rule = {
@@ -154,9 +171,10 @@ export const R3c: Rule = {
         .sort((a, b) => compareLevels(a.l, b.l) || compareIds(a.d.display_id ?? `${a.l.level}-?`, b.d.display_id ?? `${b.l.level}-?`))
         .map(({ d }) => deviceLabel(ctx, d));
       const notes = missing.length ? missing.join(', ') : null;
+      const neuron = textParam(ctx.params, 'R3c', 'item');
       const existing = levels
         .flatMap((l) => ctx.index.punchByLevel.get(l.id) ?? [])
-        .filter(isNeuronItem)
+        .filter((p) => isNeuronItem(p, neuron))
         .sort((a, b) => Number(b.rule_id === 'R3c') - Number(a.rule_id === 'R3c') || Number(b.sort_last) - Number(a.sort_last) || (a.number ?? 0) - (b.number ?? 0))[0];
       if (existing) {
         maintainNeuronItem(ctx, existing, notes, missing.length);
@@ -168,15 +186,16 @@ export const R3c: Rule = {
         kind: 'punch',
         payload: {
           level_id: first.id,
-          item: NEURON_ITEM,
+          item: neuron,
           type: 'Information',
-          owner: 'EC',
+          owner: ownerParam(ctx.params, 'R3c', 'owner'),
           tracking_status: 'Open',
           notes,
           sort_last: true,
-          device_text: 'All devices',
+          device_text: textParam(ctx.params, 'R3c', 'device_text'),
         },
         inputs: { group: groupId },
+        params: [['R3c', 'item'], ['R3c', 'owner'], ['R3c', 'device_text']],
         why: `${missing.length} device${missing.length === 1 ? '' : 's'} on ${levelNames(levels)} ${missing.length === 1 ? 'has' : 'have'} no Neuron ID.`,
       });
     }
