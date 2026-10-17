@@ -42,6 +42,14 @@ export function setEndText(editor: Editor, endId: string, field: 'from_text' | '
 }
 
 /**
+ * Whether the cable takes termination kits (T103, D213): true / false over its code's `R4b.kit`,
+ * null = back to the code's. One op, or none if unchanged. R3b / R4b follow on the next rules run.
+ */
+export function setCableTermKit(editor: Editor, cableId: string, value: boolean | null): Promise<Op | null> {
+  return editor.setField('cable', cableId, 'term_kit', value, FIELD_SURVEY);
+}
+
+/**
  * Point an end at a placeholder (D26) — the endpoint picker. Only an end that is not a device may
  * change (a device end is placed on the plan); the placeholder must belong to the editor's project.
  */

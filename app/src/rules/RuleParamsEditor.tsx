@@ -196,6 +196,7 @@ function ParamControl({ item, onSet }: { item: ParamItem; onSet: (item: ParamIte
       return <TextBox value={value as string} onCommit={(v) => onSet(item, v)} />;
     case 'owner_by_code':
     case 'text_by_code':
+    case 'bool_by_code':
       return <CodeTable item={item} onSet={onSet} />;
   }
 }
@@ -203,6 +204,7 @@ function ParamControl({ item, onSet }: { item: ParamItem; onSet: (item: ParamIte
 /** One row per cable code; `*` reads "Any other code". A row without its own entry shows `*`'s value, dimmed. */
 function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, value: ParamValue | null) => void }) {
   const owner = item.spec.kind === 'owner_by_code';
+  const flag = item.spec.kind === 'bool_by_code';
   const signal = item.spec.rule === 'R3';
   const [newCode, setNewCode] = useState('');
   const [newWord, setNewWord] = useState('');
@@ -211,15 +213,28 @@ function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, 
       {item.codes.map((code) => {
         const { value, inherited } = codeValue(item, code);
         const own = !inherited && code !== '*';
-        const def = (item.spec.default as Record<string, string>)[code];
+        const def = (item.spec.default as Record<string, string | boolean>)[code];
         return (
           <View key={code} style={styles.codeRow}>
             <Text style={[styles.code, inherited && styles.dim]}>{code === '*' ? 'Any other code' : code}</Text>
             <View style={[{ flex: 1 }, inherited && styles.dim]}>
-              {owner ? (
-                <Chips options={OWNERS} value={value} onPick={(v) => onSet(item, withCode(item, code, v))} />
+              {flag ? (
+                <Pressable
+                  onPress={() => onSet(item, withCode(item, code, value !== true))}
+                  style={styles.toggle}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: value === true }}
+                  accessibilityLabel={`${code === '*' ? 'Any other code' : code}: ${value === true ? 'on' : 'off'}`}
+                >
+                  <View pointerEvents="none">
+                    <Switch value={value === true} />
+                  </View>
+                  <Text style={styles.toggleText}>{value === true ? 'On' : 'Off'}</Text>
+                </Pressable>
+              ) : owner ? (
+                <Chips options={OWNERS} value={String(value)} onPick={(v) => onSet(item, withCode(item, code, v))} />
               ) : (
-                <TextBox value={value} onCommit={(v) => onSet(item, withCode(item, code, v))} />
+                <TextBox value={String(value)} onCommit={(v) => onSet(item, withCode(item, code, v))} />
               )}
             </View>
             {own && def !== value ? (

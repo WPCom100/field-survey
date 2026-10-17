@@ -24,11 +24,11 @@ export const RULES: readonly Rule[] = [R1, R2a, R2b, R2c, R2d, R2e, R2f, R2g, R3
 export const R5_TEXT = 'Far-end items wait for that floor\'s survey: an end on a level with no Surveyed date that nobody has surveyed raises no R3a / R3b / R4b item yet.';
 
 export { R1, R2a, R2b, R2c, R2d, R2e, R2f, R2g, R3a, R3b, R3c, R3d, R3f, R4a, R4b, R4d, E5, Acc };
-export { isDmxKitItem, isNeuronItem, actionableEnds } from './r3';
+export { isNeuronItem, actionableEnds } from './r3';
 export { LINT_RULES, VOCAB_FIELDS } from './lint';
 export { defaultPartNotes, partProblem } from './r4';
 export { LAND_0_10V } from './e5';
-export { SIGNAL, NEURON_ITEM, DMX_KITS_NOTE, BUS_LABEL, signalOf, signal, targetOf, terminationItem, waitsForSurvey, compareIds, compareLevels } from './shared';
+export { SIGNAL, NEURON_ITEM, DMX_KITS_NOTE, BUS_LABEL, signalOf, signal, targetOf, terminationItem, waitsForSurvey, compareIds, compareLevels, takesKits, isKitItem, isKitPart, kitNote } from './shared';
 export { runQuickAction, appendPhrase, QUICK_ACTION_TEXT, type QuickAction, type QuickActionResult } from './quick';
 export {
   CABLE_CODES,

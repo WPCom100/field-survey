@@ -564,6 +564,21 @@ Decision D212: suggestion chips are one `suggestion` table (your choice); new ch
 
 ---
 
+## T103 — Termination kits per cable code, at both ends  ·  Needs: no new build (JS update; server deploy first — Alembic 0016 adds `cable.term_kit`; **every iPad on the new JS before anyone sets a cable's Termination kits**, an older iPad refuses those ops on pull until it updates, nothing lost)
+
+**Why it matters:** the master raised a DMX kit for every run that still has to be pulled, and DMX is not the only cable that needs kits (D213). The rules now raise a kit at each device end of every cable that takes them, from the setting you choose per code, and never twice for one end.
+
+- [ ] **Nothing doubles on the update.** After the JS update, open Levels 01, 04 and 06M: no new kit draft repeats a kit already on the Missing Parts list (01 #8–#11, 04 #2, 06M #4–#6, #10–#13). New drafts may appear for network and fiber runs and for far ends; each "why" names the run. → saw:
+- [ ] **The setting.** Setup → **Rules** → R4b · Termination kit part → **Takes termination kits**: one toggle per code, `X`, `F`, `N`, `NG` on, the rest off. → saw:
+- [ ] **An unpulled run gets both kits.** On a floor that has been surveyed, set a DMX end to a device on another surveyed floor `Not installed` and accept its "Run DMX to …" draft. After a second or two, two kit drafts appear: "DMX termination kit - … run" on this device, and one on the far device (its "why" says "at its far end too"). Accept both: they appear on each floor's Missing Parts, Source "Punch #n" here and "Connections C-nn" on the far floor. → saw:
+- [ ] **No second kit after the pull.** On that run, close the Run item and set the end `Issue`, note "Run, not terminated; no term kit": the "Terminate DMX to …" kit-item draft appears; accept it. No new kit draft appears for that end. → saw:
+- [ ] **A placeholder far end gets one kit.** Accept a "Run DMX to <fixtures>" draft (far end Fixtures or a spare): only one kit draft, on the device. → saw:
+- [ ] **Per cable.** Open a DMX connection → **Termination kits**: "As X (yes)" is selected. Tap **No**: its open kit drafts go away after the rules run, and a "no term kit" note on it is now flagged in Lint. Tap **As X (yes)**: they come back. Set a Unison cable to **Yes** and give an end "Run, not terminated; no term kit": a "Terminate Unison to …" kit item is offered. Put both back. → saw:
+- [ ] **Per code.** In Rules turn `N` off: the network kit drafts go away, and a network kit part already on the list is flagged "Network termination kits are not parts" in Lint. Turn it back on. → saw:
+- [ ] **Second iPad.** With a second iPad on the project, set a cable's Termination kits on one and sync both: the other shows the same choice, and its drafts follow after its rules run. → saw:
+
+Decision D213: kits per cable code (`X`, `F`, `N`, `NG` on by default) with a per-cable Yes / No; one kit at each **device** end on an in-scope floor (none for Fixtures, spares or out-of-scope floors; the far end waits for its floor's survey); the far end's kit is sourced to its connection, not the Run item (whose number belongs to the other floor); a network kit is a part wherever kits are on; imported kits with no connection are matched to a run by their text. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

@@ -212,6 +212,8 @@ class Cable(Id, Synced, Base):
     end_a_id: Mapped[uuid.UUID | None] = mapped_column(fk("cable_end.id", use_alter=True))
     end_b_id: Mapped[uuid.UUID | None] = mapped_column(fk("cable_end.id", use_alter=True))
     endpoint_confirmed: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # Takes termination kits over the code's R4b.kit rule parameter; null = the code's (D213).
+    term_kit: Mapped[bool | None]
 
 
 class CableEnd(Id, Synced, Base):

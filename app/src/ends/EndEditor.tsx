@@ -17,7 +17,7 @@ import { PhotoStrip } from '../photo/PhotoStrip';
 import { chipStyles } from '../plan/chips';
 import { pinStyleFor } from '../plan/pins';
 import { PlaceholderPicker } from '../vocab/PlaceholderPicker';
-import { setEndNote, setEndPlaceholder, setEndStatus, setEndText } from './actions';
+import { setCableTermKit, setEndNote, setEndPlaceholder, setEndStatus, setEndText } from './actions';
 import { CABLE_NAME, loadCableEnds, type CableView, type EndView } from './model';
 
 const CHIPS_SHOWN = 4;
@@ -142,6 +142,7 @@ export function EndEditor(props: EndEditorProps) {
             <Text style={styles.muted}>Not recorded for this cable.</Text>
           </View>
         )}
+        <TermKitSection view={view} readOnly={readOnly} run={run} />
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Riser check</Text>
           {view.riser.state === 'none' ? (
@@ -157,6 +158,46 @@ export function EndEditor(props: EndEditorProps) {
         </View>
         {props.footer}
       </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * Termination kits (T103, D213): whether this cable gets a kit part at each device end. "As <code>"
+ * follows the project's Rules setting for the code; Yes / No set this cable alone.
+ */
+function TermKitSection({ view, readOnly, run }: { view: CableView; readOnly: boolean; run: Run }) {
+  const { own, code, takes } = view.termKit;
+  const options: { value: boolean | null; label: string }[] = [
+    { value: null, label: `As ${view.code ?? 'its code'} (${code ? 'yes' : 'no'})` },
+    { value: true, label: 'Yes' },
+    { value: false, label: 'No' },
+  ];
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Termination kits</Text>
+      <View style={styles.rowWrap}>
+        {options.map((o) => {
+          const on = own === o.value;
+          return (
+            <Pressable
+              key={String(o.value)}
+              disabled={readOnly || on}
+              onPress={() => void run((e) => setCableTermKit(e, view.id, o.value))}
+              style={[styles.statusBtn, on && styles.optionOn]}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on, disabled: readOnly }}
+            >
+              <Text style={[styles.statusText, on && styles.optionOnText]}>{o.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={styles.muted}>
+        {takes
+          ? 'A kit part at each device end: once the Run item is accepted, or the kit item of an end Issue “no term kit”.'
+          : 'No kit items or kit parts for this cable.'}
+      </Text>
     </View>
   );
 }
@@ -399,6 +440,8 @@ const styles = StyleSheet.create({
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   statusBtn: { paddingHorizontal: 8, paddingVertical: 7, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
   statusText: { fontSize: 12, color: '#222' },
+  optionOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
+  optionOnText: { color: '#fff', fontWeight: '600' },
   field: { gap: 4 },
   label: { fontSize: 12, fontWeight: '700', color: '#444' },
   marks: { fontSize: 11, color: '#e65100', fontWeight: '400' },

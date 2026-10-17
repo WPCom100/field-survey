@@ -4,9 +4,10 @@
  * - R3a: one "Run <signal> to <far end>" item per unpulled wire (`Cable not run`, `EC`), on the
  *   surveyed end only (E3), gated by R5; once the wire is run (`Issue`, "not terminated") the
  *   item to raise is a `Termination` one.
- * - R3b: a DMX end `Issue` "no term kit" gets its own device-level item `Terminate DMX to <far
- *   end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits" (as the master's
- *   rows read; D175).
+ * - R3b: an end `Issue` "no term kit" on a cable that takes termination kits (`R4b.kit` per code,
+ *   or the cable's own `term_kit`; T103, D213) gets its own device-level item `Terminate <signal>
+ *   to <far end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits" (as the
+ *   master's rows read; D175) — "Waiting on Fiber / Network Termination Kits" for those codes.
  * - R3c: every numbering group ends with "Missing all Device Neuron IDs" (`Information`, `EC`,
  *   `sort_last`), Notes = the device IDs still missing (only devices whose type needs one, T68 /
  *   D185: not racks or NSPS by default); once accepted the engine maintains it:
@@ -23,7 +24,6 @@ import { fillTemplate, ownerParam, textParam } from '../params';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, LevelRow, PunchItemRow } from '../snapshot';
 import {
-  DMX_KITS_NOTE,
   NEURON_ITEM,
   cableOf,
   compareIds,
@@ -33,10 +33,12 @@ import {
   endLevel,
   hasOpenItemText,
   isOpen,
+  kitNote,
   noteHas,
   signal,
   str,
   subjectOfEnd,
+  takesKits,
   targetOf,
   terminationItem,
   waitsForSurvey,
@@ -108,41 +110,32 @@ function otherEndHasRunItem(ctx: RuleContext, e: CableEndRow): boolean {
 
 // ------------------------------------------------------------------ R3b
 
-/**
- * The master's DMX-kit item: `Terminate DMX to <far end>` / Missing part / EC/ETC / "Waiting on
- * DMX Termination Kits" — made by R3b, or a `Missing part` item whose Notes carry the kit note
- * (the project's `R3b.notes`, or the default).
- */
-export function isDmxKitItem(p: PunchItemRow, notes: string = DMX_KITS_NOTE): boolean {
-  if (p.rule_id === 'R3b') return true;
-  if (p.type !== 'Missing part' || !p.notes) return false;
-  const have = p.notes.toLowerCase();
-  return [notes, DMX_KITS_NOTE].some((n) => have.includes(n.toLowerCase()));
-}
-
 export const R3b: Rule = {
   id: 'R3b',
-  title: 'DMX termination kit item',
-  text: 'A DMX (X) end that is Issue "no term kit" gets its own device-level item: `Terminate DMX to <far end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits". Waits for that floor\'s survey (R5).',
+  title: 'Termination kit item',
+  text: 'An end that is Issue "no term kit" on a cable that takes termination kits (X, F, N and NG by default; a cable\'s own setting overrides its code — D213) gets its own device-level item: `Terminate <signal> to <far end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits" (Fiber / Network for those codes). Waits for that floor\'s survey (R5).',
   run(ctx) {
     for (const e of ctx.index.cableEnd.values()) {
-      if (e.status !== 'Issue' || cableOf(ctx, e)?.cable !== 'X' || !noteHas(e.note, /no term kit/i)) continue;
+      if (e.status !== 'Issue' || !noteHas(e.note, /no term kit/i)) continue;
+      const cable = cableOf(ctx, e);
+      const code = cable?.cable ?? null;
+      if (!code || !takesKits(ctx, cable)) continue;
       if (waitsForSurvey(ctx, e)) continue;
       const level = endLevel(ctx, e);
       if (!level) continue;
-      const item = fillTemplate(textParam(ctx.params, 'R3b', 'item'), { signal: signal(ctx, 'X'), 'far end': targetOf(ctx, e) });
+      const item = fillTemplate(textParam(ctx.params, 'R3b', 'item'), { signal: signal(ctx, code), 'far end': targetOf(ctx, e) });
       if (hasOpenItemText(ctx, e.device_id, e.id, item)) continue;
       const device = e.device_id ? ctx.index.device.get(e.device_id) : null;
       const owner = ownerParam(ctx.params, 'R3b', 'owner');
-      const notes = textParam(ctx.params, 'R3b', 'notes');
+      const notes = kitNote(ctx, code);
       ctx.propose({
         subject: device ? { entity_kind: 'device', entity_id: device.id, level_id: device.level_id } : subjectOfEnd(ctx, e),
         discriminator: e.id,
         kind: 'punch',
         payload: { item, type: 'Missing part', owner, notes, device_id: e.device_id, cable_end_id: e.id, level_id: level.id },
         inputs: { status: e.status, item },
-        params: [['R3b', 'item'], ['R3b', 'owner'], ['R3b', 'notes'], ['R3', 'signal', 'X']],
-        why: `${endLabel(ctx, e)} is Issue "${e.note}": the DMX run waits for a termination kit.`,
+        params: [['R3b', 'item'], ['R3b', 'owner'], ['R3b', 'notes', code], ['R3', 'signal', code], ['R4b', 'kit', code]],
+        why: `${endLabel(ctx, e)} is Issue "${e.note}": the ${signal(ctx, code)} run waits for a termination kit.`,
       });
     }
   },

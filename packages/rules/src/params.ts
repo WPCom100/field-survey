@@ -11,7 +11,8 @@
  * A project reads its own rows only; no row, or `value` null, is the built-in default. Per-code
  * parameters (`*_by_code`) store a map `{code: value}` merged over the default map, `*` standing
  * for any code without an entry — adding a cable code's owner or wording is an entry, not a
- * release.
+ * release. A plain value stored for a per-code parameter (one written before the parameter was
+ * per code, T103) reads as that value for every code.
  *
  * Templates name what they are filled with in angle brackets (`Run <signal> to <far end>`); a
  * placeholder with nothing to fill it drops out with the joining word before it ("Run DMX").
@@ -22,10 +23,13 @@ import { vocab, type ConnectionStatus, type Owner } from '@field-survey/core';
 
 import { hashUuid, stableStringify } from './hash';
 
-export type ParamKind = 'owner' | 'text' | 'status' | 'bool' | 'side' | 'owner_by_code' | 'text_by_code';
+export type ParamKind = 'owner' | 'text' | 'status' | 'bool' | 'side' | 'owner_by_code' | 'text_by_code' | 'bool_by_code';
+
+/** One code's entry of a per-code map: a string (owner, text) or a flag (`bool_by_code`). */
+export type CodeEntry = string | boolean;
 
 /** A stored or resolved value: a string (owner, text, status, side), a flag, or a per-code map. */
-export type ParamValue = string | boolean | Readonly<Record<string, string>>;
+export type ParamValue = string | boolean | Readonly<Record<string, CodeEntry>>;
 
 export interface ParamSpec {
   /** The rule that reads it (`R3a`, `E7`…; `R3` = the signal words R3a / R3b share, `R5` = the gate). */
@@ -103,18 +107,42 @@ export const PARAMS: readonly ParamSpec[] = [
     changes: 'Who terminates: the Owner of each Termination item.',
     default: { '*': 'EC', X: 'EC/ETC', N: 'ETC', NG: 'ETC', U: 'ETC', F: 'EC/ETC' },
   },
-  // --- R3b: DMX termination kit item
-  { rule: 'R3b', key: 'item', kind: 'text', label: 'Item text', changes: 'The DMX-kit item of a DMX end Issue "no term kit".', default: 'Terminate DMX to <far end>', placeholders: FAR },
-  { rule: 'R3b', key: 'owner', kind: 'owner', label: 'Owner', changes: 'The Owner of each DMX-kit item.', default: 'EC/ETC' },
-  { rule: 'R3b', key: 'notes', kind: 'text', label: 'Notes', changes: 'The Notes of each DMX-kit item (and how an imported kit item is recognised).', default: 'Waiting on DMX Termination Kits' },
+  // --- R3b: termination kit item (T103: every cable code that takes kits, `R4b.kit`)
+  { rule: 'R3b', key: 'item', kind: 'text', label: 'Item text', changes: 'The kit item of an end Issue "no term kit" on a cable that takes termination kits.', default: 'Terminate <signal> to <far end>', placeholders: FAR },
+  { rule: 'R3b', key: 'owner', kind: 'owner', label: 'Owner', changes: 'The Owner of each kit item.', default: 'EC/ETC' },
+  {
+    rule: 'R3b',
+    key: 'notes',
+    kind: 'text_by_code',
+    label: 'Notes',
+    changes: 'The Notes of each kit item (and how an imported kit item is recognised).',
+    default: { '*': 'Waiting on <signal> Termination Kits', X: 'Waiting on DMX Termination Kits', F: 'Waiting on Fiber Termination Kits', N: 'Waiting on Network Termination Kits', NG: 'Waiting on Network Termination Kits' },
+    placeholders: ['<signal>'],
+  },
   // --- R3c: the Neuron ID item
   { rule: 'R3c', key: 'item', kind: 'text', label: 'Item text', changes: 'The last item of every numbering group.', default: 'Missing all Device Neuron IDs' },
   { rule: 'R3c', key: 'owner', kind: 'owner', label: 'Owner', changes: 'The Owner of the Neuron ID item.', default: 'EC' },
   { rule: 'R3c', key: 'device_text', kind: 'text', label: 'Device text', changes: 'The Punch List Device cell of the Neuron ID item.', default: 'All devices' },
   // --- R4: parts
   { rule: 'R4a', key: 'owner', kind: 'owner', label: 'Owner of missing parts', changes: 'The Owner every rule-made part gets (R4b); a part with another owner is flagged.', default: 'EC' },
-  { rule: 'R4b', key: 'part', kind: 'text', label: 'Part text', changes: 'The part made for each DMX-kit item.', default: 'DMX termination kit - <far end> run', placeholders: ['<far end>'] },
-  { rule: 'R4b', key: 'notes', kind: 'text', label: 'Notes', changes: 'The Notes of each DMX-kit part.', default: 'Need to be ordered' },
+  {
+    rule: 'R4b',
+    key: 'kit',
+    kind: 'bool_by_code',
+    label: 'Takes termination kits',
+    changes: 'A cable of a code that is on gets a termination kit part at each device end: on an unpulled run once its Run item is accepted, on a pulled one once its kit item is. A cable\'s own Termination kits setting overrides its code. Off: no kit item, no kit part, and a kit part on such a cable is flagged.',
+    default: { '*': false, X: true, F: true, N: true, NG: true },
+  },
+  {
+    rule: 'R4b',
+    key: 'part',
+    kind: 'text_by_code',
+    label: 'Part text',
+    changes: 'The kit part made for each end.',
+    default: { '*': '<signal> termination kit - <far end> run', X: 'DMX termination kit - <far end> run', F: 'Fiber termination kit - <far end> run', N: 'Network termination kit - <far end> run', NG: 'Network termination kit - <far end> run' },
+    placeholders: FAR,
+  },
+  { rule: 'R4b', key: 'notes', kind: 'text', label: 'Notes', changes: 'The Notes of each kit part.', default: 'Need to be ordered' },
   // --- R2c / R2d / R2e: library cables (drafts)
   { rule: 'R2c', key: 'fixtures.to', kind: 'text', label: '0-10V To text', changes: 'The To of a relay panel\'s 0-10V row.', default: 'Fixtures' },
   { rule: 'R2c', key: 'fixtures.status', kind: 'status', label: '0-10V starting status', changes: 'The status the 0-10V row starts with (none = Unsurveyed).', default: NO_STATUS },
@@ -153,7 +181,7 @@ export function paramSpec(rule: string, key: string): ParamSpec | null {
 }
 
 export function isByCode(kind: ParamKind): boolean {
-  return kind === 'owner_by_code' || kind === 'text_by_code';
+  return kind === 'owner_by_code' || kind === 'text_by_code' || kind === 'bool_by_code';
 }
 
 /**
@@ -179,7 +207,7 @@ const OWNERS: readonly string[] = vocab.OWNER;
 const STATUSES: readonly string[] = vocab.CONNECTION_STATUS;
 
 /** Is `v` a usable value of one entry of this kind (a per-code map's entry, or a plain value)? */
-export function validEntry(kind: ParamKind, v: unknown): v is string | boolean {
+export function validEntry(kind: ParamKind, v: unknown): v is CodeEntry {
   switch (kind) {
     case 'owner':
     case 'owner_by_code':
@@ -192,9 +220,12 @@ export function validEntry(kind: ParamKind, v: unknown): v is string | boolean {
     case 'side':
       return v === 'A' || v === 'B';
     case 'bool':
+    case 'bool_by_code':
       return typeof v === 'boolean';
   }
 }
+
+const trimmed = (v: CodeEntry): CodeEntry => (typeof v === 'string' ? v.trim() : v);
 
 /**
  * The value a stored one resolves to: a per-code map merged over the default map (bad entries
@@ -203,11 +234,15 @@ export function validEntry(kind: ParamKind, v: unknown): v is string | boolean {
  */
 export function resolveValue(spec: ParamSpec, stored: unknown): ParamValue {
   if (isByCode(spec.kind)) {
-    const out: Record<string, string> = { ...(spec.default as Record<string, string>) };
+    const out: Record<string, CodeEntry> = { ...(spec.default as Record<string, CodeEntry>) };
     if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
       for (const [code, v] of Object.entries(stored as Record<string, unknown>)) {
-        if (code.trim() && validEntry(spec.kind, v)) out[code.trim()] = (v as string).trim();
+        if (code.trim() && validEntry(spec.kind, v)) out[code.trim()] = trimmed(v);
       }
+    } else if (stored != null && validEntry(spec.kind, stored)) {
+      // a plain value from before the parameter was per code (T103): the same for every code
+      for (const code of Object.keys(out)) out[code] = trimmed(stored);
+      out['*'] = trimmed(stored);
     }
     return out;
   }
@@ -238,17 +273,23 @@ export class RuleParams {
     return this.values.get(`${rule}|${key}`) ?? resolveValue(spec, null);
   }
 
-  /** One code of a per-code parameter: its entry, else `*`, else the code itself. */
+  /** One code of a per-code text / owner parameter: its entry, else `*`, else the code itself. */
   code(rule: string, key: string, code: string | null | undefined): string {
-    const map = this.get(rule, key) as Record<string, string>;
-    return (code != null ? map[code] : undefined) ?? map['*'] ?? code ?? '';
+    const map = this.get(rule, key) as Record<string, CodeEntry>;
+    return String((code != null ? map[code] : undefined) ?? map['*'] ?? code ?? '');
+  }
+
+  /** One code of a `bool_by_code` parameter: its entry, else `*`, else off. */
+  flagCode(rule: string, key: string, code: string | null | undefined): boolean {
+    const map = this.get(rule, key) as Record<string, CodeEntry>;
+    return ((code != null ? map[code] : undefined) ?? map['*']) === true;
   }
 
   /** A ref's resolved value (one code's entry for a per-code ref with a code). */
   ref(r: ParamRef): ParamValue {
     const [rule, key, code] = r;
     const spec = paramSpec(rule, key);
-    if (spec && isByCode(spec.kind) && code !== undefined) return this.code(rule, key, code);
+    if (spec && isByCode(spec.kind) && code !== undefined) return spec.kind === 'bool_by_code' ? this.flagCode(rule, key, code) : this.code(rule, key, code);
     return this.get(rule, key);
   }
 

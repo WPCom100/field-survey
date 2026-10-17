@@ -70,15 +70,20 @@ describe('R2a note / status mismatch (lint only, D172)', () => {
     const far = b.device(level, 'Relay panel', { display_id: '06M-02' });
     b.cable('X', { device: panel, display_id: 'C-01', status: 'Not installed', note: 'Run, not terminated' }, { device: far });
     b.cable('X', { device: panel, display_id: 'C-02', status: 'Issue', note: 'Not run' }, { device: far });
-    b.cable('N', { device: panel, display_id: 'C-03', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far });
+    b.cable('U', { device: panel, display_id: 'C-03', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far });
     b.cable('X', { device: panel, display_id: 'C-04', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far });
     b.cable('X', { device: panel, display_id: 'C-05', status: 'Not installed', note: null }, { device: far });
+    // T103 (D213): network takes kits by default; a cable's own setting overrides its code
+    b.cable('N', { device: panel, display_id: 'C-06', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far });
+    b.cable('X', { device: panel, display_id: 'C-07', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far }, { term_kit: false });
+    b.cable('U', { device: panel, display_id: 'C-08', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far }, { term_kit: true });
     const out = run(b, [R2a]);
     expect(out.proposals).toEqual([]);
     expect(out.findings.map((f) => f.message)).toEqual([
       'C-01: the note says "Run, not terminated" but the end is Not installed',
       'C-02: the note says "Not run" but the end is Issue',
-      'C-03: the note says "no term kit" but the cable is N',
+      'C-03: the note says "no term kit" but this U cable takes no termination kits',
+      'C-07: the note says "no term kit" but this X cable takes no termination kits',
     ]);
   });
 });
@@ -354,13 +359,13 @@ describe('R3a Cable not run / Termination', () => {
   });
 });
 
-describe('R3b DMX termination kit item', () => {
+describe('R3b termination kit item', () => {
   it('is a device-level Missing part item for EC/ETC with the master\'s note, keyed on the end', () => {
     const b = new Build();
     const { level, panel } = floor(b);
     const far = b.device(level, 'Relay panel', { display_id: '06M-02' });
     const c = b.cable('X', { device: panel, display_id: 'C-01', to_text: 'DMX to Level 03 UFMP4s', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far });
-    b.cable('N', { device: panel, display_id: 'C-02', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far }); // not DMX
+    b.cable('U', { device: panel, display_id: 'C-02', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far }); // Unison takes no kits
     const out = run(b, [R3b]);
     expect(out.proposals).toHaveLength(1);
     expect(out.proposals[0]).toMatchObject({
@@ -369,6 +374,27 @@ describe('R3b DMX termination kit item', () => {
       discriminator: c.a.id,
       payload: { item: 'Terminate DMX to Level 03 UFMP4s', type: 'Missing part', owner: 'EC/ETC', notes: 'Waiting on DMX Termination Kits', device_id: panel.id, cable_end_id: c.a.id, level_id: level.id },
     });
+  });
+
+  it('T103 (D213): every code that takes kits (X, F, N, NG by default), worded per code; a cable\'s own setting overrides its code', () => {
+    const b = new Build();
+    const { level, panel } = floor(b);
+    const far = b.device(level, 'Equipment rack', { display_id: '06M-09' });
+    const issue = (display_id: string) => ({ device: panel, display_id, status: 'Issue' as const, note: 'Run, not terminated; no term kit' });
+    b.cable('F', issue('C-01'), { device: far });
+    b.cable('N', issue('C-02'), { device: far });
+    b.cable('NG', issue('C-03'), { device: far });
+    b.cable('X', issue('C-04'), { device: far }, { term_kit: false }); // this cable: no kits
+    b.cable('D', issue('C-05'), { device: far }, { term_kit: true }); // DALI is off by code; this one takes kits
+    b.cable('U', issue('C-06'), { device: far });
+    expect(run(b, [R3b]).proposals.map((p) => [p.payload.item, p.payload.notes, p.payload.owner])).toEqual([
+      ['Terminate fiber to 06M-09', 'Waiting on Fiber Termination Kits', 'EC/ETC'],
+      ['Terminate network to 06M-09', 'Waiting on Network Termination Kits', 'EC/ETC'],
+      ['Terminate network & ground to 06M-09', 'Waiting on Network Termination Kits', 'EC/ETC'],
+      ['Terminate DALI to 06M-09', 'Waiting on DALI Termination Kits', 'EC/ETC'],
+    ]);
+    // the cables that take no kits get R3a's Termination item instead
+    expect(run(b, [R3a]).proposals.map((p) => p.payload.item)).toEqual(['Terminate DMX to 06M-09', 'Terminate Unison to 06M-09']);
   });
 });
 
@@ -496,7 +522,65 @@ describe('R4 missing parts', () => {
       subject: { entity_kind: 'device', entity_id: panel.id, level_id: level.id },
       payload: { qty: 1, owner: 'EC', part_status: 'Needed', notes: 'Need to be ordered', device_id: panel.id, level_id: level.id, sources: [{ target_kind: 'punch', target_id: accepted.id }] },
     });
-    expect(out.proposals[0]!.why).toBe(`#${accepted.number} "Terminate DMX to Level 03" waits on a DMX termination kit: one kit per run (R4b).`);
+    expect(out.proposals[0]!.why).toBe(`#${accepted.number} "Terminate DMX to Level 03" waits on a DMX termination kit: one kit per end (R4b).`);
+  });
+
+  it('R4b (T103, D213): an accepted Run item gets a kit at each device end — the item\'s end sourced to the item, the far end to its end', () => {
+    const b = new Build();
+    const { level, panel, fixtures } = floor(b);
+    const l03 = b.level('03', { surveyed: '2026-10-10' });
+    const far = b.device(l03, 'Relay panel', { display_id: '03-01' });
+    const c = b.cable('X', { device: panel, display_id: 'C-01', to_text: 'DMX to Level 03 CT03LCPA', status: 'Not installed' }, { device: far, display_id: 'C-04', to_text: 'DMX to Level 06M CT06LCPA' });
+    const run1 = b.punch(level, { device_id: panel.id, cable_end_id: c.a.id, item: 'Run DMX to Level 03 CT03LCPA', type: 'Cable not run', rule_id: 'R3a', proposal_id: 'p1' });
+    // a placeholder far end (fixtures) gets none; a network run takes kits too
+    const fx = b.cable('X', { device: panel, display_id: 'C-02', to_text: 'DMX to B3A Canyon', status: 'Not installed' }, { placeholder: fixtures });
+    const run2 = b.punch(level, { device_id: panel.id, cable_end_id: fx.a.id, item: 'Run DMX to B3A Canyon', type: 'Cable not run' });
+    const n = b.cable('N', { device: panel, display_id: 'C-03', status: 'Not installed' }, { device: far, display_id: 'C-05' });
+    const run3 = b.punch(level, { device_id: panel.id, cable_end_id: n.a.id, item: 'Run network to Level 03 03-01', type: 'Cable not run' });
+    // Unison takes no kits; a closed Run item asks for nothing
+    const u = b.cable('U', { device: panel, display_id: 'C-06', status: 'Not installed' }, { device: far });
+    b.punch(level, { device_id: panel.id, cable_end_id: u.a.id, item: 'Run Unison to 03-01', type: 'Cable not run' });
+    const done = b.cable('X', { device: panel, display_id: 'C-07', status: 'Installed, untested' }, { device: far });
+    b.punch(level, { device_id: panel.id, cable_end_id: done.a.id, item: 'Run DMX to 03-01', type: 'Cable not run', tracking_status: 'Closed' });
+    const out = run(b, [R4b]);
+    expect(out.proposals.map((p) => [p.discriminator, p.payload.part, p.payload.level_id, p.payload.device_id, p.payload.sources])).toEqual([
+      [run1.id, 'DMX termination kit - Level 03 CT03LCPA run', level.id, panel.id, [{ target_kind: 'punch', target_id: run1.id }]],
+      [`${run1.id}:${c.b!.id}`, 'DMX termination kit - Level 06M CT06LCPA run', l03.id, far.id, [{ target_kind: 'cable_end', target_id: c.b!.id }]],
+      [run2.id, 'DMX termination kit - B3A Canyon run', level.id, panel.id, [{ target_kind: 'punch', target_id: run2.id }]],
+      [run3.id, 'Network termination kit - Level 03 03-01 run', level.id, panel.id, [{ target_kind: 'punch', target_id: run3.id }]],
+      [`${run3.id}:${n.b!.id}`, 'Network termination kit - Level 06M 06M-01 run', l03.id, far.id, [{ target_kind: 'cable_end', target_id: n.b!.id }]],
+    ]);
+    expect(out.proposals[0]).toMatchObject({ kind: 'part', subject: { entity_kind: 'device', entity_id: panel.id }, payload: { qty: 1, owner: 'EC', part_status: 'Needed', notes: 'Need to be ordered' } });
+    expect(out.proposals[1]!.why).toBe(`#${run1.number} "Run DMX to Level 03 CT03LCPA": the DMX run takes a termination kit at its far end too, C-04 (R4b).`);
+
+    // the kits accepted, the wire pulled: the kit item that follows on either end adds no second kit
+    b.part(level, { device_id: panel.id, part: 'DMX termination kit - Level 03 CT03LCPA run', rule_id: 'R4b' }, [{ target_kind: 'punch', target_id: run1.id }]);
+    b.part(l03, { device_id: far.id, part: 'DMX termination kit - Level 06M CT06LCPA run', rule_id: 'R4b' }, [{ target_kind: 'cable_end', target_id: c.b!.id }]);
+    run1.tracking_status = 'Closed';
+    b.punch(level, { device_id: panel.id, cable_end_id: c.a.id, item: 'Terminate DMX to Level 03 CT03LCPA', type: 'Missing part', owner: 'EC/ETC', notes: 'Waiting on DMX Termination Kits', rule_id: 'R3b' });
+    b.punch(l03, { device_id: far.id, cable_end_id: c.b!.id, item: 'Terminate DMX to Level 06M CT06LCPA', type: 'Missing part', owner: 'EC/ETC', notes: 'Waiting on DMX Termination Kits', rule_id: 'R3b' });
+    expect(run(b, [R4b]).proposals.map((p) => p.discriminator)).toEqual([run2.id, run3.id, `${run3.id}:${n.b!.id}`]);
+  });
+
+  it('R4b (T103): the far end waits for its floor\'s survey (R5), and gets no kit on an out-of-scope level; a cable or code with kits off gets none', () => {
+    const b = new Build();
+    const { level, panel } = floor(b);
+    const l03 = b.level('03'); // not surveyed
+    const l09 = b.level('09', { in_scope: false, surveyed: '2026-10-01' });
+    const far03 = b.device(l03, 'Relay panel', { display_id: '03-01' });
+    const far09 = b.device(l09, 'Relay panel', { display_id: '09-01' });
+    const a = b.cable('X', { device: panel, display_id: 'C-01', status: 'Not installed' }, { device: far03 });
+    const r1 = b.punch(level, { device_id: panel.id, cable_end_id: a.a.id, item: 'Run DMX to Level 03 03-01', type: 'Cable not run' });
+    const c = b.cable('F', { device: panel, display_id: 'C-02', status: 'Not installed' }, { device: far09 });
+    const r2 = b.punch(level, { device_id: panel.id, cable_end_id: c.a.id, item: 'Run fiber to Level 09 09-01', type: 'Cable not run' });
+    const off = b.cable('X', { device: panel, display_id: 'C-03', status: 'Not installed' }, { device: far03 }, { term_kit: false });
+    b.punch(level, { device_id: panel.id, cable_end_id: off.a.id, item: 'Run DMX to Level 03 03-01', type: 'Cable not run' });
+    expect(run(b, [R4b]).proposals.map((p) => [p.discriminator, p.payload.part])).toEqual([
+      [r1.id, 'DMX termination kit - Level 03 03-01 run'],
+      [r2.id, 'Fiber termination kit - Level 09 09-01 run'],
+    ]);
+    l03.surveyed = '2026-10-16';
+    expect(run(b, [R4b]).proposals.map((p) => p.discriminator)).toEqual([r1.id, `${r1.id}:${a.b!.id}`, r2.id]);
   });
 
   it('R4a / R4d: owner other than EC, re-pulled wire and network kits are findings', () => {
@@ -506,10 +590,21 @@ describe('R4 missing parts', () => {
     b.part(level, { device_id: panel.id, part: 'Belden 8471 re-pull' });
     b.part(level, { device_id: panel.id, part: 'Network termination kit' });
     b.part(level, { device_id: panel.id, part: 'ERP-FT-LVD' });
+    // T103 (D213): network kits are parts while N / NG take kits (the default) …
     expect(messages(b, [R4a, R4d])).toEqual([
       "Owner ETC: missing parts are the EC's",
       'Re-pulled wire is not a part: "Belden 8471 re-pull"',
+    ]);
+    // … and, sourced to a cable, only when that cable takes them
+    const far = b.device(level, 'Equipment rack', { display_id: '06M-09' });
+    const c = b.cable('N', { device: panel, display_id: 'C-01' }, { device: far }, { term_kit: false });
+    b.part(level, { device_id: panel.id, part: 'Network termination kit - 06M-09 run', rule_id: 'R4b' }, [{ target_kind: 'cable_end', target_id: c.a.id }]);
+    expect(messages(b, [R4d])).toEqual(['Re-pulled wire is not a part: "Belden 8471 re-pull"', 'Network termination kits are not parts: "Network termination kit - 06M-09 run"']);
+    b.snap.ruleParams = [{ id: 'rp', project_id: b.snap.projectId, rule_id: 'R4b', key: 'kit', value: { N: false, NG: false }, state: 'accepted', deleted_at: null }];
+    expect(messages(b, [R4d])).toEqual([
+      'Re-pulled wire is not a part: "Belden 8471 re-pull"',
       'Network termination kits are not parts: "Network termination kit"',
+      'Network termination kits are not parts: "Network termination kit - 06M-09 run"',
     ]);
   });
 });

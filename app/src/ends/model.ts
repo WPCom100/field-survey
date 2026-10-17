@@ -6,6 +6,7 @@
  */
 
 import { displayNumber, reviewFields, riserCheck, type RiserCheck, type Store } from '@field-survey/core';
+import { loadRuleParams } from '@field-survey/rules';
 
 import type { CardPhoto, JumpTarget } from '../card/model';
 import { photoStrip } from '../photo/links';
@@ -76,6 +77,11 @@ export type CableView = {
   riserToLabel: string | null;
   vertical: string | null;
   deleted: boolean;
+  /**
+   * Termination kits (T103, D213): this cable's own setting (null = its code's), what its code
+   * says (the project's `R4b.kit`), and the result.
+   */
+  termKit: { own: boolean | null; code: boolean; takes: boolean };
   /** The end the editor was opened on, then the other (or null when the cable has one end). */
   ends: [EndView, EndView | null];
   riser: RiserCheck;
@@ -161,6 +167,8 @@ export async function loadCableEnds(store: Store, endId: string): Promise<CableV
   const other = others[0] ? await endView(store, others[0], fromLevel) : null;
 
   const project = String(cable.project_id);
+  const codeKits = (await loadRuleParams(store, project)).flagCode('R4b', 'kit', str(cable.cable));
+  const ownKits = cable.term_kit == null ? null : !!cable.term_kit;
   const vocabRows = await store.list<Row>('vocab', {
     where: `project_id = ? AND list = 'connection_note' AND canonical_of_id IS NULL`,
     params: [project],
@@ -174,6 +182,7 @@ export async function loadCableEnds(store: Store, endId: string): Promise<CableV
     riserToLabel: str(cable.riser_to_label),
     vertical: str(cable.vertical),
     deleted: !!cable.deleted_at,
+    termKit: { own: ownKits, code: codeKits, takes: ownKits ?? codeKits },
     ends: [mine, other],
     // The riser governs the cable's To (R2): the A end's To text, else whichever end has one.
     riser: riserCheck(str(cable.riser_to_label), [mine, other].find((e) => e?.side === 'A' && e.toText)?.toText ?? mine.toText ?? other?.toText ?? null),

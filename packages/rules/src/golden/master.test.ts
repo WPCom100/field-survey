@@ -17,7 +17,11 @@
  * 5. R3b / R4b: with the master's DMX-kit items and their kits removed the engine re-proposes
  *    the item per "no term kit" end and, once each is accepted, its kit sourced to it;
  * 6. E5: an ERP-FT-LVD short of the BOM count offers the 0-10V end Issue "Not landed" and the
- *    panel "Land 0-10V control wiring", which the master holds on 01-01, 01-03 and 06M-02.
+ *    panel "Land 0-10V control wiring", which the master holds on 01-01, 01-03 and 06M-02;
+ * 7. R4b on unpulled runs (T103, D213): with the master's kits on unpulled DMX runs and their Run
+ *    items removed, accepting the re-made Run items gives a kit at each device end of every
+ *    cable that takes kits — the master's rows, plus the far ends and the network / fiber runs
+ *    the master raised none for.
  *
  * Every difference between the engine's output and the master's rows is listed in this file
  * with the master row it stands against; the test checks that those rows exist as cited, so the
@@ -32,7 +36,7 @@ import { describe, expect, it } from 'vitest';
 
 import { RuleEngine } from '../engine';
 import { RULES } from '../rules/index';
-import { isDmxKitItem } from '../rules/r3';
+
 import { compareIds, compareLevels, DMX_KITS_NOTE, NEURON_ITEM } from '../rules/shared';
 import type { CableEndRow, MissingPartRow, ProposalRow, PunchItemRow, Snapshot } from '../snapshot';
 
@@ -147,6 +151,59 @@ const KIT_PAIRS: readonly KitPair[] = [
 const KIT_ITEMS_MASTER_ONLY: readonly (readonly [MasterRef, string])[] = [
   [['03', 11, 'Terminate DMX'], 'the second UFMP4 of one Connections row ("UFMP4 #1, #2"): the engine makes one item per end'],
   [['04', 4, 'Terminate DMX to Level 06'], 'the wire is not run yet (04/C-01 Not installed): R3a\'s "Run DMX to Level 06" (04 #3) stands; the master raised the kit item with the run'],
+];
+
+/**
+ * R4b on unpulled runs (T103, D213): the master's Run items whose kits it raised with the run
+ * (Landry: every run that needs terminating gets its kit, at both device ends).
+ */
+const UNPULLED_MASTER: readonly { run: MasterRef; kits: readonly MasterRef[] }[] = [
+  { run: ['01', 42, 'Run DMX to B3A Canyon'], kits: [['01', 8, 'DMX termination kit - B3A Canyon run']] },
+  { run: ['01', 43, 'Run DMX to C13A Oculus'], kits: [['01', 9, 'DMX termination kit - C13A Oculus run']] },
+  { run: ['01', 44, 'Run DMX to D1 ED Column Capital'], kits: [['01', 10, 'DMX termination kit - D1 ED Column Capital run']] },
+  { run: ['01', 45, 'Run DMX to UFMP4s'], kits: [['01', 11, 'DMX termination kit - UFMP4 run']] },
+  { run: ['03', 27, 'Pull missing DMX cable'], kits: [['03', 15, 'DMX termination kit - missing run']] },
+  { run: ['03', 28, 'Pull missing DMX cable'], kits: [['03', 16, 'DMX termination kit - missing run']] },
+  { run: ['04', 3, 'Run DMX to Level 06'], kits: [['04', 2, 'DMX termination kit - Level 06 run']] },
+  { run: ['06M', 2, 'Run 2x DMX cables to Lvl 9 & 6M Equipment Rack'], kits: [['06M', 10, 'DMX termination kit - Level 09 run'], ['06M', 11, 'DMX termination kit - 6M Equipment Rack run']] },
+  { run: ['06M', 5, 'Run DMX to B3B Elev Core C fixture'], kits: [['06M', 4, 'DMX termination kit - B3B Elev Core C fixture run']] },
+  { run: ['06M', 6, 'Run DMX to B7 Stair A fixture'], kits: [['06M', 5, 'DMX termination kit - B7 Stair A fixture run']] },
+  { run: ['06M', 7, 'Run 2x spare DMX (Where?)'], kits: [['06M', 6, 'DMX termination kit - spare DMX out runs']] },
+];
+
+/**
+ * What R4b proposes once every re-made Run item is accepted: per end (`far` = sourced to the far
+ * end, not the item), against the master's kit, or why the master has none.
+ */
+const UNPULLED_KITS: readonly { where: string; device: string; part: string; master: MasterRef | null; why: string; far?: true; viaItem?: MasterRef }[] = [
+  { where: '01/C-09', device: '01-05', part: 'DMX termination kit - B3A Canyon run', master: ['01', 8, 'DMX termination kit - B3A Canyon run'], why: 'the same row' },
+  { where: '01/C-10', device: '01-05', part: 'DMX termination kit - C13A Oculus run', master: ['01', 9, 'DMX termination kit - C13A Oculus run'], why: 'the same row' },
+  { where: '01/C-11', device: '01-05', part: 'DMX termination kit - D1 ED Column Capital run', master: ['01', 10, 'DMX termination kit - D1 ED Column Capital run'], why: 'the same row' },
+  { where: '01/C-12', device: '01-05', part: 'DMX termination kit - UFMP4 (7) run', master: ['01', 11, 'DMX termination kit - UFMP4 run'], why: 'wording: the To text counts the UFMP4s' },
+  {
+    where: '04/C-01',
+    device: '04-01',
+    part: 'DMX termination kit - Level 06 run',
+    master: ['04', 2, 'DMX termination kit - Level 06 run'],
+    why: "the same row, made before any Run item is accepted: the master's kit item 04 #4 (no end) waits on it, and its text names 04/C-01's run",
+    viaItem: ['04', 4, 'Terminate DMX to Level 06'],
+  },
+  { where: '06M/C-01', device: '06M-01', part: 'DMX termination kit - B3B Elev Core C fixture run', master: ['06M', 4, 'DMX termination kit - B3B Elev Core C fixture run'], why: 'the same row' },
+  { where: '06M/C-02', device: '06M-01', part: 'DMX termination kit - B7 Stair A fixture run', master: ['06M', 5, 'DMX termination kit - B7 Stair A fixture run'], why: 'the same row' },
+  { where: '06M/C-03', device: '06M-01', part: 'DMX termination kit - Spare DMX out run', master: ['06M', 6, 'DMX termination kit - spare DMX out runs'], why: 'wording: one cable record for the two spares' },
+  { where: '06M/C-07', device: '06M-02', part: 'DMX termination kit - Level 09 run', master: ['06M', 10, 'DMX termination kit - Level 09 run'], why: 'the same row' },
+  { where: '06M/C-12', device: '06M-02', part: 'DMX termination kit - equipment rack run', master: ['06M', 11, 'DMX termination kit - 6M Equipment Rack run'], why: 'wording: the To text names no level' },
+  { where: '06M/C-14', device: '06M-01', part: 'DMX termination kit - CT06LCPB run', master: null, why: "the rack end of 06M/C-12: the master raised one kit per run, on the run's start", far: true },
+  { where: '06M/C-18', device: '06M-01', part: 'DMX termination kit - Level 04 UFMP8 run', master: null, why: "the 06M end of 04/C-07, whose 04 end has the master's 04 #5 (\"Level 06 run\", sourced to 04 #32 with no end; matched by its text)", far: true },
+  { where: '06M/C-05', device: '06M-01', part: 'Fiber termination kit - Level 28 run', master: null, why: 'fiber takes kits (D213); the master raised none for an unpulled fiber run' },
+  { where: '01/C-16', device: '01-05', part: 'Network termination kit - 01-06 run', master: null, why: 'network takes kits (D213); the master raised none' },
+  { where: '01/C-24', device: '01-06', part: 'Network termination kit - equipment rack run', master: null, why: 'network takes kits (D213): the touchscreen end of 01/C-16', far: true },
+];
+
+/** The master's unpulled-run kits the engine does not re-make, and why. */
+const UNPULLED_MASTER_ONLY: readonly (readonly [MasterRef, string])[] = [
+  [['03', 15, 'DMX termination kit - missing run'], "on UFMP4 #1: the import left 03/C-13's device unresolved (D126), and a kit goes on a device end only"],
+  [['03', 16, 'DMX termination kit - missing run'], 'on UFMP4 #2: as 03 #15'],
 ];
 
 /** E5: the master's panels short of ERP-FT-LVD cards, their Land items and 0-10V ends. */
@@ -386,7 +443,7 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
     let labels = new Labels(await m.engine.loadSnapshot());
     await unsurveyCopiedEnds(m, labels);
     // the master's pairs: every DMX-kit item and the kit(s) sourced to it
-    const kitItems = labels.snap.punchItems.filter((p) => !p.deleted_at && isDmxKitItem(p));
+    const kitItems = labels.snap.punchItems.filter((p) => !p.deleted_at && p.type === 'Missing part' && !!p.notes?.includes(DMX_KITS_NOTE));
     expect(kitItems).toHaveLength(19);
     expect(kitItems.every((p) => p.type === 'Missing part' && p.owner === 'EC/ETC' && p.tracking_status === 'Open')).toBe(true);
     const kitItemIds = new Set(kitItems.map((p) => p.id));
@@ -492,6 +549,70 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
       expect(items[0]).toMatchObject({ rule_id: 'E5', type: 'Wiring', owner: 'EC' });
     }
     expect((await openProposals(m)).filter((p) => p.rule_id === 'E5' || p.rule_id === 'R3a')).toHaveLength(KNOWN_DIFFERENCES.filter((d) => d.rule === 'R3a').length);
+  });
+
+  it('R4b on unpulled runs (T103, D213): accepted Run items get a kit at each device end — the master\'s kits, plus the far ends and the network / fiber runs', async () => {
+    const m = await openMaster();
+    let labels = new Labels(await m.engine.loadSnapshot());
+    await unsurveyCopiedEnds(m, labels);
+    // the master's rows as cited, each kit sourced to its Run item
+    const runs = UNPULLED_MASTER.map((u) => ({ run: labels.punch(u.run), kits: u.kits.map((k) => labels.part(k)) }));
+    for (const { run, kits } of runs) {
+      expect(run).toMatchObject({ type: 'Cable not run', cable_end_id: null });
+      for (const k of kits) expect(labels.snap.partSources.some((s) => s.missing_part_id === k.id && s.target_kind === 'punch' && s.target_id === run.id), k.part!).toBe(true);
+    }
+    for (const k of UNPULLED_KITS) if (k.master) expect(runs.some((r) => r.kits.some((x) => x.id === labels.part(k.master!).id)), k.where).toBe(true);
+    for (const [ref] of UNPULLED_MASTER_ONLY) labels.part(ref);
+    expect(UNPULLED_KITS.filter((k) => k.master).length + UNPULLED_MASTER_ONLY.length).toBe(runs.flatMap((r) => r.kits).length);
+    await m.editor.group(CTX, async (g) => {
+      for (const { run, kits } of runs) {
+        for (const k of kits) await g.delete('missing_part', k.id);
+        await g.delete('punch_item', run.id);
+      }
+    });
+
+    // 1. the Run items come back on their ends; before one is accepted, only the kit a master kit item still waits on
+    await m.engine.run();
+    const r3a = (await openProposals(m)).filter((p) => p.rule_id === 'R3a' && p.payload?.type === 'Cable not run');
+    const early = (await openProposals(m)).filter((p) => p.rule_id === 'R4b');
+    const viaItem = UNPULLED_KITS.filter((k) => k.viaItem);
+    expect(early.map((p) => [p.payload?.part, (p.payload?.sources as { target_id: string }[])[0]!.target_id])).toEqual(viaItem.map((k) => [k.part, labels.punch(k.viaItem!).id]));
+    for (const p of early) await m.engine.decide(p.id, { kind: 'accept' });
+    // 2. Accept the Run items → one kit per device end of each cable that takes kits; 04/C-01 already has its kit
+    for (const p of r3a) await m.engine.decide(p.id, { kind: 'accept' });
+    await m.engine.run();
+    labels = new Labels(await m.engine.loadSnapshot());
+    const r4b = (await openProposals(m)).filter((p) => p.rule_id === 'R4b');
+    const whereOf = (p: ProposalRow) => {
+      const s = (p.payload!.sources as { target_kind: string; target_id: string }[])[0]!;
+      if (s.target_kind === 'cable_end') return { where: labels.endById.get(s.target_id)!, far: true };
+      const item = labels.snap.punchItems.find((x) => x.id === s.target_id)!;
+      return { where: labels.endById.get(item.cable_end_id!)!, far: false };
+    };
+    expect(sorted(r4b.map((p) => `${whereOf(p).where}: ${p.payload?.part}`))).toEqual(sorted(UNPULLED_KITS.filter((k) => !k.viaItem).map((k) => `${k.where}: ${k.part}`)));
+    for (const p of r4b) {
+      const { where, far } = whereOf(p);
+      const k = UNPULLED_KITS.find((x) => x.where === where)!;
+      const end = labels.end(where);
+      expect(far, where).toBe(!!k.far);
+      expect(p.payload, where).toMatchObject({ qty: 1, owner: 'EC', part_status: 'Needed', notes: 'Need to be ordered', device_id: labels.deviceByLabel.get(k.device), level_id: end.level_id });
+      expect(end.device_id, where).toBe(labels.deviceByLabel.get(k.device));
+    }
+    // 3. Accept the kits → quiet; then the wire is pulled and waits on its kit: the kit item adds no second kit
+    for (const p of r4b) await m.engine.decide(p.id, { kind: 'accept' });
+    expect((await m.engine.run()).ops).toBe(0);
+    const c09 = labels.end('01/C-09');
+    const runItem = labels.snap.punchItems.find((x) => x.cable_end_id === c09.id && x.type === 'Cable not run')!;
+    await m.editor.group(CTX, async (g) => {
+      await g.setFields('punch_item', runItem.id, { tracking_status: 'Closed', date_closed: '2026-10-15' });
+      await g.setFields('cable_end', c09.id, { status: 'Issue', note: 'Run, not terminated; no term kit', status_source: 'surveyed', surveyed_at: NOW });
+    });
+    await m.engine.run();
+    const kitItem = (await openProposals(m)).filter((p) => p.rule_id === 'R3b' && p.payload?.cable_end_id === c09.id);
+    expect(kitItem.map((p) => p.payload?.item)).toEqual(['Terminate DMX to B3A Canyon']);
+    await m.engine.decide(kitItem[0]!.id, { kind: 'accept' });
+    await m.engine.run();
+    expect((await openProposals(m)).filter((p) => p.rule_id === 'R4b')).toEqual([]);
   });
 });
 

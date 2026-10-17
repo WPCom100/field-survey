@@ -23,14 +23,14 @@ import { statusParam, textParam, type ParamRef } from '../params';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow } from '../snapshot';
 import { deviceRole, governingCables } from './library';
-import { BUS_LABEL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, endLevel, endPlaceholder, noteHas, placeholderFor, str, subjectOfEnd } from './shared';
+import { BUS_LABEL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, endLevel, endPlaceholder, noteHas, placeholderFor, str, subjectOfEnd, takesKits } from './shared';
 
 // ------------------------------------------------------------------ R2a
 
 export const R2a: Rule = {
   id: 'R2a',
   title: 'Note matches status',
-  text: 'Notes are never auto-filled (D172). "Not run" goes with `Not installed`, "Run, not terminated" with `Issue`, "no term kit" with a DMX (X) cable; a note that says otherwise is flagged.',
+  text: 'Notes are never auto-filled (D172). "Not run" goes with `Not installed`, "Run, not terminated" with `Issue`, "no term kit" with a cable that takes termination kits (R4b, D213); a note that says otherwise is flagged.',
   run(ctx) {
     for (const e of ctx.index.cableEnd.values()) {
       const note = str(e.note);
@@ -40,7 +40,7 @@ export const R2a: Rule = {
       let problem: string | null = null;
       if (e.status === 'Not installed' && noteHas(note, /run, not terminated/i)) problem = `says "Run, not terminated" but the end is Not installed`;
       else if (e.status !== 'Not installed' && /^not run\b/i.test(note)) problem = `says "Not run" but the end is ${status}`;
-      else if (noteHas(note, /no term kit/i) && code !== 'X') problem = `says "no term kit" but the cable is ${code ?? 'not DMX'}`;
+      else if (noteHas(note, /no term kit/i) && !takesKits(ctx, cableOf(ctx, e))) problem = `says "no term kit" but this ${code ?? ''} cable takes no termination kits`.replace('  ', ' ');
       if (problem) ctx.find({ subject: subjectOfEnd(ctx, e), message: `${endLabel(ctx, e)}: the note ${problem}` });
     }
   },

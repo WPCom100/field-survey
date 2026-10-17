@@ -36,7 +36,15 @@ describe('the catalogue', () => {
     expect(d.get('R3a', 'run.end')).toBe('A');
     expect(d.code('R3', 'signal', 'X')).toBe('DMX');
     expect(d.code('R3', 'signal', 'ZZ')).toBe('ZZ'); // an unknown code stands for itself
-    expect([d.get('R3b', 'item'), d.get('R3b', 'owner'), d.get('R3b', 'notes')]).toEqual(['Terminate DMX to <far end>', 'EC/ETC', 'Waiting on DMX Termination Kits']);
+    expect([d.get('R3b', 'item'), d.get('R3b', 'owner'), d.code('R3b', 'notes', 'X')]).toEqual(['Terminate <signal> to <far end>', 'EC/ETC', 'Waiting on DMX Termination Kits']);
+    // T103 (D213): the codes that take termination kits, and their parts' wording
+    expect(['X', 'F', 'N', 'NG', 'U', 'P', '120V', '0-10V', 'D', 'ZZ'].map((c) => d.flagCode('R4b', 'kit', c))).toEqual([true, true, true, true, false, false, false, false, false, false]);
+    expect(['X', 'F', 'NG', 'D'].map((c) => d.code('R4b', 'part', c))).toEqual([
+      'DMX termination kit - <far end> run',
+      'Fiber termination kit - <far end> run',
+      'Network termination kit - <far end> run',
+      '<signal> termination kit - <far end> run',
+    ]);
     expect([d.get('R3c', 'item'), d.get('R3c', 'owner'), d.get('R3c', 'device_text')]).toEqual(['Missing all Device Neuron IDs', 'EC', 'All devices']);
     expect([d.get('R2f', 'status'), d.get('R5', 'enabled'), d.get('R2c', 'panic.status')]).toEqual(['Not started', true, 'Installed, untested']);
   });
@@ -160,8 +168,12 @@ describe('rule parameters over a store', () => {
     const accepted = await engine.decide(drafts.get(cables.X!)!.id, { kind: 'accept' });
     const itemId = accepted.recordIds[0]!;
     await engine.decide(drafts.get(cables.N!)!.id, { kind: 'reject' });
+    expect((await engine.run()).ops).toBe(2);
     expect((await engine.run()).ops).toBe(0);
 
+    // R4b: the accepted DMX run's kit at each device end (T103, D213) — nothing else
+    const kits = await store.list<ProposalRow>('proposal', { where: `project_id = ? AND rule_id = 'R4b'`, params: [PROJECT] });
+    expect(kits.map((k) => k.payload?.part)).toEqual(['DMX termination kit - 06-02 run', 'DMX termination kit - 06-01 run']);
     expect(await setRuleParam(editor, 'R3a', 'run.owner', { '*': 'ETC' })).toBe(1);
     const op = (await store.opsFor(ruleParamId(PROJECT, 'R3a', 'run.owner')))[0]!;
     expect(op).toMatchObject({ kind: 'create', change_type: 'Master edit', reason: 'Rule parameter R3a.run.owner' });

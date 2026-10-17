@@ -82,6 +82,8 @@ export interface CableRow extends Deletable {
   end_a_id: string | null;
   end_b_id: string | null;
   endpoint_confirmed: boolean;
+  /** Takes termination kits, over the code's `R4b.kit`; null (or absent) = the code's (T103). */
+  term_kit?: boolean | null;
 }
 
 export interface CableEndRow extends Deletable {

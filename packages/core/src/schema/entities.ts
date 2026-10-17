@@ -249,6 +249,8 @@ export const ENTITIES = {
       end_a_id: t(),
       end_b_id: t(),
       endpoint_confirmed: b({ notNull: true, default: 0 }),
+      // Takes termination kits, over the code's `R4b.kit` rule parameter; null = the code's (T103, D213).
+      term_kit: b(),
     },
     [['project_id']],
   ),

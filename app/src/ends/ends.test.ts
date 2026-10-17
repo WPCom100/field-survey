@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { loadDeviceCard } from '../card/model';
 import { loadLevelPlan } from '../plan/data';
 import { DEMO_LEVEL_07_ID, DEMO_LEVEL_ID, ensureDemoCardExtras, ensureDemoJumpExtras, ensureDemoLevel } from '../plan/demo';
-import { setEndNote, setEndStatus, setEndText } from './actions';
+import { setRuleParam } from '@field-survey/rules';
+
+import { setCableTermKit, setEndNote, setEndStatus, setEndText } from './actions';
 import { CONNECTION_PHRASES, loadCableEnds, riserCheck } from './model';
 
 const ME = uuidv7();
@@ -64,6 +66,22 @@ describe('connection end editor (T22)', () => {
     expect(tenV.ends[1]!.jump).toBeNull();
     const uni = (await loadCableEnds(store, end('NEW').id))!;
     expect(uni.riser).toMatchObject({ state: 'differs', riser: 'UNISON TO 06M STATIONS', to: 'Stations & Sensors' });
+  });
+
+  it('termination kits (T103, D213): the code\'s setting, a per-cable Yes / No over it, and back', async () => {
+    const { store, editor, end } = await setup();
+    const kits = async (label: string) => (await loadCableEnds(store, end(label).id))!.termKit;
+    expect(await kits('C-03')).toEqual({ own: null, code: true, takes: true }); // X takes kits by default
+    expect(await kits('C-08')).toEqual({ own: null, code: false, takes: false }); // 0-10V does not
+    const id = (await loadCableEnds(store, end('C-03').id))!.id;
+    expect(await setCableTermKit(editor, id, false)).toMatchObject({ entity_kind: 'cable', field: 'term_kit', now: false, change_type: 'Field survey' });
+    expect(await kits('C-03')).toEqual({ own: false, code: true, takes: false });
+    expect(await setCableTermKit(editor, id, false)).toBeNull(); // unchanged: nothing written
+    await setCableTermKit(editor, id, null);
+    expect(await kits('C-03')).toEqual({ own: null, code: true, takes: true });
+    // the project's Rules setting moves every cable of the code that has no setting of its own
+    await setRuleParam(editor, 'R4b', 'kit', { X: false });
+    expect(await kits('C-03')).toEqual({ own: null, code: false, takes: false });
   });
 
   it('a status tap writes status, surveyor, time and source as one group; repeating it writes nothing', async () => {

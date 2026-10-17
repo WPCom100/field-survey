@@ -38,7 +38,7 @@ describe('the rules over the demo card', () => {
     const decider = ruleDecider(store, pid, ME);
     expect(decider.wired).toBe(true);
     const r3b = card.drafts.find((d) => d.ruleId === 'R3b')!;
-    expect(await decider.explain(r3b.id)).toMatch(/^R3b — DMX termination kit item: A DMX \(X\) end that is Issue "no term kit".*\nC-03 is Issue "Run, not terminated; no term kit": the DMX run waits for a termination kit\.$/s);
+    expect(await decider.explain(r3b.id)).toMatch(/^R3b — Termination kit item: An end that is Issue "no term kit" on a cable that takes termination kits.*\nC-03 is Issue "Run, not terminated; no term kit": the DMX run waits for a termination kit\.$/s);
   });
 
   it('Accept creates the punch item with rule_id/proposal_id and the draft leaves the card', async () => {

@@ -15,7 +15,7 @@
 import { isLibraryStream, OpError, type EditContext, type Editor, type Store } from '@field-survey/core';
 
 import { stableStringify } from './hash';
-import { isByCode, paramSpec, resolveValue, ruleParamId, RuleParams, validEntry, type ParamValue, type RuleParamRow } from './params';
+import { isByCode, paramSpec, resolveValue, ruleParamId, RuleParams, validEntry, type CodeEntry, type ParamValue, type RuleParamRow } from './params';
 
 export const RULE_PARAM_REASON = 'Rule parameter';
 
@@ -48,13 +48,13 @@ export function compactValue(rule: string, key: string, value: ParamValue | null
   if (value == null) return null;
   if (isByCode(spec.kind)) {
     if (typeof value !== 'object') throw new OpError(`${spec.label}: expected a value per cable code`);
-    const def = spec.default as Record<string, string>;
-    const out: Record<string, string> = {};
+    const def = spec.default as Record<string, CodeEntry>;
+    const out: Record<string, CodeEntry> = {};
     for (const [rawCode, v] of Object.entries(value)) {
       const code = rawCode.trim();
       if (!code) continue;
       if (!validEntry(spec.kind, v)) throw new OpError(`${spec.label}, ${code === '*' ? 'any other code' : code}: "${String(v)}" is not allowed`);
-      const t = (v as string).trim();
+      const t = typeof v === 'string' ? v.trim() : v;
       if (def[code] !== t) out[code] = t;
     }
     return Object.keys(out).length ? out : null;
