@@ -57,8 +57,8 @@ tables; every iPad gets the baseline by pull. Stats (`import_batch.stats`) count
 | Summary | `level` per floor row (floor order = row order, Surveyed/Updated parsed); a `numbering_group` **create op** per new group, before its levels (since T35 — a bare row never reached a pulling client) | levels stay `setup`; the import does not lock baselines (D125) |
 | Devices | `device`: ID kept, `origin=import`, `panel_name` from a `CTxxLCPx` in Device or Type (EBDKs included) | `Unsurveyed` → empty status (D110); any other off-list status → empty + `review_item(lint)` |
 | Connections | one `cable_end` per row (`C-nn` kept) + its `cable`; pairing below; the four Unison bus spellings → `Stations & Sensors` via one `ruling` row + a `Ruling` op per end (D50) | From/To verbatim (D32); `cable.endpoint_confirmed=false` on every cable (D6) |
-| Punch List | `punch_item` (# kept, the Device text kept verbatim as `device_text` — D136), `device_id` matched from the Device text (tag `S4`/`D6`, `PI1002 #2`, panel `CT01LCPB`, `EBDK (CT01LCPB)`, model + room, `UFMP4 #2`); `Missing all Device Neuron IDs` → `sort_last` | text naming several devices, a room or "All devices" → no device |
-| Missing Parts | `missing_part` (# kept, `device_location` verbatim, single-device text matched) + `part_source` links from Source: `Punch #8-14`, `#15, #19`, `Punch #14; Devices 06-S3`, `Connections C-06 (…)` | an unparsed segment → `finding(import.part_source)`; the parsed ones still link |
+| Punch List | `punch_item` (# kept, the Device text kept verbatim as `device_text` — D136), `device_id` matched from the Device text (tag `S4`/`D6`, `PI1002 #2`, panel `CT01LCPB`, `EBDK (CT01LCPB)`, model + room, `UFMP4 #2`); `cable_end_id` when the item names one end of that device (below, T119); `Missing all Device Neuron IDs` → `sort_last` | text naming several devices, a room or "All devices" → no device; a cable item naming no single end → device only + a check |
+| Missing Parts | `missing_part` (# kept, `device_location` verbatim, single-device text matched) + `part_source` links from Source: `Punch #8-14`, `#15, #19`, `Punch #14; Devices 06-S3`, `Connections C-06 (…)`; a part reaches its end through its Source (T119) | an unparsed segment → `finding(import.part_source)`; the parsed ones still link; a termination kit whose Source reaches no end → a check |
 | Photo Log | `photo` (number kept) with the picture as a complete `blob` (`thumb_blob`, 320×240, `seed_thumbnail_only`, D40); `device_id` = first Device ID (else the Devices tab's Photo column), `punch_item_id` = first punch row listing the number; the other devices named (a list `B1-01, B1-02` or a range `01-S8 to 01-S12`, expanded to the IDs that exist) and the other punch rows listing the number become `photo_link` `link_add` ops (D128; 28 links on the master) | a row without a picture keeps its record (check) |
 | Change Log | one historical op per row: user `import`, `install_id` `IMPORT_INSTALL_ID`, **state `superseded`** (D124), `client_ts` = the row's date, `change_type`/`reason` as written, `was`/`now` verbatim, `payload` = `{source, sheet, ref, entry, field, level}`; `(row added)` → kind `create`; `field` = our column when the master's maps (`Notes` → `notes`, `Qty` → `cable.qty`…), else the master's name (`Photo`, `Source`) | Refs resolve against the imported numbering; a range (`#2-#27`) hangs off the level |
 | Lists / Floor Order | not imported (D16) | |
@@ -91,6 +91,28 @@ On the master this gives 27 pairs, 17 placeholder far ends, 8 review items (the 
 runs that only name each other's level, `01 C-05 ↔ 02 C-02` at 0.6, and two network runs with
 no destination) and 4 `import.endpoint` findings (`UFMP4 #1, #2` / `UFMP4 (7)` name several
 devices). `endpoint_confirmed` stays false everywhere: the reviewer confirms each cable (D6).
+
+### Punch items on their ends (T119)
+
+The master links a punch row to a device only. A **cable item** — its Item starts with Run, Pull,
+Re-pull, Terminate, Re-terminate, Land or Connect and names one signal word (`DMX`, `network`,
+`network & ground`, `Unison`, `fiber`, `0-10V`, `120V`, `panic`, `DALI`, `UHCI-WM`) — is put on
+the numbered end of its device with that code whose To text its destination (after `to` /
+`from`) names: the same words, a plural `s` and parentheses aside, one set inside the other
+("UFMP4s" ~ "DMX to UFMP4 (7)", "Level 03" ~ "Level 03 UFMP4s"); with no destination, or none
+matching, the device's only end with that code. "Run DMX to B3A Canyon" → C-09, "Terminate DMX
+from CT01LCPB" → C-18, "Land 0-10V control wiring" → the panel's 0-10V end. An item naming
+two signals, two runs (`&`, `and`, `,`, `/` in the destination) or matching several ends or none
+stays device-only and is listed in the checks (`punch_end_unmatched`). On the master: **46**
+items on their ends, **10** listed (06M #2 "… to Lvl 9 & 6M Equipment Rack", 06M #12 "Terminate
+DMX" on a panel with two DMX ends, the UFMP4 items on 03 whose ends the import could not resolve…).
+
+`missing_part` has no end column: a part reaches its end through its Source — a `Connections
+C-nn` link, or a punch item now on its end — which is what R4b reads (D213 (d)). Adding a
+`part_source` link to the end would change the exported Source text, so the import adds none; a
+termination kit whose Source reaches no end is listed in the checks (`part_end_unmatched`, 9 on
+the master) and the rules still match it by its text (D213 (e)). The rules then treat an
+end-linked item as that end's Run / Terminate / kit item whatever its wording (D218).
 
 ### Numbers and counters
 

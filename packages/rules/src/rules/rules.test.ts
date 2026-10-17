@@ -346,6 +346,24 @@ describe('R3a Cable not run / Termination', () => {
     expect(items(b, [R3a])).toEqual([]);
   });
 
+  it('T119 (D218): an end holding an open item of the same kind gets no second, whatever its wording; a closed one or another kind does not count', () => {
+    const b = new Build();
+    const { level, panel } = floor(b);
+    const far = b.device(level, 'Relay panel', { display_id: '06M-02' });
+    const run1 = b.cable('F', { device: panel, display_id: 'C-01', to_text: 'Equipment rack Level 28', status: 'Not installed' }, null);
+    const term = b.cable('N', { device: panel, display_id: 'C-02', to_text: 'ERn4 Level 16', status: 'Issue', note: 'Run, not terminated' }, null);
+    const kit = b.cable('X', { device: panel, display_id: 'C-03', to_text: 'DMX to Level 01', status: 'Issue', note: 'Run, not terminated; no term kit' }, { device: far });
+    expect(items(b, [R3a, R3b])).toEqual(['Run fiber to Equipment rack Level 28', 'Terminate network to ERn4 Level 16', 'Terminate DMX to Level 01']);
+    // the master's wording, imported onto the ends (T119)
+    const closed = b.punch(level, { device_id: panel.id, cable_end_id: run1.a.id, item: 'Run fiber to rack', type: 'Cable not run', tracking_status: 'Closed' });
+    b.punch(level, { device_id: panel.id, cable_end_id: term.a.id, item: 'Secure the jack', type: 'Wiring' }); // another kind
+    expect(items(b, [R3a, R3b])).toHaveLength(3);
+    closed.tracking_status = 'Open';
+    b.punch(level, { device_id: panel.id, cable_end_id: term.a.id, item: 'Terminate 2x network runs to ERn4 Level 16', type: 'Termination' });
+    b.punch(level, { device_id: panel.id, cable_end_id: kit.a.id, item: 'Terminate DMX from Level 01', type: 'Missing part', notes: 'Waiting on DMX Termination Kits' });
+    expect(items(b, [R3a, R3b])).toEqual([]);
+  });
+
   it('raises one Run item per wire (D177): on the start of the run (side A), even a placeholder end; a Run item the rule made on the other end stands for the wire', () => {
     const b = new Build();
     const { level, panel, bus } = floor(b);

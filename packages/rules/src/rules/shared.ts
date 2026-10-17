@@ -86,8 +86,8 @@ const normText = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 /**
  * The end of `deviceId` on a cable that takes kits whose far end `destination` names — the same
  * text, else one containing the other ("Level 04" ~ "Level 04 CT04LCPA") — skipping `taken`. How
- * a kit or kit item the seed import left without an end (the master links items to devices
- * only) finds its run (D213). Null when none or no destination.
+ * a kit or kit item the seed import left without an end (its text names no single end, T119)
+ * finds its run (D213). Null when none or no destination.
  */
 export function endByDestination(ctx: RuleContext, deviceId: string | null, destination: string | null, taken: ReadonlySet<string>): CableEndRow | null {
   if (!deviceId || !destination) return null;
@@ -215,6 +215,16 @@ export function itemsOfDevice(ctx: RuleContext, device: DeviceRow): PunchItemRow
 export function hasOpenItemText(ctx: RuleContext, deviceId: string | null, endId: string | null, text: string): boolean {
   const rows = [...(deviceId ? (ctx.index.punchByDevice.get(deviceId) ?? []) : []), ...(endId ? (ctx.index.punchByEnd.get(endId) ?? []) : [])];
   return rows.some((p) => isOpen(p) && p.item === text);
+}
+
+/**
+ * Does the end already hold an open item of this kind, whatever its wording (T119, D218)? An item
+ * linked to the end (made by a rule, or imported with its end) stands for that end's Run /
+ * Terminate / kit item, so the master's "Run fiber to Equipment rack Level 28" on 06M/C-05 is
+ * not drafted again as "Run fiber to Level 28".
+ */
+export function hasOpenEndItem(ctx: RuleContext, endId: string, kind: (p: PunchItemRow) => boolean): boolean {
+  return (ctx.index.punchByEnd.get(endId) ?? []).some((p) => isOpen(p) && kind(p));
 }
 
 /**

@@ -13,6 +13,9 @@
  *   D185: not racks or NSPS by default); once accepted the engine maintains it:
  *   Notes rewritten, Closed when the list is empty, reopened on a new device without an ID
  *   (D49, D170).
+ * - R3a / R3b skip an end that already holds an open item of their kind (`Cable not run`,
+ *   `Termination`, a kit item), whatever its wording — the master's items, imported onto their
+ *   ends (T119, D218).
  * - R3d: an item that says "test" or "commission" is flagged (no test or commissioning items).
  * - R3f: an item outside the project's `punch_item` vocabulary is flagged (dismissable).
  *
@@ -31,7 +34,9 @@ import {
   deviceLabel,
   endLabel,
   endLevel,
+  hasOpenEndItem,
   hasOpenItemText,
+  isKitItem,
   isOpen,
   kitNote,
   noteHas,
@@ -60,7 +65,7 @@ export const R3a: Rule = {
       if (e.status === 'Not installed') {
         if (waitsForSurvey(ctx, e) || !carriesRunItem(ctx, e)) continue;
         const item = fillTemplate(textParam(ctx.params, 'R3a', 'run.item', code), { signal: signal(ctx, code), 'far end': targetOf(ctx, e) });
-        if (hasOpenItemText(ctx, e.device_id, e.id, item) || otherEndHasRunItem(ctx, e)) continue;
+        if (hasOpenItemText(ctx, e.device_id, e.id, item) || otherEndHasRunItem(ctx, e) || hasOpenEndItem(ctx, e.id, (p) => p.type === 'Cable not run')) continue;
         const owner = ownerParam(ctx.params, 'R3a', 'run.owner', code);
         ctx.propose({
           subject: subjectOfEnd(ctx, e),
@@ -73,7 +78,7 @@ export const R3a: Rule = {
       } else if (e.status === 'Issue') {
         if (waitsForSurvey(ctx, e)) continue;
         const term = terminationItem(ctx, e);
-        if (!term || hasOpenItemText(ctx, e.device_id, e.id, term.item)) continue;
+        if (!term || hasOpenItemText(ctx, e.device_id, e.id, term.item) || hasOpenEndItem(ctx, e.id, (p) => p.type === 'Termination')) continue;
         ctx.propose({
           subject: subjectOfEnd(ctx, e),
           discriminator: 'terminate',
@@ -124,7 +129,7 @@ export const R3b: Rule = {
       const level = endLevel(ctx, e);
       if (!level) continue;
       const item = fillTemplate(textParam(ctx.params, 'R3b', 'item'), { signal: signal(ctx, code), 'far end': targetOf(ctx, e) });
-      if (hasOpenItemText(ctx, e.device_id, e.id, item)) continue;
+      if (hasOpenItemText(ctx, e.device_id, e.id, item) || hasOpenEndItem(ctx, e.id, (p) => isKitItem(ctx, p))) continue;
       const device = e.device_id ? ctx.index.device.get(e.device_id) : null;
       const owner = ownerParam(ctx.params, 'R3b', 'owner');
       const notes = kitNote(ctx, code);

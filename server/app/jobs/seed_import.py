@@ -14,8 +14,12 @@ images to put in the object store, and stats. Nothing here touches the database;
   verbatim (D32); the Unison bus spellings become `Stations & Sensors` by a recorded ruling (D50).
 - Punch List → `punch_item`; the device is matched from the Device text (tag, panel, model +
   room); a row it links to no device raises a `review_item(lint)` for Needs review (D148); the
-  Neuron ID row is `sort_last`.
+  Neuron ID row is `sort_last`. A cable item ("Run DMX to B3A Canyon", "Land 0-10V control
+  wiring") whose signal and destination name exactly one end of its device gets that end as
+  `cable_end_id` (T119); one naming none or several stays device-only and is listed in the checks.
 - Missing Parts → `missing_part` + `part_source` links parsed from Source; unparsed → `finding`.
+  A part reaches its end through its Source (a `Connections C-nn`, or a punch item with an end);
+  a kit part reaching none is listed in the checks (T119).
 - Photo Log → `photo` with the 320×240 image as `thumb_blob`, `seed_thumbnail_only` (D40),
   linked to the first Device ID and to the first punch item that lists the number.
 - Change Log → historical ops: user `import`, state `superseded` (recorded, never
@@ -82,6 +86,27 @@ TAG_RE = re.compile(r"\b([SD])(\d{1,3})\b")
 HASH_TAG_RE = re.compile(r"^(PI\d{4}|P-DOC\S*|P-LS)\s+#(\d+)\b")
 LABEL_SPLIT_RE = re.compile(r"\s+[-–—�]\s+")
 MULTI_RE = re.compile(r"[,/]|\bto\b|\band\b|&", re.I)
+
+# T119: a punch item about a cable — its verb, the signal words it names (the master's, as
+# `R3.signal` spells them; network & ground before network) and where it runs to / from.
+CABLE_VERB_RE = re.compile(r"^(?:run|pull|re-?pull|terminate|re-?terminate|land|connect)\b", re.I)
+SIGNAL_WORDS: tuple[tuple[re.Pattern[str], frozenset[str]], ...] = tuple(
+    (re.compile(pat, re.I), frozenset(codes))
+    for pat, codes in (
+        (r"\bnetwork\s*(?:&|and)\s*ground\b", ("NG",)),
+        (r"\bnetwork\b", ("N", "NG")),
+        (r"\bDMX\b", ("X",)),
+        (r"\bUnison\b", ("U",)),
+        (r"\bfiber\b", ("F",)),
+        (r"\b0-10\s*V\b", ("0-10V",)),
+        (r"\b120\s*V\b", ("120V",)),
+        (r"\bpanic\b", ("P",)),
+        (r"\bDALI\b", ("D",)),
+        (r"\bUHCI-WM\b|\bpartition sensor\b", ("UV",)),
+    )
+)
+DESTINATION_RE = re.compile(r"\b(?:to|from)\s+(.+)$", re.I)
+SEVERAL_RE = re.compile(r"[,/&]|\band\b", re.I)
 
 # Change Log master column → our field, per sheet; missing = the master name is kept as `field`.
 HISTORY_FIELDS: dict[str, dict[str, str]] = {
@@ -302,6 +327,8 @@ class Builder:
         self.part_by_key: dict[tuple[uuid.UUID, int], uuid.UUID] = {}
         self.photo_by_key: dict[tuple[uuid.UUID, int], uuid.UUID] = {}
         self.end_by_key: dict[tuple[str, str], End] = {}
+        self.ends_by_device: dict[uuid.UUID, list[End]] = {}
+        self.punch_end: dict[uuid.UUID, uuid.UUID] = {}  # punch item → its cable end (T119)
         # every punch item / device row naming a photo number, in sheet order (D128: all linked)
         self.punch_photo_refs: dict[tuple[uuid.UUID, int], list[uuid.UUID]] = {}
         self.device_photo_refs: dict[tuple[uuid.UUID, int], list[uuid.UUID]] = {}
@@ -660,6 +687,8 @@ class Builder:
             self.resolve_endpoint(e)
             ends.append(e)
             self.end_by_key[(lv.code, display_id)] = e
+            if e.endpoint and e.endpoint[0] == "device":
+                self.ends_by_device.setdefault(e.endpoint[1], []).append(e)
         self.pair(ends)
         renamed: list[tuple[End, OpIn]] = []
         for e in ends:
@@ -909,6 +938,9 @@ class Builder:
             pid = uuid7()
             item = row.get("item")
             dev = self.device_for_label(row.get("device"), lv.code)
+            end = self.punch_end_for(dev, item, f"Punch List {lv.code} #{number}")
+            if end is not None:
+                self.punch_end[pid] = end.id
             self.create(
                 "punch_item",
                 {
@@ -916,6 +948,7 @@ class Builder:
                     "level_id": lv.level_id,
                     "number": number,
                     "device_id": dev.id if dev else None,
+                    "cable_end_id": end.id if end else None,
                     # the master's spelling: Needs review shows it; exported only while no
                     # device is linked (D148, D150)
                     "device_text": row.get("device"),
@@ -955,6 +988,52 @@ class Builder:
             for n in photo_numbers(row.get("photo")):
                 self.punch_photo_refs.setdefault((lv.numbering_group_id, n), []).append(pid)
             self.count("punch_items")
+
+    def punch_end_for(self, dev: Dev | None, item: str | None, where: str) -> End | None:
+        """T119: the one end of `dev` a cable item names — "Run DMX to B3A Canyon" ↔ C-09 "DMX to
+        B3A Canyon", "Land 0-10V control wiring" ↔ its only 0-10V end. The item's verb says it is
+        about a cable (Run / Pull / Terminate / Land …) and it names one signal; of the device's
+        ends with that code, the one whose To text the item's destination matches (the same words,
+        a plural `s` aside, one set inside the other), else the only one. A cable item naming
+        none, or several (two signals, two destinations, two candidates), stays device-only and
+        is listed in the checks."""
+        if dev is None or not item or not CABLE_VERB_RE.match(item.strip()):
+            return None
+        codes = item_signals(item)
+        if codes is None:
+            return None
+        label = f"{where}: {item!r} on {dev.display_id}"
+        if len(codes) > 1:
+            self.end_unmatched(f"{label} names several signals; linked to the device only")
+            return None
+        (code,) = codes
+        candidates = [e for e in self.ends_by_device.get(dev.id, []) if e.code in code]
+        m = DESTINATION_RE.search(item)
+        destination = re.sub(r"\([^)]*\)", " ", m.group(1)) if m else None
+        if destination and SEVERAL_RE.search(destination):
+            self.end_unmatched(f"{label} names several runs; linked to the device only")
+            return None
+        hits = candidates
+        if destination and (want := word_set(destination)):
+            named = [
+                e
+                for e in candidates
+                if (have := word_set(end_target(e.to_text))) and (want <= have or have <= want)
+            ]
+            hits = named or candidates
+        if len(hits) == 1:
+            self.count("punch_end_links")
+            return hits[0]
+        found = ", ".join(e.display_id for e in hits) if hits else "none"
+        self.end_unmatched(
+            f"{label} names no single connection end (candidates: {found}); "
+            "linked to the device only"
+        )
+        return None
+
+    def end_unmatched(self, check: str) -> None:
+        self.count("punch_end_unmatched")
+        self.checks.append(check)
 
     def punch_device_review(self, pid: uuid.UUID, lv: LevelRef, text: str) -> None:
         """D148: a Punch List row whose Device text links to no single device (no match, a room,
@@ -1022,6 +1101,20 @@ class Builder:
             self.count("missing_parts")
             source = row.get("source")
             links, bad = self.parse_source(source, lv)
+            part = row.get("part")
+            if (
+                part
+                and re.search(r"(?<![-\w])kit\b", part, re.I)  # not `P-NSPS-D-KIT`
+                and not any(
+                    k == "cable_end" or (k == "punch" and t in self.punch_end) for k, t in links
+                )
+            ):
+                # T119: a kit whose Source reaches no end; the rules match it by text (D213 (e))
+                self.count("part_end_unmatched")
+                self.checks.append(
+                    f"Missing Parts {lv.code} #{number}: {part!r} reaches no connection end "
+                    f"through its Source ({source or 'none'})"
+                )
             for target_kind, target_id in links:
                 self.op(
                     "link_add",
@@ -1256,6 +1349,34 @@ def jsonable(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     return value
+
+
+def item_signals(item: str) -> list[frozenset[str]] | None:
+    """The cable codes each signal word of a punch item stands for, in order; None when it names
+    none ("network & ground" is read before "network", so it counts once)."""
+    text = item
+    found: list[frozenset[str]] = []
+    for pat, codes in SIGNAL_WORDS:
+        if pat.search(text):
+            found.append(codes)
+            text = pat.sub(" ", text)
+    return found or None
+
+
+def end_target(to_text: str | None) -> str:
+    """What an end's To text names as the far end: "DMX to B3A Canyon" → "B3A Canyon"."""
+    if not to_text:
+        return ""
+    m = DESTINATION_RE.search(to_text)
+    return m.group(1) if m else to_text
+
+
+def word_set(text: str) -> frozenset[str]:
+    """Lower-case words without parentheses or a plural `s`: "UFMP4 (7)" and "UFMP4s" → {ufmp4}."""
+    text = re.sub(r"\([^)]*\)", " ", text.casefold())
+    return frozenset(
+        w[:-1] if len(w) > 3 and w.endswith("s") else w for w in re.split(r"[^a-z0-9]+", text) if w
+    )
 
 
 def photo_device_ids(text: str, known: dict[str, Any]) -> list[str]:

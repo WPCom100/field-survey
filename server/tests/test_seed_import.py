@@ -397,6 +397,27 @@ def test_master_seed_import(session, store, factory, client):
     )
     assert str(neuron.id) not in {e for _, e in unlinked}
     assert v.punch("01", 37).device_id is None  # two stations named
+    # T119: a cable item whose signal and destination name one end of its device is on that end
+    assert v.punch("01", 42).cable_end_id == v.end("01", "C-09").id  # "Run DMX to B3A Canyon"
+    assert v.punch("01", 45).cable_end_id == v.end("01", "C-12").id  # "UFMP4s" ~ "UFMP4 (7)"
+    assert v.punch("01", 40).cable_end_id == v.end("01", "C-18").id  # "from CT01LCPB"
+    assert v.punch("04", 5).cable_end_id == v.end("04", "C-02").id  # "Level 03" of two DMX
+    assert v.punch("01", 3).cable_end_id == v.end("01", "C-03").id  # its only 0-10V end
+    assert v.punch("B2", 4).cable_end_id == v.end("B2", "C-04").id  # 120V to the NSPS
+    assert v.punch("01", 38).cable_end_id is None  # "Install ERP-FT-LVD …": no cable verb
+    assert v.punch("01", 50).cable_end_id is None  # "Secure 120V box"
+    assert v.punch("06M", 2).cable_end_id is None  # "… to Lvl 9 & 6M Equipment Rack": two runs
+    assert v.punch("06M", 12).cable_end_id is None  # "Terminate DMX" on a panel with two
+    linked = v.count(PunchItem, PunchItem.cable_end_id.is_not(None))
+    assert linked == stats["punch_end_links"] == 46
+    checks = stats["checks_list"]
+    unmatched = [c for c in checks if c.startswith("Punch List") and "device only" in c]
+    assert len(unmatched) == stats["punch_end_unmatched"] == 10
+    assert any(c.startswith("Punch List 06M #2:") and "several runs" in c for c in unmatched)
+    assert any(c.startswith("Punch List 06M #12:") and "C-09, C-13" in c for c in unmatched)
+    loose_kits = [c for c in checks if "reaches no connection end" in c]
+    assert len(loose_kits) == stats["part_end_unmatched"] == 9  # P-NSPS-D-KIT is no term kit
+    assert any(c.startswith("Missing Parts 06M #13:") for c in loose_kits)
 
     # --- missing parts and part_source
     def sources(part):
@@ -779,6 +800,18 @@ def test_imports_api(client, session, store, factory, tmp_path):
 
 
 # ------------------------------------------------- trusted push numbering
+
+
+def test_cable_item_words():
+    """T119: the words a punch item is matched to its end by."""
+    assert seed_import.item_signals("Run network & ground to 01-06") == [frozenset({"NG"})]
+    assert seed_import.item_signals("Terminate network to Level 02") == [frozenset({"N", "NG"})]
+    assert len(seed_import.item_signals("Land 120V and Unison wire") or []) == 2
+    assert seed_import.item_signals("Install cover") is None
+    assert seed_import.word_set("UFMP4 (7)") == seed_import.word_set("UFMP4s") == {"ufmp4"}
+    assert seed_import.end_target("DMX to B3A Canyon") == "B3A Canyon"
+    assert seed_import.end_target("Network from Level 03") == "Level 03"
+    assert seed_import.end_target("Equipment rack Level 06") == "Equipment rack Level 06"
 
 
 def test_trusted_create_keeps_its_number_and_moves_the_counter(session):
