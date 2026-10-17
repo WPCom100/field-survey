@@ -596,6 +596,18 @@ Decision D213: kits per cable code (`X`, `F`, `N`, `NG` on by default) with a pe
 
 Decision D214: app-level vocabulary is `vocab` with no project on the library stream (drafts for Landry; new projects and "Copy from app library" take the accepted ones; a project reads only its own rows), and pin shapes are one app-library setting per role that applies to every project at once, on the iPad and in the floor PDF (no per-project shapes, no draft). → Approve / change:
 
+## T116 — Rules tab: review accepted items after a change  ·  Needs: no new build (JS update only)
+
+**Why it matters:** a changed owner or wording follows on open drafts but leaves accepted items as they were (D176). The Rules tab now offers a ruling, already filled in, for the accepted items the change words differently, so the punch list can be brought in line without hunting for them.
+
+- [ ] **The offer.** On a level with at least one accepted "Run DMX to …" item, in Setup → Rules → R3a → **Run item owner**, set *Any other code* to `ETC`. Under the "saved" notice a yellow box lists **Review accepted items ▸  n punch items: Owner → "ETC"**, n = the accepted Run items still reading `EC`. → saw:
+- [ ] **The pre-filled ruling.** Tap it: Rulings opens on the editor with Punch item · n chosen records, the level(s) as scope, **Set field Owner = ETC** and the reason "Rule parameter R3a · … changed: accepted items reworded to match". Preview: one row per item, `EC` → `ETC`. Untick one, Apply. The items read `ETC` on the plan; History shows the change as Ruling with that reason. → saw:
+- [ ] **What is left.** Back in Setup → Rules: the box now lists only the item you unticked (1 punch item). → saw:
+- [ ] **Hand edits stay out.** Change one accepted Run item's Owner by hand to `EC/ETC`, then in Rules set *Any other code* back with **Reset to default**: that item is not in the box's count. → saw:
+- [ ] **A wording change.** Set R3a → **Run item text** *Any other code* to `Pull <signal> to <far end>`: the box lists one entry per item ("1 punch item: Item → "Pull DMX to …""), at most 8 and "+n more". Reset to default afterwards. → saw:
+
+Decision D215: accepted items are only changed by a ruling you apply; the Rules tab offers one pre-filled ruling per (field, new value) over the accepted items the change words differently, leaving out fields someone changed by hand; a wording with the far end in it means one ruling per item until a "reword" ruling action exists (T120). → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

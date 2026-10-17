@@ -3,20 +3,27 @@ import {
   NO_STATUS,
   codeValue,
   decideRuleParam,
+  describeRetrofit,
   describeValue,
   loadRuleParamRows,
   paramGroups,
+  retrofitDraft,
+  retrofitReason,
   setRuleParam,
   withCode,
   type ParamGroup,
   type ParamItem,
   type ParamValue,
+  type RetrofitGroup,
+  type RuleParamRow,
 } from '@field-survey/rules';
-import { Link } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { handRuling } from '../rulings/handoff';
 import { Btn, ChipPicker, Notice, styles as w } from '../setup/widgets';
+import { engineFor } from './engine';
 
 /**
  * The rules' owners, wordings and statuses (T102, D176 (4)): grouped by rule with the rule's
@@ -24,6 +31,8 @@ import { Btn, ChipPicker, Notice, styles as w } from '../setup/widgets';
  * (Setup → Rules: a change applies at once and the open drafts follow on the next rules run) or
  * null for the app-level defaults (Projects → Rule defaults: each change is a draft until
  * accepted; new projects copy the accepted ones). Every change is one op through `editor`.
+ * On a project, a change that words accepted items differently offers **Review accepted items ▸**:
+ * one pre-filled `set` ruling per (field, new value) over those items (T116, `retrofitGroups`).
  */
 export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Store; editor: Editor; scope: string | null; dataKey: unknown }) {
   const app = scope == null;
@@ -32,6 +41,24 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
   const [onlySet, setOnlySet] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [retrofit, setRetrofit] = useState<{ reason: string; groups: RetrofitGroup[] } | null>(null);
+  // The last change's rows as they were before it: back from a ruling, the offer lists what is left.
+  const lastChange = useRef<{ reason: string; before: RuleParamRow[] } | null>(null);
+  const findRetrofit = useCallback(async () => {
+    const c = lastChange.current;
+    if (app || !scope || !c) return;
+    try {
+      const groups = await engineFor(store, scope, editor.userId).retrofit(c.before);
+      setRetrofit(groups.length ? { reason: c.reason, groups } : null);
+    } catch (e) {
+      console.warn('[rules] retrofit', e); // only the offer is lost
+    }
+  }, [app, scope, store, editor]);
+  useFocusEffect(
+    useCallback(() => {
+      void findRetrofit();
+    }, [findRetrofit]),
+  );
 
   useEffect(() => {
     let live = true;
@@ -44,27 +71,50 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
     };
   }, [store, scope, app, tick, dataKey]);
 
-  const run = useCallback(async (fn: () => Promise<number>, done: string) => {
+  const run = useCallback(async (fn: () => Promise<number>, done: string, after?: () => Promise<void>) => {
     setError(null);
     setNotice(null);
+    setRetrofit(null);
+    lastChange.current = null;
     try {
       const n = await fn();
       if (n) setNotice(done);
       setTick((t) => t + 1);
+      if (n && after) await after();
     } catch (e) {
       setError(e instanceof OpError ? e.message : `Could not save: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, []);
 
   const set = useCallback(
-    (item: ParamItem, value: ParamValue | null) =>
+    (item: ParamItem, value: ParamValue | null) => {
+      let before: RuleParamRow[] = [];
       void run(
-        () => setRuleParam(editor, item.spec.rule, item.spec.key, value),
+        async () => {
+          if (!app) before = await loadRuleParamRows(store, scope);
+          return setRuleParam(editor, item.spec.rule, item.spec.key, value);
+        },
         app
           ? `${item.spec.rule} · ${item.spec.label}: saved as a draft default. Accept it to have new projects copy it.`
           : `${item.spec.rule} · ${item.spec.label}: saved. Open drafts follow on the next rules run; accepted items keep their text.`,
-      ),
-    [run, editor, app],
+        app
+          ? undefined
+          : async () => {
+              // The accepted items the new value words differently (T116).
+              lastChange.current = { reason: retrofitReason(item.spec.rule, item.spec.label, value), before };
+              await findRetrofit();
+            },
+      );
+    },
+    [run, editor, app, store, scope, findRetrofit],
+  );
+  const review = useCallback(
+    (g: RetrofitGroup, reason: string) => {
+      if (!scope) return;
+      handRuling(scope, retrofitDraft(g, reason), `Rules: ${describeRetrofit(g)}`);
+      router.push({ pathname: '/rulings', params: { project: scope, from: 'handoff' } });
+    },
+    [scope],
   );
   const decide = useCallback(
     (item: ParamItem, state: 'accepted' | 'rejected') =>
@@ -103,6 +153,21 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
       </View>
       <Notice text={error} error />
       <Notice text={notice} />
+      {retrofit ? (
+        <View style={styles.retrofit}>
+          <Text style={styles.changes}>
+            Accepted items still read the old wording. Review accepted items ▸ opens a ruling over them, pre-filled; untick any in its preview.
+          </Text>
+          {retrofit.groups.slice(0, RETROFIT_SHOWN).map((g) => (
+            <Btn key={`${g.entity}|${g.field}|${g.value}`} title={`Review accepted items ▸  ${describeRetrofit(g)}`} small onPress={() => review(g, retrofit.reason)} />
+          ))}
+          {retrofit.groups.length > RETROFIT_SHOWN ? (
+            <Text style={styles.small}>
+              +{retrofit.groups.length - RETROFIT_SHOWN} more wordings, one ruling each: they show here as these are done.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       {shown.length === 0 ? <Text style={styles.hint}>Nothing changed yet.</Text> : null}
       {shown.map((g) => (
         <View key={g.rule} style={styles.group}>
@@ -156,6 +221,9 @@ function ParamRow({
     </View>
   );
 }
+
+/** Groups offered at once; a wording with the far end in it makes one group per item. */
+const RETROFIT_SHOWN = 8;
 
 const OWNERS = vocab.OWNER as readonly string[];
 const STATUSES = vocab.CONNECTION_STATUS as readonly string[];
@@ -305,6 +373,7 @@ const styles = StyleSheet.create({
   root: { gap: 12 },
   hint: { fontSize: 13, color: '#666', maxWidth: 820 },
   link: { color: '#1f6feb', fontSize: 14 },
+  retrofit: { gap: 6, padding: 10, borderRadius: 8, backgroundColor: '#fff8e6', alignItems: 'flex-start' },
   small: { fontSize: 12, color: '#777' },
   group: { gap: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#e6e8ec' },
   groupTitle: { fontSize: 17, fontWeight: '700' },

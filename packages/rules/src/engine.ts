@@ -29,6 +29,8 @@ import {
   type Snapshot,
   type Subject,
 } from './snapshot';
+import type { RuleParamRow } from './params';
+import { retrofitGroups, type RetrofitGroup } from './retrofit';
 import { checkRuling, parseRuling, previewRuling, vocabPlan, RULING_RULE_ID, type RulingDraft, type RulingPreview } from './rulings';
 
 export type RuleLog = (level: 'info' | 'warn' | 'error', event: string, data?: Record<string, unknown>) => void;
@@ -365,6 +367,14 @@ export class RuleEngine {
   }
 
   // -------------------------------------------------------------- rulings (T37)
+
+  /**
+   * After a rule parameter change (T116): the accepted items the change words differently,
+   * grouped for one `set` ruling each. `before` = the project's `rule_param` rows as they were.
+   */
+  async retrofit(before: readonly RuleParamRow[]): Promise<RetrofitGroup[]> {
+    return retrofitGroups(await this.loadSnapshot(), this.rules, before, { now: this.now() });
+  }
 
   /** The preview of a draft (Phase 3 §8) over the project as it stands. */
   async previewRuling(draft: RulingDraft): Promise<RulingPreview> {

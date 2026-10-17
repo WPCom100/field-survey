@@ -191,4 +191,6 @@ export {
   type RuleParamRow,
 } from './params';
 export { loadRuleParamRows, loadRuleParams, setRuleParam, decideRuleParam, compactValue, RULE_PARAM_REASON } from './params-store';
+// T116: accepted items a changed parameter words differently, as pre-filled rulings.
+export { retrofitGroups, retrofitDraft, describeRetrofit, retrofitReason, type RetrofitGroup, type RetrofitEntity } from './retrofit';
 export { paramGroups, ruleTitle, codeValue, withCode, describeValue, type ParamGroup, type ParamItem } from './params-view';
