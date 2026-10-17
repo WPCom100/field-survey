@@ -397,6 +397,76 @@ export async function promoteType(libraryEditor: Editor, store: Store, typeId: s
   return String(made.at(-1)!.id);
 }
 
+/**
+ * Search over a type's names (T114): every word of the query must appear in the model, an alias
+ * or the catalogue display name, ignoring case and spaces ("paradigm station" finds a
+ * "Paradigm Touchscreen Station"). An empty query matches everything.
+ */
+export function matchesQuery(names: readonly (string | null | undefined)[], query: string): boolean {
+  const words = query.toUpperCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = names.filter((n): n is string => !!n).map((n) => n.toUpperCase());
+  const squashed = hay.map(modelKey);
+  return words.every((w) => hay.some((h) => h.includes(w)) || squashed.some((h) => h.includes(w)));
+}
+
+export const ACCESSORY_GROUP = 'Accessories (not placeable)';
+export const REJECTED_GROUP = 'Rejected';
+export const NO_CATEGORY_GROUP = 'No category';
+
+/** The list group a type sits in: its category, the accessories (T111), or the rejected ones. */
+export function groupOf(t: Pick<LibraryType, 'state' | 'accessoryOnly' | 'category'>): string {
+  return t.state === 'rejected' ? REJECTED_GROUP : t.accessoryOnly ? ACCESSORY_GROUP : (t.category ?? NO_CATEGORY_GROUP);
+}
+
+export interface LibraryGroup {
+  key: string;
+  types: LibraryType[];
+  drafts: number;
+}
+
+export interface LibraryFilter {
+  query?: string;
+  /** A group key (`groupOf`); null = every group. */
+  group?: string | null;
+  draftsOnly?: boolean;
+}
+
+/**
+ * The list at catalogue size (T114): the types that pass the filter, by group in the
+ * `loadLibrary` order with the accessories and the rejected ones last.
+ */
+export function libraryGroups(types: readonly LibraryType[], filter: LibraryFilter = {}): LibraryGroup[] {
+  const out = new Map<string, LibraryType[]>();
+  for (const t of types) {
+    const key = groupOf(t);
+    if (filter.group && key !== filter.group) continue;
+    if (filter.draftsOnly && t.state !== 'draft') continue;
+    if (!matchesQuery([t.model, ...t.aliases, t.sourceRef?.displayName], filter.query ?? '')) continue;
+    out.set(key, [...(out.get(key) ?? []), t]);
+  }
+  const rank = (k: string) => (k === REJECTED_GROUP ? 2 : k === ACCESSORY_GROUP ? 1 : 0);
+  return [...out.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b))
+    .map(([key, list]) => ({ key, types: list, drafts: list.filter((t) => t.state === 'draft').length }));
+}
+
+/**
+ * "Accept all drafts in <group>" (T114): every draft of the group, each with its own `state` op
+ * in one group, so each accept is still recorded as reviewed by this person (prompt Must).
+ * Returns how many.
+ */
+export async function acceptAllDrafts(editor: Editor, store: Store, scope: string | null, group: string): Promise<number> {
+  if (group === REJECTED_GROUP) throw new OpError('Rejected types are reopened one by one.');
+  const { types } = await loadLibrary(store, scope);
+  const drafts = types.filter((t) => t.state === 'draft' && groupOf(t) === group);
+  if (!drafts.length) return 0;
+  await editor.group({ ...LIBRARY_CTX, reason: `Device-type library: Accept all drafts in ${group}` }, async (g) => {
+    for (const t of drafts) await g.setField('library_type', t.id, 'state', 'accepted');
+  });
+  return drafts.length;
+}
+
 /** A blank cable row for the editor's "+ add". */
 export function blankCable(code = 'X'): LibraryCable {
   return { code, from: null, to: null, far: null, single_row: false, qty: 1, status: null };

@@ -15,6 +15,7 @@
 import { DeviceIdError, OpError, defaultIdSchemeForRole, deviceIdFor, isRole, roleOf, type Editor, type Op, type Role, type Store } from '@field-survey/core';
 
 import { FIELD_SURVEY } from '../card/actions';
+import { matchesQuery } from '../library/model';
 
 export type LibraryChoice = {
   id: string;
@@ -28,6 +29,8 @@ export type LibraryChoice = {
   state: 'draft' | 'accepted';
   /** null = app library (D65). */
   projectId: string | null;
+  /** The catalogue's display name (T111 `source_ref`), searched with the model and aliases (T114). */
+  displayName: string | null;
 };
 
 type Row = Record<string, unknown>;
@@ -52,6 +55,7 @@ export async function libraryChoices(store: Store, projectId: string, category?:
       scheme: r.id_scheme === 'level_tag' || r.id_scheme === 'level_number' ? r.id_scheme : null,
       state: r.state === 'accepted' ? 'accepted' : 'draft',
       projectId: str(r.project_id),
+      displayName: displayNameOf(r.source_ref),
     }),
   );
   // a project type shadows an app-library type of the same model (it was copied from it)
@@ -59,6 +63,15 @@ export async function libraryChoices(store: Store, projectId: string, category?:
   return out
     .filter((c) => c.projectId || !projectModels.has(c.model.toUpperCase()))
     .sort((a, b) => Number(!a.projectId) - Number(!b.projectId) || a.model.localeCompare(b.model, 'en', { numeric: true }));
+}
+
+function displayNameOf(ref: unknown): string | null {
+  return ref && typeof ref === 'object' ? str((ref as Row).display_name) : null;
+}
+
+/** The choices the picker's search keeps (T114): the Library screen's search over model, aliases, display name. */
+export function searchChoices(choices: readonly LibraryChoice[], query: string): LibraryChoice[] {
+  return choices.filter((c) => matchesQuery([c.model, ...c.aliases, c.displayName], query));
 }
 
 /** The library type a typed model means (model or alias, any case, spaces ignored), if any. */

@@ -414,6 +414,23 @@ Decision D202 (Proposed): (1) only accepted types' groups are checked; (2) a gro
 
 ---
 
+## T114 — Library screen at catalogue size  ·  Needs: no new build
+
+**Why it matters:** after the DaVinci import the app library holds about 500 placeable drafts and 630 accessories; without search, filters and a bulk accept nobody can review it, and the plan's "+ Device" picker becomes a wall of chips.
+
+Set-up: Projects → App device-type library (the imported DaVinci types). Use a **scratch** project for the picker checks.
+
+- [ ] **Opens and scrolls.** The screen opens in a few seconds; the list scrolls smoothly top to bottom; the header still reads `(n types · m drafts)` and the "in review" link (if any) shows the same count as before. Note how long it took to open. → saw:
+- [ ] **Search.** Type `ts7`: only P-TS7-E (and anything else named so) remains, under its group head reading `1 of …`. Type `control station`: the types whose display name has both words. Clear with the ✕: the full list is back. → saw:
+- [ ] **Chips and Drafts only.** Tap the `Station (…)` chip: only stations. Tap it again: all. Turn on Drafts only: accepted types disappear, group heads show `n of m`. → saw:
+- [ ] **Accessories folded.** With no search and no chip, `▸ Accessories (not placeable) (…)` shows as one folded header; tap it: it opens (▾); tap again: folded. Searching a back-box model shows it even while folded. → saw:
+- [ ] **Accept all in a group.** On a small group (e.g. Touchscreen), tap `Accept all n`: a dialog asks "Accept all n drafts in Touchscreen?"; Cancel does nothing; Accept → the note says `Accepted n drafts in Touchscreen.`, the DRAFT flags go, the header's draft count drops by n. With a search typed first, the dialog's n is still the whole group's. Rejected has no Accept all. → saw:
+- [ ] **Picker search.** On the scratch plan, long-press → + Device: the Type list shows at most 60 chips and `n more: type in the box below to narrow`. Type `acp`: the chips narrow to the matching types; tap one: it stays selected. Type a model that matches nothing: "No library type matches …" and the purple "New model … as a draft" line (D55). → saw:
+
+Decision D203 (Proposed): (1) search = every word in model / alias / display name; (2) groups = category, then accessories, then rejected, one chip per group, Drafts only; (3) accessories folded unless chip, search or tap; (4) Accept all = the whole group's drafts after a confirm, one group of per-type accepts, not offered on Rejected; (5) the picker's model box doubles as its search, 60 chips shown; (6) virtualised list. → Approve / change:
+
+---
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

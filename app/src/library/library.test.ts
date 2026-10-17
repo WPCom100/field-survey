@@ -8,20 +8,25 @@ import { Editor, LIBRARY_STREAM, Store, SyncEngine, uuidv7, type EditContext } f
 import { BetterSqliteDriver, FakeServer } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
-import { addFieldDevice, libraryChoices } from '../additions/model';
+import { addFieldDevice, libraryChoices, searchChoices } from '../additions/model';
 import { loadReviewList } from '../review/model';
 import { loadDeviceCard } from '../card/model';
 import { asFound, drillRows, loadDashboard } from '../dashboard/model';
 import { engineFor, ruleDecider } from '../rules/engine';
 import {
+  ACCESSORY_GROUP,
   NSPS_POWER_SUPPLY,
+  REJECTED_GROUP,
+  acceptAllDrafts,
   acceptType,
   blankCable,
   copySources,
   copyTypes,
   createType,
   describeCable,
+  libraryGroups,
   loadLibrary,
+  matchesQuery,
   parseAliases,
   promoteType,
   rejectType,
@@ -330,5 +335,76 @@ describe('library roles (T112, D201)', () => {
     await createType(p.editor, store, p.id, { model: 'ERP24-FT', category: 'Power Distribution' });
     await createType(p.editor, store, p.id, { model: 'UFMP4', category: 'Foundry panel' });
     expect((await loadLibrary(store, p.id)).types.map((x) => x.category)).toEqual(['Power Distribution', 'Foundry panel', 'Equipment', 'Equipment']);
+  });
+
+  it('at catalogue size (T114): search by model, alias or display name; group chip; drafts only; accessories and rejected last', async () => {
+    const { store, userId } = await setup();
+    const lib = new Editor(store, { projectId: LIBRARY_STREAM, userId });
+    const make = (model: string, category: string | null, extra: Record<string, unknown> = {}) =>
+      lib.create('library_type', { project_id: null, model, category, state: 'draft', created_by_id: userId, ...extra }, CTX).then((r) => r.id);
+    const davinci = (displayName: string) => ({ source_ref: { kind: 'davinci', display_name: displayName, family: 'Paradigm', category: 'Stations' } });
+    const st = await make('P-ACP-1', 'Station', davinci('Paradigm Architectural Control Station'));
+    await make('P-ACP-2', 'Station', davinci('Paradigm Architectural Control Station 2'));
+    const ts = await make('P-TS7-E', 'Touchscreen', { aliases: ['TS 7'] });
+    await acceptType(lib, ts);
+    await make('UH-WM-KIT', 'Station', { accessory_only: true });
+    const gone = await make('OLD-1', 'Station');
+    await rejectType(lib, gone);
+    const { types } = await loadLibrary(store, null);
+    const keys = (gs: ReturnType<typeof libraryGroups>) => gs.map((g) => [g.key, g.types.map((t) => t.model), g.drafts]);
+    expect(keys(libraryGroups(types))).toEqual([
+      ['Touchscreen', ['P-TS7-E'], 0],
+      ['Station', ['P-ACP-1', 'P-ACP-2'], 2],
+      [ACCESSORY_GROUP, ['UH-WM-KIT'], 1],
+      [REJECTED_GROUP, ['OLD-1'], 0],
+    ]);
+    // every word must appear somewhere; case and spaces ignored; an alias counts
+    expect(keys(libraryGroups(types, { query: 'architectural 2' }))).toEqual([['Station', ['P-ACP-2'], 1]]);
+    expect(keys(libraryGroups(types, { query: 'ts7' }))).toEqual([['Touchscreen', ['P-TS7-E'], 0]]);
+    expect(keys(libraryGroups(types, { query: 'p-acp' })).map((g) => g[0])).toEqual(['Station']);
+    expect(keys(libraryGroups(types, { group: 'Touchscreen' }))).toEqual([['Touchscreen', ['P-TS7-E'], 0]]);
+    expect(keys(libraryGroups(types, { draftsOnly: true })).map((g) => g[0])).toEqual(['Station', ACCESSORY_GROUP]);
+    expect(libraryGroups(types, { query: 'nothing like it' })).toEqual([]);
+    expect(matchesQuery(['P-NSPS-D', null], '')).toBe(true);
+    expect(matchesQuery(['Paradigm Touchscreen Station'], 'station paradigm')).toBe(true);
+    expect(matchesQuery(['Paradigm Touchscreen Station'], 'station rack')).toBe(false);
+
+    // Accept all drafts in Station: one group, one reviewed `state` op per draft under this user
+    const before = await loadLibrary(store, null);
+    expect(await acceptAllDrafts(lib, store, null, 'Station')).toBe(2);
+    const after = await loadLibrary(store, null);
+    expect(after.types.filter((t) => t.state === 'draft').map((t) => t.model)).toEqual(['UH-WM-KIT']);
+    expect(after.drafts).toBe(before.drafts - 2);
+    expect(after.inReview).toBe(before.inReview);
+    const accepts = (await Promise.all(after.types.filter((t) => t.category === 'Station' && !t.accessoryOnly && t.state === 'accepted').map((t) => store.opsFor(t.id)))).map((ops) => ops.at(-1)!);
+    expect(accepts).toHaveLength(2);
+    expect(accepts.every((o) => o.field === 'state' && o.now === 'accepted' && o.was === 'draft' && o.user_id === userId && o.project_id === LIBRARY_STREAM)).toBe(true);
+    expect(new Set(accepts.map((o) => o.group_id)).size).toBe(1);
+    expect(accepts[0]!.group_id).toBeTruthy();
+    expect(accepts[0]!.reason).toBe('Device-type library: Accept all drafts in Station');
+    expect((await store.get('library_type', st))!).toMatchObject({ state: 'accepted' });
+    // nothing left to accept; the accessories have their own; rejected ones are not bulk-accepted
+    expect(await acceptAllDrafts(lib, store, null, 'Station')).toBe(0);
+    expect(await acceptAllDrafts(lib, store, null, ACCESSORY_GROUP)).toBe(1);
+    await expect(acceptAllDrafts(lib, store, null, REJECTED_GROUP)).rejects.toThrow(/one by one/);
+    expect((await store.get('library_type', gone))!).toMatchObject({ state: 'rejected' });
+  });
+
+  it('the field-addition picker searches its choices the same way (T114)', async () => {
+    const { store, userId, project } = await setup();
+    const lib = new Editor(store, { projectId: LIBRARY_STREAM, userId });
+    await lib.create('library_type', { project_id: null, model: 'P-ACP-1', category: 'Station', state: 'accepted', source_ref: { kind: 'davinci', display_name: 'Paradigm Architectural Control Station' } }, CTX);
+    await lib.create('library_type', { project_id: null, model: 'P-TS7-E', category: 'Touchscreen', aliases: ['TS7'], state: 'accepted' }, CTX);
+    await lib.create('library_type', { project_id: null, model: 'UH-WM-KIT', category: 'Station', accessory_only: true, state: 'draft' }, CTX);
+    const p = await project('Tower');
+    const choices = await libraryChoices(store, p.id);
+    expect(choices.map((c) => [c.model, c.displayName])).toEqual([
+      ['P-ACP-1', 'Paradigm Architectural Control Station'],
+      ['P-TS7-E', null],
+    ]);
+    expect(searchChoices(choices, 'control station').map((c) => c.model)).toEqual(['P-ACP-1']);
+    expect(searchChoices(choices, 'ts7').map((c) => c.model)).toEqual(['P-TS7-E']);
+    expect(searchChoices(choices, '').map((c) => c.model)).toEqual(['P-ACP-1', 'P-TS7-E']);
+    expect(searchChoices(choices, 'wm kit')).toEqual([]);
   });
 });

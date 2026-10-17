@@ -3,6 +3,8 @@
  * panel: category → type from the library (or a model typed freely → draft type, D55) → Add.
  * Every ID comes from the server (D93, D118): the device shows `<level>-?` + NEW until then. The new device's
  * card opens after Add. The pin goes where the surveyor long-pressed (shown as a grey "+" pin).
+ * The model box searches the choices as you type (T114: model, alias, catalogue name; the
+ * Library screen's search), and shows at most `SHOWN` chips.
  */
 
 import { OpError, type Editor, type Store } from '@field-survey/core';
@@ -11,7 +13,10 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 
 import { chipStyles } from '../plan/chips';
 import { DEVICE_CATEGORIES } from '../plan/pins';
-import { addFieldDevice, libraryChoices, matchModel, type LibraryChoice } from './model';
+import { addFieldDevice, libraryChoices, matchModel, searchChoices, type LibraryChoice } from './model';
+
+/** Chips shown at once: the app library holds about 500 placeable types after the DaVinci import. */
+const SHOWN = 60;
 
 export type AddDeviceProps = {
   store: Store;
@@ -47,8 +52,14 @@ export function AddDevicePanel(props: AddDeviceProps) {
     libraryChoices(store, projectId).then(setAll, (e: unknown) => setError(String(e)));
   }, [store, projectId]);
 
-  const choices = useMemo(() => (all ?? []).filter((c) => !category || c.category === category), [all, category]);
   const picked = typeId ? (all?.find((c) => c.id === typeId) ?? null) : null;
+  const matching = useMemo(() => searchChoices((all ?? []).filter((c) => !category || c.category === category), typed), [all, category, typed]);
+  // the picked chip stays in view even past the cut
+  const choices = useMemo(() => {
+    const head = matching.slice(0, SHOWN);
+    return picked && !head.includes(picked) ? [picked, ...head] : head;
+  }, [matching, picked]);
+  const hidden = Math.max(0, matching.length - SHOWN);
   const typedMatch = !picked && typed.trim() ? matchModel(all ?? [], typed) : null;
   const effective = picked ?? typedMatch;
   const effectiveCategory = effective?.category ?? category;
@@ -108,6 +119,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
         {!all ? (
           <ActivityIndicator />
         ) : choices.length ? (
+          <>
           <View style={styles.rowWrap}>
             {choices.map((c) => (
               <Chip
@@ -126,6 +138,10 @@ export function AddDevicePanel(props: AddDeviceProps) {
               />
             ))}
           </View>
+          {hidden > 0 ? <Text style={styles.muted}>{hidden} more: type in the box below to narrow.</Text> : null}
+          </>
+        ) : typed.trim() && all.length ? (
+          <Text style={styles.muted}>No library type matches “{typed.trim()}”{category ? ` in ${category}` : ''}.</Text>
         ) : (
           <Text style={styles.muted}>{category ? `No ${category} types in the library yet.` : 'No types in the library yet.'} Type the model below.</Text>
         )}
@@ -136,7 +152,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
             setTyped(t);
             if (t) setTypeId(null);
           }}
-          placeholder="…or type the model (e.g. ERP-RTO)"
+          placeholder="Search the types, or type a new model (e.g. ERP-RTO)"
           placeholderTextColor="#888"
           autoCapitalize="characters"
           autoCorrect={false}

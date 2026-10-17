@@ -1,13 +1,16 @@
 import { OpError, type Editor, type Role, type Store } from '@field-survey/core';
-import { useCallback, useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, FlatList, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import {
+  ACCESSORY_GROUP,
   CABLE_CODES,
   CATEGORIES,
   NSPS_POWER_SUPPLY,
+  REJECTED_GROUP,
   ROLES,
   ROLE_LABELS,
+  acceptAllDrafts,
   acceptType,
   blankCable,
   copySources,
@@ -15,6 +18,7 @@ import {
   createType,
   promoteType,
   describeCable,
+  libraryGroups,
   loadLibrary,
   neuronIdDefaultForRole,
   parseAliases,
@@ -28,9 +32,13 @@ import {
   type IdScheme,
   type LibraryAccessory,
   type LibraryCable,
+  type LibraryGroup,
   type LibraryType,
   type LibraryView,
 } from './model';
+
+/** One row of the virtualised list: a group's header, or a type. */
+type Item = { kind: 'head'; group: LibraryGroup; total: LibraryGroup | null; collapsed: boolean } | { kind: 'type'; type: LibraryType };
 
 type Pane = { kind: 'type'; id: string } | { kind: 'new' } | { kind: 'copy' } | null;
 /** Run an edit; `done` is the line shown after it (a function to word it from what the edit did). */
@@ -43,6 +51,9 @@ type RunFn = (fn: (e: Editor, s: Store) => Promise<unknown>, done?: string | (()
  * cables and accessories, Accept / Reject — plus "+ New type" and "Copy from…". `scope` is the
  * project id, or null for the app library (T61, D65): then `editor` writes to the library stream
  * (`/library/ops`, D184). A project's accepted types can be promoted with `libraryEditor`.
+ * At catalogue size (T114, about 1100 types after the DaVinci import) the list has a search box
+ * (model, alias, display name), a group chip filter, "Drafts only", the accessories folded,
+ * and "Accept all drafts in <group>" on each group header.
  */
 export function LibraryScreen(props: {
   store: Store | null;
@@ -92,9 +103,41 @@ export function LibraryScreen(props: {
     [editor, store],
   );
 
-  const types = view?.types ?? [];
+  const [query, setQuery] = useState('');
+  const [group, setGroup] = useState<string | null>(null);
+  const [draftsOnly, setDraftsOnly] = useState(false);
+  const [accessoriesOpen, setAccessoriesOpen] = useState(false);
+
+  const types = useMemo(() => view?.types ?? [], [view]);
   const selected = pane?.kind === 'type' ? (types.find((t) => t.id === pane.id) ?? null) : null;
-  const groups = groupByCategory(types);
+  const all = useMemo(() => libraryGroups(types), [types]);
+  const filtered = !!query.trim() || draftsOnly;
+  const items = useMemo((): Item[] => {
+    const out: Item[] = [];
+    for (const g of libraryGroups(types, { query, group, draftsOnly })) {
+      // the accessories stay folded unless asked for (their chip, a search, or the header)
+      const collapsed = g.key === ACCESSORY_GROUP && !accessoriesOpen && !query.trim() && group !== ACCESSORY_GROUP;
+      out.push({ kind: 'head', group: g, total: all.find((a) => a.key === g.key) ?? null, collapsed });
+      if (!collapsed) for (const t of g.types) out.push({ kind: 'type', type: t });
+    }
+    return out;
+  }, [types, all, query, group, draftsOnly, accessoriesOpen]);
+
+  const acceptGroup = (g: LibraryGroup) => {
+    const n = g.drafts;
+    Alert.alert(`Accept all ${n} draft${n === 1 ? '' : 's'} in ${g.key}?`, 'Each accept is recorded under your name, the same as accepting them one by one. The search and Drafts only do not narrow this.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: `Accept ${n}`,
+        onPress: () => {
+          let done = 0;
+          void run(async (e, s) => {
+            done = await acceptAllDrafts(e, s, scope, g.key);
+          }, () => `Accepted ${done} draft${done === 1 ? '' : 's'} in ${g.key}.`);
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.root}>
@@ -117,34 +160,50 @@ export function LibraryScreen(props: {
       </View>
       {note ? <Text style={[styles.note, !note.error && styles.noteOk]}>{note.text}</Text> : null}
       <View style={styles.split}>
-        <ScrollView style={styles.list} contentContainerStyle={styles.listBody}>
-          {groups.map(([cat, rows]) => (
-            <View key={cat} style={styles.group}>
-              <Text style={styles.groupTitle}>{cat}</Text>
-              {rows.map((t) => (
-                <Pressable key={t.id} onPress={() => setPane({ kind: 'type', id: t.id })} style={[styles.typeRow, selected?.id === t.id && styles.typeRowOn]}>
-                  <Text style={[styles.typeModel, t.state === 'rejected' && styles.dim]} numberOfLines={1}>
-                    {t.state === 'draft' ? <Text style={styles.draft}>DRAFT </Text> : null}
-                    {t.state === 'rejected' ? <Text style={styles.dim}>rejected </Text> : null}
-                    {t.model}
-                    {t.aliases.length ? <Text style={styles.sub}> · {t.aliases.join(' · ')}</Text> : null}
-                  </Text>
-                  <Text style={styles.sub}>
-                    {t.devices} device{t.devices === 1 ? '' : 's'}
-                    {t.state === 'draft' ? ` · added by ${nameOf(props.names, t.createdById)}${t.createdAt ? ` ${shortDate(t.createdAt)}` : ''} ⚑` : ''}
+        <View style={styles.list}>
+          <View style={styles.filters}>
+            <View style={styles.row}>
+              <TextInput value={query} onChangeText={setQuery} placeholder="Search model, alias or name" placeholderTextColor="#888" autoCorrect={false} autoCapitalize="none" clearButtonMode="while-editing" style={[styles.input, styles.grow]} />
+              <Text style={styles.sub}>Drafts only</Text>
+              <Switch value={draftsOnly} onValueChange={setDraftsOnly} />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrapLine} keyboardShouldPersistTaps="handled">
+              {[null, ...all.map((g) => g.key)].map((k) => (
+                <Pressable key={k ?? 'all'} onPress={() => setGroup(group === k ? null : k)} style={[styles.chip, group === k && styles.chipOn]}>
+                  <Text style={group === k ? styles.chipTextOn : styles.chipText}>
+                    {k ?? 'All'} ({k ? (all.find((g) => g.key === k)?.types.length ?? 0) : types.length})
                   </Text>
                 </Pressable>
               ))}
-            </View>
-          ))}
-          {view && !types.length ? (
-            <Text style={styles.sub}>
-              {scope
-                ? 'No device types yet. Add one, or copy them from another project or the app library.'
-                : 'The app library is empty. New projects copy its accepted types; add one, copy from a project, or promote a project\'s type.'}
-            </Text>
-          ) : null}
-        </ScrollView>
+            </ScrollView>
+          </View>
+          <FlatList
+            data={items}
+            keyExtractor={(it) => (it.kind === 'head' ? `h:${it.group.key}` : it.type.id)}
+            contentContainerStyle={styles.listBody}
+            keyboardShouldPersistTaps="handled"
+            initialNumToRender={30}
+            windowSize={11}
+            renderItem={({ item }) =>
+              item.kind === 'head' ? (
+                <GroupHead item={item} filtered={filtered} canEdit={!!editor} onToggle={item.group.key === ACCESSORY_GROUP ? () => setAccessoriesOpen(!accessoriesOpen) : undefined} onAcceptAll={acceptGroup} />
+              ) : (
+                <TypeRow t={item.type} on={selected?.id === item.type.id} names={props.names} onPress={() => setPane({ kind: 'type', id: item.type.id })} />
+              )
+            }
+            ListEmptyComponent={
+              view ? (
+                <Text style={styles.sub}>
+                  {types.length
+                    ? 'Nothing matches the search and filters.'
+                    : scope
+                      ? 'No device types yet. Add one, or copy them from another project or the app library.'
+                      : "The app library is empty. New projects copy its accepted types; add one, copy from a project, or promote a project's type."}
+                </Text>
+              ) : null
+            }
+          />
+        </View>
         <ScrollView style={styles.pane} contentContainerStyle={styles.paneBody} keyboardShouldPersistTaps="handled">
           {pane?.kind === 'new' ? (
             <NewType scope={scope} run={run} onCreated={(id) => setPane({ kind: 'type', id })} />
@@ -161,13 +220,45 @@ export function LibraryScreen(props: {
   );
 }
 
-function groupByCategory(types: readonly LibraryType[]): [string, LibraryType[]][] {
-  const out = new Map<string, LibraryType[]>();
-  for (const t of types) {
-    const k = t.state === 'rejected' ? 'Rejected' : t.accessoryOnly ? 'Accessories (not placeable)' : (t.category ?? 'No category');
-    out.set(k, [...(out.get(k) ?? []), t]);
-  }
-  return [...out.entries()];
+/** A group's header: name, counts, "Accept all" (the whole group, not just what the search shows). */
+function GroupHead(props: { item: Extract<Item, { kind: 'head' }>; filtered: boolean; canEdit: boolean; onToggle?: () => void; onAcceptAll: (g: LibraryGroup) => void }) {
+  const { group, total, collapsed } = props.item;
+  const whole = total ?? group;
+  const count = props.filtered && group.types.length !== whole.types.length ? `${group.types.length} of ${whole.types.length}` : `${whole.types.length}`;
+  return (
+    <View style={[styles.row, styles.groupHead]}>
+      <Pressable disabled={!props.onToggle} onPress={props.onToggle} style={styles.grow}>
+        <Text style={styles.groupTitle}>
+          {props.onToggle ? (collapsed ? '▸ ' : '▾ ') : ''}
+          {group.key} <Text style={styles.sub}>({count}{whole.drafts ? ` · ${whole.drafts} draft${whole.drafts === 1 ? '' : 's'}` : ''})</Text>
+        </Text>
+      </Pressable>
+      {props.canEdit && whole.drafts > 0 && group.key !== REJECTED_GROUP ? (
+        <Pressable onPress={() => props.onAcceptAll(whole)} hitSlop={6}>
+          <Text style={styles.linkSmall}>Accept all {whole.drafts}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function TypeRow(props: { t: LibraryType; on: boolean; names: ReadonlyMap<string, string>; onPress: () => void }) {
+  const { t } = props;
+  return (
+    <Pressable onPress={props.onPress} style={[styles.typeRow, props.on && styles.typeRowOn]}>
+      <Text style={[styles.typeModel, t.state === 'rejected' && styles.dim]} numberOfLines={1}>
+        {t.state === 'draft' ? <Text style={styles.draft}>DRAFT </Text> : null}
+        {t.state === 'rejected' ? <Text style={styles.dim}>rejected </Text> : null}
+        {t.model}
+        {t.aliases.length ? <Text style={styles.sub}> · {t.aliases.join(' · ')}</Text> : null}
+      </Text>
+      <Text style={styles.sub} numberOfLines={1}>
+        {t.sourceRef?.displayName && t.sourceRef.displayName !== t.model ? `${t.sourceRef.displayName} · ` : ''}
+        {t.devices} device{t.devices === 1 ? '' : 's'}
+        {t.state === 'draft' ? ` · added by ${nameOf(props.names, t.createdById)}${t.createdAt ? ` ${shortDate(t.createdAt)}` : ''} ⚑` : ''}
+      </Text>
+    </Pressable>
+  );
 }
 
 function nameOf(names: ReadonlyMap<string, string>, id: string | null): string {
@@ -527,10 +618,13 @@ const styles = StyleSheet.create({
   noteOk: { color: '#1a7f37' },
   split: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e1e4e8' },
   list: { flex: 4, borderRightWidth: 1, borderRightColor: '#e1e4e8' },
-  listBody: { padding: 16, gap: 14 },
+  listBody: { paddingHorizontal: 16, paddingBottom: 16, gap: 2 },
+  filters: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, gap: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e1e4e8' },
+  wrapLine: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 2 },
+  groupHead: { paddingTop: 12 },
+  linkSmall: { color: '#1f6feb', fontSize: 14, fontWeight: '600' },
   pane: { flex: 6 },
   paneBody: { padding: 20, gap: 16 },
-  group: { gap: 4 },
   groupTitle: { fontSize: 15, fontWeight: '700', color: '#444' },
   typeRow: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, minHeight: 44 },
   typeRowOn: { backgroundColor: '#e8f0fe' },
