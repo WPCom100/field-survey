@@ -623,7 +623,7 @@ export function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardD
 }
 
 /**
- * Quick actions E6 / E7 / E9 (Phase 3 §4.3, T34): a tap opens the one question the action asks
+ * Quick actions E6 / E7 / E9 (Phase 3 §4.3, T34) and "Not found on site" (T101, runs on its tap): a tap opens the one question the action asks
  * (what was found / the make / the new room), Apply writes the records in one group through the
  * rules package; the card reloads through `run`.
  */
@@ -648,6 +648,13 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
     }
   };
 
+  /** An action that asks nothing ("Not found on site") runs on its tap. */
+  const runAtOnce = async (action: QuickAction) => {
+    setBusy(true);
+    await run((e) => runQuickAction(e, deviceId, action));
+    setBusy(false);
+  };
+
   return (
     <View style={styles.draftForm}>
       <View style={styles.rowWrap}>
@@ -658,6 +665,11 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
             disabled={readOnly || !x.enabled || busy}
             onPress={() => {
               setAnswer('');
+              if (x.input === null) {
+                setAsking(null);
+                void runAtOnce({ kind: 'not_found' });
+                return;
+              }
               setAsking(asking === x.key ? null : x.key);
             }}
           />
@@ -673,7 +685,7 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
           </View>
         </View>
       ) : null}
-      {!readOnly && !q ? <Text style={styles.muted}>Spot-check fixed closes an ETC item "Reterminated - all good"; Non-ETC device marks it Not installed and asks the EC to confirm; Relocated notes the move.</Text> : null}
+      {!readOnly && !q ? <Text style={styles.muted}>Spot-check fixed closes an ETC item "Reterminated - all good"; Non-ETC device marks it Not installed and asks the EC to confirm; Relocated notes the move; Not found on site marks it Not installed and not found, no item.</Text> : null}
     </View>
   );
 }

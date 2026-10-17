@@ -1,5 +1,5 @@
 /**
- * Quick actions E6 / E7 / E9 (PLAN §6.1, Phase 3 §4.3). Unlike the rules, these run when a
+ * Quick actions E6 / E7 / E9 and "Not found on site" (PLAN §6.1, Phase 3 §4.3). Unlike the rules, these run when a
  * person taps them on the device card: the records are written at once, in one group, with the
  * action's id as `rule_id` on the item. No snapshot, no proposal.
  *
@@ -8,16 +8,18 @@
  * | E6 "Spot-check fixed" | `Information` item, `ETC`, Closed today, Notes "Reterminated - all good"; item "Spot check: <what was found>" (the master's #14); device Notes untouched |
  * | E7 "Non-ETC device" (make) | device Status `Not installed`, Notes appended "Not Installed; installed <category> at location appears to be a <make>, confirm."; `Information` item `EC` "Confirm existing <category> at location is a <make>, not a <model>" (the master's 02 #22 / 02-D4) |
  * | E9 "Relocated" (new room) | Room / Location = "<new room>; moved from <old room>" |
+ * | "Not found on site" | `found_on_site = false`, Status `Not installed`, Notes appended "Not Installed."; no item (R2/R3 make the items from the status) and the device stays in the baseline (D210, T101) |
  */
 
 import { OpError, type EditContext, type Editor, type Op } from '@field-survey/core';
 
-export type QuickAction = { kind: 'E6'; found?: string | null } | { kind: 'E7'; make: string } | { kind: 'E9'; room: string };
+export type QuickAction = { kind: 'E6'; found?: string | null } | { kind: 'E7'; make: string } | { kind: 'E9'; room: string } | { kind: 'not_found' };
 
 export const QUICK_ACTION_TEXT: Readonly<Record<QuickAction['kind'], { title: string; text: string }>> = {
   E6: { title: 'Spot-check fixed', text: 'A spot-check finding fixed on site: an Information item for ETC, Closed today, Notes "Reterminated - all good". The device Notes stay as they are.' },
   E7: { title: 'Non-ETC device', text: 'A non-ETC device found at the location: the device is Not installed with a note of the make, and an Information item for the EC asks to confirm it.' },
   E9: { title: 'Relocated', text: 'The device is somewhere else than drawn: Room / Location becomes the new room with "; moved from <old room>".' },
+  not_found: { title: 'Not found on site', text: 'The drawn device is not there: it is marked not found on site and Not installed, with "Not Installed." in its Notes. It stays in the baseline; no item is made here.' },
 };
 
 type Row = Record<string, unknown>;
@@ -90,6 +92,14 @@ export async function runQuickAction(editor: Editor, deviceId: string, action: Q
         if (!room) throw new OpError('Say where the device is now.');
         const old = s(device.room_location);
         await g.setField('device', deviceId, 'room_location', old ? `${room}; moved from ${old}` : room);
+        break;
+      }
+      case 'not_found': {
+        await g.setFields('device', deviceId, {
+          found_on_site: false,
+          status: 'Not installed',
+          notes: appendPhrase(s(device.notes), 'Not Installed.'),
+        });
         break;
       }
     }

@@ -523,6 +523,14 @@ Decision D208: answered 2026-10-16, **Approved** (anyone assigns; several people
 
 Decision D209: drafts that no device card lists (Neuron ID item, Unison pair, a part on an item with no device) live in the Lint view, decided in place with the card's buttons. → Approve / change:
 
+## T101 — "Not found on site" quick action  ·  Needs: no new build
+
+**Why it matters:** a drawn device that is simply not there had no one-tap way to record it; it now stays in the baseline marked not found, and the rules make the items from its `Not installed` status.
+
+- [ ] **One tap.** Open a surveyed or unsurveyed device's card, tap **Not found on site** under the quick actions: no question appears; the status shows `Not installed` (red hollow "NI" pin), Notes end with "Not Installed." after "; " if there was a note. → saw:
+- [ ] **No item, still in the baseline.** The card's punch items gain nothing from the tap itself (rule drafts for its wires may appear as usual); the device is not deleted and its pin stays. History shows one group, "Quick action not_found: Not found on site". Tap it again: Notes do not get a second "Not Installed.". → saw:
+- [ ] **Dashboard.** Dashboard → As-found: `never found` went up by one; tap it and the list holds the device. → saw:
+
 ---
 
 ## Rules for this file

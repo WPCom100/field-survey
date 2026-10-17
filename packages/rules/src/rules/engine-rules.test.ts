@@ -145,7 +145,7 @@ describe('RULES over a store', () => {
   });
 });
 
-describe('quick actions E6 / E7 / E9', () => {
+describe('quick actions E6 / E7 / E9 / Not found on site', () => {
   it('E6 writes a Closed Information item for ETC with the master\'s note; E7 marks the device Not installed and asks to confirm; E9 appends the move', async () => {
     const { store, editor, ids } = await project();
     const e6 = await runQuickAction(editor, ids.station, { kind: 'E6', found: 'Wagos used like wire nuts' }, () => '2026-10-15T14:00:00.000Z');
@@ -166,5 +166,20 @@ describe('quick actions E6 / E7 / E9', () => {
     expect(e9.punchItemId).toBeNull();
     expect((await store.get<Row>('device', ids.station))!.room_location).toBe('Corridor XX06M-C007; moved from Corridor XX06M-C006');
     await expect(runQuickAction(editor, uuidv7(), { kind: 'E9', room: 'x' })).rejects.toThrow(/not on this iPad/);
+  });
+
+  it('Not found on site marks the device not found and Not installed with "Not Installed.", makes no item, keeps it in the baseline, and is idempotent', async () => {
+    const { store, editor, ids } = await project();
+    await editor.setField('device', ids.station, 'notes', 'Empty box on wall.', CTX);
+    const before = (await store.list<Row>('punch_item')).length;
+    const r = await runQuickAction(editor, ids.station, { kind: 'not_found' });
+    expect(r.punchItemId).toBeNull();
+    expect(await store.get<Row>('device', ids.station)).toMatchObject({ status: 'Not installed', notes: 'Empty box on wall.; Not Installed.', deleted_at: null });
+    expect([0, false]).toContain((await store.get<Row>('device', ids.station))!.found_on_site);
+    expect((await store.list<Row>('punch_item')).length).toBe(before);
+    expect(new Set(r.ops.map((o) => o.group_id)).size).toBe(1);
+    expect(r.ops.every((o) => o.reason === 'Quick action not_found: Not found on site' && o.change_type === 'Field survey')).toBe(true);
+    await runQuickAction(editor, ids.station, { kind: 'not_found' });
+    expect((await store.get<Row>('device', ids.station))!.notes).toBe('Empty box on wall.; Not Installed.');
   });
 });

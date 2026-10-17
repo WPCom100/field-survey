@@ -22,7 +22,7 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | `src/rules/lint.ts` | The PLAN §6.3 checks the rules above do not raise (T36), `LINT_RULES`, `VOCAB_FIELDS`. |
 | `src/lints.ts` | `LINT_CHECKS` (every lint id under its §6.3 check, with a hint, in the lint view's order), `checkOf`, `rulingSeeds` (the "fix all via ruling" hand-off to T37). |
 | `src/rulings.ts` | Rulings (T37, PLAN §6.4): `RulingDraft` (filter, action, scope, standing), `RULING_FIELDS`, `parseRuling` (incl. the D50 import form), `checkRuling`, `previewRuling`, `vocabPlan`, `describeRuling`, the hand-off drafts (`draftFromSeed`, `draftFromSelection`) and `RulingRule` (standing rulings). |
-| `src/rules/quick.ts` | Quick actions E6 / E7 / E9: `runQuickAction(editor, deviceId, action)` writes the records at once (a person tapped). |
+| `src/rules/quick.ts` | Quick actions E6 / E7 / E9 and Not found on site: `runQuickAction(editor, deviceId, action)` writes the records at once (a person tapped). |
 | `src/testing/sample.ts`, `src/testing/build.ts` | A two-device snapshot with two sample rules, and the snapshot builder the rule tests use. |
 
 ## The rules (T34)
@@ -48,6 +48,7 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | E5 | `status` draft on the 0-10V end + `punch` draft on the device | ERP-FT-LVD found < expected → end `Issue` with `extra {note: "Not landed", status_source: derived}`; "Land 0-10V control wiring" (`Wiring`, `EC`) unless R3a's Termination branch already raises it. |
 | Acc | finding, discriminator = accessory id | Any accessory found < expected (D52). |
 | E6 / E7 / E9 | quick actions | See `quick.ts`: Spot-check fixed, Non-ETC device (make), Relocated (new room). |
+| — | Not found on site | See `quick.ts`: `found_on_site = false`, `Not installed`, Notes "Not Installed."; no item (D210). |
 
 ## Lint checks (T36, PLAN §6.3)
 
