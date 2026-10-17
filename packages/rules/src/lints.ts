@@ -38,6 +38,7 @@ export const LINT_CHECKS: readonly LintCheck[] = [
   { id: 'pin_sheet', title: 'Pin outside the sheet', lints: ['lint.pin_sheet'], hint: 'Open the plan and move the pin onto the sheet.' },
   { id: 'locked_drafts', title: 'Level locked with unreviewed drafts', lints: ['lint.locked_drafts'], hint: 'Review the drafts in Setup, or unlock the level to do so.' },
   { id: 'accessory', title: 'Accessory found < expected', lints: ['Acc'], hint: 'Check the device; order the accessory as a missing part if it is not there.' },
+  { id: 'accessory_group', title: 'Accessory group out of range', lints: ['lint.accessory_group'], hint: 'Count the group\'s accessories on the device again; order a missing one as a part, or correct a model counted twice.' },
   { id: 'status', title: 'Device status', lints: ['R1.untested', 'R1.complete'], hint: 'Outstanding wiring is Issue; nothing is Complete in this phase.' },
   { id: 'note_status', title: 'Note does not match status', lints: ['R2a'], hint: 'Correct the note or the status so they say the same thing.' },
   { id: 'test_item', title: 'Test or commissioning item', lints: ['R3d'], hint: 'This phase has no test or commissioning items: reword or delete it.' },

@@ -16,6 +16,7 @@ import type { FindingRow } from '../snapshot';
 import { Build } from '../testing/build';
 import { RULES } from './index';
 import {
+  LintAccessoryGroup,
   LintDeletedLink,
   LintEndStatus,
   LintFarEnd,
@@ -188,6 +189,80 @@ describe('duplicates, links, pins, locks', () => {
       { id: 'dd-3', kind: 'device', level_id: open.id, state: 'proposed', deleted_at: null },
     );
     expect(found(b, [LintLockedDrafts])).toEqual([['lint.locked_drafts', locked.id, 'Level B2 is locked with 2 unreviewed drafts']]);
+  });
+});
+
+describe('accessory groups and max quantities (T113, D197 (4), D202)', () => {
+  const ern = [
+    { model: 'P-ACP-E Mk2', expected_qty: 1, max_quantity: 1, group: { label: 'ERn Modules', min: 2, max: 2 } },
+    { model: 'ERn-BM', expected_qty: null, max_quantity: 2, group: { label: 'ERn Modules', min: 2, max: 2 } },
+    { model: 'ERn-Net', expected_qty: null, max_quantity: 1, group: { label: 'ERn Accessories', min: 0, max: 1 } },
+    { model: 'ERn-DMX', expected_qty: null, max_quantity: 1, group: { label: 'ERn Accessories', min: 0, max: 1 } },
+    { model: 'URTO Mk2', expected_qty: null, max_quantity: 1 },
+  ];
+
+  it('flags a group found under its min or over its max, naming the label and the members, and a model over its max quantity', () => {
+    const b = new Build();
+    const l = b.level('06M');
+    const type = b.libraryType('ERn2', 'Equipment Rack', { optional_accessories: ern });
+    const rack = b.device(l, 'Equipment Rack', { display_id: '06M-05', library_type_id: type.id });
+    b.accessory(rack, 'P-ACP-E Mk2', 1, 1);
+    b.accessory(rack, 'ERn-Net', null, 1);
+    b.accessory(rack, 'ern-DMX ', null, 1); // matched without spaces or case
+    b.accessory(rack, 'URTO Mk2', null, 2);
+    expect(found(b, [LintAccessoryGroup])).toEqual([
+      ['lint.accessory_group', rack.id, '06M-05: URTO Mk2 found 2, at most 1'],
+      ['lint.accessory_group', rack.id, '06M-05: ERn Modules found 1, needs 2 (P-ACP-E Mk2, ERn-BM)'],
+      ['lint.accessory_group', rack.id, '06M-05: ERn Accessories found 2, needs 0 to 1 (ERn-Net, ERn-DMX)'],
+    ]);
+  });
+
+  it('is quiet when the groups are in range, before anything is counted, and on a draft or no type', () => {
+    const b = new Build();
+    const l = b.level('06M');
+    const type = b.libraryType('ERn2', 'Equipment Rack', { optional_accessories: ern });
+    const ok = b.device(l, 'Equipment Rack', { display_id: '06M-05', library_type_id: type.id });
+    b.accessory(ok, 'P-ACP-E Mk2', 1, 1);
+    b.accessory(ok, 'ERn-BM', null, 1);
+    b.accessory(ok, 'URTO Mk2', null, 1);
+    const uncounted = b.device(l, 'Equipment Rack', { display_id: '06M-06', library_type_id: type.id });
+    b.accessory(uncounted, 'P-ACP-E Mk2', 1, null);
+    const draft = b.libraryType('P-TS7-E', 'Touchscreen', {
+      state: 'draft',
+      optional_accessories: [
+        { model: 'P-BB-1', expected_qty: null, max_quantity: 1, group: { label: 'backbox accessory', min: 1, max: 1 } },
+        { model: 'P-BB-2', expected_qty: null, max_quantity: 1, group: { label: 'backbox accessory', min: 1, max: 1 } },
+      ],
+    });
+    const ts = b.device(l, 'Touchscreen', { display_id: '06M-07', library_type_id: draft.id });
+    b.accessory(ts, 'P-BB-1', null, 1);
+    b.accessory(ts, 'P-BB-2', null, 1);
+    const none = b.device(l, 'Equipment Rack', { display_id: '06M-08' });
+    b.accessory(none, 'URTO Mk2', null, 5);
+    expect(found(b, [LintAccessoryGroup])).toEqual([]);
+    // accepting the touchscreen type raises its back-box group: one of these, two found
+    draft.state = 'accepted';
+    expect(found(b, [LintAccessoryGroup])).toEqual([['lint.accessory_group', ts.id, '06M-07: backbox accessory found 2, needs 1 (P-BB-1, P-BB-2)']]);
+  });
+
+  it('reads a group with no max as "at least", and the D52 NSPS power supply stays the Acc finding', () => {
+    const b = new Build();
+    const l = b.level('06M');
+    const type = b.libraryType('P-NSPS-D-KIT', 'Equipment', {
+      role: 'nsps',
+      optional_accessories: [
+        { model: 'P-NSPS-D Power Supply', expected_qty: 1 },
+        { model: 'Wago', expected_qty: null, group: { label: 'Connectors', min: 2, max: null } },
+      ],
+    });
+    const nsps = b.device(l, 'Equipment', { display_id: '06M-04', library_type_id: type.id });
+    b.accessory(nsps, 'P-NSPS-D Power Supply', 1, 0);
+    b.accessory(nsps, 'Wago', null, 1);
+    const all = evaluate(b.snap, RULES, undefined, { now: NOW }).findings.filter((f) => f.lint_id === 'Acc' || f.lint_id === 'lint.accessory_group');
+    expect(all.map((f) => [f.lint_id, f.message])).toEqual([
+      ['Acc', 'P-NSPS-D Power Supply: found 0 of 1'],
+      ['lint.accessory_group', '06M-04: Connectors found 1, needs at least 2 (Wago)'],
+    ]);
   });
 });
 

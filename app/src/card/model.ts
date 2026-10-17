@@ -108,8 +108,19 @@ export type CardCableOffer = {
   cable: LibraryCable;
 };
 
-/** An optional accessory of the device's type it has no row for: "+ add <model>" (T105). */
-export type CardAccessoryOffer = { model: string; expected: number | null };
+/** An accessory group of the type (D197 (4)): "one of these back boxes", "two ERn modules". */
+export type AccessoryGroup = { label: string; min: number; max: number | null };
+
+/** An optional accessory of the device's type it has no row for: "+ add <model>" (T105), with its group (T113). */
+export type CardAccessoryOffer = { model: string; expected: number | null; group: AccessoryGroup | null };
+
+/**
+ * The card's "+ add" rows gathered for display (T113): an ungrouped offer is a block of its own
+ * (the D52 NSPS power supply keeps its row), a group's offers share one block under the group's
+ * label, in the type's slot order. `found` = what the device's rows of the group's
+ * members count (null while none is counted); `members` = every model of the group on the type.
+ */
+export type CardAccessoryOfferBlock = { group: AccessoryGroup | null; members: string[]; found: number | null; offers: CardAccessoryOffer[] };
 
 export type JumpTarget = { deviceId: string; levelId: string; label: string; sameLevel: boolean };
 
@@ -193,6 +204,8 @@ export type DeviceCard = {
   cableOffers: CardCableOffer[];
   /** The type's optional accessories the device has no row for. */
   accessoryOffers: CardAccessoryOffer[];
+  /** The same offers in blocks by the type's accessory groups (T113). */
+  accessoryOfferGroups: CardAccessoryOfferBlock[];
   punch: CardPunch[];
   parts: CardPart[];
   drafts: CardDraft[];
@@ -340,7 +353,52 @@ export function optionalAccessoryOffers(type: TypeLists | null, models: readonly
   const have = new Set(models.map(modelKey));
   return parseLibraryAccessories(type.optional_accessories)
     .filter((a) => !have.has(modelKey(a.model)))
-    .map((a) => ({ model: a.model, expected: a.expected_qty }));
+    .map((a) => ({ model: a.model, expected: a.expected_qty, group: a.group ?? null }));
+}
+
+const groupKey = (g: AccessoryGroup) => JSON.stringify([g.label, g.min, g.max]);
+
+/** `offers` in blocks by group (see `CardAccessoryOfferBlock`); `rows` = the device's accessories. */
+export function accessoryOfferBlocks(
+  type: TypeLists | null,
+  offers: readonly CardAccessoryOffer[],
+  rows: readonly Pick<CardAccessory, 'model' | 'found'>[],
+): CardAccessoryOfferBlock[] {
+  const slots = type ? parseLibraryAccessories(type.optional_accessories) : [];
+  const out: CardAccessoryOfferBlock[] = [];
+  const byGroup = new Map<string, CardAccessoryOfferBlock>();
+  for (const o of offers) {
+    if (!o.group) {
+      out.push({ group: null, members: [o.model], found: null, offers: [o] });
+      continue;
+    }
+    const k = groupKey(o.group);
+    let block = byGroup.get(k);
+    if (!block) {
+      const members = [...new Map(slots.filter((a) => a.group && groupKey(a.group) === k).map((a) => [modelKey(a.model), a.model])).values()];
+      const keys = new Set(members.map(modelKey));
+      const counted = rows.filter((r) => keys.has(modelKey(r.model)) && r.found !== null);
+      block = { group: o.group, members, found: counted.length ? counted.reduce((n, r) => n + (r.found ?? 0), 0) : null, offers: [] };
+      byGroup.set(k, block);
+      out.push(block);
+    }
+    block.offers.push(o);
+  }
+  // In the type's slot order, so a block does not move when one of its members is added.
+  const first = (b: CardAccessoryOfferBlock) => {
+    const keys = new Set(b.members.map(modelKey));
+    const i = slots.findIndex((a) => keys.has(modelKey(a.model)));
+    return i < 0 ? slots.length : i;
+  };
+  return out.map((b, i) => ({ b, i, at: first(b) })).sort((x, y) => x.at - y.at || x.i - y.i).map((x) => x.b);
+}
+
+/** `ERn Modules · needs 2 · found 1` for a block's head. */
+export function accessoryGroupLine(block: Pick<CardAccessoryOfferBlock, 'group' | 'found'>): string | null {
+  const g = block.group;
+  if (!g) return null;
+  const need = g.max === null ? `at least ${g.min}` : g.min === g.max ? `${g.min}` : `${g.min} to ${g.max}`;
+  return `${g.label} · needs ${need}${block.found !== null ? ` · found ${block.found}` : ''}`;
 }
 
 /** Everything the card shows for one device; null when the device is not on this iPad. */
@@ -463,6 +521,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
 
   const cableOffers = optionalCableOffers(type, connections.map((c) => c.cable));
   const accessoryOffers = optionalAccessoryOffers(type, accessories.map((a) => a.model));
+  const accessoryOfferGroups = accessoryOfferBlocks(type, accessoryOffers, accessories);
 
   // --- punch items (sort_last last, then by number) and missing parts with their sources
   const punchRows = await store.list<Row>('punch_item', { where: 'device_id = ?', params: [deviceId] });
@@ -568,6 +627,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     connections,
     cableOffers,
     accessoryOffers,
+    accessoryOfferGroups,
     punch,
     parts,
     drafts,

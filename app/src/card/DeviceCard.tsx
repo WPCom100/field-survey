@@ -32,7 +32,7 @@ import {
   setNotes,
   setStatus,
 } from './actions';
-import { loadDeviceCard, type CardDraft, type DeviceCard as Card, type HistoryEntry, type JumpTarget } from './model';
+import { accessoryGroupLine, loadDeviceCard, type CardDraft, type DeviceCard as Card, type HistoryEntry, type JumpTarget } from './model';
 import { QUICK_ACTIONS, type ProposalDecider, type QuickActionKey } from './proposals';
 
 const CHIPS_SHOWN = 4;
@@ -255,15 +255,25 @@ export function DeviceCard(props: DeviceCardProps) {
                 </View>
               );
             })}
-            {card.accessoryOffers.map((o) => (
-              <OfferRow
-                key={o.model}
-                label={`+ add ${o.model}`}
-                sub={o.expected !== null ? `expected ${o.expected}` : null}
-                disabled={readOnly}
-                onPress={() => run((e) => addOptionalAccessory(e, d.id, o.model, o.expected))}
-              />
-            ))}
+            {card.accessoryOfferGroups.map((block) => {
+              const rows = block.offers.map((o) => (
+                <OfferRow
+                  key={o.model}
+                  label={`+ add ${o.model}`}
+                  sub={o.expected !== null ? `expected ${o.expected}` : null}
+                  disabled={readOnly}
+                  onPress={() => run((e) => addOptionalAccessory(e, d.id, o.model, o.expected))}
+                />
+              ));
+              if (!block.group) return rows;
+              // One block per accessory group of the type (T113): "one of these back boxes".
+              return (
+                <View key={`group:${block.group.label}`} style={styles.offerGroup}>
+                  <Text style={styles.muted}>{accessoryGroupLine(block)}</Text>
+                  {rows}
+                </View>
+              );
+            })}
           </Section>
         ) : null}
 
@@ -782,6 +792,7 @@ const styles = StyleSheet.create({
   phraseText: { fontSize: 12, color: '#1f3b63' },
   phraseMore: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
   acc: { gap: 4 },
+  offerGroup: { gap: 2, paddingLeft: 6, borderLeftWidth: 2, borderColor: '#c9ccd1' },
   offer: { minHeight: 44, justifyContent: 'center', opacity: 0.6 },
   offerText: { flex: 1, fontSize: 13, color: '#555', fontStyle: 'italic' },
   accModel: { fontSize: 13, fontWeight: '600' },

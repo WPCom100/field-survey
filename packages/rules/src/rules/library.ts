@@ -37,7 +37,7 @@ export interface LibraryCable {
 /**
  * An accessory a type may carry (D52: an NSPS kit's power supply, expected 1). A catalogue import
  * (T111, D197) also keeps the slot's `max_quantity` and, where the catalogue asks for "n of these",
- * the `group` the slot belongs to (`{label, min, max}`); neither is read by a rule yet.
+ * the `group` the slot belongs to (`{label, min, max}`); `lint.accessory_group` reads both (T113).
  */
 export interface LibraryAccessory {
   model: string;

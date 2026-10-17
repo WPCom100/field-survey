@@ -68,6 +68,7 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | Pin outside sheet | `lint.pin_sheet` | the device (outside `width_pt` × `height_pt`, or on a deleted sheet) |
 | Level locked with unreviewed drafts | `lint.locked_drafts` | the level |
 | Accessory found < expected | `Acc` | the device (discriminator = accessory) |
+| Accessory group out of range | `lint.accessory_group` | the device (discriminator `group:<label>` or `max:<model>`): an **accepted** type's `optional_accessories` group found < min or > max, naming the label and every member; one model found > its `max_quantity`. Rows match a slot by model without spaces or case; a group is checked once one member is counted (D202). |
 
 A finding may carry `fix: {field, from, to}` (stored in its `subject`): the vocabulary lint's
 rename for "Fix all via ruling"; put `from` in the discriminator so another value is another

@@ -281,7 +281,13 @@ export async function updateType(editor: Editor, store: Store, id: string, patch
   if (patch.optionalCables !== undefined) values.optional_cables = checkCables(patch.optionalCables, 'Optional cables');
   if (patch.needsNeuronId !== undefined) values.needs_neuron_id = patch.needsNeuronId;
   if (patch.optionalAccessories !== undefined) {
-    const list = patch.optionalAccessories.map((a) => ({ model: clean(a.model), expected_qty: a.expected_qty }));
+    // A catalogue slot's max quantity and group (D197 (4)) ride along: `lint.accessory_group` reads them (T113).
+    const list = patch.optionalAccessories.map((a): LibraryAccessory => ({
+      model: clean(a.model) ?? '',
+      expected_qty: a.expected_qty,
+      ...(a.max_quantity != null ? { max_quantity: a.max_quantity } : {}),
+      ...(a.group ? { group: a.group } : {}),
+    }));
     if (list.some((a) => !a.model)) throw new OpError('An accessory needs a model.');
     if (list.some((a) => a.expected_qty != null && (!Number.isInteger(a.expected_qty) || a.expected_qty < 0))) throw new OpError('An expected quantity must be a whole number.');
     values.optional_accessories = list.length ? list : null;

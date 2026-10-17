@@ -398,6 +398,20 @@ Decision D197 (Proposed): the import files its batch under the project you start
 
 Decision D201 (Proposed): (1) `library_type.role`, read instead of category strings everywhere; (2) a device of `Power Distribution` or `Equipment` with no type is `other` — its type carries the role (Centennial's relay panels need their type picked); (3) the rename is applied through Load standard values + the vocabulary lint's "Fix all via ruling", not by the seed import, so TP-4 and TP-8 stand and the riser schema waits for T115; (4) the DaVinci import's role table; (5) what stays on the master's eight. → Approve / change:
 
+## T113 — Accessory groups in the lint and on the card  ·  Needs: no new build
+
+**Why it matters:** the catalogue says "one of these back boxes" and "two ERn modules"; until now only a single accessory found short was flagged. T113 checks the groups and each model's maximum, and the card offers a group's members together.
+
+Set-up: in Projects → Device-type library, **accept** the DaVinci types ERn2-W-120 Mk2 (or another ERn2) and P-TS7-E, and give one device of each on a scratch plan that type (card → type).
+
+- [ ] **Grouped "+ add" rows.** Open the ERn2 device's card → Accessories: the "+ add" rows come in blocks with a left rule; one reads `ERn Modules · needs 2` over its members, another `ERn Accessories · needs 0 to 1`; ungrouped accessories (URTO Mk2…) are single rows. On the P-TS7-E: one block `backbox accessory · needs 1` with the back boxes in it. On an NSPS kit device: `+ add P-NSPS-D Power Supply` · expected 1 is still its own row. → saw:
+- [ ] **Counting fills the head.** On the ERn2, + add P-ACP-E Mk2, set found 1: the block's head now reads `ERn Modules · needs 2 · found 1` and still offers ERn-BM; the block stays where it was. → saw:
+- [ ] **Group findings.** With only that module counted, the card's findings (and Lint → **Accessory group out of range**) show `<ID>: ERn Modules found 1, needs 2 (P-ACP-E Mk2, ERn-BM)`. Add ERn-BM with found 1: the finding goes. On the P-TS7-E add two different back boxes, found 1 each: `backbox accessory found 2, needs 1 (…)`; set one to 0: quiet. → saw:
+- [ ] **Max quantity.** Set an accessory whose catalogue max is 1 (URTO Mk2) to found 2: `<ID>: URTO Mk2 found 2, at most 1`. Back to 1: quiet. → saw:
+- [ ] **Drafts stay quiet; Save keeps groups.** Put the P-TS7-E type back to draft (Back to draft): its group finding disappears, the card still shows the grouped "+ add" rows. Accept it again, change its description or an alias, Save: the groups are still on the card (the editor no longer drops them). → saw:
+
+Decision D202 (Proposed): (1) only accepted types' groups are checked; (2) a group is checked once one member is counted, found = the members' counted sum; (3) one model above its max quantity is its own finding; (4) `Acc` unchanged beside it; (5) the card's "+ add" rows in blocks by group in slot order, the NSPS power supply its own row, a full group still offers its members; (6) the editor's Save keeps max quantity and group. → Approve / change:
+
 ---
 
 ## Rules for this file

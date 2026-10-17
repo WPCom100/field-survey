@@ -2,8 +2,9 @@
  * The PLAN §6.3 lint checks the T34 rules do not already raise (T36). Findings only: they never
  * propose or write. The checks already covered elsewhere: Issue device without an open item
  * (`R1.no_item`), item text outside `vocab(punch_item)` (`R3f`), To ≠ riser (`R2b`), accessory
- * found < expected (`Acc`). "Ends with different code" cannot happen: a cable is one record with
- * one code (CLAUDE.md §8), so only incompatible statuses are checked.
+ * found < expected (`Acc`; a type's accessory groups and max quantities are
+ * `lint.accessory_group`, T113). "Ends with different code" cannot happen: a cable is one record
+ * with one code (CLAUDE.md §8), so only incompatible statuses are checked.
  *
  * Every message names the facts the finding follows from and nothing volatile: a dismissed
  * finding reopens when its message changes (D178).
@@ -14,7 +15,7 @@ import { MASTER_CATEGORY_RENAME, ROLE_LABEL } from '@field-survey/core';
 import { DEVICE_CATEGORIES } from '../lints';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow, PunchItemRow } from '../snapshot';
-import { deviceNeedsNeuronId, deviceRole, governingCables } from './library';
+import { deviceNeedsNeuronId, deviceRole, governingCables, parseLibraryAccessories, typeOfDevice, type LibraryAccessory } from './library';
 import { isNeuronItem } from './r3';
 import { SIGNAL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, NEURON_ITEM, signalOf, str, subjectOfDevice, subjectOfEnd } from './shared';
 
@@ -353,6 +354,71 @@ export const LintLockedDrafts: Rule = {
   },
 };
 
+// ------------------------------------------------------------------ accessory groups (T113)
+
+const accKey = (s: string) => s.replace(/\s+/g, '').toUpperCase();
+
+/** `needs 2`, `needs at least 1`, `needs 0 to 1`. */
+function groupRange(min: number, max: number | null): string {
+  if (max === null) return `needs at least ${min}`;
+  return min === max ? `needs ${min}` : `needs ${min} to ${max}`;
+}
+
+/**
+ * The accessory slots of the device's **accepted** type (D197 (4), D202) against what was found:
+ * a `group` ("one of these back boxes", "two ERn modules") whose members were found fewer than its
+ * min or more than its max, and one model found more than its `max_quantity`. A group is checked
+ * once one of its members has been counted (found set); members not counted add nothing. The
+ * per-model found < expected stays `Acc` (D52).
+ */
+export const LintAccessoryGroup: Rule = {
+  id: 'lint.accessory_group',
+  title: 'Accessory group out of range',
+  text: 'An accepted type\'s accessory groups (one of these back boxes, two ERn modules) are found within their min and max, and no model more than its max quantity (D197 (4), D202).',
+  run(ctx) {
+    for (const d of ctx.index.device.values()) {
+      const type = typeOfDevice(ctx, d);
+      if (!type || type.state !== 'accepted') continue;
+      const slots = parseLibraryAccessories(type.optional_accessories);
+      if (!slots.length) continue;
+      const counted = new Map<string, number>();
+      for (const a of ctx.index.accessoriesByDevice.get(d.id) ?? []) {
+        if (a.found_qty == null || !a.model) continue;
+        const k = accKey(a.model);
+        counted.set(k, (counted.get(k) ?? 0) + a.found_qty);
+      }
+      if (!counted.size) continue;
+      const label = deviceLabel(ctx, d);
+      const groups = new Map<string, { group: NonNullable<LibraryAccessory['group']>; members: string[] }>();
+      const maxSeen = new Set<string>();
+      for (const s of slots) {
+        const k = accKey(s.model);
+        const n = counted.get(k);
+        if (s.max_quantity != null && n !== undefined && n > s.max_quantity && !maxSeen.has(k)) {
+          maxSeen.add(k);
+          ctx.find({ subject: subjectOfDevice(d), discriminator: `max:${k}`, message: `${label}: ${s.model} found ${n}, at most ${s.max_quantity}` });
+        }
+        if (!s.group) continue;
+        const gk = JSON.stringify([s.group.label, s.group.min, s.group.max]);
+        const g = groups.get(gk) ?? { group: s.group, members: [] };
+        if (!g.members.some((m) => accKey(m) === k)) g.members.push(s.model);
+        groups.set(gk, g);
+      }
+      for (const { group, members } of groups.values()) {
+        const keys = members.map(accKey);
+        if (!keys.some((k) => counted.has(k))) continue;
+        const n = keys.reduce((sum, k) => sum + (counted.get(k) ?? 0), 0);
+        if (n >= group.min && (group.max === null || n <= group.max)) continue;
+        ctx.find({
+          subject: subjectOfDevice(d),
+          discriminator: `group:${group.label}`,
+          message: `${label}: ${group.label} found ${n}, ${groupRange(group.min, group.max)} (${members.join(', ')})`,
+        });
+      }
+    }
+  },
+};
+
 export const LINT_RULES: readonly Rule[] = [
   LintPower,
   LintRelay,
@@ -366,4 +432,5 @@ export const LINT_RULES: readonly Rule[] = [
   LintDeletedLink,
   LintPin,
   LintLockedDrafts,
+  LintAccessoryGroup,
 ];

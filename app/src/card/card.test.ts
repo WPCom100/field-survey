@@ -24,7 +24,7 @@ import {
   setNotes,
   setStatus,
 } from './actions';
-import { STANDARD_PHRASES, cableDraftTitle, formatValue, loadDeviceCard, optionalCableOffers } from './model';
+import { STANDARD_PHRASES, accessoryGroupLine, cableDraftTitle, formatValue, loadDeviceCard, optionalCableOffers } from './model';
 import { NOT_WIRED } from './proposals';
 
 const ME = uuidv7();
@@ -317,7 +317,7 @@ describe('optional cables and accessories of the type (T105)', () => {
     const { store, deviceId } = await withType();
     const card = (await loadDeviceCard(store, deviceId))!;
     expect(card.cableOffers.map((o) => [o.key, o.title])).toEqual([['N#1', 'N → switch']]);
-    expect(card.accessoryOffers).toEqual([{ model: 'Back box', expected: 1 }]);
+    expect(card.accessoryOffers).toEqual([{ model: 'Back box', expected: 1, group: null }]);
     // pure: the default 120V comes first, then the optional ones one at a time
     const type = { state: 'accepted', default_cables: [run('120V', 'A', null)], optional_cables: [run('120V', 'B', null), run('120V', 'C', null)] };
     expect(optionalCableOffers(type, []).length).toBe(0);
@@ -361,6 +361,42 @@ describe('optional cables and accessories of the type (T105)', () => {
     await deleteDevice(editor, deviceId, 'test');
     card = (await loadDeviceCard(store, deviceId))!;
     expect(card.cableOffers).toEqual([]);
+  });
+
+  it('offers the type\'s accessories by model in blocks by group (T113); the NSPS kit power supply keeps its own row', async () => {
+    const t = await setup();
+    const { store, editor } = t;
+    const modules = { label: 'ERn Modules', min: 2, max: 2 };
+    const typeId = await createType(editor, store, t.pid, { model: 'T113-KIT', category: 'NSPS' });
+    await updateType(editor, store, typeId, {
+      optionalAccessories: [
+        { model: 'P-NSPS-D Power Supply', expected_qty: 1 },
+        { model: 'P-ACP-E Mk2', expected_qty: 1, max_quantity: 1, group: modules },
+        { model: 'URTO Mk2', expected_qty: null, max_quantity: 1 },
+        { model: 'ERn-BM', expected_qty: null, max_quantity: 2, group: modules },
+        { model: 'ERn-Net', expected_qty: null, max_quantity: 1, group: { label: 'ERn Accessories', min: 0, max: 1 } },
+      ],
+    });
+    // the library editor's save keeps the catalogue's max quantity and group
+    const stored = (await store.get<Record<string, unknown>>('library_type', typeId))!.optional_accessories as Record<string, unknown>[];
+    expect(stored[1]).toEqual({ model: 'P-ACP-E Mk2', expected_qty: 1, max_quantity: 1, group: modules });
+    await acceptType(editor, typeId);
+    const { id: deviceId } = await editor.create('device', { level_id: DEMO_LEVEL_ID, category: 'NSPS', device: 'T113-KIT', library_type_id: typeId, origin: 'field_addition' }, FIELD_SURVEY);
+    let card = (await loadDeviceCard(store, deviceId))!;
+    const blocks = () => card.accessoryOfferGroups.map((b) => [accessoryGroupLine(b), b.members, b.offers.map((o) => o.model)]);
+    expect(blocks()).toEqual([
+      [null, ['P-NSPS-D Power Supply'], ['P-NSPS-D Power Supply']],
+      ['ERn Modules · needs 2', ['P-ACP-E Mk2', 'ERn-BM'], ['P-ACP-E Mk2', 'ERn-BM']],
+      [null, ['URTO Mk2'], ['URTO Mk2']],
+      ['ERn Accessories · needs 0 to 1', ['ERn-Net'], ['ERn-Net']],
+    ]);
+    expect(card.accessoryOffers[0]).toEqual({ model: 'P-NSPS-D Power Supply', expected: 1, group: null });
+    // adding and counting one module: the block stays with the member still to add and counts what was found
+    const op = await addOptionalAccessory(editor, deviceId, 'P-ACP-E Mk2', 1);
+    await setFound(editor, op.entity_id, 1);
+    card = (await loadDeviceCard(store, deviceId))!;
+    expect(blocks()[1]).toEqual(['ERn Modules · needs 2 · found 1', ['P-ACP-E Mk2', 'ERn-BM'], ['ERn-BM']]);
+    expect(accessoryGroupLine({ group: { label: 'Wagos', min: 2, max: null }, found: null })).toBe('Wagos · needs at least 2');
   });
 
   it('a cable draft is titled by its code and To, not "cable"', () => {
