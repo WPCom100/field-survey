@@ -7,6 +7,7 @@ import { useCurrentUser } from '../../identity/IdentityGate';
 import { SetupActions, SetupError, loadProjectSetup, type ProjectSetup, type SetupLevel } from '../../setup/model';
 import { Btn, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
 import { SourcesStep } from '../../setup/SourcesStep';
+import { AssignmentsStep } from '../../setup/AssignmentsStep';
 import { BaselineDialog } from '../../setup/BaselineDialog';
 import { DraftReview } from '../../drafts/DraftReview';
 import { loadLockTable, lockWarnings, type LockLevel } from '../../setup/lock';
@@ -14,8 +15,8 @@ import { loadPlacementProgress, type PlacementProgress } from '../../placement/m
 import { useSyncStatus } from '../../sync/useSyncStatus';
 import { syncDataKey } from '../../sync/dataKey';
 
-type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock';
-const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'place', 'lock'];
+type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock' | 'assignments';
+const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'place', 'lock', 'assignments'];
 
 /**
  * Setup of an existing project (Phase 3 §3.1 steps 1–2): the project's fields and the levels
@@ -24,7 +25,8 @@ const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'pla
  * Phase 3 §3.3 review (T44, `?step=drafts&draft=<id>` opens one draft); Place devices is the
  * progress per level with Place ▸ into the level's plan in placing mode (T46, Phase 3 §3.4); Lock
  * baseline is the Phase 3 §3.5 table (T47, T46's columns), whose Lock / Unlock is also on each
- * Levels row.
+ * Levels row. Assignments (T97, D168) assigns levels to team names; it sits below the numbered
+ * steps because it changes all through the survey, not once.
  */
 export default function ProjectSetupScreen() {
   const { projectId, step: stepParam, draft } = useLocalSearchParams<{ projectId: string; step?: string; draft?: string }>();
@@ -117,6 +119,10 @@ export default function ProjectSetupScreen() {
         <Pressable onPress={() => setStep('lock')} style={[styles.step, step === 'lock' && styles.stepOn]}>
           <Text style={styles.stepText}>6 Lock baseline</Text>
         </Pressable>
+        <View style={styles.sideRule} />
+        <Pressable onPress={() => setStep('assignments')} style={[styles.step, step === 'assignments' && styles.stepOn]}>
+          <Text style={styles.stepText}>Assignments</Text>
+        </Pressable>
         <View style={{ flex: 1 }} />
         <Pressable onPress={() => router.push({ pathname: '/', params: { project: projectId } })}>
           <Text style={styles.back}>Open the levels screen ▸</Text>
@@ -137,6 +143,8 @@ export default function ProjectSetupScreen() {
             <SourcesStep projectId={projectId} />
           ) : step === 'place' ? (
             <PlaceStep progress={placement} />
+          ) : step === 'assignments' ? (
+            <AssignmentsStep projectId={projectId} dataKey={dataKey} />
           ) : step === 'lock' ? (
             <LockStep levels={setup.levels.map((l) => locks.get(l.id)).filter((l): l is LockLevel => !!l)} onLock={setDialog} />
           ) : (
@@ -504,6 +512,7 @@ const styles = StyleSheet.create({
   stepOn: { backgroundColor: '#dce8fb' },
   stepText: { fontSize: 15 },
   stepDim: { color: '#9aa0a8' },
+  sideRule: { height: 1, backgroundColor: '#d5d9e0', marginVertical: 6 },
   hint: { fontSize: 13, color: '#666' },
   main: { padding: 20, gap: 8 },
   empty: { fontSize: 15, color: '#666', padding: 20 },

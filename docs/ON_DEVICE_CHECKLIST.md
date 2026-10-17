@@ -489,6 +489,21 @@ Set-up: any sheet with lettered and numbered grid bubbles (06M on the Tower roun
 - [ ] **Finish unchanged.** Finish: the set is saved as before (columns A–H, rows 12–6 on the set row), the dashed rings are gone and only the tapped bubbles show in the saved set's colour; **Test** on a point reads the same Drawing Position as before T96. Cancel instead: the dashed rings go with the taps. → saw:
 - [ ] **Smooth while panning.** With the dashed rings showing, pinch and pan: the rings stay on their bubbles every frame (no lag, no flicker). → saw:
 
+## T97 — Assign levels to people  ·  Needs: no new build (JS update; no server change)
+
+**Why it matters:** in the close-out round (C-2) there was no way to assign a level, so "Assigned to me", the ● on the Levels screen and Download assigned levels could not be tried.
+
+Set-up: two iPads under two team names (say Landry and Ann), both synced, the Tower round project with B2, 06, 06M in scope.
+
+- [ ] **The tab.** Projects → Setup: below *6 Lock baseline*, after a rule, **Assignments**. It shows the levels down the side (out-of-scope ones dimmed, "out of scope"), one column per team name (yours marked "(you)"), ☐ in every cell and "nobody" under each in-scope level. → saw:
+- [ ] **Assign, several per level.** On Landry's iPad tap 06 × Ann and 06 × Landry, then 06M × Ann: those cells turn ☑ on blue; "nobody" goes from 06 and 06M. Tap 06 × Landry again: back to ☐. Works in airplane mode too. → saw:
+- [ ] **All in scope / None.** Under Landry's column tap **All in scope**: "Landry: 3 levels added" (B2, 06, 06M; never the out-of-scope ones). Tap **None**: "Landry: 3 levels removed". → saw:
+- [ ] **The other iPad follows a sync.** Sync both iPads. On Ann's Levels screen 06 and 06M carry ●, B2 does not; **Assigned to me** shows only 06 and 06M; Ann's Setup → Assignments shows the same ticks Landry set. → saw:
+- [ ] **Only your levels once you have some (D208).** On Ann's iPad Sync → **Download assigned levels**: only 06 and 06M plans download (B2 stays "not cached" unless cached before). On Landry's iPad (no assignment now) the same button fetches every in-scope level. → saw:
+- [ ] **Anyone can change it.** On Ann's iPad untick 06 × Ann, sync both: Landry's Assignments shows 06 × Ann ☐ and Ann's ● on 06 is gone. → saw:
+
+Decision D208: answered 2026-10-16, **Approved** (anyone assigns; several people per level; unassigned does not count for everyone once you have an assignment). Nothing to answer here.
+
 ---
 
 ## Rules for this file
