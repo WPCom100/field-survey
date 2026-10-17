@@ -497,6 +497,8 @@ export const ENTITIES = {
       candidates: j(),
       name: t(),
       category: t(),
+      // T115 (D201): what the extraction read the device as; null = the category's role
+      role: enumCol(v.LIBRARY_ROLE),
       qty: i(),
       accessories: j(),
       source_ref: j(),

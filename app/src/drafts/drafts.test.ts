@@ -32,6 +32,7 @@ import {
   DraftError,
 } from './actions';
 import { loadCables } from '../cables/model';
+import { typeForDraft, type DeviceType } from '../library/neuron';
 import { loadDeviceCard } from '../card/model';
 import { engineFor } from '../rules/engine';
 import { batchFor, cropUrl, excludedLines, extractionLine, promotedKeys, riserBlobFor, type Batch } from './api';
@@ -44,6 +45,7 @@ import {
   cropBox,
   deviceForDraft,
   devicesOn,
+  draftRole,
   endpointOptions,
   flaggedDraftCounts,
   levelCounts,
@@ -533,5 +535,49 @@ describe('draft review server helpers (T44)', () => {
     const data = await loadDraftReview(store, PROJECT);
     await rejectDraft(editor, 'device', row(data.devices, ids.dF), 'Pooled; placed by the riser');
     expect(await flaggedDraftCounts(store, PROJECT)).toEqual({ devices: 3, cables: 1 });
+  });
+});
+
+describe('draft roles (T115, D201)', () => {
+  const MASTER = { change_type: 'Master edit' as const, reason: 'seed' };
+
+  it("reads the extraction's role and finds the master's old-spelled device by it", async () => {
+    const { store, editor, ids } = await setup();
+    // a riser rack written the T115 way: role + D196 category, beside the master's `Equipment rack`
+    const { id } = await editor.create('draft_device', { project_id: PROJECT, level_id: ids.l06m, model: 'ERN4-RM-120', category: 'Equipment Panels', role: 'equipment_rack', qty: 1, state: 'proposed', level_basis: 'riser_band' }, MASTER);
+    const data = await loadDraftReview(store, PROJECT);
+    const d = row(data.devices, id);
+    expect(d.role).toBe('equipment_rack');
+    expect(deviceForDraft(data, d)?.id).toBe(ids.rack);
+    // a draft from before T115 has no role: its category's
+    expect(row(data.devices, ids.dD).role).toBeNull();
+    expect(draftRole(row(data.devices, ids.dD))).toBe('relay_panel');
+    // `Power Distribution` names no role: compared by canonical category — the master's `Relay panel` is one
+    expect(deviceForDraft(data, { ...d, id: uuidv7(), role: null, category: 'Power Distribution', name: null })?.id).toBe(ids.panel);
+  });
+
+  it('a category picked or edited by hand sets the role it names; a hand draft too', async () => {
+    const { store, editor, ids } = await setup();
+    const data = await loadDraftReview(store, PROJECT);
+    await editDevice(editor, row(data.devices, ids.dA), { category: 'Sensor' });
+    await editDevice(editor, row(data.devices, ids.dE), { category: 'Power Distribution' });
+    const hand = await addDeviceDraft(editor, PROJECT, { levelId: ids.l02, model: 'EBDK', category: 'EBDK', qty: 1 });
+    const after = await loadDraftReview(store, PROJECT);
+    expect(row(after.devices, ids.dA)).toMatchObject({ category: 'Sensor', role: 'sensor' });
+    expect(row(after.devices, ids.dE)).toMatchObject({ category: 'Power Distribution', role: null }); // the type decides
+    expect(row(after.devices, hand)).toMatchObject({ category: 'Emergency Equipment', role: 'ebdk' });
+  });
+
+  it("placement's type match (T46): the catalogue type by model, its role before the draft's", () => {
+    const t = (id: string, model: string, category: string, role: string | null): DeviceType => ({ id, project_id: null, model, aliases: [], state: 'accepted', category, needs_neuron_id: null, role });
+    const types = new Map<string, DeviceType>([
+      ['a', t('a', 'ERP24-FT-241P', 'Power Distribution', null)],
+      ['b', t('b', 'UFMP8', 'Power Distribution', 'foundry_panel')],
+      ['c', t('c', 'P-GWY', 'Equipment', null)],
+    ]);
+    expect(typeForDraft(types, { model: 'UFMP8', role: 'relay_panel', category: 'Power Distribution' })).toMatchObject({ type: { id: 'b' }, role: 'foundry_panel' });
+    expect(typeForDraft(types, { model: 'erp24-ft-241p', role: 'relay_panel', category: 'Power Distribution' })).toMatchObject({ type: { id: 'a' }, role: 'relay_panel' });
+    expect(typeForDraft(types, { model: 'P-GWY', role: 'other', category: 'Equipment' })).toMatchObject({ type: { id: 'c' }, role: 'other' });
+    expect(typeForDraft(types, { model: 'PI1002', role: null, category: 'Station' })).toEqual({ type: null, role: 'station' });
   });
 });

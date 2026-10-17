@@ -4,7 +4,7 @@
  * core); this loads the types they read: the project's own and the app library's (D183 (4)).
  */
 
-import { roleOf, type Role, type Store } from '@field-survey/core';
+import { isRole, roleOf, type Role, type Store } from '@field-survey/core';
 import { findDeviceType, needsNeuronId, type TypeLike } from '@field-survey/rules';
 
 /** The row as stored; the card also reads its optional cables and accessories (T105). */
@@ -43,6 +43,18 @@ export function typeOf(types: DeviceTypes, d: DeviceLike): DeviceType | null {
 /** The device's role (T112, D201): its type's, else its type's category's, else its own category's. */
 export function roleOfDevice(types: DeviceTypes, d: DeviceLike): Role {
   return roleOf(typeOf(types, d), { category: text(d.category) });
+}
+
+/**
+ * The type and role a device placed from a draft gets (T115 → T46): the catalogue type whose model
+ * or alias is the draft's model (D183 (4)), and the role — that type's own `role`, else the role
+ * the extraction read, else what the type's category (or the draft's) names.
+ */
+export function typeForDraft(types: DeviceTypes, d: { model: string | null; role?: Role | null; category: string | null }): { type: DeviceType | null; role: Role } {
+  const type = findDeviceType(types, { device: text(d.model), library_type_id: null });
+  if (type && isRole(type.role)) return { type, role: type.role };
+  if (d.role && d.role !== 'other') return { type, role: d.role };
+  return { type, role: roleOf(type, { category: text(d.category) }) };
 }
 
 export function deviceNeedsNeuron(types: DeviceTypes, d: DeviceLike): boolean {

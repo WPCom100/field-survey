@@ -431,6 +431,20 @@ Decision D203 (Proposed): (1) search = every word in model / alias / display nam
 
 ---
 
+## T115 — BOM and riser drafts by role  ·  Needs: no new build (JS update; server deploy first — Alembic 0013 adds `draft_device.role`; every iPad on the new JS before the next upload, an older iPad refuses the new column on pull until it updates, nothing lost)
+
+**Why it matters:** the extractions wrote the master's old category names (`Relay panel`, `NSPS`…) into drafts and matched trunk labels by them; with the D196 categories and the catalogue types those names no longer say what a device is. Drafts now carry a role and the new category.
+
+Set-up: a **scratch** project with levels B2–06 / 06M and the DaVinci types copied; upload `BOM.pdf`, then `riser.pdf` (Setup → Imports).
+
+- [ ] **New categories in Review drafts.** Devices tab, level 01: the relay panels read `Power Distribution`, the rack `Equipment Panels`, the EBDKs `Emergency Equipment`, the stations / sensors / touchscreen as before; no draft shows `Relay panel`, `NSPS` or `Equipment rack`. A pooled NSPS reads `Equipment`. → saw:
+- [ ] **Trunk ends still resolve.** Cables tab, level 01: an `F` run labelled `TO EQUIP RACK LEVEL 06` has its far end on the 06M rack draft (or the rack device) as before T115; a DMX run `TO RELAY PANEL LEVEL nn` names that level's relay panel. → saw:
+- [ ] **Edit sets the role.** Edit… a station draft, change its category to `Sensor`, Save & accept: it reads `Sensor`; nothing else on the row changes. → saw:
+
+Decision D204 (Proposed): (1) `draft_device.role` written by both extractions, every riser check by role; (2) the library type's role and canonical category first, else the model rule and the rename table's category; (3) the riser schema asks for the role only (the API's 16-union limit); (4) draft review matches the master's device by role; a hand-picked category sets the role it names; (5) placement (T46) takes the type and role from `typeForDraft`. → Approve / change:
+
+---
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

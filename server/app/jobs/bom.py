@@ -152,6 +152,7 @@ def target_of(session: Session, project_id: uuid.UUID) -> bom_extract.Target:
                 model=t.model,
                 category=t.category,
                 aliases=tuple(str(a) for a in (t.aliases or []) if a),
+                role=t.role,
             )
         )
     return bom_extract.Target(

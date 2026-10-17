@@ -97,6 +97,16 @@ the column's levels and the project's levels. The answer must match
 ids from the list, or a far-end label with a level code); on sheet 002 it returns the devices,
 the bubbles and the cables. Coordinates come back in band pixels and are mapped to page points.
 
+Devices are classified by **role** (T115, D201): the schema's `devices[].role` is one of
+`relay_panel` … `other` (the prompt lists a text sheet's devices by role too), and the draft's
+D196 `category` is the role's (`roles.ROLE_CATEGORY`; none for `other`) — or, when the project's
+library has a type for the model, that type's role and canonical category. The schema carries no
+`category` of its own: the API allows at most 16 union-typed (nullable) parameters in a
+structured-output schema and the riser schema already has 16. `draft_device.role` (Alembic
+0013, client migration 0012) keeps the role for draft review and placement (`typeForDraft` in
+`app/src/library/neuron.ts`). A trunk label (`TO RELAY PANEL LEVEL 20`, `TO EQUIP RACK LEVEL
+06`, `TO NSPS …`) resolves to the device of that role on the level (`device_on`).
+
 A model answer's confidence is capped at 0.85 (`MODEL_CONFIDENCE_CAP`), so nothing the model
 alone proposed is bulk-acceptable; under 0.7 the cable is flagged `endpoint:low_confidence`;
 with no end named, `endpoint:unresolved`. A failed band (API error, refusal, bad JSON) is

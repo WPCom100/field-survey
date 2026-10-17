@@ -23,8 +23,10 @@ so one row parser serves both. Every line keeps its `source_ref` (`job`, `page`,
 
 Classification (`build`):
 
-- ETC lighting-control **devices** become drafts: category from the project's device-type
-  library (`library_type.model` / `aliases`, D183 (4)) first, then `MODEL_CATEGORY`.
+- ETC lighting-control **devices** become drafts with a **role** (`relay_panel` … `other`,
+  D201) and a D196 category (T115): the project's device-type library (`library_type.model` /
+  `aliases`, D183 (4)) first — the type's role, else its category's, else `MODEL_ROLE`'s; its
+  category canonicalised — then `MODEL_ROLE`, the category being the role's (`ROLE_CATEGORY`).
 - **Accessories** (faceplates, ERP option cards, through-beam parts, touchscreen backboxes, DIN
   enclosures…, `ACCESSORY_PARENT`) attach to the nearest parent line of the right model in the
   same venue (preceding first), as `accessories[]` on its draft (D27).
@@ -54,6 +56,7 @@ from typing import Any
 
 import pdfplumber
 
+from app import roles
 from app.ocr import Word
 
 # ----------------------------------------------------------------- constants
@@ -96,38 +99,37 @@ DEFAULT_LEVEL_ALIAS: dict[str, str] = {"LEVEL 5": "06M"}
 """Built-in `level_alias` (PLAN §7.2, the Tower's BOM calls the 06M rack venue `Level 5`);
 applied only when the project has the target level. Project `vocab(level_alias)` rows add to it."""
 
-CATEGORY_RELAY = "Relay panel"
-CATEGORY_FOUNDRY = "Foundry panel"
-CATEGORY_EBDK = "EBDK"
-CATEGORY_RACK = "Equipment rack"
-CATEGORY_NSPS = "NSPS"
-CATEGORY_TOUCHSCREEN = "Touchscreen"
-CATEGORY_STATION = "Station"
-CATEGORY_SENSOR = "Sensor"
+ROLE_RELAY = "relay_panel"
+ROLE_FOUNDRY = "foundry_panel"
+ROLE_EBDK = "ebdk"
+ROLE_RACK = "equipment_rack"
+ROLE_NSPS = "nsps"
+ROLE_TOUCHSCREEN = "touchscreen"
+ROLE_STATION = "station"
+ROLE_SENSOR = "sensor"
+ROLE_OTHER = "other"
 
-MODEL_CATEGORY: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"^ERP\d+"), CATEGORY_RELAY),
-    (re.compile(r"^UFMP\d"), CATEGORY_FOUNDRY),
-    (re.compile(r"^EBDK"), CATEGORY_EBDK),
-    (re.compile(r"^P-NSPS"), CATEGORY_NSPS),
-    (re.compile(r"^P-TS\d"), CATEGORY_TOUCHSCREEN),
-    (re.compile(r"^P-LCD(?!-FBB)"), CATEGORY_TOUCHSCREEN),
-    (re.compile(r"^ETS-\d"), CATEGORY_TOUCHSCREEN),  # EchoTouch
-    (re.compile(r"^PI\d{4}"), CATEGORY_STATION),  # Paradigm Inspire
-    (re.compile(r"^EPS\d+(?!-FP)"), CATEGORY_STATION),  # Echo preset station
-    (re.compile(r"^P-DOC"), CATEGORY_SENSOR),
-    (re.compile(r"^P-LS\b"), CATEGORY_SENSOR),
-    (re.compile(r"^UHCI"), CATEGORY_SENSOR),  # partition sensor interface
+MODEL_ROLE: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^ERP\d+"), ROLE_RELAY),
+    (re.compile(r"^UFMP\d"), ROLE_FOUNDRY),
+    (re.compile(r"^EBDK"), ROLE_EBDK),
+    (re.compile(r"^P-NSPS"), ROLE_NSPS),
+    (re.compile(r"^P-TS\d"), ROLE_TOUCHSCREEN),
+    (re.compile(r"^P-LCD(?!-FBB)"), ROLE_TOUCHSCREEN),
+    (re.compile(r"^ETS-\d"), ROLE_TOUCHSCREEN),  # EchoTouch
+    (re.compile(r"^PI\d{4}"), ROLE_STATION),  # Paradigm Inspire
+    (re.compile(r"^EPS\d+(?!-FP)"), ROLE_STATION),  # Echo preset station
+    (re.compile(r"^P-DOC"), ROLE_SENSOR),
+    (re.compile(r"^P-LS\b"), ROLE_SENSOR),
+    (re.compile(r"^UHCI"), ROLE_SENSOR),  # partition sensor interface
 ]
-"""Built-in model → category (CLAUDE.md §3); the project's library types come first."""
+"""Built-in model → role (D201, T115); the project's library types come first."""
 
 RACK_ROOT_RE = re.compile(r"^(?:\d+U RACK|ERN4)")
 """A line that opens an Equipment rack: the rack itself or an ERn4 enclosure (wall mount)."""
 
-PANEL_CATEGORIES = frozenset(
-    {CATEGORY_RELAY, CATEGORY_FOUNDRY, CATEGORY_EBDK, CATEGORY_RACK, CATEGORY_NSPS}
-)
-"""Categories the master keeps on the mezzanine (06M) when a floor is split (Phase 1f §4)."""
+PANEL_ROLES = frozenset({ROLE_RELAY, ROLE_FOUNDRY, ROLE_EBDK, ROLE_RACK, ROLE_NSPS})
+"""Roles the master keeps on the mezzanine (06M) when a floor is split (Phase 1f §4)."""
 
 ACCESSORY_PARENT: list[tuple[re.Pattern[str], re.Pattern[str]]] = [
     # Inspire faceplate → station, or the switch-mount sensor that shares the gang
@@ -624,6 +626,15 @@ class LibraryModel:
     model: str
     category: str | None
     aliases: tuple[str, ...] = ()
+    role: str | None = None  # `library_type.role` (T112); null = its category's
+
+
+@dataclass(frozen=True)
+class Kind:
+    """What a model classifies as (T115): a role and the D196 category drafts carry."""
+
+    role: str
+    category: str | None
 
 
 @dataclass
@@ -651,11 +662,11 @@ class Target:
                     return canonical
         return None
 
-    def library_category(self, model: str) -> str | None:
+    def library_type(self, model: str) -> LibraryModel | None:
         key = _key(model)
         for t in self.library:
             if _key(t.model) == key or any(_key(a) == key for a in t.aliases):
-                return t.category
+                return t
         return None
 
 
@@ -692,13 +703,29 @@ def normalise_model(raw: str, target: Target) -> Model:
     return Model(model=base, raw=text, candidates=candidates, conflicts=conflicts)
 
 
-def category_of(model: str, target: Target) -> str | None:
-    cat = target.library_category(model)
-    if cat:
-        return cat
-    for pat, name in MODEL_CATEGORY:
+def model_role(model: str) -> str | None:
+    for pat, role in MODEL_ROLE:
         if pat.match(model):
-            return name
+            return role
+    return None
+
+
+def classify(model: str, target: Target) -> Kind | None:
+    """The model's role and category (T115, D201): a library type's role, else the role its
+    category names, else `MODEL_ROLE`'s (a `Power Distribution` type with no role is still an
+    ERP by its model), with the type's category canonicalised; no type → `MODEL_ROLE` and the
+    role's category; neither → None (not a lighting-control device)."""
+    t = target.library_type(model)
+    if t is not None:
+        if roles.is_role(t.role):
+            role = str(t.role)
+        elif (by_cat := roles.role_of_category(t.category)) != ROLE_OTHER:
+            role = by_cat
+        else:
+            role = model_role(model) or ROLE_OTHER
+        return Kind(role, roles.canonical_category(t.category) or roles.ROLE_CATEGORY.get(role))
+    if role := model_role(model):
+        return Kind(role, roles.ROLE_CATEGORY.get(role))
     return None
 
 
@@ -732,6 +759,7 @@ class Draft:
     model_raw: str
     candidates: list[str]
     category: str | None
+    role: str | None
     qty: int | None
     accessories: list[dict[str, Any]]
     source_ref: dict[str, Any]
@@ -749,6 +777,7 @@ class Draft:
             "candidates": self.candidates if len(self.candidates) > 1 else None,
             "name": None,
             "category": self.category,
+            "role": self.role,
             "qty": self.qty,
             "accessories": self.accessories or None,
             "source_ref": {**self.source_ref, "level_code": self.level_code},
@@ -792,7 +821,7 @@ class Result:
             by_level[d.level_code or "(pool)"] = by_level.get(d.level_code or "(pool)", 0) + 1
         return {
             "drafts": len(self.drafts),
-            "racks": sum(1 for d in self.drafts if d.category == CATEGORY_RACK),
+            "racks": sum(1 for d in self.drafts if d.role == ROLE_RACK),
             "accessory_lines": self.accessory_lines,
             "component_lines": self.component_lines,
             "excluded": len(self.excluded),
@@ -858,23 +887,25 @@ def build(lines: list[Line], target: Target) -> Result:
                     accessory_lines += 1
                     continue
             if RACK_ROOT_RE.match(model.model) and rack is None:
-                rack = _draft(ln, model, CATEGORY_RACK, venue, target)
+                rack = _draft(
+                    ln, model, Kind(ROLE_RACK, roles.ROLE_CATEGORY[ROLE_RACK]), venue, target
+                )
                 rack.model_raw = model.raw
                 drafts.append(rack)
                 parents.append((ln, rack))
                 continue
-            category = category_of(model.model, target)
-            if rack is not None and category is None:
+            kind = classify(model.model, target)
+            if rack is not None and kind is None:
                 # a component of the open rack (switch, processor, UPS, patch panel…)
                 if RACK_ROOT_RE.match(model.model) and model.model.upper().startswith("ERN4"):
                     rack.model, rack.model_raw = model.model, model.raw
                 rack.accessories.append(_accessory_entry(ln, model, "component"))
                 component_lines += 1
                 continue
-            if category is None:
+            if kind is None:
                 excluded.append(Excluded(ln, model.model, "not a lighting-control device"))
                 continue
-            draft = _draft(ln, model, category, venue, target)
+            draft = _draft(ln, model, kind, venue, target)
             drafts.append(draft)
             parents.append((ln, draft))
 
@@ -902,7 +933,7 @@ def _order(ln: Line) -> int:
     return ln.page * 100_000 + ln.column * 10_000 + ln.line
 
 
-def _draft(ln: Line, model: Model, category: str, venue: Venue | None, target: Target) -> Draft:
+def _draft(ln: Line, model: Model, kind: Kind, venue: Venue | None, target: Target) -> Draft:
     level_id = None
     level_code: str | None = None
     basis: str
@@ -923,7 +954,7 @@ def _draft(ln: Line, model: Model, category: str, venue: Venue | None, target: T
             if (
                 split in target.levels
                 and not code.endswith("M")
-                and category in PANEL_CATEGORIES
+                and kind.role in PANEL_ROLES
                 and target.alias_for(venue.text) is None
             ):
                 # the master keeps panels and racks on the mezzanine when a floor is split
@@ -936,7 +967,8 @@ def _draft(ln: Line, model: Model, category: str, venue: Venue | None, target: T
         model=model.model,
         model_raw=model.raw,
         candidates=list(model.candidates),
-        category=category,
+        category=kind.category,
+        role=kind.role,
         qty=ln.qty,
         accessories=[],
         source_ref=ln.source_ref(),

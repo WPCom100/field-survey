@@ -75,6 +75,13 @@ MASTER_CATEGORY_RENAME = {
     "Equipment rack": "Equipment Panels",
 }
 
+# The D196 category an extraction writes for a role it read (T115, D201 (3)): the master's
+# spelling of the role, renamed — `Relay panel` → `Power Distribution`, `Equipment rack` →
+# `Equipment Panels` (the rename ruling's table). `other` names no category.
+ROLE_CATEGORY = {
+    r: MASTER_CATEGORY_RENAME.get(ROLE_LABEL[r], ROLE_LABEL[r]) for r in ROLES if r != "other"
+}
+
 _ROLE_OF_CATEGORY = {
     # the master's eight (D1): one role each
     "Relay panel": "relay_panel",
@@ -94,6 +101,13 @@ _ROLE_OF_CATEGORY = {
 
 def is_role(v: object) -> bool:
     return isinstance(v, str) and v in ROLES
+
+
+def canonical_category(category: str | None) -> str | None:
+    """The D196 spelling of `category`: the master's renamed five map to their new value."""
+    if not category:
+        return None
+    return MASTER_CATEGORY_RENAME.get(category, category)
 
 
 def role_of_category(category: str | None) -> str:

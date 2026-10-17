@@ -6,7 +6,7 @@
  * fallback) read the same way. Pure: a `Store` in, plain rows out; tested in Node.
  */
 
-import { roleOfCategory, type Role, type Store } from '@field-survey/core';
+import { canonicalCategory, isRole, roleOfCategory, type Role, type Store } from '@field-survey/core';
 
 import { loadDeviceTypes, roleOfDevice } from '../library/neuron';
 
@@ -37,6 +37,8 @@ export type DeviceDraftRow = {
   candidates: string[];
   name: string | null;
   category: string | null;
+  /** T115 (D201): what the extraction read the device as; null = its category's role. */
+  role: Role | null;
   qty: number | null;
   accessories: { model: string; qty: number | null; role: string }[];
   confidence: number | null;
@@ -422,6 +424,7 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
         candidates,
         name: str(d.name),
         category: str(d.category),
+        role: isRole(d.role) ? d.role : null,
         qty: num(d.qty),
         accessories: (json<Record<string, unknown>[]>(d.accessories) ?? []).map((a) => ({ model: str(a.model) ?? '?', qty: num(a.qty), role: str(a.role) ?? 'accessory' })),
         confidence,
@@ -637,24 +640,34 @@ export function mismatchList(data: DraftReviewData, key: LevelKey): Mismatch[] {
 /**
  * The live device a draft device has become: one placed from it (`baseline_ref`, T46), else the
  * one device on its level that is plainly the same — the same panel tag, or the only device of
- * its category when the draft names no tag and counts one (the seeded master's panels, racks and
- * NSPS, D30). Null when there is none or more than one.
+ * its role (T115; its category when the role is `other`) when the draft names no tag and counts
+ * one (the seeded master's panels, racks and NSPS, D30). Null when there is none or more than one.
  */
-export function deviceForDraft(data: Pick<DraftReviewData, 'devicesLive'>, d: Pick<DeviceDraftRow, 'id' | 'levelId' | 'name' | 'category' | 'qty'>): DraftReviewData['devicesLive'][number] | null {
+export function deviceForDraft(
+  data: Pick<DraftReviewData, 'devicesLive'>,
+  d: Pick<DeviceDraftRow, 'id' | 'levelId' | 'name' | 'category' | 'qty'> & { role?: Role | null },
+): DraftReviewData['devicesLive'][number] | null {
   const placed = data.devicesLive.filter((x) => x.baselineRef === d.id);
   if (placed.length === 1) return placed[0]!;
   if (placed.length > 1 || !d.levelId) return null;
   const here = data.devicesLive.filter((x) => x.levelId === d.levelId);
   const tag = d.name?.replace(/\s+/g, '').toUpperCase();
-  if (tag && roleOfCategory(d.category) !== 'equipment_rack') {
+  const role = draftRole(d);
+  if (tag && role !== 'equipment_rack') {
     const byTag = here.filter((x) => x.panelName?.replace(/\s+/g, '').toUpperCase() === tag);
     return byTag.length === 1 ? byTag[0]! : null;
   }
   if (d.qty === 1 && d.category) {
-    const same = here.filter((x) => x.category === d.category);
+    // the draft writes the D196 category, the seeded master its own spelling: compare roles
+    const same = role !== 'other' ? here.filter((x) => x.role === role) : here.filter((x) => canonicalCategory(x.category) === canonicalCategory(d.category));
     return same.length === 1 ? same[0]! : null;
   }
   return null;
+}
+
+/** A draft's role (T115): the one the extraction read, else its category's. */
+export function draftRole(d: { role?: Role | null; category: string | null }): Role {
+  return d.role ?? roleOfCategory(d.category);
 }
 
 /**

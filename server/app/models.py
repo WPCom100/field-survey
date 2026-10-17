@@ -511,7 +511,7 @@ class DraftDevice(Id, Synced, Base):
     """Phase 1f `device_drafts` row."""
 
     __tablename__ = "draft_device"
-    __table_args__ = (one_of("state", vocab.DRAFT_STATE),)
+    __table_args__ = (one_of("state", vocab.DRAFT_STATE), one_of("role", vocab.LIBRARY_ROLE))
 
     project_id: Mapped[uuid.UUID] = mapped_column(fk("project.id"), index=True)
     import_batch_id: Mapped[uuid.UUID | None] = mapped_column(fk("import_batch.id"))
@@ -521,6 +521,7 @@ class DraftDevice(Id, Synced, Base):
     candidates: Mapped[list[Any] | None]
     name: Mapped[str | None]
     category: Mapped[str | None]
+    role: Mapped[str | None]  # T115: what the extraction read the device as (D201)
     qty: Mapped[int | None]
     accessories: Mapped[list[Any] | None]
     source_ref: Mapped[dict[str, Any] | None]

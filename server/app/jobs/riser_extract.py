@@ -43,6 +43,7 @@ import pdfplumber
 import pypdfium2 as pdfium
 from PIL import Image, ImageDraw
 
+from app import roles
 from app.ids import uuid7
 from app.jobs import bom_extract as bx
 
@@ -204,6 +205,11 @@ overview image shows the whole column so you can follow them, and labels such as
 LEVEL 06 or TO ERn4 LEVEL 16 name the far end outright. The rack's output stack lists its DMX
 outputs (DMX TO B3A CANYON), spares (SPARE DMX OUT) and fibre / network runs to other racks.
 
+Classify every device by its role: relay_panel (an Echo relay panel, ERP…), foundry_panel
+(UFMPn), ebdk, equipment_rack (the rack, or an ERn4 enclosure), nsps (a P-NSPS power supply or
+its DIN enclosure), touchscreen (P-TS…, P-LCD…), station (PI…, EPS…), sensor (P-DOC…, P-LS,
+UHCI-WM) or other.
+
 U bubbles are chain links between the device types of one level's Unison bus, not runs: never
 list them as cables.
 
@@ -278,7 +284,8 @@ class Band:
 class Device:
     id: str  # short id within the band (d1, d2…), the prompt's handle
     band: Band
-    category: str | None
+    role: str  # relay_panel … other (D201, T115)
+    category: str | None  # the D196 category the draft carries
     model: str
     model_raw: str
     name: str | None
@@ -734,7 +741,7 @@ class _Groups:
     def add(
         self,
         *,
-        category: str | None,
+        role: str,
         model_raw: str,
         name: str | None,
         qty: int | None,
@@ -746,7 +753,8 @@ class _Groups:
         d = Device(
             id=f"d{self.n}",
             band=self.band,
-            category=category,
+            role=role,
+            category=roles.ROLE_CATEGORY.get(role),
             model=riser_model(model_raw),
             model_raw=model_raw,
             name=name,
@@ -795,9 +803,8 @@ def devices_of(band: Band, words: list[Tok]) -> list[Device]:
                     accessories.append({"model": acc, "qty": int(m.group(1)), "role": "accessory"})
                     for x in r:
                         claimed.add(id(x))
-        category = bx.CATEGORY_FOUNDRY if model_raw.startswith("UFMP") else bx.CATEGORY_RELAY
         g.add(
-            category=category,
+            role=bx.ROLE_FOUNDRY if model_raw.startswith("UFMP") else bx.ROLE_RELAY,
             model_raw=model_raw,
             name=t.text,
             qty=1,
@@ -829,7 +836,7 @@ def devices_of(band: Band, words: list[Tok]) -> list[Device]:
             (c["model"] for c in comps if c["model"].upper().startswith("ERN4")), None
         )
         g.add(
-            category=bx.CATEGORY_RACK,
+            role=bx.ROLE_RACK,
             model_raw=rack_model or "ERN4-RM",
             name=RACK_NAME,
             qty=1,
@@ -846,7 +853,7 @@ def devices_of(band: Band, words: list[Tok]) -> list[Device]:
         for m in ACCESSORY_LINE_RE.finditer(rt):
             if m.group(2).upper().startswith("P-NSPS") and not any(id(x) in claimed for x in r):
                 g.add(
-                    category=bx.CATEGORY_NSPS,
+                    role=bx.ROLE_NSPS,
                     model_raw="P-NSPS-DIN",
                     name=None,
                     qty=int(m.group(1)),
@@ -873,18 +880,16 @@ def devices_of(band: Band, words: list[Tok]) -> list[Device]:
                 if model_tok is None:
                     continue
                 raw = model_tok.text
-                cat = bx.category_of(riser_model(raw), bx.Target(levels={})) or bx.category_of(
-                    raw, bx.Target(levels={})
-                )
+                role = bx.model_role(riser_model(raw)) or bx.model_role(raw) or bx.ROLE_OTHER
                 if raw.upper().startswith("P-NSPS"):
-                    cat = bx.CATEGORY_NSPS
+                    role = bx.ROLE_NSPS
                 label = _text(sorted((r[i], model_tok), key=lambda t: t.x0))
                 after = upper[i + 2] if model_tok is r[i + 1] and i + 2 < len(r) else ""
                 enclosure = after.startswith("W/ENCL")
-                qty = 1 if cat == bx.CATEGORY_NSPS or enclosure else None
+                qty = 1 if role == bx.ROLE_NSPS or enclosure else None
                 groups.append(
                     g.add(
-                        category=cat,
+                        role=role,
                         model_raw=raw,
                         name=None,
                         qty=qty,
@@ -897,7 +902,7 @@ def devices_of(band: Band, words: list[Tok]) -> list[Device]:
             elif s.startswith("UFMP") and id(r[i]) not in claimed:
                 groups.append(
                     g.add(
-                        category=bx.CATEGORY_FOUNDRY,
+                        role=bx.ROLE_FOUNDRY,
                         model_raw=r[i].text,
                         name=None,
                         qty=None,
@@ -908,7 +913,7 @@ def devices_of(band: Band, words: list[Tok]) -> list[Device]:
                 claimed.add(id(r[i]))
             elif s == "EBDK" and id(r[i]) not in claimed:
                 g.add(
-                    category=bx.CATEGORY_EBDK,
+                    role=bx.ROLE_EBDK,
                     model_raw="EBDK",
                     name=None,
                     qty=1,
@@ -919,7 +924,7 @@ def devices_of(band: Band, words: list[Tok]) -> list[Device]:
             elif s.startswith("P-TS") and id(r[i]) not in claimed and "PARADIGM" not in upper:
                 groups.append(
                     g.add(
-                        category=bx.CATEGORY_TOUCHSCREEN,
+                        role=bx.ROLE_TOUCHSCREEN,
                         model_raw=r[i].text,
                         name=None,
                         qty=None,
@@ -1466,10 +1471,10 @@ def band_prompt(sheet: Sheet, band: Band, crop: Crop, levels_known: list[str]) -
     devices = sheet.band_devices(band)
     bubbles = sheet.band_bubbles(band)
     if sheet.has_text:
-        lines.append("\nDevices on this band (id: label, category, model, qty, [x, y, w, h] px):")
+        lines.append("\nDevices on this band (id: label, role, model, qty, [x, y, w, h] px):")
         for d in devices:
             lines.append(
-                f"- {d.id}: {d.label} — {d.category or 'Other'}, {d.model}"
+                f"- {d.id}: {d.label} — {d.role}, {d.model}"
                 + (f", tag {d.name}" if d.name and d.name != d.label else "")
                 + f", qty {d.qty}, {crop.to_px(d.bbox)}"
             )
@@ -1533,11 +1538,14 @@ def apply_answer(sheet: Sheet, band: Band, crop: Crop, data: dict[str, Any]) -> 
         for item in data.get("devices") or []:
             n += 1
             raw = str(item.get("model") or "").strip() or str(item.get("label") or "?")
-            cat = item.get("category")
-            if cat == "Other":
-                cat = bx.category_of(riser_model(raw), bx.Target(levels={}))
+            role = item.get("role")
+            if not roles.is_role(role) or role == bx.ROLE_OTHER:
+                role = bx.model_role(riser_model(raw)) or bx.ROLE_OTHER
+            # the role names the category (the rename ruling's table); `other` has none until
+            # the library type or the reviewer gives one
+            cat = roles.ROLE_CATEGORY.get(str(role))
             name = item.get("name") or None
-            if cat == bx.CATEGORY_RACK and not name:
+            if role == bx.ROLE_RACK and not name:
                 name = RACK_NAME
             conf = min(float(item.get("confidence") or 0.0), MODEL_CONFIDENCE_CAP)
             accs = [
@@ -1548,6 +1556,7 @@ def apply_answer(sheet: Sheet, band: Band, crop: Crop, data: dict[str, Any]) -> 
             d = Device(
                 id=str(item.get("id") or f"new-{n}"),
                 band=band,
+                role=str(role),
                 category=cat,
                 model=riser_model(raw),
                 model_raw=raw,
@@ -1746,6 +1755,7 @@ class DeviceDraft:
     candidates: list[str]
     name: str | None
     category: str | None
+    role: str | None
     qty: int
     accessories: list[dict[str, Any]]
     source_ref: dict[str, Any]
@@ -1763,6 +1773,7 @@ class DeviceDraft:
             "candidates": self.candidates if len(self.candidates) > 1 else None,
             "name": self.name,
             "category": self.category,
+            "role": self.role,
             "qty": self.qty,
             "accessories": self.accessories or None,
             "source_ref": {**self.source_ref, "level_code": self.level_code},
@@ -1951,11 +1962,11 @@ class _Build:
         self.placeholders.append(NewPlaceholder(pid, label, kind))
         return pid
 
-    def bom_on(self, level_code: str, key: str, category: str | None) -> list[BomDraft]:
+    def bom_on(self, level_code: str, key: str, role: str) -> list[BomDraft]:
         """The BOM's drafts of this model family on the level — and on its mezzanine for a
         panel-class device (the BOM's `Level 5` rack is the master's 06M, the riser's band 06)."""
         codes = {level_code}
-        if category in bx.PANEL_CATEGORIES and (mezz := self.t.split_level(level_code)):
+        if role in bx.PANEL_ROLES and (mezz := self.t.split_level(level_code)):
             codes.add(mezz)
         return [
             b
@@ -2004,25 +2015,21 @@ class _Build:
             for band in sheet.bands:
                 level_id, code = self.level_of(band)
                 devs = sheet.band_devices(band)
-                ebdk = sum(d.qty for d in devs if d.category == bx.CATEGORY_EBDK)
-                erp = sum(1 for d in devs if d.category == bx.CATEGORY_RELAY)
+                ebdk = sum(d.qty for d in devs if d.role == bx.ROLE_EBDK)
+                erp = sum(1 for d in devs if d.role == bx.ROLE_RELAY)
                 n_runs = any(b.code in ("N", "NG") for b in sheet.band_bubbles(band))
                 for d in devs:
                     m = bx.normalise_model(d.model, self.norm)
                     key = model_key(m.model)
                     conflicts = list(m.conflicts)
-                    if (
-                        code
-                        and d.category in bx.PANEL_CATEGORIES
-                        and (mezz := self.t.split_level(code))
-                    ):
+                    if code and d.role in bx.PANEL_ROLES and (mezz := self.t.split_level(code)):
                         conflicts.append(f"level:{code}/{mezz}")
-                    if d.category == bx.CATEGORY_EBDK and ebdk != erp:
+                    if d.role == bx.ROLE_EBDK and ebdk != erp:
                         conflicts.append("pairing:ebdk≠erp")
                         self.findings.append(
                             {"check": "ebdk_erp_pairing", "level": code, "ebdk": ebdk, "erp": erp}
                         )
-                    if d.category in (bx.CATEGORY_NSPS, bx.CATEGORY_RACK) and not n_runs:
+                    if d.role in (bx.ROLE_NSPS, bx.ROLE_RACK) and not n_runs:
                         conflicts.append("network:no_N_run")
                         self.findings.append(
                             {"check": "network_run", "level": code, "device": d.label}
@@ -2038,11 +2045,18 @@ class _Build:
                         qty=d.qty,
                         model=d.model_raw,
                     )
-                    same_level = self.bom_on(code, key, d.category) if code else []
+                    same_level = self.bom_on(code, key, d.role) if code else []
                     if same_level:
                         self.merge(d, same_level, riser_ref, conflicts)
                         continue
                     pooled = self.pooled_for(code, key) if code else []
+                    # the project's library type for the model, when there is one, gives the
+                    # role and category (D183 (4), T115); else what the riser read
+                    kind = (
+                        bx.classify(m.model, self.norm)
+                        if self.norm.library_type(m.model) is not None
+                        else None
+                    ) or bx.Kind(d.role, d.category)
                     draft = DeviceDraft(
                         id=uuid7(),
                         level_id=level_id,
@@ -2051,7 +2065,8 @@ class _Build:
                         model_raw=d.model_raw,
                         candidates=m.candidates,
                         name=d.name,
-                        category=d.category,
+                        category=kind.category,
+                        role=kind.role,
                         qty=d.qty,
                         accessories=[
                             {
@@ -2141,7 +2156,7 @@ class _Build:
         self.merged += 1
 
     def card_mismatch(self, d: Device, boms: list[BomDraft]) -> dict[str, Any] | None:
-        if d.category != bx.CATEGORY_RELAY:
+        if d.role != bx.ROLE_RELAY:
             return None
         riser = {
             a["model"]: a["qty"] for a in d.accessories if OPTION_CARD_RE.match(str(a["model"]))
@@ -2296,7 +2311,7 @@ class _Build:
         frm = devs.get(b.from_device or "")
         if b.output_label:
             # the rack's output stack: from the rack, to the printed label
-            rack = next((d for d in devs.values() if d.category == bx.CATEGORY_RACK), None)
+            rack = next((d for d in devs.values() if d.role == bx.ROLE_RACK), None)
             frm = frm or rack
             to_label, to_level_code, far = self.resolve_label(b.output_label)
             if far:
@@ -2441,19 +2456,19 @@ class _Build:
             code = bx.norm_level(m.group("level"))
             what = m.group("what")
             kind = {
-                "EQUIP RACK": bx.CATEGORY_RACK,
-                "EQUIPMENT RACK": bx.CATEGORY_RACK,
-                "ERN4": bx.CATEGORY_RACK,
-                "RELAY PANEL": bx.CATEGORY_RELAY,
+                "EQUIP RACK": bx.ROLE_RACK,
+                "EQUIPMENT RACK": bx.ROLE_RACK,
+                "ERN4": bx.ROLE_RACK,
+                "RELAY PANEL": bx.ROLE_RELAY,
                 "UNISON STATIONS": None,
-                "P-NSPS-DIN": bx.CATEGORY_NSPS,
-                "NSPS": bx.CATEGORY_NSPS,
+                "P-NSPS-DIN": bx.ROLE_NSPS,
+                "NSPS": bx.ROLE_NSPS,
             }[what]
             if code in self.t.levels:
                 target = self.device_on(code, kind) if kind else None
                 name = (
                     RACK_NAME
-                    if kind == bx.CATEGORY_RACK
+                    if kind == bx.ROLE_RACK
                     else (what.capitalize() if kind else "Stations & Sensors")
                 )
                 label = f"{name} Level {code}"
@@ -2478,10 +2493,12 @@ class _Build:
             return text.strip(), level_hint, None
         return text.strip(), None, None
 
-    def device_on(self, code: str, category: str | None) -> Device | None:
+    def device_on(self, code: str, role: str) -> Device | None:
+        """The device of `role` on level `code` that a trunk label (TO RELAY PANEL LEVEL 20)
+        names (T115: by role, not by the category text)."""
         for sheet in self.riser.sheets:
             for d in sheet.devices:
-                if d.band.level_code == code and d.category == category:
+                if d.band.level_code == code and d.role == role:
                     return d
         return None
 

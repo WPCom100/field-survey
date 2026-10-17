@@ -44,6 +44,11 @@ const ctx = (reason: string): EditContext => ({ change_type: 'Master edit', reas
 // the D196 eleven; an extraction job's category (the master's spelling, D1) is read as its canonical value
 const CATEGORIES: readonly string[] = DEVICE_CATEGORIES;
 const known = (c: string | null | undefined): string | null => canonicalCategory(c);
+// a category picked by hand names the draft's role when it names one (T115); else the type decides at placement
+const roleFor = (category: string | null): Role | null => {
+  const r = roleOfCategory(category);
+  return r === 'other' ? null : r;
+};
 
 function wholePositive(n: unknown, what: string): number {
   if (typeof n !== 'number' || !Number.isInteger(n) || n < 1) throw new DraftError(`${what} must be a whole number, 1 or more.`);
@@ -93,7 +98,10 @@ export async function acceptDevice(editor: Editor, d: DeviceDraftRow, choice: De
   if (d.needs.model && choice.model !== d.model) changes.model = choice.model;
   if (d.needs.qty && choice.qty !== d.qty) changes.qty = wholePositive(choice.qty, 'Quantity');
   if (d.needs.level && choice.levelId !== d.levelId) changes.level_id = choice.levelId;
-  if (d.needs.category) changes.category = known(choice.category);
+  if (d.needs.category) {
+    changes.category = known(choice.category);
+    changes.role = roleFor(changes.category as string);
+  }
   const qty = (changes.qty as number | undefined) ?? d.qty;
   const model = (changes.model as string | undefined) ?? d.model;
   return editor.group(ctx(`Draft review: accepted ${label({ ...d, model, qty })}`), async (g) => {
@@ -115,6 +123,7 @@ export async function editDevice(editor: Editor, d: DeviceDraftRow, f: DeviceFie
   if (!category || !CATEGORIES.includes(category)) throw new DraftError(`Category must be one of: ${CATEGORIES.join(' · ')}.`);
   const qty = f.qty !== undefined && f.qty !== null ? wholePositive(f.qty, 'Quantity') : d.qty;
   const changes: Record<string, unknown> = { model, category, qty, name: f.name !== undefined ? f.name?.trim() || null : d.name };
+  if (category !== known(d.category)) changes.role = roleFor(category);
   if (f.levelId !== undefined) changes.level_id = f.levelId;
   return editor.group(ctx(`Draft review: edited ${label({ model, name: changes.name as string | null, qty })}`), async (g) => {
     await g.setFields('draft_device', d.id, changes);
@@ -163,6 +172,7 @@ export async function addDeviceDraft(editor: Editor, projectId: string, f: NewDe
       model_raw: model,
       name: f.name?.trim() || null,
       category,
+      role: roleFor(category),
       qty: wholePositive(f.qty, 'Quantity'),
       level_basis: f.levelId ? 'manual' : 'project_pool',
       extraction: 'manual',

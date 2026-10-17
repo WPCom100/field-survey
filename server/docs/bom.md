@@ -63,7 +63,7 @@ Only `draft_device` rows, as trusted `create` ops by the user who uploaded the f
 | Column | From |
 |---|---|
 | `model`, `model_raw`, `candidates` | the Model column, normalised (below); `candidates` only when there is more than one |
-| `category` | the project's device-type library (`library_type.model` / `aliases`, project rows then the app library's, D183 (4)), else the built-in `MODEL_CATEGORY` table (`ERP…` Relay panel, `UFMP…` Foundry panel, `EBDK`, `P-NSPS…` NSPS, `P-TS…` / `ETS-…` Touchscreen, `PI1234` / `EPS05` Station, `P-DOC…` / `P-LS` / `UHCI…` Sensor) |
+| `role`, `category` | T115 (D201): the project's device-type library (`library_type.model` / `aliases`, project rows then the app library's, D183 (4)) — the type's `role`, else the role its category names, else the model's; `category` = the type's, canonicalised to the D196 spelling — else the built-in `MODEL_ROLE` table (`ERP…` relay_panel, `UFMP…` foundry_panel, `EBDK` ebdk, `P-NSPS…` nsps, `P-TS…` / `P-LCD…` / `ETS-…` touchscreen, `PI1234` / `EPS05` station, `P-DOC…` / `P-LS` / `UHCI…` sensor) with the role's category (`roles.ROLE_CATEGORY`: Power Distribution, Emergency Equipment, Equipment, Equipment Panels for a rack, Touchscreen, Station, Sensor). A rack venue's draft is `equipment_rack` / `Equipment Panels`. |
 | `qty` | the Quantity column |
 | `accessories[]` | `{model, model_raw, qty, role: accessory \| component, description, source_ref, extraction, confidence}` |
 | `level_id`, `level_basis` | `venue` (one floor the project has), `pooled_venue` (null, D10), `level_not_in_project` (null, the floor code kept in `source_ref.level_code`), `project_pool` (Material List) |

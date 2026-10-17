@@ -161,7 +161,8 @@ def result(parsed):
 def test_drafts_from_the_text_pages(result):
     text = [d for d in result.drafts if d.line.page != 3]
     assert len(text) == 74
-    racks = [d for d in text if d.category == "Equipment rack"]
+    racks = [d for d in text if d.role == "equipment_rack"]
+    assert {d.category for d in racks} == {"Equipment Panels"}  # T115: the D196 category
     assert len(racks) == 3
     # rack component lines fold into one Equipment rack draft named by its ERn4 enclosure
     level1 = draft_at(result, 1, 100)
@@ -191,23 +192,25 @@ def test_drafts_from_the_text_pages(result):
     assert sr.model == "P-DOC-C-SR" and sr.candidates == ["P-DOC-C-SR", "P-DOC-C-LR"]
     assert sr.conflicts == ["model:SR/LR"] and sr.level_code == "B2"
     ts = draft_at(result, 1, 530)
-    assert ts.model == "P-TS7-E" and ts.category == "Touchscreen"
+    assert ts.model == "P-TS7-E" and (ts.role, ts.category) == ("touchscreen", "Touchscreen")
     assert [a["model"] for a in ts.accessories] == ["P-LCD-FBB"]
     nsps = draft_at(result, 4, 20)
-    assert nsps.model == "P-NSPS-D" and nsps.category == "NSPS"
+    assert nsps.model == "P-NSPS-D" and (nsps.role, nsps.category) == ("nsps", "Equipment")
     # levels by venue
     assert (
         draft_at(result, 4, 145).level_code == "03"
         and draft_at(result, 4, 145).level_basis == "venue"
     )
-    assert draft_at(result, 4, 145).category == "Foundry panel"
+    ufmp = draft_at(result, 4, 145)
+    assert (ufmp.role, ufmp.category) == ("foundry_panel", "Power Distribution")
+    assert ufmp.row()["role"] == "foundry_panel"
     assert draft_at(result, 4, 340).level_code == "06" and not draft_at(result, 4, 340).conflicts
     assert draft_at(result, 5, 360).level_code == "06"  # carried over the page break
     floor11 = draft_at(result, 5, 380)
     assert floor11.level_id is None and floor11.level_basis == "level_not_in_project"
     # accessories (D27): faceplates on their stations, option cards on the ERP, AD parts on UHCI
     for d in text:
-        if d.category == "Station":
+        if d.role == "station":
             plates = [a for a in d.accessories if a["model"] == "1IFP"]
             assert len(plates) == 1 and plates[0]["qty"] == d.qty, d.line
     erp48 = draft_at(result, 1, 40)
@@ -216,7 +219,7 @@ def test_drafts_from_the_text_pages(result):
         ("ERP-RTO", 15),
     }
     uhci = draft_at(result, 4, 250)
-    assert uhci.category == "Sensor"
+    assert (uhci.role, uhci.category) == ("sensor", "Sensor")
     assert sorted(a["model"] for a in uhci.accessories) == ["AD-C18E-00-2A", "AD-C18R-0P-2A"]
     assert draft_at(result, 5, 380).accessories[0]["model"] == "ERM VDK"
     assert draft_at(result, 5, 410).accessories[0]["model"] == "DIN14"
@@ -264,7 +267,7 @@ def test_drafts_of_the_whole_bom(result):
     assert stats["component_lines"] == 50
     # the wall-mount ERn4 on FLOOR 16 is a rack too: processors fold in, the ride-thru is a part
     f16 = draft_at(result, 3, 440)
-    assert f16.category == "Equipment rack" and f16.model == "ERN4-W-120"
+    assert f16.role == "equipment_rack" and f16.model == "ERN4-W-120"
     assert f16.level_code == "16" and f16.level_basis == "level_not_in_project"
     assert [(a["model"], a["role"]) for a in f16.accessories] == [
         ("P-ACP3", "component"),
@@ -294,7 +297,11 @@ def test_vocabulary_and_library_override_the_defaults(parsed):
     assert draft_at(res, 4, 180).model == "PI1104-F"
     f11 = draft_at(res, 5, 420)
     assert f11.level_code == "02" and f11.level_id == t.levels["02"] and f11.level_basis == "venue"
-    assert draft_at(res, 4, 145).category == "Relay panel"
+    # the type's (old-spelled) category names the role and is written canonical (T115)
+    assert (draft_at(res, 4, 145).role, draft_at(res, 4, 145).category) == (
+        "relay_panel",
+        "Power Distribution",
+    )
     # a split floor (03 with a 03M): panels on 03 are flagged for 03M, stations are not
     split = bx.Target(levels={**target().levels, "03M": uuid7()})
     res2 = bx.build(lines, split)
@@ -327,7 +334,35 @@ def test_model_normalisation():
     lr = bx.normalise_model("P-DOC-C-LR-5", t)
     assert lr.candidates == ["P-DOC-C-LR", "P-DOC-C-SR"] and lr.conflicts == ["model:SR/LR"]
     assert bx.fix_ocr_model("P11002-4Z") == "PI1002-4Z"
-    assert bx.category_of("UHCI-WM", t) == "Sensor" and bx.category_of("SGE1552", t) is None
+    assert bx.classify("UHCI-WM", t) == bx.Kind("sensor", "Sensor")
+    assert bx.classify("SGE1552", t) is None
+
+
+def test_classify_by_library_role():
+    """T115 (D201): a type's role first, else the role its category names, else the model's;
+    the category is the type's, canonicalised, else the role's."""
+    lib = [
+        # DaVinci's spelling: `Equipment` names several roles, the type carries `nsps`
+        bx.LibraryModel("P-NSPS-D", "Equipment", role="nsps"),
+        # a `Power Distribution` type with no role yet: the model says relay panel
+        bx.LibraryModel("ERP24-FT-241P", "Power Distribution"),
+        # a gateway: `Equipment`, no role, no model rule → other, still a device
+        bx.LibraryModel("P-GWY", "Equipment"),
+        # the role overrides what the model rule would say
+        bx.LibraryModel("UFMP8", "Power Distribution", role="relay_panel"),
+        bx.LibraryModel("ERn4-RM-120", "Equipment rack"),
+    ]
+    t = bx.Target(levels={}, library=lib)
+    assert bx.classify("P-NSPS-D", t) == bx.Kind("nsps", "Equipment")
+    assert bx.classify("ERP24-FT-241P", t) == bx.Kind("relay_panel", "Power Distribution")
+    assert bx.classify("P-GWY", t) == bx.Kind("other", "Equipment")
+    assert bx.classify("UFMP8", t) == bx.Kind("relay_panel", "Power Distribution")
+    assert bx.classify("ERN4-RM-120", t) == bx.Kind("equipment_rack", "Equipment Panels")
+    # no type: the model rule and the role's category (the rename ruling's table)
+    bare = bx.Target(levels={})
+    assert bx.classify("ERP48-FT-481P", bare) == bx.Kind("relay_panel", "Power Distribution")
+    assert bx.classify("EBDK", bare) == bx.Kind("ebdk", "Emergency Equipment")
+    assert bx.classify("PI1002", bare) == bx.Kind("station", "Station")
 
 
 # --------------------------------------------------------- the Material List
@@ -354,7 +389,7 @@ def test_material_list_goes_to_the_project_pool():
     res = bx.build(lines, target())
     assert all(d.level_id is None and d.level_basis == "project_pool" for d in res.drafts)
     station = draft_at(res, 2, 260)
-    assert station.model == "EPS05" and station.category == "Station"
+    assert station.model == "EPS05" and station.role == "station"
     assert sorted(a["model"] for a in station.accessories) == ["EPS05-ELEC", "EPS05-FP"]
     assert any(e.line.part_number == "7131A1075" for e in res.excluded)  # the breaker panel
     assert any(e.line.part_number == "N4036" for e in res.excluded)  # a Cat5 cable
@@ -428,7 +463,8 @@ def test_bom_job_writes_drafts_as_ops(session, store, factory):
     ]
     assert b2_sensor.level_id == levels["B2"].id and b2_sensor.source_ref["file"] == "BOM.pdf"
     rack = next(r for r in rows if r.source_ref["page"] == 1 and r.source_ref["line"] == 320)
-    assert rack.level_id == levels["06M"].id and rack.category == "Equipment rack"
+    assert rack.level_id == levels["06M"].id and rack.category == "Equipment Panels"
+    assert rack.role == "equipment_rack"
     assert rack.accessories[0]["role"] == "component"
     pooled = [r for r in rows if r.level_basis == "pooled_venue"]
     assert len(pooled) == 15 and all(r.level_id is None and r.confidence < 0.7 for r in pooled)

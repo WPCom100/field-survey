@@ -130,27 +130,30 @@ def test_sheet_001_devices_by_band(analysed):
     # level 01: two 48-relay panels with their cards, the rack, UFMP4 ×7, the touchscreen, the chain
     l01 = devs(r, "01")
     pb = dev(r, "01", "ERP48-FT-481P", "CT01LCPB")
-    assert pb.category == "Relay panel" and pb.model_raw == "ERP-FT-481P"
+    assert pb.role == "relay_panel" and pb.model_raw == "ERP-FT-481P"
+    assert pb.category == "Power Distribution"  # T115: the role's D196 category
     assert [(a["model"], a["qty"]) for a in pb.accessories] == [("ERP-FT-LVD", 2), ("ERP-RTO", 1)]
     assert dev(r, "01", "ERP48-FT-481P", "CT01LCPA").qty == 1
     rack = dev(r, "01", "ERN4-RM-120")
-    assert rack.category == "Equipment rack" and rack.name == rx.RACK_NAME
+    assert rack.role == "equipment_rack" and rack.name == rx.RACK_NAME
+    assert rack.category == "Equipment Panels"
     comps = {a["model"] for a in rack.accessories}
     assert {"P-ACP", "P-SPM-E", "MOSAIC MSCX-10 SHOW CONTROLLER", "24-PORT PATCH PANEL"} <= comps
     assert all(a["role"] == "component" for a in rack.accessories)
     assert dev(r, "01", "UFMP4").qty == 7 and dev(r, "01", "UFMP4").qty_source == "qty"
-    assert dev(r, "01", "P-TS7-E").category == "Touchscreen"
-    assert sum(1 for d in l01 if d.category == "EBDK") == 2
-    counts = {(d.model, d.qty) for d in l01 if d.category in ("Station", "Sensor")}
+    assert dev(r, "01", "P-TS7-E").role == "touchscreen"
+    assert sum(1 for d in l01 if d.role == "ebdk") == 2
+    assert {d.category for d in l01 if d.role == "ebdk"} == {"Emergency Equipment"}
+    counts = {(d.model, d.qty) for d in l01 if d.role in ("station", "sensor")}
     assert counts == {("P-DOC-C-LR", 1), ("PI1002", 5), ("PI1004", 2), ("PI1104", 15)}
     assert all(d.extraction == "text" and d.confidence == rx.TEXT_CONFIDENCE for d in l01)
     # level 06: CT06LCPA is a Foundry panel, CT06LCPB a 24-relay panel; the mezzanine rack
-    assert dev(r, "06", "UFMP8", "CT06LCPA").category == "Foundry panel"
+    assert dev(r, "06", "UFMP8", "CT06LCPA").role == "foundry_panel"
     assert [
         (a["model"], a["qty"]) for a in dev(r, "06", "ERP24-FT-241P", "CT06LCPB").accessories
     ] == [("ERP-FT-LVD", 1), ("ERP-RTO", 1)]
     assert dev(r, "06", "ERN4-RM-120").qty == 1
-    assert {(d.model, d.qty) for d in devs(r, "06") if d.category in ("Station", "Sensor")} == {
+    assert {(d.model, d.qty) for d in devs(r, "06") if d.role in ("station", "sensor")} == {
         ("P-DOC-C-LR", 7),
         ("PI1002", 7),
     }
@@ -170,7 +173,7 @@ def test_sheet_001_devices_by_band(analysed):
     assert dev(r, "04", "P-NSPS-D").model_raw == "P-NSPS-DIN"
     # level 03: 13 ceiling sensors (the BOM says 11 LR + 2 SR; the survey found 9 — a conflict)
     assert dev(r, "03", "P-DOC-C-LR").qty == 13
-    assert {(d.model, d.qty) for d in devs(r, "03") if d.category == "Station"} == {
+    assert {(d.model, d.qty) for d in devs(r, "03") if d.role == "station"} == {
         ("PI1002", 8),
         ("PI1004", 1),
         ("PI1104", 10),
@@ -178,14 +181,14 @@ def test_sheet_001_devices_by_band(analysed):
     assert dev(r, "03", "UFMP4").qty == 2
     # B1: the wall sensors the BOM calls P-DOC-W-WD
     assert dev(r, "B1", "P-DOC-W").qty == 8 and dev(r, "B1", "P-DOC-C-LR").qty == 13
-    assert dev(r, "B1", "ERP24-FT-241P", "CTB1LCPB").category == "Relay panel"
+    assert dev(r, "B1", "ERP24-FT-241P", "CTB1LCPB").role == "relay_panel"
     # NSPS enclosures: `2 - P-NSPS-DIN` on 09 and 10, `1 -` on 11
     assert dev(r, "10", "P-NSPS-D").qty == 2 and dev(r, "11", "P-NSPS-D").qty == 1
     # Phase 1f: pooled BOM totals equal the riser's placements on B2–12
     all_devs = r.sheets[0].devices
     assert sum(1 for d in all_devs if d.model == "ERP24-FT-241P") == 9
     assert sum(1 for d in all_devs if d.model == "ERP48-FT-481P") == 6
-    assert sum(d.qty for d in all_devs if d.category == "EBDK") == 15
+    assert sum(d.qty for d in all_devs if d.role == "ebdk") == 15
     assert sum(1 for d in all_devs if d.model == "UFMP8" and d.name) == 5  # + the loose one on 04
     assert len(all_devs) == 93
 
@@ -245,7 +248,8 @@ def test_model_lines_written_backwards_or_passing_through():
     panel = rx.Device(
         id="new-1",
         band=b,
-        category="Relay panel",
+        role="relay_panel",
+        category="Power Distribution",
         model="ERP24-FT-241P",
         model_raw="ERP-FT-241P",
         name="CT22LCPA",
@@ -297,6 +301,45 @@ def test_model_lines_written_backwards_or_passing_through():
     (c,) = res.cables
     assert "endpoint:unresolved" not in c.conflicts and c.from_label == "CT22LCPA"
     assert any(x["side"] == "from" for x in c.candidates)
+
+
+def test_trunk_labels_resolve_by_role():
+    """T115: `TO RELAY PANEL LEVEL 06` / `TO EQUIP RACK LEVEL 06` name the device of that role on
+    the level (`device_on`), whatever its category text says."""
+    b = rx.Band(page=1, column=0, index=0, top=0.0, bottom=100.0, x0=0.0, x1=500.0)
+    b.level_code = "06"
+
+    def device(n: int, role: str, category: str | None, name: str) -> rx.Device:
+        return rx.Device(
+            id=f"d{n}",
+            band=b,
+            role=role,
+            category=category,
+            model="M",
+            model_raw="M",
+            name=name,
+            qty=1,
+            qty_source="one",
+            accessories=[],
+            bbox=[10.0 * n, 10.0, 5.0, 5.0],
+            label=name,
+            extraction="text",
+            confidence=0.9,
+            draft_id=uuid7(),
+        )
+
+    # both `Power Distribution`: only the role tells the relay panel from the Foundry panel
+    foundry = device(1, "foundry_panel", "Power Distribution", "CT06LCPA")
+    relay = device(2, "relay_panel", "Power Distribution", "CT06LCPB")
+    rack = device(3, "equipment_rack", "Equipment Panels", rx.RACK_NAME)
+    sheet = rx.Sheet(1, "001", 3000.0, 2000.0, True, [b], [foundry, relay, rack], [], 0, 1)
+    bld = rx._Build(rx.Riser([sheet]), tower_target())
+    assert bld.device_on("06", "relay_panel") is relay
+    _, lvl, far = bld.resolve_label("TO RELAY PANEL LEVEL 06")
+    assert (lvl, far["kind"], far["id"]) == ("06", "draft_device", str(relay.draft_id))
+    _, _, far = bld.resolve_label("TO EQUIP RACK LEVEL 06")
+    assert far["id"] == str(rack.draft_id)
+    assert bld.resolve_label("TO NSPS LEVEL 06")[2] is None  # no NSPS on 06
 
 
 def test_far_end_labels_resolve_to_placeholders_and_levels():
@@ -367,7 +410,8 @@ def test_build_without_a_bom_or_endpoints(analysed):
     assert row["source_ref"]["level_code"] == "01" and row["source_ref"]["band"] == "p1c0b8"
     assert row["accessories"][0]["role"] == "accessory" and row["state"] == "proposed"
     assert row["confidence"] == 0.9 and row["candidates"] is None
-    nsps = next(d for d in res.drafts if d.level_code == "03" and d.category == "NSPS")
+    nsps = next(d for d in res.drafts if d.level_code == "03" and d.role == "nsps")
+    assert nsps.category == "Equipment" and nsps.row()["role"] == "nsps"
     assert "network:no_N_run" in nsps.conflicts
     assert {f["check"] for f in res.findings} == {"network_run"}
     # cables: one per run bubble; the labelled outputs resolved, the rest unresolved
@@ -799,6 +843,12 @@ def test_riser_job_with_claude_endpoints(session, store, factory):
         ("EBDK", 1),
         ("ERN4-RM-120", 1),
     }
+    # the model classifies by role (T115); the draft's category is the role's
+    roles_16 = {r.model: (r.role, r.category) for r in l16}
+    assert roles_16["ERP24-FT-241P"] == ("relay_panel", "Power Distribution")
+    assert roles_16["EBDK"] == ("ebdk", "Emergency Equipment")
+    assert roles_16["ERN4-RM-120"] == ("equipment_rack", "Equipment Panels")
+    assert all(r.role for r in rows)
     # lines with no bubble (T108, D192): the Tower's count, each asked about with a guess
     every = session.scalars(select(DraftCable).where(DraftCable.project_id == project_id)).all()
     unknown = [c for c in every if c.code is None]
@@ -971,5 +1021,5 @@ def test_claude_cost_and_recording(tmp_path):
     assert json.loads((tmp_path / "rec.json").read_text())[key]["data"] == {"ok": True}
 
 
-TOWER_UNKNOWN_CODE = 221
+TOWER_UNKNOWN_CODE = 222
 """Lines with no bubble on the Tower's riser, both sheets, with the recorded answers (T108)."""
