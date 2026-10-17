@@ -186,3 +186,26 @@ Run the PC number again: a scratch script wrapping `S3ObjectStore` with `time.sl
 around `export_xlsx.export_bytes` (S3_ENDPOINT=http://localhost:9000). The Droplet row is filled from the
 on-device checklist's T32 / T94 step and the export row's `stats.stage_seconds`. Floor PDF photos are still
 read one at a time → T98.
+
+### Floor PDF speed (T98, 2026-10-16)
+
+**Measured.** 06M of the local "TP-3 synthetic 2026-10-12" (1,000 devices, 5,000 photos — thumbnails
+only, as the generator makes them — and 3,140 finding thumbnails) costs 8,141 reads in `floor_pdf.load`.
+With no delay the load takes 18.8 s; with 0.11 s added to every read and the reads one at a time it
+took **930 s** (devices with their thumbnails 358 s, photos 571 s). The Droplet was not timed (no access from the
+session); its per-read cost is T94's.
+
+**Fix.** The findings' thumbnails and the Photos section's pictures go through `read_ordered`, 16 at a
+time, the photos at most 25 ahead (≤ 64 MB of 2.5 MB full-size pictures; `server/docs/exports.md`,
+Floor PDF).
+
+| Floor PDF of 06M, TP-3 (8,141 reads) | Load | Render | Total | Target |
+|---|---|---|---|---|
+| PC, 0.11 s per read, one at a time (before) | 930 s | ≈ 35 s | ≈ 965 s (16 min) | < 5 min |
+| PC, 0.11 s per read, 16 at a time (in the server image) | 59 s | 35 s (40.5 MB) | **≈ 94 s** | < 5 min |
+| Droplet after (Generate → Ready, `stats.stage_seconds`) | | | *after the push* | < 5 min |
+
+Run it again: `t98_measure.py`-style scratch script — `floor_pdf.load` for 06M over `S3ObjectStore`
+wrapped with `time.sleep(0.11)` per `read`, then `floor_pdf.render`, inside the api image
+(`docker compose run --rm --no-deps -v <server>/app:/srv/app … api python <script>`) so WeasyPrint
+loads. The Droplet row is filled from the on-device checklist's T98 step.

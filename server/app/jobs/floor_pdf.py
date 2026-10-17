@@ -13,7 +13,8 @@ user's ink layer drawn over it with the stroke rules of `packages/core/docs/stro
 (`markup.draw_strokes`), then the pins: shape = category, fill = status (D64, the app's
 `pins.ts`), labelled with the device type (the app's `pinLabel`, D119/D120). The findings carry a
 crop of the same raster around each device's pin. Photos in the appendix are the full JPEG when
-the server has it (else the thumbnail), markup flattened, scaled down for print.
+the server has it (else the thumbnail), markup flattened, scaled down for print. Thumbnails and
+photos are read from storage several at a time (`app.storage.read_ordered`, T98), in report order.
 
 WeasyPrint needs the Pango libraries (present in the server image); it is imported only by
 `render`, so the module loads anywhere.
@@ -26,6 +27,7 @@ import html
 import io
 import math
 import uuid
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -50,7 +52,7 @@ from app.models import (
     Sheet,
 )
 from app.roles import DeviceRoles
-from app.storage import ObjectMissing, ObjectStore
+from app.storage import ObjectMissing, ObjectStore, read_ordered
 
 PDF_MIME = "application/pdf"
 SECTIONS = ("plan", "findings", "connections", "punch", "parts", "photos")
@@ -75,6 +77,11 @@ CROP_PT = (300.0, 200.0)  # sheet area around a finding's pin
 CROP_SCALE = 1.0  # raster px per sheet pt for crops
 PHOTO_MAX_PX = 1100
 THUMBS_PER_FINDING = 4
+# T98: a full-size photo is up to ≈ 2.5 MB; at most PHOTOS_AHEAD of them (≈ 64 MB) are read and
+# waiting at once, on a 2 GB Droplet. Thumbnails (≈ 20 KB) use read_ordered's default.
+FULL_SIZE_BYTES = 2_500_000
+PHOTO_BYTES_HELD = 64_000_000
+PHOTOS_AHEAD = PHOTO_BYTES_HELD // FULL_SIZE_BYTES
 
 
 # ------------------------------------------------------------------ data
@@ -233,43 +240,57 @@ def load(
 
     sheet = session.get(Sheet, level.display_sheet_id) if level.display_sheet_id else None
     by_id: dict[uuid.UUID, Device] = {d.id: d for d in devices}
-    for i, d in enumerate(sorted(devices, key=lambda d: export_xlsx.id_sort_key(d.display_id))):
-        progress("Devices", i, len(devices), "devices")
-        pin = None
-        if (
-            sheet is not None
-            and isinstance(d.pin, dict)
-            and str(d.pin.get("sheet")) == str(sheet.id)
-        ):
-            try:
-                pin = (float(d.pin["x"]), float(d.pin["y"]))
-            except (KeyError, TypeError, ValueError):
-                data.checks.append(f"{d.display_id}: pin unreadable")
-        status = d.status if d.status in STATUS_STYLE else None
-        want_thumbs = "findings" in data.sections and status != NOT_A_FINDING
-        thumbs = []
-        if want_thumbs:
-            for ph in device_photos.get(d.id, [])[:THUMBS_PER_FINDING]:
-                b = _read(store, ph.thumb_blob)
+    ordered = sorted(devices, key=lambda d: export_xlsx.id_sort_key(d.display_id))
+
+    def status_of(d: Device) -> str | None:
+        return d.status if d.status in STATUS_STYLE else None
+
+    def thumbs_of(d: Device) -> list[Photo]:
+        if "findings" not in data.sections or status_of(d) == NOT_A_FINDING:
+            return []
+        return device_photos.get(d.id, [])[:THUMBS_PER_FINDING]
+
+    # T98: every finding's thumbnails, read several at a time in device order
+    thumb_reads = read_ordered(
+        lambda ph: _read(store, ph.thumb_blob), (ph for d in ordered for ph in thumbs_of(d))
+    )
+    with closing(thumb_reads):
+        for i, d in enumerate(ordered):
+            progress("Devices", i, len(devices), "devices")
+            pin = None
+            if (
+                sheet is not None
+                and isinstance(d.pin, dict)
+                and str(d.pin.get("sheet")) == str(sheet.id)
+            ):
+                try:
+                    pin = (float(d.pin["x"]), float(d.pin["y"]))
+                except (KeyError, TypeError, ValueError):
+                    data.checks.append(f"{d.display_id}: pin unreadable")
+            thumbs = []
+            for _ph in thumbs_of(d):
+                _, b, error = next(thumb_reads)
+                if error is not None:
+                    raise error  # storage down: the export fails, as before
                 if b:
                     thumbs.append(b)
-        data.devices.append(
-            FloorDevice(
-                id=d.id,
-                display_id=d.display_id or f"{level.level}-?",
-                category=d.category,
-                role=roles.role_of(d),
-                device=d.device,
-                type=d.type,
-                room=d.room_location,
-                status=status,
-                notes=d.notes,
-                pin=pin,
-                owners=sorted(owners.get(d.id, set())),
-                open_items=items.get(d.id, []),
-                thumbs=thumbs,
+            data.devices.append(
+                FloorDevice(
+                    id=d.id,
+                    display_id=d.display_id or f"{level.level}-?",
+                    category=d.category,
+                    role=roles.role_of(d),
+                    device=d.device,
+                    type=d.type,
+                    room=d.room_location,
+                    status=status_of(d),
+                    notes=d.notes,
+                    pin=pin,
+                    owners=sorted(owners.get(d.id, set())),
+                    open_items=items.get(d.id, []),
+                    thumbs=thumbs,
+                )
             )
-        )
     for s in (*DEVICE_STATUS, None):
         data.counts[s or UNSURVEYED] = sum(1 for d in data.devices if d.status == s)
 
@@ -296,24 +317,33 @@ def load(
         data.parts = rows["Missing Parts"]
 
     if "photos" in data.sections:
-        for i, ph in enumerate(photos):
-            progress("Photos", i, len(photos), "pictures")
+
+        def fetch(ph: Photo) -> tuple[bytes | None, bytes | None]:
             jpeg = _read(store, ph.image_blob) or _read(store, ph.thumb_blob)
-            if jpeg and ph.markup_blob:
-                strokes = _read(store, ph.markup_blob)
-                try:
-                    jpeg, _ = markup.flatten(jpeg, strokes)
-                except (markup.MarkupError, ValueError):
-                    data.checks.append(f"photo {ph.number}: markup not drawn")
-            ids = [by_id[i].display_id for i in photo_devices[ph.id] if i in by_id]
-            data.photos.append(
-                FloorPhoto(
-                    number=ph.number,
-                    subject=ph.subject,
-                    device_ids=[i for i in ids if i],
-                    jpeg=_shrink(jpeg) if jpeg else None,
+            return jpeg, _read(store, ph.markup_blob) if jpeg and ph.markup_blob else None
+
+        # T98: read several at a time in photo order, at most PHOTOS_AHEAD full-size ones held
+        photo_reads = read_ordered(fetch, photos, ahead=PHOTOS_AHEAD)
+        with closing(photo_reads):
+            for i, (ph, got, error) in enumerate(photo_reads):
+                progress("Photos", i, len(photos), "pictures")
+                if error is not None:
+                    raise error  # storage down: the export fails, as before
+                jpeg, strokes = got or (None, None)
+                if jpeg and strokes is not None:
+                    try:
+                        jpeg, _ = markup.flatten(jpeg, strokes)
+                    except (markup.MarkupError, ValueError):
+                        data.checks.append(f"photo {ph.number}: markup not drawn")
+                ids = [by_id[i].display_id for i in photo_devices[ph.id] if i in by_id]
+                data.photos.append(
+                    FloorPhoto(
+                        number=ph.number,
+                        subject=ph.subject,
+                        device_ids=[i for i in ids if i],
+                        jpeg=_shrink(jpeg) if jpeg else None,
+                    )
                 )
-            )
     return data
 
 

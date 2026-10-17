@@ -68,7 +68,7 @@ runs again from the start. The daily backup skips a project whose workbook is qu
 and tries again the next minute.
 
 **Pictures in parallel (T94).** The Photo Log reads its thumbnails (and markup) through
-`app.storage.read_ordered`: `READ_WORKERS` (16) reads at once, at most 64 ahead, handed back in
+`app.storage.read_ordered`: `READ_WORKERS` (16) reads at once, at most 64 ahead (`ahead`), handed back in
 Photo Log order; a picture not in storage is still a `checks` line, any other storage error fails
 the export as before, and Cancel drops the reads not started. One R2 GET from the Droplet costs
 ≈ 0.1 s, so 10,000 pictures one at a time took 18–23 min; 16 at a time is ≈ 70 s
@@ -181,6 +181,15 @@ strokes not drawn).
 | Findings | devices whose status is not `Installed, untested` (Unsurveyed included), by ID; each a block that never splits: ● status colour, `ID — Device`, `Status \| Owner \| Category` (owners of open punch items and parts), Room / Location, Type, Notes, open punch items, up to four thumbnails, and a 300 × 200 pt crop of the plan around its pin with the neighbours drawn and the device ringed. Four per Letter page in practice |
 | Connections · Punch list · Missing parts | tables with the workbook's rows for this level (the same generated texts: From/To verbatim, Device text, Source); the punch list by (`sort_last`, #) |
 | Photos | the level's photos by number in a 2 × 3 grid (two columns, three rows per page), the full JPEG when the server has it, else the thumbnail, markup flattened, scaled to ≤ 1,100 px; caption `Photo n — <Subject> — <Device IDs>` |
+
+**Pictures in parallel (T98).** Like the Photo Log, the findings' thumbnails (in device order) and
+the Photos section's pictures (full JPEG else thumbnail, plus markup, by number) are read through
+`app.storage.read_ordered`, 16 at a time. The photos keep at most `PHOTOS_AHEAD` (25) read and not
+yet drawn, so ≈ 2.5 MB full-size pictures hold ≤ 64 MB at once on the 2 GB Droplet; markup is
+flattened and the picture shrunk one at a time as before. A picture not in storage is still left
+out, any other storage error fails the export, Cancel drops the reads not started. 06M of
+"TP-3 synthetic" (1,000 devices, 5,000 photos, 3,140 thumbnails — 8,141 reads) with 0.11 s added to
+every read: load 59 s + render 35 s against ≈ 15 min one at a time (`docs/perf/tp3.md` §3).
 
 Sections follow one another without forced page breaks (D66); only the cover ends its page.
 Rendering is WeasyPrint, which needs Pango: the server image installs `libpango-1.0-0`,

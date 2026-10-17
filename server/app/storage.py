@@ -51,12 +51,16 @@ def client(fail_fast: bool = False):
 
 
 def read_ordered[T, R](
-    fn: Callable[[T], R], items: Iterable[T], workers: int = READ_WORKERS
+    fn: Callable[[T], R],
+    items: Iterable[T],
+    workers: int = READ_WORKERS,
+    ahead: int | None = None,
 ) -> Iterator[tuple[T, R | None, Exception | None]]:
     """`fn(item)` for each item on `workers` threads, yielded in the items' order as
-    `(item, result, None)` or `(item, None, error)` (T94). At most `workers * 4` calls are ahead of
-    the consumer; closing the generator (the job was cancelled) drops the ones not started."""
-    ahead = max(1, workers) * 4
+    `(item, result, None)` or `(item, None, error)` (T94). At most `ahead` calls (default
+    `workers * 4`) are running or done and not yet consumed, which bounds the bytes held (T98);
+    closing the generator (the job was cancelled) drops the ones not started."""
+    ahead = max(1, ahead if ahead is not None else max(1, workers) * 4)
     pending: deque[tuple[T, Future[R]]] = deque()
     pool = ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix="read")
     try:
@@ -67,14 +71,15 @@ def read_ordered[T, R](
                 break
         while pending:
             item, fut = pending.popleft()
-            nxt = next(it, _END)
-            if nxt is not _END:
-                pending.append((nxt, pool.submit(fn, nxt)))
             try:
                 out = (item, fut.result(), None)
             except Exception as e:  # noqa: BLE001 — handed to the caller with its item
                 out = (item, None, e)
             yield out
+            del out  # handed over: the next read takes its place
+            nxt = next(it, _END)
+            if nxt is not _END:
+                pending.append((nxt, pool.submit(fn, nxt)))
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 

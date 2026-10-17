@@ -65,7 +65,7 @@ Decision D166 (already answered by you: one at a time per project and kind, anyo
 Failed 2026-10-14 (close-out G-4): over 5 minutes (the server logs say 18–23 min), no status, the card lost on leaving the screen. Every other TP-3 step passed (`docs/perf/tp3.md` §3). **Why it matters:** T94 makes the server read the 10,000 Photo Log pictures 16 at a time instead of one by one; on the PC with the Droplet's storage delay imitated the whole workbook took 80 s. This proves it on the real server.
 
 - [ ] **Export.** "TP-3 synthetic" → Export → Generate workbook (all levels, all tabs): time from Generate until Ready under 5 minutes? (Expect about 2.) The `Photo Log … pictures` count on the card should climb by hundreds a second, not a few. Open it in Excel from the share sheet: pictures in the Photo Log, no repair prompt. → saw:
-- [ ] **Floor PDF still fine.** Generate floor PDF for 06M on the same project: Ready, opens. (Unchanged by T94; its photos are still read one at a time, so note the minutes.) → saw:
+- [ ] **Floor PDF still fine.** Generate floor PDF for 06M on the same project: Ready, opens. (Its speed is the T98 section below.) → saw:
 
 ## T81 — Punch List Device text follows the device  ·  Needs: no new build
 
@@ -503,6 +503,14 @@ Set-up: two iPads under two team names (say Landry and Ann), both synced, the To
 - [ ] **Anyone can change it.** On Ann's iPad untick 06 × Ann, sync both: Landry's Assignments shows 06 × Ann ☐ and Ann's ● on 06 is gone. → saw:
 
 Decision D208: answered 2026-10-16, **Approved** (anyone assigns; several people per level; unassigned does not count for everyone once you have an assignment). Nothing to answer here.
+
+## T98 — Floor PDF at tower scale  ·  Needs: no new build (server deploy; push T98 first)
+
+**Why it matters:** 06M of "TP-3 synthetic" has 5,000 photos and 3,140 finding thumbnails; read one at a time from R2 (≈ 0.11 s each) its floor PDF would take ≈ 15 min. T98 reads them 16 at a time; on the PC with the Droplet's storage delay imitated it took ≈ 1.5 min (load 59 s, render 35 s).
+
+- [ ] **Under 5 minutes.** "TP-3 synthetic" → Export → Generate floor PDF, level 06M, all sections: time from Generate until Ready under 5 minutes? (Expect 2–3.) The card's `Photos … pictures` count climbs by about a hundred a second, not a few. → saw:
+- [ ] **Same report.** Open it: the cover's counts and plan, findings with up to four thumbnails each, then the tables, then the photos in number order with their captions (spot-check Photo 1 and the last one); no blank picture boxes. → saw:
+- [ ] **Cancel.** Generate it again and tap Cancel while the card says `Photos`: the card goes to Cancelled within a few seconds, and a new Generate starts at once. → saw:
 
 ---
 
