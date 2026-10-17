@@ -546,6 +546,22 @@ Decision D209: drafts that no device card lists (Neuron ID item, Unison pair, a 
 
 Decision D211: rule settings are a `rule_param` table (your choice), owners per project and cable code (not per level); a project reads only its own values — app-level defaults are copied when a project is created and never change an existing project; only values set away from the default can bring back a rejected draft; Punch Type, part status and the `Stations & Sensors` label stay fixed. → Approve / change:
 
+## T99 — Suggestion chips in the library  ·  Needs: no new build (JS update; server deploy first — Alembic 0015 adds `suggestion`; **every iPad on the new JS before anyone adds a chip**, an older iPad refuses those ops on pull until it updates, nothing lost)
+
+**Why it matters:** the chips under Notes were one list for every device; stations need "Stuck buttons", racks do not, and a DMX end needs "Missing DMX termination kit" where a network end needs "Missing network termination" (D172, D174). Chips now come from the library: per type, per category, per cable code.
+
+- [ ] **Nothing moves on the update.** Open a device card and a connection end you know: the chips under Notes / Note are the same as before (no library chips yet). → saw:
+- [ ] **Seed the app library.** Projects → app library → **Suggestions…** → **Load standard suggestions**: "Added 21 standard suggestions as drafts". Pick **Station**: "Stuck buttons" and "Empty box on wall." marked DRAFT. Pick cable **N**: "Missing network termination" under End Note and Punch item; the place chips at the bottom have no **Part** (R4). Tap Load again: "all here already". Accept the ones you want, edit by Remove + add, Reject the rest. → saw:
+- [ ] **Into the Tower.** Tower → Library → **Suggestions…** → **Copy from app library**: "Copied N chips" (only what you accepted); a second tap copies nothing. → saw:
+- [ ] **Card chips, most specific first.** Open a station's card: under Notes the first chips are the Station ones ("Stuck buttons", "Empty box on wall."), then the usual list; a relay panel's card does not show them. Tap "Stuck buttons": it is appended to Notes as any chip; typing freely still works. → saw:
+- [ ] **A type's own chips.** Library → pick the station's type (e.g. PI1002) → **Suggestions** (under Default cables): add "Faceplate cracked" for Device Notes. It shows as DRAFT and appears at once, **first**, on every device of that type, before the Station chips. Reject it: it disappears from the card. → saw:
+- [ ] **End chips by code.** Open a DMX (X) end: the X chips come first, then the usual list; an N end shows "Missing network termination" instead. → saw:
+- [ ] **Draft Edit form.** On a card with a "Terminate DMX to …" (or any punch) draft, tap **Edit**: under *item* the X punch chip "Missing DMX termination kit" shows (when the draft sits on a DMX end), then the project's punch-item phrases; tapping a chip replaces the item text; Cancel leaves the draft as it was. → saw:
+- [ ] **Copy and promote with the type.** In a project, accept a chip on an accepted type, then **Promote to app library**: in the app library the type shows the chip too. Add another chip to the project type afterwards, accept it: it has its own **Promote**. → saw:
+- [ ] **Second iPad.** Sync both iPads: a chip added on one appears on the other's card after its sync. → saw:
+
+Decision D212: suggestion chips are one `suggestion` table (your choice); new chips are drafts that show at once; a project reads its own category / code chips and its types' chips (the app library's reach it by copying); the card's draft Edit form is where punch-item and part chips appear for now; N / NG never offer a Part chip; the seed above is a first draft of the phrases per category and code for you to accept or change. → Approve / change:
+
 ---
 
 ## Rules for this file

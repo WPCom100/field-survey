@@ -598,6 +598,15 @@ export function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardD
                 autoCapitalize="none"
                 autoCorrect={false}
               />
+              {draft.chips?.[k]?.length ? (
+                <View style={styles.rowWrap}>
+                  {draft.chips[k]!.map((c) => (
+                    <Pressable key={c} onPress={() => setEditing((f) => (f ? { ...f, [k]: c } : f))} style={[styles.phrase, editing[k] === c && styles.phraseOn]}>
+                      <Text style={styles.phraseText}>{c}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
             </View>
           ))}
           <View style={styles.rowWrap}>
@@ -802,6 +811,7 @@ const styles = StyleSheet.create({
   notes: { minHeight: 60, textAlignVertical: 'top' },
   mono: { fontVariant: ['tabular-nums'], letterSpacing: 1 },
   phrase: { maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, backgroundColor: '#eef2f7' },
+  phraseOn: { backgroundColor: '#cfe0f5' },
   phraseText: { fontSize: 12, color: '#1f3b63' },
   phraseMore: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
   acc: { gap: 4 },

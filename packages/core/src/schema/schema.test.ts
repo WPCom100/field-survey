@@ -55,7 +55,7 @@ describe('migrations', () => {
       'project', 'level', 'numbering_group', 'sheet', 'app_user', 'assignment', 'device',
       'accessory', 'cable', 'cable_end', 'placeholder', 'punch_item', 'missing_part',
       'part_source', 'photo', 'photo_link', 'ink_layer', 'blob', 'op', 'review_item', 'ruling', 'proposal',
-      'finding', 'import_batch', 'draft_device', 'draft_cable', 'library_type', 'rule_param', 'vocab', 'export',
+      'finding', 'import_batch', 'draft_device', 'draft_cable', 'library_type', 'rule_param', 'suggestion', 'vocab', 'export',
       'install', 'field_head', 'outbox', 'blob_queue', 'sync_state',
     ];
     for (const k of expected) expect(entity(k).table).toBe(k);

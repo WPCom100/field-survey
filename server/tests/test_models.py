@@ -43,6 +43,7 @@ PLAN_ENTITIES = {
     "draft_cable",
     "library_type",
     "rule_param",
+    "suggestion",
     "vocab",
     "export",
     "install",

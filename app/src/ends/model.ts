@@ -9,6 +9,7 @@ import { displayNumber, reviewFields, riserCheck, type RiserCheck, type Store } 
 
 import type { CardPhoto, JumpTarget } from '../card/model';
 import { photoStrip } from '../photo/links';
+import { chipsFor, loadChipRows } from '../suggestions/model';
 
 // The riser matcher lives in core since T34 (the rule engine's R2b uses the same one).
 export { riserCheck, type RiserCheck };
@@ -78,6 +79,7 @@ export type CableView = {
   /** The end the editor was opened on, then the other (or null when the cable has one end). */
   ends: [EndView, EndView | null];
   riser: RiserCheck;
+  /** Chips under a Note: the library's for the cable code (T99), then the project's `connection_note` list, else `CONNECTION_PHRASES`. */
   phrases: readonly string[];
 };
 
@@ -175,6 +177,7 @@ export async function loadCableEnds(store: Store, endId: string): Promise<CableV
     ends: [mine, other],
     // The riser governs the cable's To (R2): the A end's To text, else whichever end has one.
     riser: riserCheck(str(cable.riser_to_label), [mine, other].find((e) => e?.side === 'A' && e.toText)?.toText ?? mine.toText ?? other?.toText ?? null),
-    phrases: vocabRows.length ? vocabRows.map((v) => String(v.value)) : CONNECTION_PHRASES,
+    // the cable code's suggestion chips first (T99, D174 (2)), then the project's list
+    phrases: chipsFor(await loadChipRows(store, project), { codes: [str(cable.cable)] }, 'connection_note', vocabRows.length ? vocabRows.map((v) => String(v.value)) : CONNECTION_PHRASES),
   };
 }

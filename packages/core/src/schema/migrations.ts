@@ -18,6 +18,7 @@ import { statements as m0010 } from './migrations/0010_davinci_library';
 import { statements as m0011 } from './migrations/0011_library_role';
 import { statements as m0012 } from './migrations/0012_draft_device_role';
 import { statements as m0013 } from './migrations/0013_rule_param';
+import { statements as m0014 } from './migrations/0014_suggestion';
 
 export interface Migration {
   version: number;
@@ -39,6 +40,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 11, name: 'library_role', statements: m0011 },
   { version: 12, name: 'draft_device_role', statements: m0012 },
   { version: 13, name: 'rule_param', statements: m0013 },
+  { version: 14, name: 'suggestion', statements: m0014 },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

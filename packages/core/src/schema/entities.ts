@@ -585,6 +585,24 @@ export const ENTITIES = {
     [['project_id']],
   ),
 
+  // T99 (D174, D212): a suggestion chip, one row per phrase, at the two scopes of the device-type
+  // library (D65): `project_id` null = the app library. `scope` + `ref` say what it hangs off —
+  // a `library_type` id, a (canonical) category, a cable code — and `target` where it is offered.
+  suggestion: record(
+    'suggestion',
+    {
+      project_id: t(),
+      scope: enumCol(v.SUGGESTION_SCOPE, { notNull: true }),
+      ref: t({ notNull: true }),
+      target: enumCol(v.SUGGESTION_TARGET, { notNull: true }),
+      text: t({ notNull: true }),
+      state: enumCol(v.LIBRARY_STATE, { notNull: true, default: 'draft' }),
+      created_by_id: t(),
+      promoted_from_id: t(),
+    },
+    [['project_id'], ['ref']],
+  ),
+
   vocab: record(
     'vocab',
     {

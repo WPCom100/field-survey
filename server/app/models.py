@@ -613,6 +613,29 @@ class RuleParam(Id, Synced, Base):
     state: Mapped[str] = mapped_column(default="accepted", server_default="accepted")
 
 
+class Suggestion(Id, Synced, Base):
+    """A suggestion chip (T99, D174, D212), one row per phrase, at the device-type library's two
+    scopes (D65): `project_id` null = the app library. `scope` + `ref` name what it hangs off — a
+    `library_type` id, a category, a cable code — and `target` where it is offered (device Notes,
+    end Note, a punch item's Item, a part's Part). Copied with the type and at project creation."""
+
+    __tablename__ = "suggestion"
+    __table_args__ = (
+        one_of("scope", vocab.SUGGESTION_SCOPE),
+        one_of("target", vocab.SUGGESTION_TARGET),
+        one_of("state", vocab.LIBRARY_STATE),
+    )
+
+    project_id: Mapped[uuid.UUID | None] = mapped_column(fk("project.id"), index=True)
+    scope: Mapped[str]
+    ref: Mapped[str] = mapped_column(index=True)
+    target: Mapped[str]
+    text: Mapped[str]
+    state: Mapped[str] = mapped_column(default="draft", server_default="draft")
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(fk("app_user.id"))
+    promoted_from_id: Mapped[uuid.UUID | None]
+
+
 class Vocab(Id, Synced, Base):
     __tablename__ = "vocab"
     __table_args__ = (one_of("list", vocab.VOCAB_LIST), one_of("state", vocab.LIBRARY_STATE))

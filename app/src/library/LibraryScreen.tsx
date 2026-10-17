@@ -36,11 +36,13 @@ import {
   type LibraryType,
   type LibraryView,
 } from './model';
+import { loadSuggestions, type Suggestion } from '../suggestions/model';
+import { SuggestionList, SuggestionsPane } from './SuggestionEditor';
 
 /** One row of the virtualised list: a group's header, or a type. */
 type Item = { kind: 'head'; group: LibraryGroup; total: LibraryGroup | null; collapsed: boolean } | { kind: 'type'; type: LibraryType };
 
-type Pane = { kind: 'type'; id: string } | { kind: 'new' } | { kind: 'copy' } | null;
+type Pane = { kind: 'type'; id: string } | { kind: 'new' } | { kind: 'copy' } | { kind: 'suggestions' } | null;
 /** Run an edit; `done` is the line shown after it (a function to word it from what the edit did). */
 type RunFn = (fn: (e: Editor, s: Store) => Promise<unknown>, done?: string | (() => string)) => Promise<boolean>;
 
@@ -53,7 +55,8 @@ type RunFn = (fn: (e: Editor, s: Store) => Promise<unknown>, done?: string | (()
  * (`/library/ops`, D184). A project's accepted types can be promoted with `libraryEditor`.
  * At catalogue size (T114, about 1100 types after the DaVinci import) the list has a search box
  * (model, alias, display name), a group chip filter, "Drafts only", the accessories folded,
- * and "Accept all drafts in <group>" on each group header.
+ * and "Accept all drafts in <group>" on each group header. Suggestion chips (T99, D174): a type's
+ * on its editor beside the default cables, a category's and a cable code's under "Suggestions…".
  */
 export function LibraryScreen(props: {
   store: Store | null;
@@ -70,6 +73,7 @@ export function LibraryScreen(props: {
 }) {
   const { store, editor, scope } = props;
   const [view, setView] = useState<LibraryView | null>(null);
+  const [chips, setChips] = useState<Suggestion[]>([]);
   const [pane, setPane] = useState<Pane>(null);
   const [tick, setTick] = useState(0);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
@@ -77,8 +81,12 @@ export function LibraryScreen(props: {
   useEffect(() => {
     if (!store) return;
     let live = true;
-    loadLibrary(store, scope).then(
-      (v) => live && setView(v),
+    Promise.all([loadLibrary(store, scope), loadSuggestions(store, scope)]).then(
+      ([v, c]) => {
+        if (!live) return;
+        setView(v);
+        setChips(c);
+      },
       (e: unknown) => live && setNote({ text: String(e), error: true }),
     );
     return () => {
@@ -157,6 +165,9 @@ export function LibraryScreen(props: {
         <Pressable disabled={!editor} onPress={() => setPane({ kind: 'copy' })} style={[styles.btnGhost, !editor && styles.off]}>
           <Text style={styles.link}>Copy from…</Text>
         </Pressable>
+        <Pressable onPress={() => setPane({ kind: 'suggestions' })} style={styles.btnGhost}>
+          <Text style={styles.link}>Suggestions…</Text>
+        </Pressable>
       </View>
       {note ? <Text style={[styles.note, !note.error && styles.noteOk]}>{note.text}</Text> : null}
       <View style={styles.split}>
@@ -209,8 +220,18 @@ export function LibraryScreen(props: {
             <NewType scope={scope} run={run} onCreated={(id) => setPane({ kind: 'type', id })} />
           ) : pane?.kind === 'copy' && store ? (
             <CopyFrom store={store} scope={scope} run={run} onDone={() => setPane(null)} />
+          ) : pane?.kind === 'suggestions' ? (
+            <SuggestionsPane rows={chips} library={scope} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
           ) : selected ? (
-            <TypeEditor key={`${selected.id}:${tick}`} type={selected} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
+            <TypeEditor
+              key={`${selected.id}:${tick}`}
+              type={selected}
+              chips={chips.filter((c) => c.scope === 'type' && c.ref === selected.id)}
+              scope={scope}
+              canEdit={!!editor}
+              run={run}
+              libraryEditor={props.libraryEditor}
+            />
           ) : (
             <Text style={styles.sub}>Pick a type to see and edit it.</Text>
           )}
@@ -359,7 +380,7 @@ function toggle(set: Set<string>, id: string): Set<string> {
 }
 
 /** The selected type: a form edited locally, saved as one group. */
-function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
+function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; scope: string | null; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
   const t = props.type;
   const [model, setModel] = useState(t.model);
   const [category, setCategory] = useState<string | null>(t.category);
@@ -453,6 +474,11 @@ function TypeEditor(props: { type: LibraryType; canEdit: boolean; run: RunFn; li
         label="Default cables (always generated)"
         hint="Once the type is accepted, the rules offer each run as a draft to every device of this type that lacks it, instead of the category's (R2c / R2d). Unison (U) stays one bus per level (R2e).">
         <CableList list={defaults} onChange={ro ? undefined : setDefaults} />
+      </Field>
+      <Field
+        label="Suggestions"
+        hint="Chips offered for this type's devices, before its category's and the project's (D174): under Notes, under an end's Note, for a punch item or a part. Saved as you add them; copied and promoted with the type (a chip added after the promotion has its own Promote).">
+        <SuggestionList rows={props.chips} scope="type" refKey={t.id} library={props.scope} canEdit={props.canEdit} run={props.run} libraryEditor={t.promotedAs ? props.libraryEditor : null} />
       </Field>
       <Field label="Optional cables" hint="Kept with the type; not generated.">
         <CableList list={optional} onChange={ro ? undefined : setOptional} />

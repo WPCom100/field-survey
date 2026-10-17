@@ -11,6 +11,8 @@
 import { DEVICE_CATEGORIES, LIBRARY_STREAM, OpError, ROLE, ROLE_LABEL, canonicalCategory, isRole, roleOf, roleOfCategory, type EditContext, type Editor, type Role, type Store } from '@field-survey/core';
 import { CABLE_CODES, neuronIdDefault, neuronIdDefaultForRole, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
 
+import { copyTypeChips } from '../suggestions/model';
+
 export const LIBRARY_CTX: EditContext = { change_type: 'Master edit', reason: 'Device-type library' };
 
 /** The D196 eleven (CLAUDE.md §3, core), the picker's order; a project's `vocab(category)` may add more. */
@@ -334,7 +336,8 @@ export async function copySources(store: Store, scope: string | null): Promise<C
  * copy at project creation does the same, D65). A model the target already has is skipped.
  * One group for the whole copy. Copying a project's type into the app library (`scope` null) is
  * a promotion: the copy records `promoted_from_id`. The editor must write to the target's
- * stream (`libraryEditor` for the app library).
+ * stream (`libraryEditor` for the app library). The type's accepted suggestion chips are copied
+ * with it (T99).
  */
 export async function copyTypes(editor: Editor, store: Store, scope: string | null, typeIds: readonly string[]): Promise<{ copied: number; skipped: string[] }> {
   const have = new Set((await loadLibrary(store, scope)).types.filter((t) => t.state !== 'rejected').flatMap((t) => [t.model, ...t.aliases].map(modelKey)));
@@ -353,7 +356,7 @@ export async function copyTypes(editor: Editor, store: Store, scope: string | nu
         continue;
       }
       have.add(k);
-      await g.create('library_type', {
+      const { id: copy } = await g.create('library_type', {
         project_id: scope,
         model: r.model,
         aliases: r.aliases ?? null,
@@ -375,6 +378,8 @@ export async function copyTypes(editor: Editor, store: Store, scope: string | nu
         created_by_id: editor.userId,
         ...(scope === null && r.project_id ? { promoted_from_id: r.id } : {}),
       });
+      // its accepted suggestion chips go with it (T99, D174 (3))
+      await copyTypeChips(g, store, String(r.id), copy, scope, editor.userId);
       copied++;
     }
   });

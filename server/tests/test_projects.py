@@ -59,6 +59,7 @@ def test_create_project_rows_and_ops(client, session):
     assert out["copied"] == {
         "vocab": 0,
         "library_types": 0,
+        "suggestions": 0,
         "rulings": 0,
         "rule_params": 0,
         "placeholders": 0,
@@ -241,6 +242,7 @@ def test_copy_from(client, session):
     assert out["copied"] == {
         "vocab": 2,
         "library_types": 2,
+        "suggestions": 0,
         "rulings": 1,
         "rule_params": 0,
         "placeholders": 1,
@@ -284,6 +286,7 @@ def test_copy_from(client, session):
     assert plain["copied"] == {
         "vocab": 0,
         "library_types": 1,
+        "suggestions": 0,
         "rulings": 0,
         "rule_params": 0,
         "placeholders": 0,

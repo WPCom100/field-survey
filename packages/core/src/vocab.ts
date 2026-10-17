@@ -108,6 +108,10 @@ export const VOCAB_LIST = [
   // T111 (D197): the cable codes; a DaVinci port protocol with no code lands here as a draft
   'cable_code',
 ] as const;
+// T99 (D174, D212): library suggestion chips — the scope a row hangs off (a type id, a category, a
+// cable code) and where it is offered (device Notes, end Note, a punch item's Item, a part's Part).
+export const SUGGESTION_SCOPE = ['type', 'category', 'code'] as const;
+export const SUGGESTION_TARGET = ['device_note', 'connection_note', 'punch_item', 'part'] as const;
 export const EXPORT_KIND = ['xlsx', 'floor_pdf'] as const;
 
 // Client-only lists (outbox and blob queue, PLAN §3.4).

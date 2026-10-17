@@ -89,4 +89,7 @@ VOCAB_LIST = (
     # T111 (D197): the cable codes; a DaVinci port protocol with no code lands here as a draft
     "cable_code",
 )
+# T99 (D174, D212): library suggestion chips — what a row hangs off and where it is offered.
+SUGGESTION_SCOPE = ("type", "category", "code")
+SUGGESTION_TARGET = ("device_note", "connection_note", "punch_item", "part")
 EXPORT_KIND = ("xlsx", "floor_pdf")

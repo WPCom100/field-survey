@@ -61,7 +61,7 @@ describe('device card read model', () => {
     expect(card.punch[0]).toMatchObject({ open: true, tracking: 'Open' });
     expect(card.history).toHaveLength(1);
     expect(card.history[0]).toMatchObject({ what: '(row added)', changeType: 'Master edit', pending: false });
-    expect(card.phrases).toBe(STANDARD_PHRASES);
+    expect(card.phrases).toEqual(STANDARD_PHRASES);
     expect(card.pending.size).toBe(0);
 
     const withPhotos = byLabel('06M-03'); // i = 2: one photo

@@ -10,6 +10,7 @@ import { cableTitle, editableKeys, parseLibraryAccessories, parseLibraryCables, 
 import { deviceNeedsNeuron, loadNeuronTypes, typeOf } from '../library/neuron';
 import { photoStrip } from '../photo/links';
 import { baselineEvents, type BaselineEvent } from '../setup/lock';
+import { chipsFor, loadChipRows } from '../suggestions/model';
 
 /** Seed of the device-note chips until T40 puts the project's `vocab` lists on the iPad (CLAUDE.md §3). */
 export const STANDARD_PHRASES: readonly string[] = [
@@ -170,12 +171,16 @@ export type CardDraft = {
   id: string;
   ruleId: string;
   kind: string;
+  /** The proposal's subject entity (the device, an end, a numbering group…). */
+  subjectId: string | null;
   title: string;
   sub: string;
   why: string | null;
   /** The proposal payload; `editable` names the keys the Edit form offers (T33). */
   payload: Record<string, unknown>;
   editable: string[];
+  /** Chips under an editable field of the Edit form (T99): a punch draft's `item`, a part draft's `part`. */
+  chips?: Readonly<Record<string, readonly string[]>>;
 };
 
 /** A proposal row as the card's draft row (also the Lint view's drafts without a device, T100). */
@@ -185,6 +190,7 @@ export function cardDraftOf(p: Row): CardDraft {
     id: String(p.id),
     ruleId: String(p.rule_id),
     kind: String(p.kind),
+    subjectId: p.subject && typeof p.subject === 'object' ? str((p.subject as Row).entity_id) : null,
     title: p.kind === 'cable' ? cableDraftTitle(pl) : (str(pl.item) ?? str(pl.part) ?? str(pl.text) ?? str(pl.now) ?? String(p.kind)),
     sub: [p.kind === 'part' ? 'part' : p.kind === 'cable' ? 'cable' : str(pl.type), str(pl.owner), str(pl.part_status) ?? str(pl.tracking_status)].filter(Boolean).join(' · '),
     why: str(pl.why),
@@ -230,7 +236,10 @@ export type DeviceCard = {
   inReview: ReadonlySet<string>;
   /** Fields with an unsynced op of this iPad (per-field dot, Phase 3 §13). */
   pending: ReadonlySet<string>;
-  /** Chips under Notes: the project's `device_note` vocabulary, else `STANDARD_PHRASES`. */
+  /**
+   * Chips under Notes (D174 (2)): the library's for the device's type, then for its category
+   * (T99), then the project's `device_note` vocabulary, else `STANDARD_PHRASES`.
+   */
   phrases: readonly string[];
 };
 
@@ -614,13 +623,25 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
   const pending = new Set(ops.filter((o) => o.state === 'pending' && o.field).map((o) => o.field!));
   const inReview = new Set(Object.keys(await reviewFields(store, deviceId)));
 
-  // --- note chips
-  const vocabRows = await store.list<Row>('vocab', {
-    where: `project_id = ? AND list = 'device_note' AND canonical_of_id IS NULL`,
-    params: [projectId],
-    orderBy: 'id',
-  });
-  const phrases = vocabRows.length ? vocabRows.map((v) => String(v.value)) : STANDARD_PHRASES;
+  // --- chips: the library's suggestions for the type, category and codes (T99, D174), then the
+  // project's vocabulary lists
+  const vocabOf = async (list: string) =>
+    (await store.list<Row>('vocab', { where: `project_id = ? AND list = ? AND canonical_of_id IS NULL`, params: [projectId, list], orderBy: 'id' })).map((v) => String(v.value));
+  const chipRows = await loadChipRows(store, projectId, [type?.id]);
+  const chipCtx = { typeId: type?.id ?? null, category: str(d.category) };
+  const deviceNotes = await vocabOf('device_note');
+  const phrases = chipsFor(chipRows, chipCtx, 'device_note', deviceNotes.length ? deviceNotes : STANDARD_PHRASES);
+  // a draft on one of the device's ends (or a far end) also offers that cable's code chips
+  const codeOfEnd = new Map<string, string | null>();
+  for (const e of [...ends, ...others.values()]) codeOfEnd.set(String(e.id), str(cables.get(String(e.cable_id))?.cable));
+  const punchItems = drafts.some((dr) => dr.kind === 'punch') ? await vocabOf('punch_item') : [];
+  for (const dr of drafts) {
+    const field = dr.kind === 'punch' ? 'item' : dr.kind === 'part' ? 'part' : null;
+    if (!field || !dr.editable.includes(field)) continue;
+    const ctx = { ...chipCtx, codes: [codeOfEnd.get(dr.subjectId ?? '') ?? null] };
+    const chips = dr.kind === 'punch' ? chipsFor(chipRows, ctx, 'punch_item', punchItems) : chipsFor(chipRows, ctx, 'part');
+    if (chips.length) dr.chips = { [field]: chips };
+  }
 
   return {
     device,

@@ -34,6 +34,7 @@ from app.models import (
     Project,
     RuleParam,
     Ruling,
+    Suggestion,
     User,
     Vocab,
 )
@@ -350,7 +351,14 @@ def _copy(
     flags: CopyFrom | None,
 ) -> dict[str, int]:
     """Copies as new rows (new ids, `canonical_of` remapped); counts per kind."""
-    counts = {"vocab": 0, "library_types": 0, "rulings": 0, "rule_params": 0, "placeholders": 0}
+    counts = {
+        "vocab": 0,
+        "library_types": 0,
+        "suggestions": 0,
+        "rulings": 0,
+        "rule_params": 0,
+        "placeholders": 0,
+    }
     now = datetime.now(UTC)
 
     # The app library (D65) always seeds the project's library; a source project's accepted
@@ -375,12 +383,13 @@ def _copy(
                 )
             )
         )
+    type_ids: dict[uuid.UUID, uuid.UUID] = {}  # source type -> its copy (T99: chips follow)
     for t in types:
         key = t.model.casefold()
         if key in models:
             continue
         models.add(key)
-        ops.create(
+        type_ids[t.id] = ops.create(
             "library_type",
             {
                 "project_id": project_id,
@@ -398,6 +407,11 @@ def _copy(
             },
         )
         counts["library_types"] += 1
+
+    with_source = source is not None and flags is not None and flags.library
+    counts["suggestions"] = _copy_suggestions(
+        session, ops, project_id, user, source if with_source else None, type_ids
+    )
 
     _copy_rule_params(session, ops, project_id, source if flags and flags.rule_params else None)
     counts["rule_params"] = sum(1 for o in ops.ops if o.entity_kind == "rule_param")
@@ -463,6 +477,58 @@ def _copy(
             counts["placeholders"] += 1
 
     return counts
+
+
+def _copy_suggestions(
+    session: Session,
+    ops: "_Ops",
+    project_id: uuid.UUID,
+    user: User,
+    source: Project | None,
+    type_ids: dict[uuid.UUID, uuid.UUID],
+) -> int:
+    """The new project's suggestion chips (T99, D212): the accepted ones of the app library, then
+    of the source project — a type's chips only when the type itself was copied (pointing at the
+    copy), every category and cable-code chip. One chip per (scope, what, where, text)."""
+    scopes = [Suggestion.project_id.is_(None)]
+    if source is not None:
+        scopes.append(Suggestion.project_id == source.id)
+    seen: set[tuple[str, str, str, str]] = set()
+    n = 0
+    for where in scopes:
+        rows = session.scalars(
+            select(Suggestion)
+            .where(where, Suggestion.state == "accepted", Suggestion.deleted_at.is_(None))
+            .order_by(Suggestion.id)
+        )
+        for r in rows:
+            ref = r.ref
+            if r.scope == "type":
+                try:
+                    copied = type_ids.get(uuid.UUID(r.ref))
+                except ValueError:
+                    copied = None
+                if copied is None:
+                    continue
+                ref = str(copied)
+            key = (r.scope, ref.casefold(), r.target, r.text.strip().casefold())
+            if key in seen:
+                continue
+            seen.add(key)
+            ops.create(
+                "suggestion",
+                {
+                    "project_id": project_id,
+                    "scope": r.scope,
+                    "ref": ref,
+                    "target": r.target,
+                    "text": r.text,
+                    "state": "accepted",
+                    "created_by_id": user.id,
+                },
+            )
+            n += 1
+    return n
 
 
 def _copy_rule_params(

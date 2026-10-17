@@ -167,7 +167,7 @@ export default function NewProjectScreen() {
               <Check label="Placeholders" value={flags.placeholders} onChange={(v) => setFlags({ ...flags, placeholders: v })} />
             </View>
           ) : (
-            <Text style={styles.hint}>The app library's accepted device types and rule defaults are copied in either way (D65, D176).</Text>
+            <Text style={styles.hint}>The app library's accepted device types, suggestion chips and rule defaults are copied in either way (D65, D176, D174).</Text>
           )}
           <Field label="Export title" value={exportTitle} onChange={setExportTitle} />
           <Field label="Disclaimer" value={disclaimer} onChange={setDisclaimer} placeholder="Based on submittal drawings rev F …" multiline />
