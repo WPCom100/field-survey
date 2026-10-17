@@ -73,6 +73,31 @@ R2e makes the bus rows.
 **Rack output labels.** Text printed right beside a bubble (`DMX TO B3A CANYON`, `SPARE DMX OUT`,
 `TO ERn4 LEVEL 16`, `TO EQUIP RACK LEVEL 06`) names that run's far end outright.
 
+**Endpoints by line tracing (T107, D206).** On a text sheet every run bubble's line is
+followed through the ink (`trace_runs`): the same pieces as `lines_of` (`segments_of`) joined
+end to end within 2 pt — a crossing is not a joint — over the whole sheet, so a trunk is
+followed from band to band. A bubble's own outline and the detail inside a symbol outline are
+not ink; a line end at another bubble of the same code passes through it (the run's other end);
+a bubble of another code (a Unison link) or a dead end makes the trace inconclusive. A device is
+reached where a line meets its drawn outline (`drawn_box`: the rectangle `symbol_box` finds);
+a symbol with no outline (the EBDK's label box, sensors) only where a line ends in it — never a
+station, sensor or touchscreen at a bubble's own stub, since their label boxes overlap the
+trunks beside them. A trace that reaches **exactly two devices, one on the bubble's band**, with
+no dead end and no foreign bubble, fixes the run: from the bubble's own device (fewest joints
+away; a panic run from the panel to its EBDK, as the master's single P row reads), to the other —
+on its band (`to_device`) or another (`to_ref`, its level the band's), `endpoint_source =
+trace`, confidence **0.9** (`TRACE_CONFIDENCE`, like a printed label). **A run drawn with a bubble
+at each end is one run** (D206): the bubble on the higher band keeps it (`twin`), the other is
+`merged_into` it and makes no draft. An inconclusive trace leaves a `trace_hint` for the prompt
+(the devices reached, and the device a dead end stops within 40 pt of). Sheet 001: **56 of 71
+bubbles traced, 15 of them the other end of a run** → 56 runs; the 13 rack outputs keep their
+printed labels; the 2 runs into CT02LCPB stop 26 pt short of it, because that panel's two X
+bubbles are drawn with no vector ink pdfplumber can read (no curve, line or image there), and
+go to the model with the hint. Against the T110 recording, the model had put 34 of the 39
+traced runs it answered on the right level and about 28 on the right device, at a mean
+confidence of 0.68 (it read `Equipment rack 06` for CT12LCPB → CT11LCPB, and one relay panel
+of two for every inter-level run).
+
 **Lines with no bubble (T108, D192, D194).** Every connecting line drawn without a wire bubble
 is asked about, so nothing on the drawing goes unaccounted for. On a text sheet they are found
 by geometry (`lines_of`): every straight piece of ink (`segments_of`: lines, rectangle edges,
@@ -92,7 +117,16 @@ model lists the lines itself.
 One call per band, in band order: the band crop (≤ 2000 px on its long edge, PNG), the whole
 column at low resolution with the band outlined in red (so trunk lines between bands can be
 followed), and a prompt listing the band's known devices and bubbles with their pixel boxes,
-the column's levels and the project's levels. The answer must match
+the column's levels and the project's levels. On a text sheet each bubble carries what its
+trace found: `RESOLVED: traced from d4 to Equipment Rack 18U on level 06`, `RESOLVED: the other
+end of b1's run`, or `trace: reaches d1; stops 26 pt from CT02LCPB (level 02)`; the model is
+asked not to return a resolved bubble nor add a cable for its other end, and `apply_answer`
+ignores it if it does. A bubble the model adds (`new-b…`) that sits on a listed bubble's box,
+or leaves the device another band's run of the same code arrives at, is that run's other end:
+dropped, and it gives the run its far device when the run had none (`_other_end`). A far-end
+label that names a panel outright on a level (`CT02LCPB`, level 02) links that device
+(`_named`). No call is skipped: every band of sheet 001 also has lines with no bubble for the
+model to read (D192). The answer must match
 `riser_endpoints.schema.json`. On a text sheet the model returns cables only (from / to device
 ids from the list, or a far-end label with a level code); on sheet 002 it returns the devices,
 the bubbles and the cables. Coordinates come back in band pixels and are mapped to page points.
@@ -114,13 +148,14 @@ recorded in `stats.claude_bands` and skipped; its cables stay unresolved.
 
 Cost: `stats.claude` = `{model, calls, replayed, input_tokens, output_tokens, cost_usd}` from
 `response.usage` at D189's prices; each call logs a `claude_call` event with its label, tokens,
-USD and request id. The Tower's two sheets: 26 calls, ≈ 210 K input tokens (the system prompt
-cached), ≈ 113 K output tokens (thinking included), **≈ $3.10 per run** at effort high (T108's
-re-recording, 2026-10-16; ≈ $2.00 before the lines with no bubble were asked about — 244 line
-answers added ≈ 48 K output tokens) — above the Phase 1f estimate ($0.45) because the estimate
-had no thinking tokens and one image per band. With the recording: 221 lines with no bubble on
-the Tower (sheet 001: 99 by geometry + 6 the model added; sheet 002: 116 by the model), guessed
-120V 140, 0-10V 37, U 16, N 3, X 2, none 23 — about 135 of them load, feed-circuit and sense-feed
+USD and request id. The Tower's two sheets: 26 calls, ≈ 218 K input tokens (the system prompt
+cached), ≈ 95 K output tokens (thinking included), **≈ $2.78 per run** at effort high (T107's
+re-recording, 2026-10-16: sheet 001 $0.98, sheet 002 $1.80). Tracing (T107) took sheet 001 from
+$1.28 to $0.98 — output 45 K → 29 K tokens, since resolved bubbles are not answered — and left
+sheet 002 (no text layer) as it was; T108's run was $3.10, T43's ≈ $2.00 before the lines with
+no bubble were asked about. All above the Phase 1f estimate ($0.45), which had no thinking
+tokens and one image per band. With the recording: 221 lines with no bubble on the Tower, about
+135 of them load, feed-circuit and sense-feed
 arrows "by others" that the reviewer rejects (kept, D192). Reading the model's lines
 (`apply_lines`): a line written arrow-first (from the note to the device) is turned round so the
 device is its near end, and a trunk that touches no device on the band is dropped there (it is
@@ -137,7 +172,7 @@ Everything as trusted ops by the uploading user (`Master edit`, reason `Riser ex
 | `draft_device` create | a riser symbol with no BOM draft of its model family on its level — `level_basis = riser_band`, `extraction` `text` (0.9) or `model` (≤ 0.85), `source_ref = {kind: riser_symbol, file, page, sheet, band, bbox, label, qty, model, level_code}`, `name` for panels (the tag) and racks (`Equipment Rack 18U`), accessories with their own `source_ref`; `source_ref.bom` when it draws down a pooled BOM line |
 | `draft_device` set | the merge (D28): a BOM draft of the same model family on the level gets `source_ref.riser` (`shared_with` when several BOM lines share one symbol), `name` from the panel tag (D10), `conflicts` (`qty:bom≠riser`, `cards:bom≠riser`, `pairing:ebdk≠erp`, `network:no_N_run`), `confidence` raised only when the counts agree |
 | `draft_device` delete | a pooled BOM line whose riser placements add up (option cards summed per venue): reason `Placed by the riser: n drafts on levels …` |
-| `draft_cable` create | one per run bubble: `code`, `qty 1`, `origin riser`, `from_label` / `to_label` / `to_level_id`, `candidates[]` (`{side: from\|to, kind: draft_device\|placeholder, id, label, confidence}`), `source_ref = {kind: riser_bubble, file, page, sheet, band, bbox, label, bubble, note, level_code}`, `extraction`, `confidence`, `conflicts` |
+| `draft_cable` create | one per run (a run drawn with a bubble at each end once, D206): `code`, `qty 1`, `origin riser`, `from_label` / `to_label` / `to_level_id`, `candidates[]` (`{side: from\|to, kind: draft_device\|placeholder, id, label, confidence}` — a traced far end on another band is its `draft_device`), `source_ref = {kind: riser_bubble, file, page, sheet, band, bbox, label, bubble, note, level_code, traced?, twin?: {bubble, band, bbox}}`, `extraction`, `confidence`, `conflicts` |
 | `draft_cable` create (line) | one per line with no bubble (D192): `code` **null**, conflict `code:unknown`, `candidates` with the guess as `{side: code, value, confidence, source: label\|model}` (never the code) and, for a guessed `0-10V` / `120V`, the library's placeholder (`Fixtures` / `120v Power`, D194) as the To; `source_ref = {kind: riser_line, …, bbox, line, label, note}` |
 | `review_item` create | `source_conflict` (D30): the riser's count per (level, model family) against the project's live devices on a surveyed floor, `subject = {entity_kind: draft_device, entity_id, field: qty, level_code, model}`, `candidates = [{side: riser}, {side: bom}, {side: master}]` |
 
@@ -165,7 +200,10 @@ them a level. A far end on such a level becomes the `Level nn` placeholder.
 ## Stats (`fixtures/riser.pdf`, Tower levels)
 
 Sheet 001: 11 bands (12, 11, 10, 09, 06, 04, 03, 02, 01, B1, B2), **93 devices**, **71 bubbles**
-(X 46, N 5, F 3, P 15, NG 1, UV 1) and 41 Unison links; 13 bubbles carry a rack output label.
+(X 46, N 5, F 3, P 15, NG 1, UV 1) and 41 Unison links; 13 bubbles carry a rack output label;
+56 bubbles traced, 15 of them a run's other end → **56 runs** (X 31), 41 of them traced and 2
+unresolved without the model (`stats.endpoints_traced`, `twins_folded`, `sheets[].traced`,
+`sheets[].twins`).
 Every device count on B2–06 matches the drawing and the master's Devices tab (Phase 1f §3), and
 the pooled BOM totals equal the placements (ERP24 ×9, ERP48 ×6, EBDK 15, UFMP8 ×5). Sheet 002:
 two columns, 6 + 9 bands, read by the model. TP-9 (`test_tp9_device_keys_and_the_master_cross_check`):
@@ -195,7 +233,8 @@ the box with the box outlined in red, PNG, cacheable. Accept on a device draft o
 reviewed (devices are made at placement, T46); Accept / **Confirm endpoint** on a cable draft
 makes the cable with both ends once both endpoints are records, or links the matching cable a
 seeded master already has.
-- The model's trunk-line reading is a judgement (0.5–0.85 on the Tower's inter-level DMX runs);
-  line tracing over the vector segments would make it deterministic for text sheets.
+- Trunk lines on a text sheet are traced (T107); on sheet 002 (outlined, no text layer) the
+  model still reads them, and a run whose bubble has no vector ink (CT02LCPB) goes to the model
+  with the trace's hint.
 - OCR (tesseract) is not used on sheet 002; the model reads it. A scanned riser would go the
   same way.

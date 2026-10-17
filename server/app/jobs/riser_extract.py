@@ -108,6 +108,18 @@ LINE_TRUNK_SHARE = 0.6
 SYMBOL_MIN_PT = 20.0
 """The smallest box drawn round a device symbol."""
 
+TRACE_CONFIDENCE = 0.9
+"""Endpoints read by tracing a bubble's line to the device box it reaches (T107): geometry, as
+certain as a printed label."""
+
+TRACE_BESIDE_PT = 40.0
+"""A traced line that stops this close to a device names it in the prompt's hint (a bubble the
+PDF draws with no vector ink — CT02LCPB's — breaks the line there)."""
+
+UNISON_ROLES = ("station", "sensor", "touchscreen")
+"""Symbols drawn with no outline that a bubble's stub never lands in (their label boxes overlap
+the trunks beside them)."""
+
 LABEL_GUESS_CONFIDENCE = 0.5
 """A code guessed from the line's printed text alone (`0-10V CONTROL`, `120V`), no model."""
 
@@ -324,8 +336,13 @@ class Bubble:
     to_label: str | None = None
     to_level_code: str | None = None
     confidence: float = 0.0
-    endpoint_source: str | None = None  # label | model | none
+    endpoint_source: str | None = None  # label | trace | model | none
     note: str | None = None
+    to_ref: Device | None = None  # a traced far end on another band (T107)
+    via: list[str] = field(default_factory=list)  # bubbles the trace passed through
+    twin: Bubble | None = None  # the bubble at the run's other end, folded into this one
+    merged_into: str | None = None  # this bubble is the other end of that bubble's run
+    trace_hint: str | None = None  # what an inconclusive trace reached, for the prompt
 
 
 @dataclass
@@ -406,6 +423,8 @@ class Riser:
                     "bubbles": len(s.bubbles),
                     "unison_links": s.unison_links,
                     "unlabelled_lines": len(s.lines),
+                    "traced": sum(1 for b in s.bubbles if b.endpoint_source == "trace"),
+                    "twins": sum(1 for b in s.bubbles if b.merged_into),
                 }
                 for s in self.sheets
             ]
@@ -1106,9 +1125,9 @@ def symbol_boxes(segs: list[Seg], max_w: float, max_h: float) -> list[Box]:
     return sorted(boxes)
 
 
-def symbol_box(d: Device, boxes: list[Box]) -> Box:
+def drawn_box(d: Device, boxes: list[Box]) -> Box | None:
     """The outline drawn round a device: the largest box holding its label's centre, else the
-    box just under its label (stations, NSPS, EBDK), else the label's own box."""
+    box just under its label (stations, NSPS, EBDK); None when no rectangle is drawn."""
     lx, ly, lw, lh = d.bbox
     cx, cy = lx + lw / 2, ly + lh / 2
     area = lambda b: (b[2] - b[0]) * (b[3] - b[1])  # noqa: E731
@@ -1118,6 +1137,14 @@ def symbol_box(d: Device, boxes: list[Box]) -> Box:
     under = [b for b in boxes if -6 <= b[1] - (ly + lh) <= 25 and b[0] - 5 <= cx <= b[2] + 5]
     if under:
         return max(under, key=area)
+    return None
+
+
+def symbol_box(d: Device, boxes: list[Box]) -> Box:
+    """The outline drawn round a device (`drawn_box`), else the label's own box."""
+    if (drawn := drawn_box(d, boxes)) is not None:
+        return drawn
+    lx, ly, lw, lh = d.bbox
     # the label box, widened by the boxes drawn inside it (the EBDK's breaker module)
     own: Box = (lx, ly, lx + lw, ly + lh)
     parts = [own] + [b for b in boxes if _in_box(((b[0] + b[2]) / 2, (b[1] + b[3]) / 2), own, 2)]
@@ -1344,11 +1371,251 @@ def lines_of(
     return out
 
 
+# ------------------------------------------------------------------- trace
+
+
+class _BoxIndex:
+    """Boxes by coarse cell, for point lookups over the whole sheet."""
+
+    CELL = 32.0
+
+    def __init__(self) -> None:
+        self.cells: dict[tuple[int, int], list[tuple[Box, Any]]] = defaultdict(list)
+
+    def add(self, box: Box, item: Any) -> None:
+        c = self.CELL
+        for gx in range(math.floor(box[0] / c) - 1, math.floor(box[2] / c) + 2):
+            for gy in range(math.floor(box[1] / c) - 1, math.floor(box[3] / c) + 2):
+                self.cells[(gx, gy)].append((box, item))
+
+    def near(self, p: tuple[float, float]) -> list[tuple[Box, Any]]:
+        return self.cells.get((math.floor(p[0] / self.CELL), math.floor(p[1] / self.CELL)), [])
+
+
+def _at_ring(p: tuple[float, float], ring: Box) -> bool:
+    """A line end at a bubble: within the ring's height exactly (stacked bubbles sit 7.6 pt
+    apart), a little past its round ends."""
+    return ring[0] - 3 <= p[0] <= ring[2] + 3 and ring[1] <= p[1] <= ring[3]
+
+
+def _pt_box(box: Box) -> list[float]:
+    return [
+        round(box[0], 1),
+        round(box[1], 1),
+        round(box[2] - box[0], 1),
+        round(box[3] - box[1], 1),
+    ]
+
+
+def _trace_hint(
+    b: Bubble,
+    reached: list[tuple[int, Device]],
+    dead: list[tuple[float, float]],
+    drawn: _BoxIndex,
+) -> str | None:
+    """What an inconclusive trace saw, for the prompt: the devices it reached and the device a
+    dead end stops beside (a bubble with no vector ink breaks the line there)."""
+
+    if b.output_label:
+        return None  # the printed label names the far end
+
+    def name(d: Device) -> str:
+        return d.id if d.band is b.band else f"{d.name or d.label} (level {d.band.level_code})"
+
+    parts = ["reaches " + ", ".join(name(d) for _, d in reached)] if reached else []
+    for p in dead:
+        boxes = [(box, d) for box, d in drawn.near(p) if d.role not in UNISON_ROLES]
+        gaps = [
+            (math.hypot(max(x0 - p[0], 0, p[0] - x1), max(y0 - p[1], 0, p[1] - y1)), d)
+            for (x0, y0, x1, y1), d in boxes
+        ]
+        best = min(gaps, key=lambda g: g[0], default=None)
+        if best is not None and best[0] <= TRACE_BESIDE_PT:
+            parts.append(f"stops {best[0]:.0f} pt from {name(best[1])}")
+    return "; ".join(parts) or None
+
+
+def trace_runs(
+    sheet: Sheet,
+    words: list[Tok],
+    segs: list[Seg],
+    curves: list[tuple[float, float, float, float]],
+) -> None:
+    """Endpoints by line tracing on a text sheet (T107): every run bubble's line is followed
+    through the ink — pieces whose ends meet within `LINE_TOUCH_PT`; a crossing is no joint —
+    across bands, through the bubble at the run's other end and through a bubble ring with no
+    text, to the device outlines it reaches. A trace that reaches exactly two devices, one of
+    them on the bubble's band, with no dead end and no bubble of another code on the way, fixes
+    the endpoints (`endpoint_source = trace`): the bubble's own device is the near end, except
+    that a panic run leaves the panel for its EBDK (the master's single P row). A run drawn
+    with a bubble at each end is one run: the bubble on the higher band keeps it, the other is
+    `merged_into` it (D206)."""
+    if not sheet.bands or not sheet.bubbles:
+        return
+    x0 = min(b.x0 for b in sheet.bands) - 5
+    x1 = max(b.x1 for b in sheet.bands) + 5
+    y0 = min(b.top for b in sheet.bands) - 2
+    y1 = max(b.bottom for b in sheet.bands) + 2
+    region = [s for s in segs if all(x0 <= p[0] <= x1 and y0 <= p[1] <= y1 for p in s)]
+
+    drawn, loose, rings = _BoxIndex(), _BoxIndex(), _BoxIndex()
+    for band in sheet.bands:
+        near = [
+            s
+            for s in region
+            if all(
+                band.x0 - 5 <= p[0] <= band.x1 + 5 and band.top - 2 <= p[1] <= band.bottom + 2
+                for p in s
+            )
+        ]
+        boxes = symbol_boxes(near, max_w=250.0, max_h=(band.bottom - band.top) * 0.8)
+        for d in sheet.band_devices(band):
+            box = drawn_box(d, boxes)
+            if box is None:
+                # no outline round it (sensors, an EBDK): reached only where a line ends in it
+                loose.add(symbol_box(d, boxes), d)
+            else:
+                drawn.add(box, d)
+    listed = {tuple(b.bbox): b for b in sheet.bubbles}
+    for band in sheet.bands:
+        for t, _ in _bubble_tokens(band, words, curves):
+            bb = _grow(_bbox([t]), 9, 3)
+            rings.add((bb[0], bb[1], bb[0] + bb[2], bb[1] + bb[3]), (t.text, listed.get(tuple(bb))))
+
+    def inside_one(s: Seg, boxes: list[tuple[Box, Any]], tol: float) -> bool:
+        return any(_in_box(s[0], b, tol) and _in_box(s[1], b, tol) for b, _ in boxes)
+
+    # the ink: a bubble's own outline and a symbol's inner detail are not lines
+    ink = [
+        s
+        for s in region
+        if not inside_one(s, rings.near(s[0]), 1.0) and not inside_one(s, drawn.near(s[0]), 0.5)
+    ]
+    cell = 4.0
+    ends: dict[tuple[int, int], list[tuple[int, tuple[float, float]]]] = defaultdict(list)
+    for i, s in enumerate(ink):
+        for p in s:
+            ends[(round(p[0] / cell), round(p[1] / cell))].append((i, p))
+
+    def joined(p: tuple[float, float], i: int) -> list[int]:
+        gx, gy = round(p[0] / cell), round(p[1] / cell)
+        return [
+            j
+            for dx in (-1, 0, 1)
+            for dy in (-1, 0, 1)
+            for j, q in ends[(gx + dx, gy + dy)]
+            if j != i and abs(p[0] - q[0]) <= LINE_TOUCH_PT and abs(p[1] - q[1]) <= LINE_TOUCH_PT
+        ]
+
+    def at(ring: Box) -> list[int]:
+        return sorted(
+            {
+                i
+                for gx in range(round((ring[0] - 3) / cell) - 1, round((ring[2] + 3) / cell) + 2)
+                for gy in range(round(ring[1] / cell) - 1, round(ring[3] / cell) + 2)
+                for i, p in ends[(gx, gy)]
+                if _at_ring(p, ring)
+            }
+        )
+
+    def device_at(p: tuple[float, float], index: _BoxIndex, edge: bool) -> Device | None:
+        hit = [
+            (b, d)
+            for b, d in index.near(p)
+            if ((_on_edge(p, b) or _in_box(p, b, 0)) if edge else _in_box(p, b, LINE_TOUCH_PT))
+        ]
+        if not hit:
+            return None
+        return min(hit, key=lambda h: (h[0][2] - h[0][0]) * (h[0][3] - h[0][1]))[1]
+
+    resolved: dict[str, tuple[Device, Device]] = {}
+    for b in sheet.bubbles:
+        own: Box = (b.bbox[0], b.bbox[1], b.bbox[0] + b.bbox[2], b.bbox[1] + b.bbox[3])
+        visited: list[Box] = [own]
+        hits: dict[int, tuple[int, Device]] = {}  # id(device) → (hops, device)
+        via: list[Bubble] = []
+        dead: list[tuple[float, float]] = []
+        foreign = False
+        queue = [(i, 0) for i in at(own)]
+        seen = {i for i, _ in queue}
+        while queue:
+            i, hops = queue.pop(0)
+            for p in ink[i]:
+                d = device_at(p, drawn, edge=True)
+                if d is not None:
+                    hits.setdefault(id(d), (hops, d))
+                    continue
+                nxt = joined(p, i)
+                ring = next((r for r in visited if _at_ring(p, r)), None)
+                if ring is not None:
+                    outside = p[0] < ring[0] or p[0] > ring[2]
+                    d = device_at(p, loose, edge=False) if not nxt and outside else None
+                    if d is not None and d.role not in UNISON_ROLES:
+                        hits.setdefault(id(d), (hops, d))  # a stub straight into an EBDK
+                    continue
+                other = next(((r, v) for r, v in rings.near(p) if _at_ring(p, r)), None)
+                if other is not None:
+                    r, (code, o) = other
+                    if code != b.code:
+                        foreign = True  # a Unison link or another run: not this line
+                        continue
+                    visited.append(r)
+                    if o is not None:
+                        via.append(o)
+                    nxt = at(r)
+                elif not nxt:
+                    if (d := device_at(p, loose, edge=False)) is not None:
+                        hits.setdefault(id(d), (hops, d))
+                    else:
+                        dead.append(p)
+                for j in nxt:
+                    if j not in seen:
+                        seen.add(j)
+                        queue.append((j, hops + 1))
+        reached = sorted(hits.values(), key=lambda h: h[0])
+        near = [d for _, d in reached if d.band is b.band]
+        if dead or foreign or len(reached) != 2 or not near:
+            b.trace_hint = _trace_hint(b, reached, dead, drawn)
+            continue
+        frm = near[0]
+        if b.code == "P" and frm.role == bx.ROLE_EBDK:
+            frm = next(d for _, d in reached if d is not frm)  # the panel's panic wire
+        to = next(d for _, d in reached if d is not frm)
+        b.from_device, b.from_label = frm.id, frm.name or frm.label
+        if to.band is b.band:
+            b.to_device, b.to_label, b.to_ref = to.id, None, None
+            b.to_level_code = None
+        else:
+            b.to_device, b.to_label, b.to_ref = None, to.name or to.label, to
+            b.to_level_code = to.band.level_code
+        b.via = [o.id for o in via]
+        b.confidence = TRACE_CONFIDENCE
+        b.endpoint_source = "trace"
+        resolved[b.id] = (frm, to)
+
+    # a run drawn with a bubble at each end is one run: the higher band's bubble keeps it
+    order = {id(band): n for n, band in enumerate(sheet.bands)}
+    by_id = {b.id: b for b in sheet.bubbles}
+    for b in sheet.bubbles:
+        if b.id not in resolved or b.merged_into or b.twin:
+            continue
+        for oid in b.via:
+            o = by_id.get(oid)
+            if o is None or o.id not in resolved or o.merged_into or o.twin:
+                continue
+            if {id(d) for d in resolved[b.id]} != {id(d) for d in resolved[o.id]}:
+                continue
+            keep, drop = (b, o) if order[id(b.band)] <= order[id(o.band)] else (o, b)
+            keep.twin, drop.merged_into = drop, keep.id
+            break
+
+
 # ----------------------------------------------------------------- analyse
 
 
 def analyse(pdf_bytes: bytes) -> Riser:
-    """The deterministic pass over every page: bands, levels, devices, bubbles, output labels."""
+    """The deterministic pass over every page: bands, levels, devices, bubbles, output labels,
+    lines with no bubble and, on a text sheet, the runs' endpoints by tracing (T107)."""
     sheets: list[Sheet] = []
     for i in range(page_count(pdf_bytes)):
         width, height = page_size(pdf_bytes, i)
@@ -1376,21 +1643,22 @@ def analyse(pdf_bytes: bytes) -> Riser:
                 output_labels(b, words, bb)
                 bubbles.extend(bb)
                 lines.extend(lines_of(b, words, segs, curves, band_devices, len(lines)))
-        sheets.append(
-            Sheet(
-                page=i + 1,
-                drawing=drawing_number(words) or f"{i + 1:03d}",
-                width=width,
-                height=height,
-                has_text=has_text,
-                bands=bands,
-                devices=devices,
-                bubbles=bubbles,
-                unison_links=links,
-                columns=ncols,
-                lines=lines,
-            )
+        sheet = Sheet(
+            page=i + 1,
+            drawing=drawing_number(words) or f"{i + 1:03d}",
+            width=width,
+            height=height,
+            has_text=has_text,
+            bands=bands,
+            devices=devices,
+            bubbles=bubbles,
+            unison_links=links,
+            columns=ncols,
+            lines=lines,
         )
+        if has_text:
+            trace_runs(sheet, words, segs, curves)
+        sheets.append(sheet)
     return Riser(sheets)
 
 
@@ -1480,12 +1748,13 @@ def band_prompt(sheet: Sheet, band: Band, crop: Crop, levels_known: list[str]) -
             )
         lines.append(
             "\nWire bubbles on this band (id: code, [x, y, w, h] px, label printed beside it "
-            "if any):"
+            "if any; what tracing its line found):"
         )
         for b in bubbles:
             lines.append(
                 f"- {b.id}: {b.code}, {crop.to_px(b.bbox)}"
                 + (f", label '{b.output_label}'" if b.output_label else "")
+                + _trace_note(sheet, b)
             )
         lines.append(
             "\nLines with no bubble on this band (id: the device it leaves, [x, y, w, h] px, "
@@ -1500,7 +1769,9 @@ def band_prompt(sheet: Sheet, band: Band, crop: Crop, levels_known: list[str]) -
                 + (", leaves the band" if ln.leaves_band else "")
             )
         lines.append(
-            "\nReturn devices as an empty list (they are known). For every bubble above return "
+            "\nReturn devices as an empty list (they are known). A bubble marked RESOLVED was "
+            "traced along its line to both ends: do not return it, and do not add a cable for "
+            "the bubble at its other end. For every other bubble above return "
             "one cable: from_device = the listed device whose line the bubble sits on; to_device "
             "when the other end is a device on this band; otherwise to_label (the printed far-end "
             "text, or Equipment rack / Relay panel / NSPS) with to_level_code read from the "
@@ -1578,14 +1849,17 @@ def apply_answer(sheet: Sheet, band: Band, crop: Crop, data: dict[str, Any]) -> 
         if code not in RUN_CODES:
             continue
         b = by_id.get(bid)
+        if b is not None and (b.endpoint_source == "trace" or b.merged_into):
+            continue  # the trace is the truth (T107)
         if b is None:
-            if sheet.has_text and bid in by_id:
+            box = crop.to_pt(list(item.get("bbox") or []))
+            if _other_end(sheet, band, item, box) is not None:
                 continue
             b = Bubble(
                 id=bid or f"new-b{len(by_id) + 1}",
                 band=band,
                 code=code,
-                bbox=crop.to_pt(list(item.get("bbox") or [])),
+                bbox=box,
                 fragments=0,
                 extraction="model",
             )
@@ -1601,6 +1875,8 @@ def apply_answer(sheet: Sheet, band: Band, crop: Crop, data: dict[str, Any]) -> 
         b.to_level_code = (
             bx.norm_level(str(item["to_level_code"])) if item.get("to_level_code") else None
         )
+        if b.to_device is None and b.to_label and b.to_level_code:
+            b.to_ref = _named(sheet, b.to_label, b.to_level_code)  # "CT02LCPB", level 02
         b.note = item.get("note") or None
         if b.output_label and b.endpoint_source == "label":
             # the printed label is the truth; the model only confirms the near end
@@ -1609,6 +1885,57 @@ def apply_answer(sheet: Sheet, band: Band, crop: Crop, data: dict[str, Any]) -> 
             b.confidence = conf
             b.endpoint_source = "model"
     apply_lines(sheet, band, crop, data, device_ids)
+
+
+def _trace_note(sheet: Sheet, b: Bubble) -> str:
+    """The prompt's account of a bubble's trace (T107)."""
+    if b.merged_into:
+        return f", RESOLVED: the other end of {b.merged_into}'s run"
+    if b.endpoint_source != "trace":
+        return f", trace: {b.trace_hint}" if b.trace_hint else ""
+    to = b.to_device if b.to_device else f"{b.to_label} on level {b.to_level_code or '?'}"
+    twin = f" (its other end is {b.twin.id} on level {b.twin.band.level_code})" if b.twin else ""
+    return f", RESOLVED: traced from {b.from_device} to {to}{twin}"
+
+
+def _named(sheet: Sheet, label: str, level_code: str) -> Device | None:
+    """The device a far-end label names outright on a level of this sheet (`CT02LCPB`)."""
+    key = label.strip().upper()
+    return next(
+        (
+            d
+            for d in sheet.devices
+            if d.band.level_code == level_code and (d.name or "").upper() == key
+        ),
+        None,
+    )
+
+
+def _other_end(sheet: Sheet, band: Band, item: dict[str, Any], box: list[float]) -> Bubble | None:
+    """A bubble the model adds that is the far end of a run already listed (T107): on a traced
+    bubble's box, or leaving the device another band's run of the same code arrives at. The
+    run takes the device as its far end when it had none."""
+    devs = {d.id: d for d in sheet.band_devices(band)}
+    frm = devs.get(str(item.get("from_device") or ""))
+    level = bx.norm_level(str(item["to_level_code"])) if item.get("to_level_code") else None
+    for o in sheet.bubbles:
+        if o.code != item.get("code"):
+            continue
+        if o.band is band and _overlaps(o.bbox, _grow(box, 2, 2)):
+            return o
+        if o.merged_into:
+            continue
+        if (
+            frm is not None
+            and o.band is not band
+            and o.band.level_code == level
+            and o.to_level_code == band.level_code
+            and o.to_ref in (None, frm)
+        ):
+            if o.to_ref is None:
+                o.to_ref, o.to_label = frm, frm.name or frm.label
+            return o
+    return None
 
 
 def _overlaps(a: list[float], b: list[float]) -> bool:
@@ -1898,6 +2225,8 @@ class Result:
             "endpoints_unresolved": sum(
                 1 for c in self.cables if "endpoint:unresolved" in c.conflicts
             ),
+            "endpoints_traced": sum(1 for c in self.cables if c.source_ref.get("traced")),
+            "twins_folded": sum(1 for c in self.cables if "twin" in c.source_ref),
             "source_conflicts": len(self.conflicts),
             "findings": self.findings,
             "flagged": sum(1 for d in self.drafts if d.conflicts or d.confidence < LOW_CONFIDENCE),
@@ -2284,7 +2613,8 @@ class _Build:
                 level_id, code = self.level_of(band)
                 devs = {d.id: d for d in sheet.band_devices(band)}
                 for b in sheet.band_bubbles(band):
-                    self.cable(sheet, band, level_id, code, devs, b)
+                    if not b.merged_into:  # the run's other end (T107)
+                        self.cable(sheet, band, level_id, code, devs, b)
                 for ln in sheet.band_lines(band):
                     self.cable(sheet, band, level_id, code, devs, ln)
 
@@ -2297,7 +2627,8 @@ class _Build:
         devs: dict[str, Device],
         b: Bubble | Line,
     ) -> None:
-        """One `draft_cable` per run bubble, and per line with no bubble (D192): `code` null,
+        """One `draft_cable` per run (a bubble not `merged_into` another, D206), and per line
+        with no bubble (D192): `code` null,
         conflict `code:unknown`, the guess as a `{side: code}` candidate — never the code."""
         line = isinstance(b, Line)
         conflicts: list[str] = []
@@ -2309,6 +2640,11 @@ class _Build:
         confidence = b.confidence
         extraction = "model" if b.endpoint_source == "model" or b.extraction == "model" else "text"
         frm = devs.get(b.from_device or "")
+        trace: dict[str, Any] = {}
+        if isinstance(b, Bubble) and b.endpoint_source == "trace":
+            trace["traced"] = True
+            if b.twin is not None:
+                trace["twin"] = {"bubble": b.twin.id, "band": b.twin.band.key, "bbox": b.twin.bbox}
         if b.output_label:
             # the rack's output stack: from the rack, to the printed label
             rack = next((d for d in devs.values() if d.role == bx.ROLE_RACK), None)
@@ -2330,6 +2666,7 @@ class _Build:
                 }
             )
         to = devs.get(b.to_device or "")
+        far_ref = b.to_ref if isinstance(b, Bubble) else None
         if to is not None:
             to_label = to.name or to.label
             to_level_code = code
@@ -2338,6 +2675,19 @@ class _Build:
                     "side": "to",
                     "kind": "draft_device",
                     "id": str(to.draft_id),
+                    "label": to_label,
+                    "confidence": round(confidence, 3),
+                }
+            )
+        elif far_ref is not None and far_ref.draft_id is not None:
+            # a device on another band, reached by the trace or named by the model (T107)
+            to_label = far_ref.name or far_ref.label
+            to_level_code = far_ref.band.level_code
+            candidates.append(
+                {
+                    "side": "to",
+                    "kind": "draft_device",
+                    "id": str(far_ref.draft_id),
                     "label": to_label,
                     "confidence": round(confidence, 3),
                 }
@@ -2405,6 +2755,7 @@ class _Build:
                 label=b.output_label,
                 bubble=b.id,
                 note=b.note,
+                **trace,
             )
         )
         self.cables.append(
@@ -2505,7 +2856,7 @@ class _Build:
 
 def build(riser: Riser, target: Target) -> Result:
     """Devices (merged into the BOM's drafts where they match, D28 / D10), the master
-    cross-check (D30), then one `draft_cable` per run bubble."""
+    cross-check (D30), then one `draft_cable` per run (D206) and per line with no bubble."""
     b = _Build(riser, target)
     b.run_devices()
     b.run_master()

@@ -384,8 +384,9 @@ def test_far_end_labels_resolve_to_placeholders_and_levels():
 
 @needs_fixture
 def test_build_without_a_bom_or_endpoints(analysed):
-    """The deterministic drafts alone: every symbol a draft, every run bubble a cable, the
-    rack's labelled outputs resolved, the rest flagged for the reviewer (D11)."""
+    """The deterministic drafts alone: every symbol a draft, every run a cable (a run drawn
+    with a bubble at each end once, T107), the rack's labelled outputs resolved by their
+    labels, the rest by tracing their lines; what neither resolves is flagged (D11)."""
     t = tower_target()
     res = rx.build(analysed, t)
     assert len(res.drafts) == len(analysed.sheets[0].devices) == 93
@@ -414,9 +415,9 @@ def test_build_without_a_bom_or_endpoints(analysed):
     assert nsps.category == "Equipment" and nsps.row()["role"] == "nsps"
     assert "network:no_N_run" in nsps.conflicts
     assert {f["check"] for f in res.findings} == {"network_run"}
-    # cables: one per run bubble; the labelled outputs resolved, the rest unresolved
+    # cables: one per run; the labelled outputs resolved, the rest traced but two
     runs = [c for c in res.cables if c.source_ref["kind"] == "riser_bubble"]
-    assert len(runs) == 71 and Counter(c.code for c in runs)["X"] == 46
+    assert len(runs) == RUNS_001 and Counter(c.code for c in runs)["X"] == 46 - TWINS_001
     assert all(c.code is None for c in res.cables if c not in runs)  # the lines (D192)
     labelled = [c for c in runs if c.source_ref["label"]]
     assert len(labelled) == 13 and all(c.confidence == rx.LABEL_CONFIDENCE for c in labelled)
@@ -433,9 +434,14 @@ def test_build_without_a_bom_or_endpoints(analysed):
     assert to06.candidates[0]["kind"] == "draft_device"  # the rack draft on band 06
     to16 = next(c for c in labelled if c.source_ref["label"] == "TO ERn4 LEVEL 16")
     assert to16.to_level_id is None and to16.candidates[0]["label"] == "Level 16"
-    rest = [c for c in runs if not c.source_ref["label"]]
+    rest = [c for c in runs if not c.source_ref["label"] and not c.source_ref.get("traced")]
+    assert len(rest) == 2  # through CT02LCPB's bubbles, which have no vector ink
     assert all("endpoint:unresolved" in c.conflicts and c.confidence == 0 for c in rest)
     assert {p.label for p in res.placeholders} == {
+        "Level 09",  # traced runs' far ends on levels the project lacks
+        "Level 10",
+        "Level 11",
+        "Level 12",
         "Fixtures",  # a 0-10V line's far end (D194)
         "120v Power",  # a 120V feed's
         "B3A Canyon",
@@ -456,15 +462,177 @@ def test_build_without_a_bom_or_endpoints(analysed):
         and crow["source_ref"]["kind"] == "riser_bubble"
     )
     stats = res.stats()
-    assert stats["cable_drafts"] == 71 + LINES_001 and stats["placeholders_added"] == 11
-    assert sum(1 for c in runs if "endpoint:unresolved" in c.conflicts) == 58
+    assert stats["cable_drafts"] == RUNS_001 + LINES_001 and stats["placeholders_added"] == 15
+    assert sum(1 for c in runs if "endpoint:unresolved" in c.conflicts) == 2
+    assert stats["endpoints_traced"] == RUNS_001 - 13 - 2 and stats["twins_folded"] == TWINS_001
     assert stats["cables_unknown_code"] == LINES_001
-    assert "None" not in stats["cables_by_code"] and sum(stats["cables_by_code"].values()) == 71
+    assert "None" not in stats["cables_by_code"]
+    assert sum(stats["cables_by_code"].values()) == RUNS_001
 
 
 LINES_001 = 99
 """Lines with no bubble on sheet 001 (D192): per band the load arrows, the 0-10V leaders, the
 feed arrows, the EBDK sense feeds, the NSPS / rack feeds and the trunk runs out of the band."""
+
+
+RUNS_001 = 56
+"""Runs on sheet 001: 71 bubbles, 15 of them the far end of a run another bubble starts (T107)."""
+
+TWINS_001 = 15
+
+
+@needs_fixture
+def test_runs_traced_to_their_far_ends(analysed, riser_pdf):
+    """Endpoints by line tracing (T107): a bubble's line followed through the joined ink to
+    the device box it reaches, on its band or another; a run drawn with a bubble at each end
+    is one run; the model is told what is resolved and cannot change it."""
+    s1 = analysed.sheets[0]
+    sheet = analysed.stats()["sheets"][0]
+    assert sheet["bubbles"] == 71 and sheet["traced"] == 56 and sheet["twins"] == TWINS_001
+    by = {(b.band.level_code, b.id): b for b in s1.bubbles}
+
+    def name(b: rx.Bubble, side: str) -> str | None:
+        d = next((x for x in s1.band_devices(b.band) if x.id == getattr(b, f"{side}_device")), None)
+        return d.name or d.model if d else None
+
+    # 12's LCPB down the trunk to 11's LCPB: the bubble at 11 is the same run, folded into 12's
+    b1, b6 = by[("12", "b1")], by[("11", "b6")]
+    assert b1.endpoint_source == "trace" and b1.confidence == rx.TRACE_CONFIDENCE
+    assert name(b1, "from") == "CT12LCPB" and b1.to_ref.name == "CT11LCPB"
+    assert b1.to_level_code == "11" and b1.via == ["b6"]
+    assert b1.twin is b6 and b6.merged_into == "b1"
+    # the model read these at 0.45-0.5 as "Equipment rack 06" / "Relay panel 03"
+    b38 = by[("04", "b38")]
+    assert name(b38, "from") == "CT04LCPA" and b38.to_ref.model == "UFMP4"
+    assert b38.to_level_code == "03" and b38.twin.id == "b40"
+    b4 = by[("11", "b4")]
+    assert name(b4, "from") == "UFMP4" and b4.to_ref.name == rx.RACK_NAME and not b4.twin
+    assert b4.to_level_code == "06"
+    # in-band: a panic run leaves the panel for its EBDK; the rack's network to the touchscreen
+    b3 = by[("12", "b3")]
+    assert (name(b3, "from"), name(b3, "to")) == ("CT12LCPB", "EBDK")
+    assert all(
+        b.endpoint_source == "trace" and name(b, "to") == "EBDK"
+        for b in s1.bubbles
+        if b.code == "P"
+    )
+    b64 = by[("01", "b64")]
+    assert {name(b64, "from"), name(b64, "to")} == {rx.RACK_NAME, "P-TS7-E"}
+    # the rack's labelled outputs keep their labels; CT02LCPB's bubbles have no vector ink, so
+    # those two runs stop beside it and the model is told so
+    assert all(not b.endpoint_source for b in s1.bubbles if b.output_label)
+    b45 = by[("03", "b45")]
+    assert b45.endpoint_source is None and b45.from_device is None
+    assert b45.trace_hint == "reaches d1; stops 26 pt from CT02LCPB (level 02)"
+    # the prompts: resolved bubbles are marked, the hint is given
+    crop = rx.band_crop(riser_pdf, s1, band(analysed, "11"))
+    prompt = rx.band_prompt(s1, band(analysed, "11"), crop, list(TOWER_LEVELS))
+    assert "- b6: X, " in prompt and "RESOLVED: the other end of b1's run" in prompt
+    assert "RESOLVED: traced from d4 to Equipment Rack 18U on level 06" in prompt
+    assert "do not return it" in prompt
+    crop3 = rx.band_crop(riser_pdf, s1, band(analysed, "03"))
+    p3 = rx.band_prompt(s1, band(analysed, "03"), crop3, list(TOWER_LEVELS))
+    assert "trace: reaches d1; stops 26 pt from CT02LCPB (level 02)" in p3
+
+
+@needs_fixture
+def test_model_answers_beside_a_trace(riser_pdf):
+    """The model cannot change a traced run, and a bubble it adds at a run's other end is that
+    run, not a second cable: CT02LCPB's bubble (no vector ink) names b45's far end."""
+    r = rx.analyse(riser_pdf)  # mutated below
+    s1 = r.sheets[0]
+    b03, b02 = band(r, "03"), band(r, "02")
+    crop3, crop2 = rx.band_crop(riser_pdf, s1, b03), rx.band_crop(riser_pdf, s1, b02)
+    b41 = next(b for b in s1.bubbles if b.id == "b41")
+    before = (b41.from_device, b41.to_device, b41.confidence)
+    rx.apply_answer(
+        s1,
+        b03,
+        crop3,
+        {
+            "cables": [
+                # a traced bubble and its folded twin: ignored
+                {
+                    "bubble_id": "b41",
+                    "code": "X",
+                    "from_device": "d2",
+                    "to_device": "d1",
+                    "confidence": 0.6,
+                },
+                {
+                    "bubble_id": "b43",
+                    "code": "X",
+                    "from_device": "d2",
+                    "to_label": "Relay panel",
+                    "to_level_code": "02",
+                    "confidence": 0.6,
+                },
+                # the hinted run: the model's reading
+                {
+                    "bubble_id": "b45",
+                    "code": "X",
+                    "from_device": "d1",
+                    "to_label": "Relay panel",
+                    "to_level_code": "02",
+                    "confidence": 0.6,
+                },
+            ],
+            "unlabelled_lines": [],
+        },
+    )
+    assert (b41.from_device, b41.to_device, b41.confidence) == before
+    b45 = next(b for b in s1.bubbles if b.id == "b45")
+    assert b45.endpoint_source == "model" and b45.to_ref is None
+    n = len(s1.bubbles)
+    ct02 = next(d for d in s1.band_devices(b02) if d.name == "CT02LCPB")
+    rx.apply_answer(
+        s1,
+        b02,
+        crop2,
+        {
+            "cables": [
+                # b45's other end, as the model adds it on band 02
+                {
+                    "bubble_id": "new-b1",
+                    "code": "X",
+                    "from_device": ct02.id,
+                    "to_label": "Relay panel",
+                    "to_level_code": "03",
+                    "bbox": [0, 0, 10, 10],
+                    "confidence": 0.5,
+                },
+                # a traced bubble's box under a new id
+                {
+                    "bubble_id": "new-b2",
+                    "code": "X",
+                    "from_device": "d2",
+                    "bbox": crop2.to_px(next(b for b in s1.bubbles if b.id == "b48").bbox),
+                    "to_label": "Relay panel",
+                    "to_level_code": "03",
+                    "confidence": 0.5,
+                },
+                # a bubble nobody listed: added
+                {
+                    "bubble_id": "new-b3",
+                    "code": "X",
+                    "from_device": ct02.id,
+                    "to_device": "d3",
+                    "bbox": [5, 5, 20, 10],
+                    "confidence": 0.8,
+                },
+            ],
+            "unlabelled_lines": [],
+        },
+    )
+    assert len(s1.bubbles) == n + 1 and s1.bubbles[-1].id == "new-b3"
+    assert b45.to_ref is ct02 and b45.to_label == "CT02LCPB"
+    res = rx.build(r, tower_target())
+    c45 = next(c for c in res.cables if c.source_ref.get("bubble") == "b45")
+    assert c45.from_label == "CT03LCPB" and c45.to_label == "CT02LCPB"
+    assert any(x["side"] == "to" and x["label"] == "CT02LCPB" for x in c45.candidates)
+    assert c45.to_level_id is not None and "endpoint:low_confidence" in c45.conflicts
+    # the model naming a device outright on another level links it (`_named`)
+    assert rx._named(s1, "ct02lcpb", "02") is ct02 and rx._named(s1, "CT02LCPB", "03") is None
 
 
 @needs_fixture
@@ -764,8 +932,9 @@ def test_riser_job_without_a_claude_key(session, store, factory):
     s = batch.stats
     assert s["claude"].startswith("unavailable") and s["claude_bands"] is None
     assert s["levels"] == SHEET_001_LEVELS and s["device_drafts"] == 93
-    assert s["cable_drafts"] == 71 + LINES_001 and s["cables_unknown_code"] == LINES_001
-    assert s["placeholders_added"] == 11 and s["sheets"][0]["unlabelled_lines"] == LINES_001
+    assert s["cable_drafts"] == RUNS_001 + LINES_001 and s["cables_unknown_code"] == LINES_001
+    assert s["placeholders_added"] == 15 and s["sheets"][0]["unlabelled_lines"] == LINES_001
+    assert s["endpoints_traced"] == 41 and s["sheets"][0]["twins"] == TWINS_001
     rows = session.scalars(select(DraftDevice).where(DraftDevice.project_id == project_id)).all()
     assert len(rows) == 93 and all(
         r.state == "proposed" and r.import_batch_id == batch.id for r in rows
@@ -775,7 +944,7 @@ def test_riser_job_without_a_claude_key(session, store, factory):
     )
     assert {r.level_id for r in rows if r.source_ref["level_code"] == "01"} == {levels["01"].id}
     cables = session.scalars(select(DraftCable).where(DraftCable.project_id == project_id)).all()
-    assert len(cables) == 71 + LINES_001 and all(
+    assert len(cables) == RUNS_001 + LINES_001 and all(
         c.origin == "riser" and c.state == "proposed" for c in cables
     )
     unknown = [c for c in cables if c.code is None]
@@ -785,7 +954,7 @@ def test_riser_job_without_a_claude_key(session, store, factory):
     canyon = next(c for c in cables if c.source_ref.get("label") == "DMX TO B3A CANYON")
     ph = session.scalars(select(Placeholder).where(Placeholder.project_id == project_id)).all()
     kinds = {p.label: p.kind for p in ph}
-    assert kinds["B3A Canyon"] == "fixture_run" and len(ph) == 11
+    assert kinds["B3A Canyon"] == "fixture_run" and len(ph) == 15
     assert kinds["Fixtures"] == "fixtures" and kinds["120v Power"] == "power"
     assert canyon.candidates[0]["id"] == str(next(p.id for p in ph if p.label == "B3A Canyon"))
     assert canyon.level_id == levels["01"].id and canyon.to_label == "B3A Canyon"
@@ -797,7 +966,7 @@ def test_riser_job_without_a_claude_key(session, store, factory):
             Op.entity_kind.in_(("draft_device", "draft_cable", "placeholder")),
         )
     ).all()
-    assert len(ops) == 93 + 71 + LINES_001 + 11 == s["ops"] and all(
+    assert len(ops) == 93 + RUNS_001 + LINES_001 + 15 == s["ops"] and all(
         o.state == "applied" and o.kind == "create" for o in ops
     )
     assert all(
@@ -870,7 +1039,7 @@ def test_riser_job_with_claude_endpoints(session, store, factory):
     assert sum(s["code_guesses"].values()) == len(unknown)
     # cables: every run has endpoints now; the guesses are flagged
     cables = [c for c in every if c.code is not None]
-    assert len(cables) >= 71 + 20
+    assert len(cables) >= RUNS_001 + 20
     unresolved = [c for c in cables if "endpoint:unresolved" in (c.conflicts or [])]
     assert len(unresolved) < len(cables) // 4, len(unresolved)
     low = [c for c in cables if c.confidence < rx.LOW_CONFIDENCE]
@@ -885,6 +1054,18 @@ def test_riser_job_with_claude_endpoints(session, store, factory):
         for c in cables
         if c.extraction == "model" and not c.source_ref.get("label")
     )
+    # the traced runs (T107) keep their geometry whatever the model answered, and nothing the
+    # model added on sheet 001 is the other end of a traced run
+    traced = [c for c in cables if c.source_ref.get("traced")]
+    assert len(traced) == s["endpoints_traced"] >= 41
+    assert all(c.confidence == rx.TRACE_CONFIDENCE and c.extraction == "text" for c in traced)
+    assert s["twins_folded"] == TWINS_001
+    added = [
+        c
+        for c in cables
+        if c.source_ref["sheet"] == "001" and str(c.source_ref.get("bubble", "")).startswith("new")
+    ]
+    assert len(added) <= 2, [(c.from_label, c.to_label) for c in added]
     # a DMX run from a Level 3 panel: from the panel, to a device or a level, with a candidate
     l03 = [c for c in cables if c.source_ref["level_code"] == "03" and c.code == "X"]
     assert l03 and any(c.from_label and c.from_label.startswith("CT03LCP") for c in l03)
@@ -1021,5 +1202,5 @@ def test_claude_cost_and_recording(tmp_path):
     assert json.loads((tmp_path / "rec.json").read_text())[key]["data"] == {"ok": True}
 
 
-TOWER_UNKNOWN_CODE = 222
+TOWER_UNKNOWN_CODE = 221
 """Lines with no bubble on the Tower's riser, both sheets, with the recorded answers (T108)."""
