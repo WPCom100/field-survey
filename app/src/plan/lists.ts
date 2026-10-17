@@ -8,6 +8,10 @@
  * the item's own for punch and parts and the device's open owners for a connection; Open punch
  * is "this item is open" for punch and parts and "the device has an open punch item" for a
  * connection. Rows without a device match only when Category is not being filtered.
+ *
+ * A connection row names both ends, `06M-04 ↔ ERP24` (D167): each end's device ID, or the
+ * placeholder's text (D26) where an end is not a device. A connection-number search (D163)
+ * also returns the two end devices, so the Devices tab lists them and the plan shows their pins.
  */
 
 import { displayNumber, isNew, punchDeviceText, type Store } from '@field-survey/core';
@@ -34,6 +38,8 @@ export type ListRow = {
   title: string;
   sub: string;
   deviceId: string | null;
+  /** The device at the other end of a connection (any level); null for punch, parts and placeholder ends. */
+  farDeviceId: string | null;
   badges: Badges;
   /** The end's own status (connections); null for punch and parts. */
   endStatus: string | null;
@@ -130,24 +136,43 @@ export async function loadLevelLists(
   const ends = await store.list<Row>('cable_end', { where: 'level_id = ?', params: [levelId], includeDeleted });
   const cableIds = [...new Set(ends.map((e) => String(e.cable_id)))];
   const cables = new Map<string, Row>();
+  /** Every end of those cables (the far ends may be on other levels), by cable. */
+  const endsOf = new Map<string, Row[]>();
   if (cableIds.length) {
     const marks = cableIds.map(() => '?').join(',');
     for (const c of await store.db.query<Row>(`SELECT id, cable, deleted_at FROM cable WHERE id IN (${marks})`, cableIds)) {
       cables.set(String(c.id), c);
     }
+    for (const e of await store.db.query<Row>(
+      `SELECT id, cable_id, side, endpoint_kind, device_id, placeholder_id, deleted_at FROM cable_end WHERE cable_id IN (${marks})`,
+      cableIds,
+    )) {
+      endsOf.set(String(e.cable_id), [...(endsOf.get(String(e.cable_id)) ?? []), e]);
+    }
   }
+  const endLabels = await loadEndLabels(store, [...endsOf.values()].flat());
+  /** What an end is called: its device ID, its placeholder's text, or `?` when it is not set yet. */
+  const endLabel = (e: Row | undefined) =>
+    (e && (endLabels.get(str(e.device_id) ?? '') ?? endLabels.get(str(e.placeholder_id) ?? ''))) ?? '?';
+  /** The cable's other end: the opposite side, a live one before a deleted one. */
+  const farEnd = (e: Row) =>
+    (endsOf.get(String(e.cable_id)) ?? [])
+      .filter((o) => String(o.id) !== String(e.id) && o.side !== e.side)
+      .sort((a, b) => Number(!!a.deleted_at) - Number(!!b.deleted_at))[0];
   const connections = ends.map((e): ListRow => {
     const id = String(e.id);
     const cable = cables.get(String(e.cable_id));
-    const dev = inherit(str(e.device_id));
-    const { deviceLabel, ...inherited } = dev;
+    const { deviceLabel: _deviceLabel, ...inherited } = inherit(str(e.device_id));
+    void _deviceLabel; // the near end is named from the ends below, like the far one
+    const far = farEnd(e);
     return withText(
       {
         id,
         tab: 'connections',
         label: displayNumber('cable_end', e),
         title: [str(cable?.cable), str(e.to_text) ?? str(e.from_text)].filter(Boolean).join(' → ') || '(no text yet)',
-        sub: [deviceLabel, str(e.status) ?? 'Not started'].filter(Boolean).join(' · '),
+        sub: [`${endLabel(e)} ↔ ${endLabel(far)}`, str(e.status) ?? 'Not started'].join(' · '),
+        farDeviceId: str(far?.device_id),
         ...inherited,
         badges: badgesOf(id, isNew('cable_end', e), !!e.deleted_at || !!cable?.deleted_at),
         cable: str(cable?.cable),
@@ -175,6 +200,7 @@ export async function loadLevelLists(
         tab: 'punch',
         label: displayNumber('punch_item', p),
         title: str(p.item) ?? '(no text)',
+        farDeviceId: null,
         sub: [deviceLabel, deviceText, str(p.type), str(p.owner), str(p.tracking_status) ?? 'Open'].filter(Boolean).join(' · '),
         ...inherited,
         badges: badgesOf(id, isNew('punch_item', p), !!p.deleted_at),
@@ -195,6 +221,7 @@ export async function loadLevelLists(
         tab: 'parts',
         label: displayNumber('missing_part', m),
         title: [str(m.part), m.qty != null ? `×${String(m.qty)}` : null].filter(Boolean).join(' ') || '(no part)',
+        farDeviceId: null,
         sub: [deviceLabel ?? str(m.device_location), str(m.owner), str(m.part_status) ?? 'Needed'].filter(Boolean).join(' · '),
         ...inherited,
         badges: badgesOf(id, isNew('missing_part', m), !!m.deleted_at),
@@ -219,6 +246,31 @@ export async function loadLevelLists(
   return { deviceBadges, connections, punch, parts };
 }
 
+/** Labels of the devices (`06M-04`, `06M-?` while NEW) and placeholders (D26) the ends point at, by id. */
+async function loadEndLabels(store: Store, ends: readonly Row[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const ids = (col: string) => [...new Set(ends.map((e) => str(e[col])).filter((v): v is string => v !== null))];
+  const deviceIds = ids('device_id');
+  if (deviceIds.length) {
+    const marks = deviceIds.map(() => '?').join(',');
+    for (const d of await store.db.query<Row>(
+      `SELECT d.*, l.level AS level FROM device d LEFT JOIN level l ON l.id = d.level_id WHERE d.id IN (${marks})`,
+      deviceIds,
+    )) {
+      out.set(String(d.id), displayNumber('device', d));
+    }
+  }
+  const placeholderIds = ids('placeholder_id');
+  if (placeholderIds.length) {
+    const marks = placeholderIds.map(() => '?').join(',');
+    for (const p of await store.db.query<Row>(`SELECT id, label FROM placeholder WHERE id IN (${marks})`, placeholderIds)) {
+      const label = str(p.label);
+      if (label) out.set(String(p.id), label);
+    }
+  }
+  return out;
+}
+
 /** The plan filters (D99) applied to a non-device row; see the file header for the rules. */
 export function rowMatches(row: ListRow, f: PlanFilter): boolean {
   if (f.categories.length && !f.categories.includes(row.category ?? '')) return false;
@@ -238,6 +290,7 @@ export function rowMatches(row: ListRow, f: PlanFilter): boolean {
 /**
  * Ids matching a search on this level: FTS (or the LIKE fallback) for devices, punch and parts,
  * a text match for connections (not in the index). `null` means no query, so no restriction.
+ * A connection-number search (`C-14`, D163) also returns the devices at both ends (D167).
  */
 export async function searchIds(
   store: Store,
@@ -250,9 +303,20 @@ export async function searchIds(
   const hits = await store.search(q, { levelId, limit: 5000 });
   const ids = new Set(hits.map((h) => h.entity_id));
   const terms = q.toLowerCase().split(/\s+/);
-  for (const c of connections) if (connectionMatches(terms, c)) ids.add(c.id);
+  const byNumber = terms.some((t) => connectionNumber(t) !== undefined);
+  for (const c of connections) {
+    if (!connectionMatches(terms, c)) continue;
+    ids.add(c.id);
+    if (byNumber) {
+      if (c.deviceId) ids.add(c.deviceId);
+      if (c.farDeviceId) ids.add(c.farDeviceId);
+    }
+  }
   return ids;
 }
+
+/** The number of a term shaped like a connection number (`c-14`, `c14`, `14`), else undefined. */
+const connectionNumber = (t: string): string | undefined => /^(?:c-?)?(\d+)$/.exec(t)?.[1];
 
 /**
  * Does a connection row match every search term? Shared by the side lists and the dashboard's
@@ -264,7 +328,7 @@ export function connectionMatches(terms: readonly string[], c: { cable: string |
     if (CABLE_CODES.some((k) => k.toLowerCase() === t)) return c.cable?.toLowerCase() === t;
     // A term shaped like a connection number ("c-14", "c14", "14") means that C-nn exactly (D163), so
     // "14" does not find C-140 or a "14" inside the text. A NEW end has no number and never matches.
-    const n = /^(?:c-?)?(\d+)$/.exec(t)?.[1];
+    const n = connectionNumber(t);
     if (n !== undefined) {
       const own = /^C-(\d+)$/.exec(c.label)?.[1];
       return own !== undefined && Number(own) === Number(n);

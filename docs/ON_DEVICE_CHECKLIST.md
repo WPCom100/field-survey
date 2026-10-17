@@ -464,6 +464,19 @@ Set-up: the T115 **scratch** project, with its BOM / riser drafts reviewed (some
 
 Decision D205 (Proposed): (1) the unplaced list = pinless devices of the level + units of accepted drafts not yet placed, minus the level's existing devices that stand for a draft (panel tag, then model, then the one device of the role for a one-unit draft), and the pool on every in-scope level; (2) placing a baseline device sets only its pin and the fields you changed; placing a draft unit creates the device (`baseline_ref` = the draft, no ID — the server numbers it, no tag field per D118, the type from the library or a new draft type with the draft's role, the draft's accessories divided per unit when they divide), then makes the cables waiting on it; (3) "not on this sheet" is the draft's `not_on_sheet` flag, for drafts only; (4) dashed proposals come from the sheet's panel tags (exact tag or model first, then a 4+ character part of the model), never written until Place ✓; (5) the Lock table's Drafts / Flagged / Cables ⚑ columns and the "unreviewed drafts" / "draft devices to place" warnings. → Approve / change:
 
+
+## T95 — Connection search shows the devices at both ends  ·  Needs: no new build (JS update)
+
+**Why it matters:** in the close-out round (B-1) a connection search showed the run but not which devices it joins; you had to open the card to find either end.
+
+Set-up: 06M on a project with cables (the Houston project or the scratch one), plan open, side panel on **Conns**.
+
+- [ ] **Both ends on every row.** Each Conns row's second line reads `<this end> ↔ <other end> · <status>`, e.g. `06M-04 ↔ 06-02 · Issue`; an end on a placeholder shows its text (`Stations & Sensors`, `Fixtures`); a cable whose other end is not set yet shows `?`. A riser cable names the device on the other floor. → saw:
+- [ ] **C-nn search lists both end devices.** Type `C-14` (or `c14`, `14`) in the search: Conns shows that one row; switch to **Devices**: the two devices at its ends are listed (one, if the other end is a placeholder or on another floor), and the plan shows just their pins. → saw:
+- [ ] **A name search stays a name search.** Type an end device's ID (e.g. `06-02`): Conns lists the runs to or from it; the Devices tab shows that device only, not every device at the other end of those runs. → saw:
+
+Decision D167: answered 2026-10-15, **Approved** (both). Nothing to answer here.
+
 ---
 
 ## Rules for this file

@@ -191,6 +191,72 @@ describe('side lists', () => {
     expect(c).toBeDefined();
   });
 
+  it('names both ends of a connection, and a C-nn search returns the devices at both ends (D167)', async () => {
+    const { store, plan, pid } = await demo();
+    const [near, far, other] = plan.devices;
+    // A device on another level (07), reached by a riser cable.
+    const l07 = uuidv7();
+    const remote = uuidv7();
+    const group = (await store.db.query<{ g: string }>('SELECT numbering_group_id AS g FROM level WHERE id = ?', [DEMO_LEVEL_ID]))[0]!.g;
+    await store.db.exec('INSERT INTO level (id, project_id, level, numbering_group_id) VALUES (?, ?, ?, ?)', [l07, pid, '07', group]);
+    await store.apply(op('device', remote, 'create', pid, { level_id: l07, category: 'Equipment' }));
+    await store.db.exec('UPDATE device SET display_id = ? WHERE id = ?', ['07-02', remote]);
+    const ph = uuidv7();
+    await store.apply(op('placeholder', ph, 'create', pid, { project_id: pid, label: 'Stations & Sensors', kind: 'station_bus' }));
+
+    type End = { level: string; device?: string; placeholder?: string; num?: number };
+    const mk = async (code: string, a: End, b: End | null) => {
+      const cable = uuidv7();
+      await store.apply(op('cable', cable, 'create', pid, { project_id: pid, cable: code }));
+      const ids: string[] = [];
+      for (const [side, e] of [['A', a], ['B', b]] as const) {
+        if (!e) continue;
+        const id = uuidv7();
+        ids.push(id);
+        await store.apply(op('cable_end', id, 'create', pid, {
+          cable_id: cable, side, level_id: e.level,
+          endpoint_kind: e.device ? 'device' : 'placeholder', device_id: e.device ?? null, placeholder_id: e.placeholder ?? null,
+        }));
+        if (e.num) await store.db.exec('UPDATE cable_end SET display_id = ? WHERE id = ?', [`C-${e.num}`, id]);
+      }
+      return ids;
+    };
+    const [local] = await mk('N', { level: DEMO_LEVEL_ID, device: near!.id, num: 14 }, { level: DEMO_LEVEL_ID, device: far!.id, num: 15 });
+    const [riser] = await mk('X', { level: DEMO_LEVEL_ID, device: other!.id, num: 16 }, { level: l07, device: remote, num: 3 });
+    const [bus] = await mk('U', { level: DEMO_LEVEL_ID, device: near!.id, num: 17 }, { level: DEMO_LEVEL_ID, placeholder: ph });
+    const [lone] = await mk('P', { level: DEMO_LEVEL_ID, device: far!.id, num: 18 }, null);
+
+    const { lists } = await load(store, pid);
+    const row = (id: string | undefined) => lists.connections.find((c) => c.id === id)!;
+    expect(row(local).sub).toBe(`${near!.label} ↔ ${far!.label} · Not started`);
+    expect(row(local).farDeviceId).toBe(far!.id);
+    expect(lists.connections.find((c) => c.label === 'C-15')!.sub).toBe(`${far!.label} ↔ ${near!.label} · Not started`);
+    expect(row(riser).sub).toBe(`${other!.label} ↔ 07-02 · Not started`);
+    expect(row(bus)).toMatchObject({ sub: `${near!.label} ↔ Stations & Sensors · Not started`, farDeviceId: null });
+    expect(row(lone)).toMatchObject({ sub: `${far!.label} ↔ ? · Not started`, farDeviceId: null });
+
+    const search = async (q: string) => (await searchIds(store, DEMO_LEVEL_ID, q, lists.connections))!;
+    // C-14 → the row plus both end devices (they list on the Devices tab and show their pins).
+    for (const q of ['C-14', 'c14', '14']) {
+      const ids = await search(q);
+      expect(ids.has(local!)).toBe(true);
+      expect(ids.has(near!.id) && ids.has(far!.id)).toBe(true);
+      expect(ids.has(other!.id)).toBe(false);
+    }
+    // The far end on another level is returned too; this level's lists simply do not hold it.
+    const r = await search('c-16');
+    expect([r.has(riser!), r.has(other!.id), r.has(remote)]).toEqual([true, true, true]);
+    expect(plan.devices.filter((d) => r.has(d.id)).map((d) => d.id)).toEqual([other!.id]);
+    // A placeholder end adds only the device end.
+    const b = await search('C-17');
+    expect(plan.devices.filter((d) => b.has(d.id)).map((d) => d.id)).toEqual([near!.id]);
+    // A text search finds a connection by an end's name but does not pull in the end devices.
+    const t = await search('07-02');
+    expect(t.has(riser!)).toBe(true);
+    expect(t.has(other!.id)).toBe(false);
+    expect((await search('stations')).has(bus!)).toBe(true);
+  });
+
   it('handles 2,000 rows per tab and search/filter over them quickly', async () => {
     const { store, plan, pid } = await demo();
     const devs = plan.devices;
