@@ -3,7 +3,8 @@
  * the sheet's grid sets (name and Drawing Position prefix editable, D47; mode and residual),
  * "Test: tap a point" (the plan shows what Drawing Position a tap reads as), and the manual
  * fallback — tap three bubbles on the plan, say which label each is (pre-filled from the printed
- * label under the tap), Finish → a `manual` set. The plan screen owns the taps (they come from
+ * label under the tap), Finish → a `manual` set. Once two taps fix an axis the plan rings, dashed,
+ * the bubbles the set would claim (T96), so a wrong tap or label shows before Finish. The plan screen owns the taps (they come from
  * the PDF view) and saves `sheet.grid_sets` as one op; this component is the form.
  */
 
@@ -121,6 +122,9 @@ export function GridPanel(props: GridPanelProps) {
             ) : (
               <Text style={styles.hint}>Tap the next bubble on the plan.</Text>
             )}
+            {alpha >= 2 || nums >= 2 ? (
+              <Text style={styles.muted}>Dashed rings: the bubbles this set would claim. If one sits beside its printed bubble instead of on it, a tap or a label is wrong: Undo tap.</Text>
+            ) : null}
             <Text style={styles.label}>New set</Text>
             <TextInput style={styles.input} value={newName} onChangeText={setNewName} placeholder="Name (optional, e.g. Walter Tower)" placeholderTextColor="#888" />
             <TextInput style={styles.input} value={newPrefix} onChangeText={setNewPrefix} placeholder="Prefix for Drawing Position (e.g. WT)" placeholderTextColor="#888" autoCapitalize="characters" autoCorrect={false} />

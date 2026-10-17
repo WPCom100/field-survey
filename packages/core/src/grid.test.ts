@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  EMPTY_FEATURES,
   chooseGridSet,
   drawingPosition,
   gridSummary,
   labelKey,
   labelKind,
   labelSequence,
+  manualGridPreview,
   manualGridSet,
   nearestRoom,
   parseGridSets,
@@ -203,6 +205,62 @@ describe('manual three-tap calibration', () => {
     expect(snapLabel(SETS, f, { x: 655, y: 418 })).toBe('A');
     expect(snapLabel(SETS, f, { x: 1680, y: 1940 })).toBe('22');
     expect(snapLabel(SETS, f, { x: 100, y: 100 })).toBeNull();
+  });
+});
+
+describe('manual calibration preview (T96)', () => {
+  // the same orthogonal grid; printed bubbles along the top (y=400) and down the left (x=450)
+  const colX = (k: number) => 600 + (k - 1) * 300;
+  const rowY = (n: number) => 3300 - (n - 1) * 300;
+  const LETTERS = 'ABCDEFGH';
+  const printed = parseSheetFeatures({
+    bubbles: [
+      ...[...LETTERS].map((l, i) => ({ text: l, x: colX(i + 1), y: 400 })),
+      ...[...LETTERS].map((l, i) => ({ text: l, x: colX(i + 1), y: 3500 })), // the other end of each line
+      ...Array.from({ length: 13 }, (_, i) => ({ text: String(i + 1), x: 450, y: rowY(i + 1) })),
+      { text: 'C', x: 5000, y: 400 }, // another grid's C, far off the line
+    ],
+  });
+  const A = { x: colX(1), y: 400, label: 'A' };
+  const H = { x: colX(8), y: 400, label: 'H' };
+  const at = (marks: ReturnType<typeof manualGridPreview>) => marks.map((m) => `${m.label}@${Math.round(m.x)},${Math.round(m.y)}${m.printed ? '' : '?'}`);
+
+  it('shows nothing until two taps fix an axis', () => {
+    expect(manualGridPreview([], printed)).toEqual([]);
+    expect(manualGridPreview([A], printed)).toEqual([]);
+    expect(manualGridPreview([A, { x: 450, y: rowY(9), label: '9' }], printed)).toEqual([]);
+  });
+
+  it('two column taps ring the printed bubbles in between, both ends of each line', () => {
+    const marks = manualGridPreview([A, H], printed);
+    expect(marks.every((m) => m.axis === 'col' && m.printed)).toBe(true);
+    expect([...new Set(marks.map((m) => m.label))]).toEqual(['B', 'C', 'D', 'E', 'F', 'G']);
+    expect(at(marks.filter((m) => m.label === 'C'))).toEqual(['C@1200,400', 'C@1200,3500']);
+  });
+
+  it('a third tap on the other axis adds that axis beyond the tap', () => {
+    const marks = manualGridPreview([A, H, { x: 450, y: rowY(9), label: '9' }], printed).filter((m) => m.axis === 'row');
+    expect(marks.map((m) => m.label)).toEqual(['12', '11', '10', '8', '7', '6']);
+    expect(marks.every((m) => m.printed && m.x === 450)).toBe(true);
+    expect(marks.find((m) => m.label === '8')!.y).toBe(rowY(8));
+  });
+
+  it('a wrong label shows: the predicted rings miss the printed bubbles', () => {
+    // H tapped but called G: B … F are predicted at 7/6 of the true spacing
+    const marks = manualGridPreview([A, { ...H, label: 'G' }], printed);
+    // B is 50 pt off its line, still within reach; C … F are a full ring or more away and show bare
+    expect(at(marks)).toEqual(['B@900,400', 'B@900,3500', 'C@1300,400?', 'D@1650,400?', 'E@2000,400?', 'F@2350,400?']);
+  });
+
+  it('with no printed bubbles the rings sit where the taps predict', () => {
+    const marks = manualGridPreview([A, H], EMPTY_FEATURES);
+    expect(at(marks)).toEqual(['B@900,400?', 'C@1200,400?', 'D@1500,400?', 'E@1800,400?', 'F@2100,400?', 'G@2400,400?']);
+  });
+
+  it('taps that cannot make an axis preview nothing, never throw', () => {
+    expect(manualGridPreview([A, { ...A, x: A.x + 300 }], printed)).toEqual([]);
+    expect(manualGridPreview([A, { ...H, x: A.x, y: A.y }], printed)).toEqual([]);
+    expect(manualGridPreview([A, { ...H, label: 'OF' }, { x: 450, y: 900, label: '9' }], printed)).toEqual([]);
   });
 });
 

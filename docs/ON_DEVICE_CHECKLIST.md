@@ -477,6 +477,18 @@ Set-up: 06M on a project with cables (the Houston project or the scratch one), p
 
 Decision D167: answered 2026-10-15, **Approved** (both). Nothing to answer here.
 
+## T96 — Manual grid calibration previews the bubbles in between  ·  Needs: no new build (JS update)
+
+**Why it matters:** in the close-out round (D-6) a hand calibration showed only the three tapped bubbles, so a wrong tap or label only showed after Finish, when pins read the wrong Drawing Position.
+
+Set-up: any sheet with lettered and numbered grid bubbles (06M on the Tower round project, or the demo plan), plan open, **⌗ Grid** → **Recalibrate: tap three bubbles**.
+
+- [ ] **Two taps, the bubbles in between.** Tap bubble A, label it `A`; tap bubble H, label it `H`: dashed rings in the new set's colour appear on the printed B … G bubbles (at both ends of each grid line where the sheet prints two), while A and H keep their solid rings. The panel shows the "Dashed rings" line. → saw:
+- [ ] **Third tap, the other axis.** Tap a row bubble (9), label it `9`: dashed rings appear on its neighbours (12 … 6), on the printed bubbles where they line up. → saw:
+- [ ] **A wrong label shows.** **Undo tap** twice (back to A only), tap H again but label it `G`: the dashed B … F rings drift off the printed bubbles (C … F sit between printed bubbles rather than on them). **Undo tap**, re-tap H as `H`: the rings snap back onto the bubbles. → saw:
+- [ ] **Finish unchanged.** Finish: the set is saved as before (columns A–H, rows 12–6 on the set row), the dashed rings are gone and only the tapped bubbles show in the saved set's colour; **Test** on a point reads the same Drawing Position as before T96. Cancel instead: the dashed rings go with the taps. → saw:
+- [ ] **Smooth while panning.** With the dashed rings showing, pinch and pan: the rings stay on their bubbles every frame (no lag, no flicker). → saw:
+
 ---
 
 ## Rules for this file

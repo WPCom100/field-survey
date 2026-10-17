@@ -412,3 +412,73 @@ export function snapLabel(sets: readonly GridSet[], features: SheetFeatures, p: 
   for (const b of features.bubbles) consider(b.x, b.y, b.text);
   return best ? (best as { label: string }).label : null;
 }
+
+export type GridPreviewMark = {
+  label: string;
+  axis: 'col' | 'row';
+  x: number;
+  y: number;
+  /** A printed bubble of that label sits on the predicted line; false = no printed bubble found,
+   * the ring is drawn where the taps say it should be. */
+  printed: boolean;
+};
+
+/** A printed bubble is on a predicted grid line within this fraction of the spacing. */
+export const PREVIEW_FRACTION = 0.2;
+
+const norm = (label: string) => label.trim().toUpperCase();
+
+/**
+ * What a manual calibration in progress would claim (T96): as soon as two taps of one axis fix it,
+ * every label that axis gets between and beyond the tapped ones (B … G between A and H; the
+ * neighbours of a lone tap once the set can be built), placed on the printed bubble of that label
+ * whose position along the axis matches, else at the spot the taps predict. The tapped labels are
+ * left out (the taps are drawn already). Never throws: taps that cannot make an axis preview
+ * nothing.
+ */
+export function manualGridPreview(taps: readonly GridTap[], features: SheetFeatures): GridPreviewMark[] {
+  const of = (kind: 'alpha' | 'num') => taps.filter((t) => labelKind(t.label) === kind);
+  type Axis = { axis: 'col' | 'row'; labels: GridLabel[]; n: Point; anchor: GridTap; tapped: GridTap[] };
+  const axes: Axis[] = [];
+  let gs: GridSet | null = null;
+  try {
+    gs = taps.length >= 3 ? manualGridSet(taps) : null;
+  } catch {
+    gs = null;
+  }
+  if (gs) {
+    const nCol = { x: gs.affine.a, y: gs.affine.c };
+    const nRow = { x: gs.affine.b, y: gs.affine.d };
+    axes.push({ axis: 'col', labels: gs.col_labels, n: nCol, anchor: of('alpha')[0]!, tapped: of('alpha') });
+    axes.push({ axis: 'row', labels: gs.row_labels, n: nRow, anchor: of('num')[0]!, tapped: of('num') });
+  } else {
+    // one axis fixed by two taps, the other not yet: that axis alone
+    for (const [kind, axis] of [['alpha', 'col'], ['num', 'row']] as const) {
+      const mine = of(kind);
+      if (mine.length < 2) continue;
+      const [p, q] = [mine[0]!, mine[1]!];
+      const len = Math.hypot(q.x - p.x, q.y - p.y);
+      const seq = labelSequence(p.label, q.label);
+      if (len < 1 || !seq || labelKey(p.label) === labelKey(q.label)) continue;
+      const n = { x: (q.x - p.x) / len, y: (q.y - p.y) / len };
+      const start = n.x * p.x + n.y * p.y;
+      const per = len / (seq.length - 1 || 1);
+      axes.push({ axis, labels: seq.map((label, i) => ({ label, pos: start + i * per })), n, anchor: p, tapped: mine });
+    }
+  }
+
+  const out: GridPreviewMark[] = [];
+  for (const { axis, labels, n, anchor, tapped } of axes) {
+    const along = (p: Point) => n.x * p.x + n.y * p.y;
+    const tol = PREVIEW_FRACTION * spacingOf(labels);
+    const done = new Set(tapped.map((t) => norm(t.label)));
+    const a0 = along(anchor);
+    for (const l of labels) {
+      if (done.has(norm(l.label))) continue;
+      const printed = features.bubbles.filter((b) => norm(b.text) === norm(l.label) && Math.abs(along(b) - l.pos) <= tol);
+      if (printed.length) for (const b of printed) out.push({ label: l.label, axis, x: b.x, y: b.y, printed: true });
+      else out.push({ label: l.label, axis, x: anchor.x + (l.pos - a0) * n.x, y: anchor.y + (l.pos - a0) * n.y, printed: false });
+    }
+  }
+  return out;
+}

@@ -38,10 +38,12 @@
  */
 
 import {
+  EMPTY_FEATURES,
   Editor,
   drawingPosition,
   emptyStrokeList,
   labelKind,
+  manualGridPreview,
   manualGridSet,
   nearestRoom,
   resolutionReason,
@@ -915,10 +917,12 @@ export function PlanScreen(props: PlanScreenProps) {
     return recordStrokes(lists, { width: crop?.width ?? plan?.sheet?.widthPt ?? 20000, height: crop?.height ?? plan?.sheet?.heightPt ?? 20000 });
   }, [prefs.layers.ink, ink.others, ink.mine, plan]);
 
-  /** Grid bubbles of every set, plus the calibration taps as a new set, while the Grid panel is open (T45). */
+  /** Grid bubbles of every set, plus the calibration taps as a new set and, dashed, the bubbles
+   * those taps would claim once they fix an axis (T45, T96), while the Grid panel is open. */
   const gridMarks = useMemo<GridMark[]>(() => {
     const sets = plan?.sheet?.gridSets ?? [];
     const marks: GridMark[] = sets.flatMap((gs, i) => (gs.bubbles ?? []).map((b) => ({ label: b.label, axis: b.axis, x: b.x, y: b.y, set: i })));
+    for (const b of manualGridPreview(gridTaps, plan?.sheet?.features ?? EMPTY_FEATURES)) marks.push({ label: b.label, axis: b.axis, x: b.x, y: b.y, set: sets.length, preview: true });
     for (const t of gridTaps) marks.push({ label: t.label, axis: labelKind(t.label) === 'alpha' ? 'col' : 'row', x: t.x, y: t.y, set: sets.length });
     if (gridPending) marks.push({ label: '?', axis: 'col', x: gridPending.x, y: gridPending.y, set: sets.length });
     return marks;
