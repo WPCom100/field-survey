@@ -27,27 +27,15 @@ from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import bindparam, func, insert, select, text
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app import vocab
 from app.db import Base
 from app.ids import uuid7
-from app.materialise import materialise
+from app.materialise import RowBuffer, insert_rows, materialise
 from app.models import FieldHead, Level, Op, Project, ReviewItem, User
-from app.numbering import (
-    NUMBERED,
-    TAG_PREFIX,
-    DeviceNumberCache,
-    device_role,
-    device_scheme,
-    next_device_id,
-    next_number,
-    note_device_id,
-    numbering_group_for_level,
-    parse_number,
-)
+from app.numbering import NUMBERED, TAG_PREFIX, Numbering, parse_number
 
 log = logging.getLogger("sync")
 
@@ -62,7 +50,11 @@ LIBRARY_KINDS = frozenset({"library_type", "review_item"})
 # Serialises library pushes as the project row lock serialises a project's (arbitrary key).
 LIBRARY_LOCK = 0x11B0A11B
 MAX_OPS_PER_PUSH = 500
+# Rows per multi-row statement. What stalls ~45 ms on a Windows ↔ Docker socket (delayed ACK;
+# T75) is the request's size, not its row count: ten op rows with their JSON payloads stay
+# under it and 25 do not, while 40 three-column heads are fine (T76 sweep). Linux does not mind.
 OP_INSERT_BATCH = 10
+HEAD_UPSERT_BATCH = 40
 
 # ---------------------------------------------------------------- schema registry
 
@@ -304,14 +296,6 @@ def jsonable(value: Any) -> Any:
 
 
 OP_COLUMNS = [c.name for c in TABLES["op"].c]
-# The one-head upsert is prebuilt (compiled once, prepared by psycopg): it runs once or twice
-# per op, so its build cost shows at 500 ops per push (T75).
-_HEAD = pg_insert(TABLES["field_head"]).values(
-    entity_id=bindparam("entity_id"), field=bindparam("field"), op_id=bindparam("op_id")
-)
-UPSERT_HEAD = _HEAD.on_conflict_do_update(
-    index_elements=["entity_id", "field"], set_={"op_id": _HEAD.excluded.op_id}
-)
 
 
 def op_to_json(op: Op) -> dict[str, Any]:
@@ -369,8 +353,6 @@ class Push:
         self.duplicates: list[uuid.UUID] = []
         # Server-side producers (the seed import) may carry display numbers; see `validate_op`.
         self.trusted = trusted
-        # Highest device number per (level code, prefix) seen so far in this push (T75, D146).
-        self.device_numbers: DeviceNumberCache = {}
         # Ops of this push the log already holds (duplicates), looked up once per push.
         self.known: dict[uuid.UUID, Op] = {}
         # Head op per (entity, field) seen in this push (None = known absent) and the entities
@@ -386,6 +368,11 @@ class Push:
         # push — one statement per hundred ops instead of one ORM flush each (T75).
         self.stored: dict[uuid.UUID, Op] = {}
         self.pending_ops: list[dict[str, Any]] = []
+        # T76: created rows and moved heads are written in batches too (`flush_ops` writes all
+        # three); levels, types and group counters are read once per push (`Numbering`).
+        self.rows = RowBuffer(session)
+        self.pending_heads: dict[tuple[uuid.UUID, str], uuid.UUID] = {}
+        self.numbering = Numbering(session, self.scope, self.head_value, self.flush_ops)
 
     # ------------------------------------------------------------- entry point
 
@@ -421,6 +408,12 @@ class Push:
             o.op_id: o
             for o in self.session.scalars(select(Op).where(Op.op_id.in_([o.op_id for o in ops])))
         }
+        creates: dict[str, list[uuid.UUID]] = defaultdict(list)
+        for o in ops:
+            if o.kind == "create" and o.op_id not in self.known:
+                creates[o.entity_kind].append(o.entity_id)
+        for kind, ids in creates.items():
+            self.rows.preload(kind, ids)  # one existence query per table, not one per create
         results: list[OpResult | None] = [None] * len(ops)
         groups: dict[uuid.UUID, list[int]] = defaultdict(list)
         for i, op in enumerate(ops):
@@ -439,6 +432,7 @@ class Push:
                 results[i] = self.apply_one(op)
 
         self.flush_ops()
+        self.numbering.write()
         server_ops = [op_to_json(o) for o in self.server_ops]
         if self.duplicates:
             earlier = self.session.scalars(
@@ -722,6 +716,7 @@ class Push:
         """Every head of one entity in one query; fields not returned are known absent."""
         if entity_id in self.heads_loaded:
             return
+        self.flush_ops()
         for field, op_id in self.session.execute(
             select(FieldHead.field, FieldHead.op_id).where(FieldHead.entity_id == entity_id)
         ):
@@ -732,26 +727,26 @@ class Push:
         self.set_heads([(entity_id, field, op_id)])
 
     def set_heads(self, heads: list[tuple[uuid.UUID, str, uuid.UUID]]) -> None:
-        """Move several heads in one upsert statement. One statement per record, not one ORM
-        row per field: an ORM flush of several new rows goes through `executemany`, which on a
-        Windows ↔ Docker socket costs ~45 ms per call (delayed ACK), while one multi-row INSERT
-        is a millisecond (T75 profile)."""
-        if not heads:
-            return
-        if len(heads) == 1:
-            e, f, o = heads[0]
-            self.session.execute(UPSERT_HEAD, {"entity_id": e, "field": f, "op_id": o})
-        else:
-            stmt = pg_insert(FieldHead.__table__).values(
-                [{"entity_id": e, "field": f, "op_id": o} for e, f, o in heads]
-            )
-            self.session.execute(
-                stmt.on_conflict_do_update(
-                    index_elements=["entity_id", "field"], set_={"op_id": stmt.excluded.op_id}
-                )
-            )
+        """Move heads: in memory at once, in the table by `flush_heads` (T76)."""
         for e, f, o in heads:
             self.head_ids[(e, f)] = o
+            self.pending_heads[(e, f)] = o
+        if len(self.pending_heads) >= HEAD_UPSERT_BATCH:
+            self.flush_heads()
+
+    def flush_heads(self) -> None:
+        """Pending heads in prebuilt multi-row upserts of up to `HEAD_UPSERT_BATCH` rows (a key
+        appears once: the pending map keeps each field's last head). Core statements, never an
+        ORM flush of several rows: that goes through `executemany`, ~45 ms per call on the PC
+        (T75)."""
+        items = list(self.pending_heads.items())
+        self.pending_heads = {}
+        for i in range(0, len(items), HEAD_UPSERT_BATCH):
+            rows = [
+                {"entity_id": e, "field": f, "op_id": o}
+                for (e, f), o in items[i : i + HEAD_UPSERT_BATCH]
+            ]
+            insert_rows(self.session, "field_head", rows, "entity_id,field")
 
     def build(self, op: OpIn) -> Op:
         return Op(
@@ -782,15 +777,19 @@ class Push:
         row.state = state
         self.pending_ops.append({c: getattr(row, c) for c in OP_COLUMNS})
         self.stored[row.op_id] = row
-        if len(self.pending_ops) >= OP_INSERT_BATCH or row.entity_kind == "review_item":
+        if row.entity_kind == "review_item":
             self.flush_ops()  # settling a review item updates op rows (`_settle_review`)
+        elif len(self.pending_ops) >= OP_INSERT_BATCH:
+            self.write_ops()
         if state == "applied":
             # T10: tables follow the log inside the transaction. A create that inserted its row
             # proves the record is new: no head of it can exist, so none is looked up.
-            fresh = materialise(self.session, row)
+            fresh = materialise(self.session, row, self.rows)
             self.last_fresh = fresh
             if fresh and row.kind == "create":
                 self.heads_loaded.add(row.entity_id)
+            if row.entity_kind in ("level", "library_type"):
+                self.numbering.forget(row.entity_id)
             if row.entity_kind == "device":
                 carried = None
                 if row.kind == "create":
@@ -798,13 +797,19 @@ class Push:
                 elif row.kind in ("set", "assign") and row.field == "display_id":
                     carried = row.now
                 if isinstance(carried, str):
-                    note_device_id(self.device_numbers, carried)
+                    self.numbering.note_device_id(carried)
         return row
 
     def flush_ops(self) -> None:
-        """Write the ops stored since the last flush to the `op` table in one INSERT."""
+        """Write everything pending: op rows (one INSERT), created rows and moved heads. Called
+        before anything reads the `op`, `field_head` or entity tables, and at the end of a push."""
+        self.write_ops()
+        self.rows.flush()
+        self.flush_heads()
+
+    def write_ops(self) -> None:
         if self.pending_ops:
-            self.session.execute(insert(TABLES["op"]).values(self.pending_ops))
+            insert_rows(self.session, "op", self.pending_ops)
             self.pending_ops = []
 
     def server_op(
@@ -844,7 +849,7 @@ class Push:
             return
         if create.entity_kind not in NUMBERED:
             return
-        counter, field = NUMBERED[create.entity_kind]
+        _, field = NUMBERED[create.entity_kind]
         if self.head(create.entity_id, field, {}) is not None:
             return  # a replayed create never renumbers
         payload = create.payload or {}
@@ -855,14 +860,8 @@ class Push:
             # the next field addition continues after it (PLAN §7.5 "counters set to max").
             self.set_head(create.entity_id, field, create.op_id)
             n = parse_number(create.entity_kind, carried)
-            group = (
-                numbering_group_for_level(self.session, uuid.UUID(str(level_id)), self.head_value)
-                if level_id
-                else None
-            )
-            if group is not None and n is not None and n > getattr(group, counter):
-                setattr(group, counter, n)
-                self.session.flush()
+            if level_id and n is not None:
+                self.numbering.catch_up(create.entity_kind, uuid.UUID(str(level_id)), n)
             return
         if create.entity_kind == "cable_end" and payload.get("side") == "B":
             # The far end of a single-row cable (`P`, `0-10V`, `120V`: PLAN §6 R2) is never a
@@ -871,7 +870,7 @@ class Push:
             if cable_id and self.head_value(uuid.UUID(str(cable_id)), "single_row"):
                 return
         assigned = (
-            next_number(self.session, create.entity_kind, uuid.UUID(str(level_id)), self.head_value)
+            self.numbering.next_number(create.entity_kind, uuid.UUID(str(level_id)))
             if level_id
             else None
         )
@@ -897,16 +896,9 @@ class Push:
             kind="assign",
             field=field,
             now=assigned.value,
-            reason=f"Numbered from group {assigned.group.label}",
+            reason=f"Numbered from group {assigned.label}",
         )
         self.set_head(create.entity_id, field, op.op_id)
-
-    def level_code_of(self, level_id: Any) -> str | None:
-        if not level_id:
-            return None
-        lid = uuid.UUID(str(level_id))
-        level = self.session.get(Level, lid)
-        return level.level if level is not None else self.head_value(lid, "level")
 
     def assign_device(self, create: Op) -> None:
         """D93/D118: a device created without `display_id` gets its ID from the server as an
@@ -917,22 +909,11 @@ class Push:
         if self.head_value(create.entity_id, "display_id") is not None:
             return  # carries its ID, or a replayed create: never renumber
         prefix = ""
-        if device_scheme(self.session, payload, self.head_value) == "level_tag":
-            prefix = TAG_PREFIX.get(device_role(self.session, payload, self.head_value), "")
+        if self.numbering.device_scheme(payload) == "level_tag":
+            prefix = TAG_PREFIX.get(self.numbering.device_role(payload), "")
         level_id = payload.get("level_id")
-        if (self.level_code_of(level_id), prefix) not in self.device_numbers:
-            self.flush_ops()  # the first assignment per level code scans the op log
         display_id = (
-            next_device_id(
-                self.session,
-                self.project_id,
-                uuid.UUID(str(level_id)),
-                self.head_value,
-                prefix,
-                self.device_numbers,
-            )
-            if level_id
-            else None
+            self.numbering.next_device_id(uuid.UUID(str(level_id)), prefix) if level_id else None
         )
         if display_id is None:
             log.warning(
@@ -978,6 +959,7 @@ class Push:
             self.candidate("B", o, f) for o, f in zip(incoming, fields, strict=True)
         ]
         level_id = self.head_value(first.entity_id, "level_id")
+        self.flush_ops()  # the level row is read below
         if level_id:
             level_id = uuid.UUID(str(level_id))
             subject["level_id"] = str(level_id)
@@ -1010,6 +992,7 @@ class Push:
         for f in payload:
             if f != "id":
                 self.set_head(item_id, f, op.op_id)
+        self.flush_ops()  # the item row was queued by materialising its create
         item = self.session.get(ReviewItem, item_id)
         assert item is not None
         return item

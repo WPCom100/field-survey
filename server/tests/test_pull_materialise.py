@@ -355,6 +355,49 @@ def test_replay_of_the_op_log_equals_the_materialised_state(client, w):
     assert after == before
 
 
+def test_one_push_that_creates_and_edits_its_own_rows_replays_exactly(client, w):
+    """T76: a push writes the rows it creates ten per INSERT and folds later ops of the same push
+    on a row still pending (its `assign`, sets, a delete and a restore) into that row. The
+    tables, the numbers, the heads and the group counter must be what one op at a time gives."""
+    punches = [w.create(w.ann, "punch_item") for _ in range(23)]
+    devices = [w.create(w.ann, "device", {"display_id": f"06-{n:02d}"}) for n in range(1, 13)]
+    first, last = punches[0], punches[-1]
+    ops = [*punches, *devices]
+    status = w.set(
+        w.ann, "device", devices[-1]["entity_id"], "status", "Issue", devices[-1]["op_id"]
+    )
+    notes = w.set(
+        w.ann, "device", devices[-1]["entity_id"], "notes", "Empty box on wall.", status["op_id"]
+    )
+    item = w.set(w.ann, "punch_item", last["entity_id"], "item", "Run N", last["op_id"])
+    gone = w.op(w.ann, "delete", "punch_item", last["entity_id"], reason="duplicate")
+    back = w.op(w.ann, "restore", "punch_item", last["entity_id"], base_op_id=gone["op_id"])
+    early = w.set(w.ann, "punch_item", first["entity_id"], "notes", "Not run", first["op_id"])
+    ops += [status, notes, item, gone, back, early]
+    res = w.push(client, ops)
+    assert outcomes(res) == ["applied"] * len(ops)
+    seqs = [r["server_seq"] for r in res["results"]]
+    assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
+    assigned = {o["entity_id"]: o["now"] for o in res["server_ops"] if o["kind"] == "assign"}
+    assert [assigned[p["entity_id"]] for p in punches] == list(range(1, 24))
+
+    w.session.expire_all()
+    group = w.session.get(NumberingGroup, w.group.id)
+    assert group.counter_punch == 23
+    row = w.session.get(PunchItem, uuid.UUID(last["entity_id"]))
+    assert (row.number, row.item, row.deleted_at, row.version) == (23, "Run N", None, 5)
+    dev = w.session.get(Device, uuid.UUID(devices[-1]["entity_id"]))
+    assert (dev.status, dev.notes, dev.version) == ("Issue", "Empty box on wall.", 3)
+    assert w.head(last["entity_id"], "item") == item["op_id"]
+    assert w.head(last["entity_id"], "deleted_at") == back["op_id"]
+    assert w.head(first["entity_id"], "notes") == early["op_id"]
+
+    before = snapshot(w.session)
+    with Session(w.session.get_bind()) as s, s.begin():
+        materialise.replay(s, w.project.id)
+    assert snapshot(w.session) == before
+
+
 def test_replay_rebuilds_from_empty_tables(client, w):
     """Wipe what the ops built, replay, and the rows come back identical."""
     survey_a_floor(client, w)

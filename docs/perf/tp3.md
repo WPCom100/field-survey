@@ -87,10 +87,43 @@ cd server && S3_ENDPOINT=http://localhost:9000 uv run python -m app.jobs.exports
 
 | Where | What | Action |
 |---|---|---|
-| Server push loop | Applying 16,293 trusted creates took 264 s on the PC, ≈ 16 ms per op. Normal iPad pushes are ≤ 500 ops (≈ 8 s at that rate) and imports are ~1,500 ops, so nothing breaks today, but a seed import or a copied floor at tower size would be slow, and the project lock is held for the whole push | Follow-up task **T76** (profile `Push.run`, batch the per-op queries). *T75 (2026-10-12) already took the first step: 500 device creates in one push went from 5.0 s to 1.6 s on the PC (per-push caches for field heads, duplicates and device numbers; op rows inserted ten per statement) — see T75 in TASKS.md* |
+| Server push loop | Applying 16,293 trusted creates took 264 s on the PC, ≈ 16 ms per op. Normal iPad pushes are ≤ 500 ops (≈ 8 s at that rate) and imports are ~1,500 ops, so nothing breaks today, but a seed import or a copied floor at tower size would be slow, and the project lock is held for the whole push | **T76 done (2026-10-16): 1.3 ms per create, §2.1.** Was: follow-up task T76 (profile `Push.run`, batch the per-op queries). *T75 (2026-10-12) already took the first step: 500 device creates in one push went from 5.0 s to 1.6 s on the PC (per-push caches for field heads, duplicates and device numbers; op rows inserted ten per statement) — see T75 in TASKS.md* |
 | Local dev database | It was still on migration 0001 (0002/0003 never applied locally), so the first export attempt failed | Upgraded with `alembic upgrade head`; nothing to change in code |
 
 No client hot spot showed on the PC. The iPad numbers may add some (§3).
+
+### 2.1 The push loop after T76 (2026-10-16)
+
+Same PC, a fresh database per run, the generator at full size (`Spec` defaults: 2,000 devices,
+10,000 photos, 1,500 edits; no plan sheet, in-memory blob store, so only `Push.run` is timed),
+pushed in the generator's 2,000-op chunks. "Before" is `main` at b6c78a4 (T75 already in), run the
+same day on the same machine.
+
+| | Before (b6c78a4) | After (T76) |
+|---|---|---|
+| All `Push.run` calls (17,809 ops) | 78.7 s | 26.1 s |
+| Trusted creates (16,309 incl. the project's own) | 74.2 s, **4.6 ms each**, growing 1.9 → 5.3 ms per chunk | 21.6 s, **1.33 ms each**, 1.1 → 1.4 ms per chunk |
+| Untrusted field edits (1,500 sets, one push) | 4.49 s, 3.0 ms each | 4.47 s, 3.0 ms each |
+| SQL statements per create (cProfile, 8,309-op run) | ≈ 5.3 | ≈ 1.6 |
+
+T32's 264 s (≈ 16 ms per create) was measured before T75. Target ≤ 3 ms per create: met.
+
+What changed (D207): created rows queued and written ten per INSERT, with a create's `assign`
+(and any set / delete / restore of the same push) folded into the queued row; row existence looked up
+once per push and table; field heads queued and upserted 40 per statement; levels, library types and
+numbering groups read and locked once per push, counters written back once; multi-row statements
+prebuilt per shape so SQLAlchemy stops recompiling them. The profile before: 44,427 statements for
+8,309 ops (one `SELECT … FOR UPDATE` + counter UPDATE per number, a `session.get(Level)` that missed
+the weak identity map every time, the assign's UPDATE and head upsert), and ~0.7 ms of SQL compile per
+INSERT.
+
+Batch sizes were swept on this PC: heads 10 → 20 → 40 per statement took creates from 1.75 to 1.48
+to 1.26 ms; 25 op or entity rows per INSERT went back to 4.4 ms (the Windows ↔ Docker stall follows
+request size, T75), so op and entity rows stay at ten. Linux does not stall, so the Droplet should do
+at least as well; re-time a tower-size seed import there when one runs.
+
+Not changed: untrusted edits still cost ≈ 3 ms each (per-op head lookups and conflict checks); a
+500-op iPad push is ≈ 1.5 s, so no task is filed.
 
 ### On the Droplet (2026-10-14)
 

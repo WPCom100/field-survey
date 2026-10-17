@@ -23,6 +23,7 @@ column's Python type here. Foreign keys are deferred (D76), so a push may create
 order; a reference the server has never seen fails the whole push at commit (409 from the route).
 """
 
+import functools
 import json
 import logging
 import uuid
@@ -39,6 +40,7 @@ from sqlalchemy import (
     Integer,
     Table,
     Uuid,
+    bindparam,
     func,
     select,
     update,
@@ -58,6 +60,40 @@ LINK_OWNER = {
     "part_source": "missing_part_id",
     "photo_link": "photo_id",
 }
+
+# ------------------------------------------------------- multi-row statements (T76)
+
+
+@functools.lru_cache(maxsize=512)
+def multirow_insert(table_name: str, columns: tuple[str, ...], n: int, conflict: str = ""):
+    """A prebuilt `INSERT … VALUES (…), …` of `n` rows over `columns`, with typed bind
+    parameters `<column>_<i>`, so SQLAlchemy compiles each shape once instead of on every
+    execution (a 10-row VALUES compiled afresh cost about as much as its round trip, T76).
+    `conflict`: "" plain, "nothing" ON CONFLICT DO NOTHING, or the comma-joined key columns of
+    an upsert that overwrites every other column."""
+    table = TABLES[table_name]
+    stmt = pg_insert(table).values(
+        [{c: bindparam(f"{c}_{i}", type_=table.c[c].type) for c in columns} for i in range(n)]
+    )
+    if conflict == "nothing":
+        return stmt.on_conflict_do_nothing()
+    if conflict:
+        keys = conflict.split(",")
+        return stmt.on_conflict_do_update(
+            index_elements=keys,
+            set_={c: stmt.excluded[c] for c in columns if c not in keys},
+        )
+    return stmt
+
+
+def insert_rows(
+    session: Session, table_name: str, rows: list[dict[str, Any]], conflict: str = ""
+) -> None:
+    """Execute `multirow_insert` for rows that all have the same keys."""
+    columns = tuple(sorted(rows[0]))
+    params = {f"{c}_{i}": row[c] for i, row in enumerate(rows) for c in columns}
+    session.execute(multirow_insert(table_name, columns, len(rows), conflict), params)
+
 
 # ------------------------------------------------------------------- coercion
 
@@ -108,19 +144,78 @@ def _head_seq(table: Table, seq: int | None) -> Any:
 # ------------------------------------------------------------------- applying
 
 
-def materialise(session: Session, op: Op) -> bool:
+class RowBuffer:
+    """The rows one push creates, written up to `BATCH` per INSERT instead of one statement each
+    (T76).
+
+    Whether a create's row already exists is looked up once per push and table (`preload`), not
+    per row. A `set`, `assign`, `delete` or `restore` on a row still pending is applied to it in
+    memory with the values its UPDATE would write, so a numbered create and its `assign` cost one
+    row of one INSERT. Anything that reads or updates an entity table by other means calls
+    `flush` first (the push does it in `flush_ops`). The rows written are the ones a one-op-at-a-
+    time projection gives, so `replay` (which uses no buffer) reproduces them exactly."""
+
+    # Ten rows per statement: larger requests stall ~45 ms on a Windows ↔ Docker socket (T75, T76).
+    BATCH = 10
+
+    def __init__(self, session: Session):
+        self.session = session
+        self.checked: set[tuple[str, uuid.UUID]] = set()
+        self.exists: set[tuple[str, uuid.UUID]] = set()
+        self.pending: dict[tuple[str, uuid.UUID], dict[str, Any]] = {}
+
+    def preload(self, entity_kind: str, ids: list[uuid.UUID]) -> None:
+        """Which of these rows already exist, in one query."""
+        ids = [i for i in ids if (entity_kind, i) not in self.checked]
+        if not ids:
+            return
+        table = TABLES[entity_kind]
+        found = self.session.scalars(select(table.c.id).where(table.c.id.in_(ids)))
+        self.exists.update((entity_kind, i) for i in found)
+        self.checked.update((entity_kind, i) for i in ids)
+
+    def add(self, entity_kind: str, values: dict[str, Any]) -> bool:
+        """Queue a created row; False when it already exists (a replayed create never
+        overwrites)."""
+        key = (entity_kind, values["id"])
+        if key not in self.checked:
+            self.preload(entity_kind, [values["id"]])
+        if key in self.exists:
+            return False
+        if len(self.pending) >= self.BATCH:
+            self.flush()  # before queueing, so the newest row stays pending for its `assign`
+        self.exists.add(key)
+        self.pending[key] = values
+        return True
+
+    def get(self, entity_kind: str, entity_id: uuid.UUID) -> dict[str, Any] | None:
+        return self.pending.get((entity_kind, entity_id))
+
+    def flush(self) -> None:
+        """One INSERT per table and column set (a multi-row VALUES lists the same columns)."""
+        if not self.pending:
+            return
+        groups: dict[tuple[str, tuple[str, ...]], list[dict[str, Any]]] = {}
+        for (kind, _), values in self.pending.items():
+            groups.setdefault((kind, tuple(sorted(values))), []).append(values)
+        self.pending = {}
+        for (kind, _), rows in groups.items():
+            insert_rows(self.session, kind, rows, "nothing")
+
+
+def materialise(session: Session, op: Op, rows: RowBuffer | None = None) -> bool:
     """Project one applied op onto its entity table. Returns False for an orphan (no row) or a
-    `create` whose row already existed."""
+    `create` whose row already existed. A push passes its `rows` buffer (T76)."""
     table = TABLES[op.entity_kind]
     match op.kind:
         case "create":
-            return _create(session, table, op)
+            return _create(session, table, op, rows)
         case "set" | "assign":
-            return _set(session, table, op)
+            return _set(session, table, op, rows)
         case "delete":
-            return _delete(session, table, op, True)
+            return _delete(session, table, op, True, rows)
         case "restore":
-            return _delete(session, table, op, False)
+            return _delete(session, table, op, False, rows)
         case "link_add":
             return _link(session, table, op, True)
         case "link_remove":
@@ -128,30 +223,48 @@ def materialise(session: Session, op: Op) -> bool:
     raise AssertionError(op.kind)
 
 
-def _create(session: Session, table: Table, op: Op) -> bool:
+def _create(session: Session, table: Table, op: Op, rows: RowBuffer | None) -> bool:
     """True when the row was inserted; False when it already existed (a replayed create, which
     never overwrites) — the push loop uses that to skip the head lookup of a brand-new record."""
     values = _values(table, {**(op.payload or {}), "id": op.entity_id})
     if _is_record(table):
         values["version"] = 1
         values["head_seq"] = op.server_seq
+    if rows is not None:
+        return rows.add(op.entity_kind, values)
     # RETURNING tells inserted from skipped (psycopg reports no rowcount for this statement).
     stmt = pg_insert(table).values(**values).on_conflict_do_nothing().returning(table.c.id)
     return session.execute(stmt).first() is not None
 
 
-def _set(session: Session, table: Table, op: Op) -> bool:
+def _set(session: Session, table: Table, op: Op, rows: RowBuffer | None) -> bool:
     field = op.field or ""
-    values: dict[str, Any] = {field: coerce(table.c[field], op.now)}
-    if _is_record(table):
-        values["version"] = table.c.version + 1
-        values["head_seq"] = _head_seq(table, op.server_seq)
-    pk = table.primary_key.columns.values()[0]
-    result = session.execute(update(table).where(pk == op.entity_id).values(**values))
-    found = _found(result.rowcount, op)
+    value = coerce(table.c[field], op.now)
+    pending = rows.get(op.entity_kind, op.entity_id) if rows is not None else None
+    if pending is not None:
+        pending[field] = value
+        if _is_record(table):
+            _bump(pending, op.server_seq)
+        found = True
+    else:
+        values: dict[str, Any] = {field: value}
+        if _is_record(table):
+            values["version"] = table.c.version + 1
+            values["head_seq"] = _head_seq(table, op.server_seq)
+        pk = table.primary_key.columns.values()[0]
+        result = session.execute(update(table).where(pk == op.entity_id).values(**values))
+        found = _found(result.rowcount, op)
     if found and op.entity_kind == "review_item" and field == "state" and op.now in SETTLED:
+        if rows is not None:
+            rows.flush()
         _settle_review(session, table, op.entity_id)
     return found
+
+
+def _bump(pending: dict[str, Any], seq: int | None) -> None:
+    """What `version + 1, head_seq = greatest(head_seq, seq)` does, on a row not yet written."""
+    pending["version"] = (pending.get("version") or 0) + 1
+    pending["head_seq"] = max(pending.get("head_seq") or 0, seq or 0)
 
 
 # A review item leaving `open` settles the ops it held (T15, D91).
@@ -176,14 +289,19 @@ def _settle_review(session: Session, table: Table, item_id: uuid.UUID) -> None:
             )
 
 
-def _delete(session: Session, table: Table, op: Op, deleted: bool) -> bool:
+def _delete(session: Session, table: Table, op: Op, deleted: bool, rows: RowBuffer | None) -> bool:
     values: dict[str, Any] = {
         "deleted_at": (op.server_ts or op.client_ts) if deleted else None,
         "deleted_by_id": op.user_id if deleted else None,
         "delete_reason": op.reason if deleted else None,
-        "version": table.c.version + 1,
-        "head_seq": _head_seq(table, op.server_seq),
     }
+    pending = rows.get(op.entity_kind, op.entity_id) if rows is not None else None
+    if pending is not None:
+        pending.update(values)
+        _bump(pending, op.server_seq)
+        return True
+    values["version"] = table.c.version + 1
+    values["head_seq"] = _head_seq(table, op.server_seq)
     result = session.execute(update(table).where(table.c.id == op.entity_id).values(**values))
     return _found(result.rowcount, op)
 

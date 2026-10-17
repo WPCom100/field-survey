@@ -185,6 +185,17 @@ def test_06_and_06m_count_device_ids_separately(client, w):
     assert [got[o["entity_id"]] for o in ops] == ["06-01", "06M-01", "06-02", "07-01"]
 
 
+def test_a_carried_id_ahead_of_the_first_assignment_still_counts_past_the_log(client, w):
+    """T76: a carried ID applied before the push's first assignment on its level code used to
+    seed the count, so the log scan was skipped and an earlier push's higher ID was missed."""
+    w.push(
+        client, [w.create(w.ann, "device", {"level_id": str(w.l06m.id), "display_id": "06M-05"})]
+    )
+    carried = w.create(w.ann, "device", {"level_id": str(w.l06m.id), "display_id": "06M-02"})
+    fresh = new_device(w, w.ann, w.l06m)
+    assert ids(w.push(client, [carried, fresh])) == {fresh["entity_id"]: "06M-06"}
+
+
 def test_deleted_and_renamed_ids_stay_used_and_restore_keeps_the_id(client, w):
     d1, d2 = new_device(w, w.ann, w.l06m), new_device(w, w.ann, w.l06m)
     got = ids(w.push(client, [d1, d2]))
