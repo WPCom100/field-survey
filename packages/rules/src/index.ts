@@ -104,6 +104,7 @@ export {
   type QuickActionResult,
   R2g,
   CABLE_CODES,
+  cableCodes,
   governingCables,
   parseLibraryAccessories,
   parseLibraryCables,

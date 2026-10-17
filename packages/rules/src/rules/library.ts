@@ -12,12 +12,22 @@
 
 import { roleOf, type ConnectionStatus, type Role } from '@field-survey/core';
 
+import { DEFAULT_PARAMS, type RuleParams } from '../params';
 import type { Rule, RuleContext } from '../rule';
 import type { DeviceRow, LibraryTypeRow, PlaceholderRow } from '../snapshot';
 import { SIGNAL, cableOf, deviceLabel, str } from './shared';
 
 /** The cable codes a library row may name (CLAUDE.md §3). */
 export const CABLE_CODES: readonly string[] = Object.keys(SIGNAL);
+
+/**
+ * The cable codes a scope accepts (T117): the master's ten, then every code its Rules give a
+ * signal word (`R3.signal`), as the cable-code lint reads them.
+ */
+export function cableCodes(params: RuleParams = DEFAULT_PARAMS): string[] {
+  const own = Object.keys(params.get('R3', 'signal') as object).filter((c) => c !== '*' && !CABLE_CODES.includes(c));
+  return [...CABLE_CODES, ...own];
+}
 
 /** One run of a device type: its code and the texts the generated ends get. */
 export interface LibraryCable {
@@ -48,15 +58,15 @@ export interface LibraryAccessory {
 
 const STATUSES: readonly string[] = ['Complete', 'Installed, untested', 'Issue', 'Not installed', 'No access', 'Not started'];
 
-/** Read a stored cable list defensively: rows without a known code are dropped. */
-export function parseLibraryCables(v: unknown): LibraryCable[] {
+/** Read a stored cable list defensively: rows without a code of `codes` (`cableCodes`) are dropped. */
+export function parseLibraryCables(v: unknown, codes: readonly string[] = CABLE_CODES): LibraryCable[] {
   if (!Array.isArray(v)) return [];
   const out: LibraryCable[] = [];
   for (const raw of v) {
     if (!raw || typeof raw !== 'object') continue;
     const r = raw as Record<string, unknown>;
     const code = str(r.code);
-    if (!code || !CABLE_CODES.includes(code)) continue;
+    if (!code || !codes.includes(code)) continue;
     const qty = typeof r.qty === 'number' && Number.isFinite(r.qty) ? r.qty : null;
     const status = typeof r.status === 'string' && STATUSES.includes(r.status) ? (r.status as ConnectionStatus) : null;
     out.push({ code, from: str(r.from), to: str(r.to), far: str(r.far), single_row: r.single_row === true, qty, status });
@@ -151,7 +161,7 @@ export function deviceNeedsNeuronId(ctx: RuleContext, d: DeviceRow): boolean {
 export function governingCables(ctx: RuleContext, d: DeviceRow): { type: LibraryTypeRow; cables: LibraryCable[] } | null {
   const type = typeOfDevice(ctx, d);
   if (!type || type.state !== 'accepted') return null;
-  const cables = parseLibraryCables(type.default_cables);
+  const cables = parseLibraryCables(type.default_cables, cableCodes(ctx.params));
   return cables.length ? { type, cables } : null;
 }
 

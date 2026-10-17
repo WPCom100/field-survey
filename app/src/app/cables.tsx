@@ -6,11 +6,10 @@ import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 
 import { getBlobFiles, getBlobQueue } from '../blobs/queue';
 import { confirmEndpoint } from '../cables/actions';
-import { CABLE_CHECKS, UNSURVEYED, codeTitle, endCell, groupCables, loadCables, statusCell, type CableData, type CableFilter, type CableRow, type GroupBy } from '../cables/model';
+import { CABLE_CHECKS, UNSURVEYED, codeRank, codeTitle, endCell, groupCables, loadCables, statusCell, type CableData, type CableFilter, type CableRow, type CodeNames, type GroupBy } from '../cables/model';
 import { RiserCrop } from '../cables/RiserCrop';
 import { openAppStore } from '../db';
 import { EndEditor } from '../ends/EndEditor';
-import { CABLE_NAME } from '../ends/model';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
 import { useCurrentUser } from '../identity/IdentityGate';
@@ -88,7 +87,7 @@ export default function CablesScreen() {
   const shown = useMemo(() => [...new Map(groups.flatMap((g) => g.rows).map((r) => [r.id, r])).values()], [groups]);
   const row = useMemo(() => data?.rows.find((r) => r.id === selected) ?? null, [data, selected]);
   const codes = useMemo(() => new Map((data?.levels ?? []).map((l) => [l.id, l.code] as const)), [data]);
-  const presentCodes = useMemo(() => [...new Set((data?.rows ?? []).map((r) => r.code).filter((c): c is string => !!c))].sort((a, b) => Object.keys(CABLE_NAME).indexOf(a) - Object.keys(CABLE_NAME).indexOf(b)), [data]);
+  const presentCodes = useMemo(() => [...new Set((data?.rows ?? []).map((r) => r.code).filter((c): c is string => !!c))].sort((a, b) => codeRank(a, data?.names) - codeRank(b, data?.names)), [data]);
   const editor = useMemo(() => (store && projectId ? new Editor(store, { projectId, userId: user.id }) : null), [store, projectId, user.id]);
 
   const set = (patch: Partial<CableFilter>) => setFilter((f) => ({ ...f, ...patch }));
@@ -238,7 +237,7 @@ export default function CablesScreen() {
               resolveBlobUri={resolveBlobUri}
               footer={
                 <>
-                  <CableChecks row={row} canEdit={!!editor} onConfirm={() => confirm(row)} projectId={projectId} />
+                  <CableChecks row={row} names={data?.names} canEdit={!!editor} onConfirm={() => confirm(row)} projectId={projectId} />
                   <RiserCrop store={store} projectId={projectId} riser={row.riserRef} blobs={blobs} />
                 </>
               }
@@ -246,7 +245,7 @@ export default function CablesScreen() {
           ) : row ? (
             <ScrollView contentContainerStyle={styles.panelBody}>
               <Text style={styles.empty}>This cable has no ends.</Text>
-              <CableChecks row={row} canEdit={!!editor} onConfirm={() => confirm(row)} projectId={projectId} />
+              <CableChecks row={row} names={data?.names} canEdit={!!editor} onConfirm={() => confirm(row)} projectId={projectId} />
             </ScrollView>
           ) : (
             <Text style={styles.empty}>Select a cable.</Text>
@@ -302,11 +301,11 @@ function StatusText({ value }: { value: string }) {
   );
 }
 
-function CableChecks({ row: r, canEdit, onConfirm, projectId }: { row: CableRow; canEdit: boolean; onConfirm: () => void; projectId: string | null }) {
+function CableChecks({ row: r, names, canEdit, onConfirm, projectId }: { row: CableRow; names: CodeNames | undefined; canEdit: boolean; onConfirm: () => void; projectId: string | null }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>
-        Checks on this cable · {codeTitle(r.code)}
+        Checks on this cable · {codeTitle(r.code, names)}
         {r.vertical ? ` · ${r.vertical}` : ''}
       </Text>
       {r.checks.length ? (

@@ -221,12 +221,13 @@ export function LibraryScreen(props: {
           ) : pane?.kind === 'copy' && store ? (
             <CopyFrom store={store} scope={scope} run={run} onDone={() => setPane(null)} />
           ) : pane?.kind === 'suggestions' ? (
-            <SuggestionsPane rows={chips} library={scope} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
+            <SuggestionsPane rows={chips} codes={view?.codes ?? CABLE_CODES} library={scope} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
           ) : selected ? (
             <TypeEditor
               key={`${selected.id}:${tick}`}
               type={selected}
               chips={chips.filter((c) => c.scope === 'type' && c.ref === selected.id)}
+              codes={view?.codes ?? CABLE_CODES}
               scope={scope}
               canEdit={!!editor}
               run={run}
@@ -380,7 +381,7 @@ function toggle(set: Set<string>, id: string): Set<string> {
 }
 
 /** The selected type: a form edited locally, saved as one group. */
-function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; scope: string | null; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
+function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: readonly string[]; scope: string | null; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
   const t = props.type;
   const [model, setModel] = useState(t.model);
   const [category, setCategory] = useState<string | null>(t.category);
@@ -473,7 +474,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; scope: stri
       <Field
         label="Default cables (always generated)"
         hint="Once the type is accepted, the rules offer each run as a draft to every device of this type that lacks it, instead of the category's (R2c / R2d). Unison (U) stays one bus per level (R2e).">
-        <CableList list={defaults} onChange={ro ? undefined : setDefaults} />
+        <CableList list={defaults} codes={props.codes} onChange={ro ? undefined : setDefaults} />
       </Field>
       <Field
         label="Suggestions"
@@ -481,7 +482,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; scope: stri
         <SuggestionList rows={props.chips} scope="type" refKey={t.id} library={props.scope} canEdit={props.canEdit} run={props.run} libraryEditor={t.promotedAs ? props.libraryEditor : null} />
       </Field>
       <Field label="Optional cables" hint="Kept with the type; not generated.">
-        <CableList list={optional} onChange={ro ? undefined : setOptional} />
+        <CableList list={optional} codes={props.codes} onChange={ro ? undefined : setOptional} />
       </Field>
       <Field label="Optional accessories">
         {accessories.map((a, i) => (
@@ -559,8 +560,8 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; scope: stri
   );
 }
 
-function CableList(props: { list: LibraryCable[]; onChange?: (list: LibraryCable[]) => void }) {
-  const { list, onChange } = props;
+function CableList(props: { list: LibraryCable[]; codes: readonly string[]; onChange?: (list: LibraryCable[]) => void }) {
+  const { list, codes, onChange } = props;
   if (!onChange) return list.length ? <>{list.map((c, i) => <Text key={i} style={styles.value}>{describeCable(c)}</Text>)}</> : <Text style={styles.sub}>None.</Text>;
   return (
     <View style={styles.cables}>
@@ -569,7 +570,7 @@ function CableList(props: { list: LibraryCable[]; onChange?: (list: LibraryCable
         return (
           <View key={i} style={styles.cable}>
             <View style={styles.wrap}>
-              {CABLE_CODES.map((code) => (
+              {codes.map((code) => (
                 <Pressable key={code} onPress={() => set({ code })} style={[styles.chipSmall, c.code === code && styles.chipOn]}>
                   <Text style={c.code === code ? styles.chipTextOn : styles.chipText}>{code}</Text>
                 </Pressable>

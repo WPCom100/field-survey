@@ -9,7 +9,7 @@
  */
 
 import { DEVICE_CATEGORIES, LIBRARY_STREAM, OpError, ROLE, ROLE_LABEL, canonicalCategory, isRole, roleOf, roleOfCategory, type EditContext, type Editor, type Role, type Store } from '@field-survey/core';
-import { CABLE_CODES, neuronIdDefault, neuronIdDefaultForRole, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
+import { CABLE_CODES, RuleParams, cableCodes, loadRuleParamRows, neuronIdDefault, neuronIdDefaultForRole, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
 
 import { copyTypeChips } from '../suggestions/model';
 
@@ -83,6 +83,13 @@ export interface LibraryView {
   drafts: number;
   /** Open sync-conflict items on this library's types (Needs review, D184). */
   inReview: number;
+  /** The cable codes this scope's types may name: the master's, then its Rules' own (T117). */
+  codes: string[];
+}
+
+/** The cable codes a scope accepts (`cableCodes` over its accepted Rules: a project's, or the app library's). */
+export async function scopeCableCodes(store: Store, scope: string | null): Promise<string[]> {
+  return cableCodes(new RuleParams(await loadRuleParamRows(store, scope)));
 }
 
 type Row = Record<string, unknown>;
@@ -126,7 +133,7 @@ function scopeWhere(scope: string | null): { where: string; params: string[] } {
   return scope ? { where: 'project_id = ?', params: [scope] } : { where: 'project_id IS NULL', params: [] };
 }
 
-function toType(r: Row): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | 'promotedAs'> {
+function toType(r: Row, codes: readonly string[]): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | 'promotedAs'> {
   return {
     id: String(r.id),
     projectId: str(r.project_id),
@@ -136,8 +143,8 @@ function toType(r: Row): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | '
     role: isRole(r.role) ? r.role : null,
     effectiveRole: roleOf({ role: r.role, category: str(r.category) }, null),
     idScheme: r.id_scheme === 'level_tag' || r.id_scheme === 'level_number' ? r.id_scheme : null,
-    defaultCables: parseLibraryCables(r.default_cables),
-    optionalCables: parseLibraryCables(r.optional_cables),
+    defaultCables: parseLibraryCables(r.default_cables, codes),
+    optionalCables: parseLibraryCables(r.optional_cables, codes),
     optionalAccessories: parseLibraryAccessories(r.optional_accessories),
     needsNeuronId: typeof r.needs_neuron_id === 'boolean' ? r.needs_neuron_id : null,
     neuronId: typeof r.needs_neuron_id === 'boolean' ? r.needs_neuron_id : neuronIdDefaultForRole(roleOf({ role: r.role, category: str(r.category) }, null)),
@@ -174,6 +181,7 @@ export function sourceLine(ref: SourceRef | null): string | null {
 export async function loadLibrary(store: Store, scope: string | null): Promise<LibraryView> {
   const { where, params } = scopeWhere(scope);
   const rows = await store.list<Row>('library_type', { where, params, orderBy: 'id' });
+  const codes = await scopeCableCodes(store, scope);
   // devices of the project, to count each type's (by link, else by Device text = model or alias)
   const devices = scope
     ? await store.db.query<{ library_type_id: string | null; device: string | null }>(
@@ -190,7 +198,7 @@ export async function loadLibrary(store: Store, scope: string | null): Promise<L
   }
   const types: LibraryType[] = [];
   for (const r of rows) {
-    const t = toType(r);
+    const t = toType(r, codes);
     const keys = new Set([t.model, ...t.aliases].map(modelKey));
     const count = devices.filter((d) => (d.library_type_id ? d.library_type_id === t.id : !!d.device && keys.has(modelKey(d.device)))).length;
     const first = (await store.opsFor(t.id))[0];
@@ -214,7 +222,7 @@ export async function loadLibrary(store: Store, scope: string | null): Promise<L
     params: [scope ?? LIBRARY_STREAM],
   });
   const inReview = open.filter((i) => i.subject?.entity_kind === 'library_type').length;
-  return { types, drafts: types.filter((t) => t.state === 'draft').length, inReview };
+  return { types, drafts: types.filter((t) => t.state === 'draft').length, inReview, codes };
 }
 
 async function assertFreeModel(store: Store, scope: string | null, model: string, exceptId: string | null): Promise<void> {
@@ -251,9 +259,9 @@ export interface TypePatch {
   needsNeuronId?: boolean | null;
 }
 
-function checkCables(list: readonly LibraryCable[], what: string): LibraryCable[] | null {
+function checkCables(list: readonly LibraryCable[], what: string, codes: readonly string[]): LibraryCable[] | null {
   for (const c of list) {
-    if (!CABLE_CODES.includes(c.code)) throw new OpError(`${what}: "${c.code}" is not a cable code (${CABLE_CODES.join(', ')}).`);
+    if (!codes.includes(c.code)) throw new OpError(`${what}: "${c.code}" is not a cable code (${codes.join(', ')}).`);
     if (c.qty != null && (!Number.isInteger(c.qty) || c.qty < 0)) throw new OpError(`${what}: the quantity must be a whole number.`);
   }
   // an empty list is stored as null: the category table applies again (D183)
@@ -279,8 +287,9 @@ export async function updateType(editor: Editor, store: Store, id: string, patch
   }
   if (patch.aliases !== undefined) values.aliases = patch.aliases.length ? patch.aliases : null;
   if (patch.idScheme !== undefined) values.id_scheme = patch.idScheme;
-  if (patch.defaultCables !== undefined) values.default_cables = checkCables(patch.defaultCables, 'Default cables');
-  if (patch.optionalCables !== undefined) values.optional_cables = checkCables(patch.optionalCables, 'Optional cables');
+  const codes = patch.defaultCables !== undefined || patch.optionalCables !== undefined ? await scopeCableCodes(store, scope) : [];
+  if (patch.defaultCables !== undefined) values.default_cables = checkCables(patch.defaultCables, 'Default cables', codes);
+  if (patch.optionalCables !== undefined) values.optional_cables = checkCables(patch.optionalCables, 'Optional cables', codes);
   if (patch.needsNeuronId !== undefined) values.needs_neuron_id = patch.needsNeuronId;
   if (patch.optionalAccessories !== undefined) {
     // A catalogue slot's max quantity and group (D197 (4)) ride along: `lint.accessory_group` reads them (T113).

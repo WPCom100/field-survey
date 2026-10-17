@@ -32,6 +32,7 @@ export { SIGNAL, NEURON_ITEM, DMX_KITS_NOTE, BUS_LABEL, signalOf, signal, target
 export { runQuickAction, appendPhrase, QUICK_ACTION_TEXT, type QuickAction, type QuickActionResult } from './quick';
 export {
   CABLE_CODES,
+  cableCodes,
   NO_NEURON_ROLES,
   cableTitle,
   deviceNeedsNeuronId,

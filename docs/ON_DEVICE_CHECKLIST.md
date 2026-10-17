@@ -608,6 +608,18 @@ Decision D214: app-level vocabulary is `vocab` with no project on the library st
 
 Decision D215: accepted items are only changed by a ruling you apply; the Rules tab offers one pre-filled ruling per (field, new value) over the accepted items the change words differently, leaving out fields someone changed by hand; a wording with the far end in it means one ruling per item until a "reword" ruling action exists (T120). → Approve / change:
 
+## T117 — Cable codes beyond the master's in the library and the Cable / riser view  ·  Needs: no new build (JS update only)
+
+**Why it matters:** a project can add a cable code by giving it a signal word in Rules (T102); until now the library's cable picker, the device card's "+ add" offers and the Cable / riser view still knew only the master's ten, so the new code could not be put on a type and showed as an error.
+
+- [ ] **D is a code.** Open Cable / riser on a project with a `D` (DALI) cable (add one on a device card if there is none): it shows as `D (DALI)` with no "not a cable code" check. → saw:
+- [ ] **A new code.** In Setup → Rules → **Signal words**, add code `DX` with the word `DALI-2`. Open Library, pick a type, + add cable: the code chips end with `… 120V · D · DX`. Pick `DX`, To `DALI-2 bus`, Save — it saves (no "not a cable code"). → saw:
+- [ ] **The card and the cable view.** Put that run in the type's optional cables; on a device of the type the card offers "+ add DX → …". Add it: in Cable / riser it is grouped as `DX (DALI-2)` after D, the filter chips include `DX`, and it has no code check. → saw:
+- [ ] **Suggestions.** Library → Suggestions → Cable code lists `DX` as well. → saw:
+- [ ] **Scoped to the project.** On another project (no `DX` word), the Library's code chips stop at `D`. → saw:
+
+Decision D216: a scope's cable codes are the master's ten plus every code its own accepted Rules give a signal word; the app library reads its own accepted rule parameters; a project skips a library run whose code it does not name; the Cable / riser view names a project code by its signal word. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

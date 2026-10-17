@@ -7,6 +7,7 @@
  */
 
 import { displayNumber, riserCheck, type Store } from '@field-survey/core';
+import { cableCodes, loadRuleParams, type RuleParams } from '@field-survey/rules';
 
 import { CABLE_NAME } from '../ends/model';
 import type { Rect } from '../plan/viewport';
@@ -72,7 +73,23 @@ export type CableData = {
   levels: { id: string; code: string; inScope: boolean }[];
   /** Cables per check, over the whole project. */
   totals: Record<CheckId, number>;
+  /** The project's cable codes and what each is called, in order (`codeNames`, T117). */
+  names: CodeNames;
 };
+
+/** Cable code → its name, in the order the view lists codes. */
+export type CodeNames = Readonly<Record<string, string>>;
+
+/**
+ * The project's cable codes (`cableCodes`: the master's, then any its Rules give a signal word)
+ * and their names: the master's names, a project code's signal word.
+ */
+export function codeNames(params?: RuleParams): CodeNames {
+  const signal = params ? (params.get('R3', 'signal') as Record<string, string>) : {};
+  return Object.fromEntries(cableCodes(params).map((c) => [c, CABLE_NAME[c] ?? signal[c] ?? c]));
+}
+
+const DEFAULT_NAMES = codeNames();
 
 export type GroupBy = 'vertical' | 'level' | 'code';
 
@@ -150,6 +167,7 @@ export function cableChecks(
   c: { code: string | null; riserToLabel: string | null; endpointConfirmed: boolean },
   ends: readonly (CableEndCell & { toText: string | null })[],
   inScope: (levelId: string) => boolean,
+  names: CodeNames = DEFAULT_NAMES,
 ): CableCheck[] {
   const out: CableCheck[] = [];
   const sorted = [...ends].sort((x, y) => x.side.localeCompare(y.side));
@@ -162,7 +180,7 @@ export function cableChecks(
   }
   // code mismatch
   if (!c.code) out.push({ id: 'code', message: 'Cable has no code' });
-  else if (!CABLE_NAME[c.code]) out.push({ id: 'code', message: `"${c.code}" is not a cable code` });
+  else if (!Object.prototype.hasOwnProperty.call(names, c.code)) out.push({ id: 'code', message: `"${c.code}" is not a cable code` });
   else {
     const want = riserSignal(c.riserToLabel);
     if (want && !want.includes(c.code)) out.push({ id: 'code', message: `Riser "${c.riserToLabel}" names ${want.join('/')}, cable code is ${c.code}` });
@@ -204,6 +222,7 @@ export async function loadCables(store: Store, projectId: string): Promise<Cable
   const levelRows = await store.list<Row>('level', { where: 'project_id = ? AND deleted_at IS NULL', params: [projectId], orderBy: 'floor_order, level' });
   const levels = levelRows.map((l) => ({ id: String(l.id), code: String(l.level), inScope: !!l.in_scope }));
   const levelById = new Map(levels.map((l, i) => [l.id, { ...l, order: i }]));
+  const names = codeNames(await loadRuleParams(store, projectId));
   const cables = await store.list<Row>('cable', { where: 'project_id = ? AND deleted_at IS NULL', params: [projectId], orderBy: 'id' });
   const ends = await store.db.query<Row>(
     `SELECT e.* FROM cable_end e JOIN cable c ON c.id = e.cable_id WHERE c.project_id = ? AND c.deleted_at IS NULL AND e.deleted_at IS NULL ORDER BY e.side, e.id`,
@@ -274,7 +293,7 @@ export async function loadCables(store: Store, projectId: string): Promise<Cable
       a: strip(a),
       b: strip(b),
       levelIds,
-      checks: cableChecks({ code, riserToLabel, endpointConfirmed }, cells, inScope),
+      checks: cableChecks({ code, riserToLabel, endpointConfirmed }, cells, inScope, names),
       reviewItemId: reviewBy.get(id) ?? cells.map((e) => reviewBy.get(e.id)).find(Boolean) ?? null,
     });
   }
@@ -283,7 +302,7 @@ export async function loadCables(store: Store, projectId: string): Promise<Cable
 
   const totals = Object.fromEntries(CABLE_CHECKS.map((k) => [k.id, 0])) as Record<CheckId, number>;
   for (const r of rows) for (const id of new Set(r.checks.map((k) => k.id))) totals[id] += 1;
-  return { rows, levels, totals };
+  return { rows, levels, totals, names };
 }
 
 export function matches(r: CableRow, f: CableFilter): boolean {
@@ -298,26 +317,29 @@ export function matches(r: CableRow, f: CableFilter): boolean {
   return true;
 }
 
-export function codeTitle(code: string | null): string {
+export function codeTitle(code: string | null, names: CodeNames = DEFAULT_NAMES): string {
   if (!code) return 'No code';
-  const name = CABLE_NAME[code];
+  const name = names[code];
   return name && name !== code ? `${code} (${name})` : code;
 }
 
-const CODE_ORDER = Object.keys(CABLE_NAME);
-const codeRank = (c: string | null) => (c && CODE_ORDER.includes(c) ? CODE_ORDER.indexOf(c) : CODE_ORDER.length);
+/** A code's place in the view's order: the project's codes in order, then any other, then no code. */
+export function codeRank(code: string | null, names: CodeNames = DEFAULT_NAMES): number {
+  const order = Object.keys(names);
+  return code == null ? order.length + 1 : code in names ? order.indexOf(code) : order.length;
+}
 
 /**
  * The vertical a cable belongs to (Phase 3 §5): its stored `vertical`, else derived (D180) —
  * single-row codes together, a run whose ends are on one level as "Same-floor", and every other
  * run under the device (or placeholder) at its A end and its code.
  */
-export function verticalOf(r: CableRow): { key: string; title: string; rank: number } {
+export function verticalOf(r: CableRow, names: CodeNames = DEFAULT_NAMES): { key: string; title: string; rank: number } {
   if (r.vertical) return { key: `v:${r.vertical}`, title: `Vertical: ${r.vertical}`, rank: 0 };
   if (r.singleRow) return { key: 'single', title: 'Single-row: P · 0-10V · 120V', rank: 3 };
-  if (r.a && r.b && r.levelIds.length === 1) return { key: `same:${r.code ?? ''}`, title: `Same-floor: ${codeTitle(r.code)}`, rank: 2 };
+  if (r.a && r.b && r.levelIds.length === 1) return { key: `same:${r.code ?? ''}`, title: `Same-floor: ${codeTitle(r.code, names)}`, rank: 2 };
   const from = r.a?.endpoint ?? r.b?.endpoint ?? '(no endpoint)';
-  return { key: `run:${from}:${r.code ?? ''}`, title: `${from} → ${codeTitle(r.code)}`, rank: 1 };
+  return { key: `run:${from}:${r.code ?? ''}`, title: `${from} → ${codeTitle(r.code, names)}`, rank: 1 };
 }
 
 /** The rows that pass the filter, grouped; a cable spanning levels shows under each when grouped by level. */
@@ -331,13 +353,13 @@ export function groupCables(data: CableData, by: GroupBy, f: CableFilter = {}): 
   };
   const levelOrder = new Map(data.levels.map((l, i) => [l.id, i]));
   for (const r of rows) {
-    if (by === 'code') add(`code:${r.code ?? ''}`, codeTitle(r.code), codeRank(r.code), r);
+    if (by === 'code') add(`code:${r.code ?? ''}`, codeTitle(r.code, data.names), codeRank(r.code, data.names), r);
     else if (by === 'level') {
       const ids = f.levelId ? [f.levelId] : r.levelIds;
       if (!ids.length) add('level:none', 'No level', Number.MAX_SAFE_INTEGER, r);
       for (const id of ids) add(`level:${id}`, `Level ${data.levels.find((l) => l.id === id)?.code ?? '?'}`, levelOrder.get(id) ?? 0, r);
     } else {
-      const v = verticalOf(r);
+      const v = verticalOf(r, data.names);
       add(v.key, v.title, v.rank, r);
     }
   }

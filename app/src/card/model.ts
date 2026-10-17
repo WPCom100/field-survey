@@ -5,7 +5,7 @@
  */
 
 import { defaultDeviceText, displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
-import { cableTitle, editableKeys, parseLibraryAccessories, parseLibraryCables, type LibraryCable } from '@field-survey/rules';
+import { CABLE_CODES, cableCodes, cableTitle, editableKeys, loadRuleParams, parseLibraryAccessories, parseLibraryCables, type LibraryCable } from '@field-survey/rules';
 
 import { deviceNeedsNeuron, loadNeuronTypes, typeOf } from '../library/neuron';
 import { photoStrip } from '../photo/links';
@@ -355,16 +355,16 @@ type TypeLists = { state: string; default_cables?: unknown; optional_cables?: un
  * The optional cables of `type` a device with runs of `codes` lacks, each offered once the runs
  * before it of its code exist: an accepted type's default cables come first (R2g drafts them, and an
  * optional 120V added in their place would satisfy that draft with the wrong texts), then the
- * optional ones in order. A rejected type offers nothing.
+ * optional ones in order. A rejected type offers nothing. `known`: the project's cable codes (`cableCodes`, T117).
  */
-export function optionalCableOffers(type: TypeLists | null, codes: readonly (string | null)[]): CardCableOffer[] {
+export function optionalCableOffers(type: TypeLists | null, codes: readonly (string | null)[], known: readonly string[] = CABLE_CODES): CardCableOffer[] {
   if (!type || type.state === 'rejected') return [];
   const have = new Map<string, number>();
   for (const c of codes) if (c) have.set(c, (have.get(c) ?? 0) + 1);
   const seen = new Map<string, number>();
-  if (type.state === 'accepted') for (const c of parseLibraryCables(type.default_cables)) seen.set(c.code, (seen.get(c.code) ?? 0) + 1);
+  if (type.state === 'accepted') for (const c of parseLibraryCables(type.default_cables, known)) seen.set(c.code, (seen.get(c.code) ?? 0) + 1);
   const out: CardCableOffer[] = [];
-  for (const c of parseLibraryCables(type.optional_cables)) {
+  for (const c of parseLibraryCables(type.optional_cables, known)) {
     const n = seen.get(c.code) ?? 0;
     seen.set(c.code, n + 1);
     if ((have.get(c.code) ?? 0) !== n) continue; // already there, or an earlier run of the code is missing
@@ -545,7 +545,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     (a, b) => Number(a.label === 'NEW') - Number(b.label === 'NEW') || a.label.localeCompare(b.label, 'en', { numeric: true }) || a.id.localeCompare(b.id),
   );
 
-  const cableOffers = optionalCableOffers(type, connections.map((c) => c.cable));
+  const cableOffers = optionalCableOffers(type, connections.map((c) => c.cable), cableCodes(await loadRuleParams(store, projectId)));
   const accessoryOffers = optionalAccessoryOffers(type, accessories.map((a) => a.model));
   const accessoryOfferGroups = accessoryOfferBlocks(type, accessoryOffers, accessories);
 

@@ -6,6 +6,7 @@
 
 import { Editor, LIBRARY_STREAM, Store, SyncEngine, uuidv7, type EditContext } from '@field-survey/core';
 import { BetterSqliteDriver, FakeServer } from '@field-survey/core/node';
+import { decideRuleParam, setRuleParam } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
 
 import { addFieldDevice, libraryChoices, searchChoices } from '../additions/model';
@@ -119,6 +120,32 @@ describe('device-type library editor (T48)', () => {
     await expect(updateType(p.editor, store, id, { defaultCables: [{ ...blankCable('Z') }] })).rejects.toThrow(/not a cable code/);
     await expect(updateType(p.editor, store, id, { optionalAccessories: [{ model: ' ', expected_qty: 1 }] })).rejects.toThrow(/needs a model/);
     await expect(updateType(p.editor, store, id, { model: '' })).rejects.toThrow(/needs a model/);
+  });
+
+  it("a code the scope's Rules give a signal word is a cable code of its types, the picker and the card (T117)", async () => {
+    const { store, userId, project } = await setup();
+    const p = await project('Tower');
+    const id = await createType(p.editor, store, p.id, { model: 'DALI-GW', category: 'Equipment' });
+    const dx = { ...blankCable('DX'), to: 'DALI-2 bus', far: 'Fixtures' };
+    expect((await loadLibrary(store, p.id)).codes).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D']);
+    await expect(updateType(p.editor, store, id, { optionalCables: [dx] })).rejects.toThrow(/"DX" is not a cable code/);
+    await setRuleParam(p.editor, 'R3', 'signal', { DX: 'DALI-2' });
+    await updateType(p.editor, store, id, { optionalCables: [dx] });
+    const view = await loadLibrary(store, p.id);
+    expect(view.codes.slice(-2)).toEqual(['D', 'DX']);
+    expect(view.types[0]!.optionalCables.map((c) => c.code)).toEqual(['DX']);
+    // the card offers the run on a device of the type
+    const device = await p.editor.create('device', { level_id: p.levelId, category: 'Equipment', device: 'DALI-GW', library_type_id: id }, CTX);
+    expect((await loadDeviceCard(store, device.id))!.cableOffers.map((o) => o.cable.code)).toEqual(['DX']);
+    // the app library reads its own accepted Rules: a draft word is not enough; another project knows nothing of DX
+    const lib = new Editor(store, { projectId: LIBRARY_STREAM, userId });
+    const appType = await createType(lib, store, null, { model: 'DALI-GW', category: 'Equipment' });
+    await setRuleParam(lib, 'R3', 'signal', { DX: 'DALI-2' });
+    await expect(updateType(lib, store, appType, { optionalCables: [dx] })).rejects.toThrow(/not a cable code/);
+    await decideRuleParam(lib, 'R3', 'signal', 'accepted');
+    await updateType(lib, store, appType, { optionalCables: [dx] });
+    expect((await loadLibrary(store, null)).types[0]!.optionalCables.map((c) => c.code)).toEqual(['DX']);
+    expect((await loadLibrary(store, (await project('Other')).id)).codes).not.toContain('DX');
   });
 
   it('Neuron ID per type (T68, D185): category default, the flag in the editor, the card, the dashboard and Copy from', async () => {

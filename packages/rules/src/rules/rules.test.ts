@@ -10,7 +10,8 @@ import type { Rule } from '../rule';
 import { Build } from '../testing/build';
 import { Acc, E5 } from './e5';
 import { R1 } from './r1';
-import { R2g, needsNeuronId, neuronIdDefault } from './library';
+import { RuleParams, type RuleParamRow } from '../params';
+import { CABLE_CODES, R2g, cableCodes, needsNeuronId, neuronIdDefault, parseLibraryCables } from './library';
 import { R2a, R2b, R2c, R2d, R2e, R2f } from './r2';
 import { LintPower, LintRelay } from './lint';
 import { R3a, R3b, R3c, R3d, R3f } from './r3';
@@ -231,6 +232,22 @@ describe('R2g device-type library cables (T48, D183)', () => {
     // a rejected type is never matched by model
     empty.state = 'rejected';
     expect(run(b, [R2g]).proposals.map((p) => p.subject.entity_id)).toEqual([panel.id]);
+  });
+
+  it("a code beyond the master's counts once the project's Rules give it a signal word (T117)", () => {
+    const b = new Build();
+    const { panel } = floor(b);
+    b.libraryType('CT06LCPA', 'Relay panel', { default_cables: [tenV, { code: 'DX', to: 'DALI-2 bus', far: 'Fixtures' }] });
+    expect(run(b, [R2g]).proposals.map((p) => p.discriminator)).toEqual(['0-10V']);
+    expect(cableCodes()).toEqual(CABLE_CODES);
+    const row: RuleParamRow = { id: 'rp', project_id: b.snap.projectId, rule_id: 'R3', key: 'signal', value: { DX: 'DALI-2' }, state: 'accepted', deleted_at: null };
+    b.snap.ruleParams = [row];
+    const out = run(b, [R2g]);
+    expect(out.proposals.map((p) => [p.subject.entity_id, p.discriminator])).toEqual([[panel.id, '0-10V'], [panel.id, 'DX']]);
+    expect(out.proposals[1]!.payload).toMatchObject({ cable: { cable: 'DX' } });
+    expect(cableCodes(new RuleParams([row]))).toEqual([...CABLE_CODES, 'DX']);
+    expect(parseLibraryCables([{ code: 'DX' }, { code: 'X' }]).map((c) => c.code)).toEqual(['X']);
+    expect(parseLibraryCables([{ code: 'DX' }, { code: 'X' }], cableCodes(new RuleParams([row]))).map((c) => c.code)).toEqual(['DX', 'X']);
   });
 });
 

@@ -17,7 +17,7 @@ import {
   type SuggestionScope,
   type SuggestionTarget,
 } from '../suggestions/model';
-import { CABLE_CODES, CATEGORIES } from './model';
+import { CATEGORIES } from './model';
 
 type RunFn = (fn: (e: Editor, s: Store) => Promise<unknown>, done?: string | (() => string)) => Promise<boolean>;
 
@@ -123,7 +123,7 @@ function ChipRow(props: { row: Suggestion; canEdit: boolean; run: RunFn; library
  * "Suggestions…" (T99): the chips of a category or a cable code. The app library offers "Load
  * standard suggestions" (the seed as drafts, D174 (3)); a project "Copy from app library".
  */
-export function SuggestionsPane(props: { rows: readonly Suggestion[]; library: string | null; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
+export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: readonly string[]; library: string | null; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
   const [pick, setPick] = useState<{ scope: 'category' | 'code'; ref: string }>({ scope: 'category', ref: CATEGORIES[0]! });
   const count = (scope: SuggestionScope, ref: string) => props.rows.filter((r) => r.scope === scope && r.ref.toUpperCase() === ref.toUpperCase() && r.state !== 'rejected').length;
   const rows = props.rows.filter((r) => r.scope === pick.scope && r.ref.toUpperCase() === pick.ref.toUpperCase());
@@ -169,7 +169,7 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; library: s
       </View>
       <Text style={styles.label}>Cable code</Text>
       <View style={styles.wrap}>
-        {CABLE_CODES.map((c) => (
+        {props.codes.map((c) => (
           <Pick key={c} on={pick.scope === 'code' && pick.ref === c} label={c} n={count('code', c)} onPress={() => setPick({ scope: 'code', ref: c })} />
         ))}
       </View>

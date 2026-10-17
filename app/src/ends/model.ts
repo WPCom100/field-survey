@@ -37,6 +37,7 @@ export const CABLE_NAME: Readonly<Record<string, string>> = {
   UV: 'UHCI-WM partition sensor',
   '0-10V': '0-10V',
   '120V': '120V',
+  D: 'DALI',
 };
 
 export type EndEndpoint =

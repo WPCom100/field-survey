@@ -7,16 +7,17 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { Editor, Store, uuidv7, type Op } from '@field-survey/core';
+import { Editor, Store, uuidv7, type EditContext, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
-import { RULES, RuleEngine } from '@field-survey/rules';
+import { RULES, RuleEngine, setRuleParam } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
 
 import { confirmEndpoint } from './actions';
-import { cableChecks, groupCables, loadCables, parseRiserRef, riserBlobOf, riserSignal, statusCell, verticalOf } from './model';
+import { cableChecks, codeTitle, groupCables, loadCables, parseRiserRef, riserBlobOf, riserSignal, statusCell, verticalOf } from './model';
 
 const PROJECT = uuidv7();
 const ME = uuidv7();
+const CTX: EditContext = { change_type: 'Field survey', reason: 'test' };
 let clock = 1_760_700_000_000;
 const now = () => new Date((clock += 1000)).toISOString();
 
@@ -127,6 +128,30 @@ describe('cable / riser view (T39)', () => {
     expect(titles('level')).toEqual(['Level 03 3', 'Level 06M 7', 'Level 09 1']);
     expect(titles('level', { levelId: id.l03 })).toEqual(['Level 03 3']);
     expect(titles('code')).toEqual(['X (DMX) 2', 'N (network) 1', 'U (Unison) 1', 'F (fiber) 1', '0-10V 1', 'No code 1']);
+  });
+
+  it("reads the project's cable codes: D is one, a code with a signal word in Rules is too (T117)", async () => {
+    const { store, editor, id } = await setup();
+    const run = async (code: string) => {
+      const c = await editor.create('cable', { project_id: PROJECT, cable: code, qty: 1, endpoint_confirmed: true }, CTX);
+      await editor.create('cable_end', { cable_id: c.id, side: 'A', endpoint_kind: 'device', device_id: id.panel, level_id: id.l06m }, CTX);
+      await editor.create('cable_end', { cable_id: c.id, side: 'B', endpoint_kind: 'placeholder', placeholder_id: id.fixtures }, CTX);
+      return c.id;
+    };
+    const dali = await run('D');
+    const dx = await run('DX');
+    let data = await loadCables(store, PROJECT);
+    const checks = (cid: string) => data.rows.find((r) => r.id === cid)!.checks;
+    expect(checks(dali)).toEqual([]);
+    expect(checks(dx)).toEqual([{ id: 'code', message: '"DX" is not a cable code' }]);
+    await setRuleParam(editor, 'R3', 'signal', { DX: 'DALI-2' });
+    data = await loadCables(store, PROJECT);
+    expect(checks(dx)).toEqual([]);
+    expect(Object.keys(data.names).slice(-2)).toEqual(['D', 'DX']);
+    expect(groupCables(data, 'code').map((g) => g.title).slice(-4)).toEqual(['0-10V', 'D (DALI)', 'DX (DALI-2)', 'No code']);
+    expect(groupCables(data, 'code', { code: 'DX' }).map((g) => g.rows.length)).toEqual([1]);
+    expect(codeTitle('DX', data.names)).toBe('DX (DALI-2)');
+    expect(codeTitle('DX')).toBe('DX');
   });
 
   it('filters by code, end status (Unsurveyed too) and check', async () => {
