@@ -53,7 +53,10 @@ parser. Every line keeps `source_ref = {kind: bom_line, file, job, page, line, b
 level_code}` (bbox in PDF points, top-left origin) and `extraction` (`text` | `ocr`).
 
 OCR fixes (`fix_ocr_model`): `P11002` → `PI1002` (Phase 1f's one systematic misread) and a
-letter `O` for a digit inside a `P-…` model.
+letter `O` for a digit inside a `P-…` model. On an OCR page a line number or quantity loses the specks at its ends
+(`OCR_SPECK_RE`): Tesseract 5.4 on Windows reads the edge of p.3's grey-banded line 630 as a
+quotation mark (`‘630`), which Linux's build does not, and the row was dropped as "not a BOM row"
+(T109). The text layer is parsed as printed.
 
 ## What the job writes
 

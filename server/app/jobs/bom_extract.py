@@ -358,8 +358,18 @@ def _text(words: list[Word]) -> str:
     return " ".join(w.text for w in words)
 
 
-def _int(text: str) -> int | None:
+OCR_SPECK_RE = re.compile(r"^[^\w]+|[^\w]+$")
+"""Noise glued to the ends of an OCR'd number: Tesseract 5.4 (the UB-Mannheim Windows build)
+reads the edge of a grey-banded row as a quotation mark in front of its line number (`‘630`,
+BOM p.3, T109), where Linux's build reads `630`."""
+
+
+def _int(text: str, *, ocr: bool = False) -> int | None:
+    """The cell as a whole number, else None. On an OCR page (`ocr`) specks at its ends are
+    dropped first; the text layer is taken as printed."""
     t = text.strip().replace(",", "")
+    if ocr:
+        t = OCR_SPECK_RE.sub("", t)
     if re.fullmatch(r"\d+(?:\.0+)?", t):
         return int(float(t))
     return None
@@ -436,14 +446,14 @@ def _submittal_lines(
     lines: list[Line] = []
     venue: str | None = None
     for row in rows_of(words):
-        number = _int(_text(_in_band(row, table.bands["line"])))
+        number = _int(_text(_in_band(row, table.bands["line"])), ocr=pw.extraction == "ocr")
         if number is None:
             continue  # a title-block fragment or a wrapped word: not a BOM row
         part = _text(_in_band(row, table.bands["part_number"]))
         desc = _text(_in_band(row, table.bands["description"]))
         model = _text(_in_band(row, table.bands["model"]))
         qty_words = _in_band(row, table.bands["qty"])
-        qty = _int(qty_words[0].text) if qty_words else None
+        qty = _int(qty_words[0].text, ocr=pw.extraction == "ocr") if qty_words else None
         if pw.extraction == "ocr":
             model = fix_ocr_model(model)
             part = fix_ocr_model(part)
@@ -501,12 +511,12 @@ def _material_lines(
     rows = rows_of(words)
     for row in rows:
         line_words = _in_band(row, table.bands["line"])
-        number = _int(_text(line_words))
+        number = _int(_text(line_words), ocr=pw.extraction == "ocr")
         material = _in_band(row, table.bands["material"])
         text = _text(material)
         if number is not None and material:
             qty_words = _in_band(row, table.bands["qty"])
-            qty = _int(qty_words[0].text) if qty_words else None
+            qty = _int(qty_words[0].text, ocr=pw.extraction == "ocr") if qty_words else None
             current = Line(
                 page=pw.page,
                 line=number,

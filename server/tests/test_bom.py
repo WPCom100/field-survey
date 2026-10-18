@@ -144,6 +144,14 @@ def test_page3_by_ocr(parsed):
     assert by_ref(lines, 3, 440).model == "ERN4-W-120"
     assert by_ref(lines, 3, 470).model == "URTO" and by_ref(lines, 3, 470).venue == "FLOOR 16"
     assert by_ref(lines, 3, 670).part_number.startswith("DATA")
+    # the grey-banded row Tesseract 5.4 on Windows reads as `‘630` (T109)
+    row630 = by_ref(lines, 3, 630)
+    assert (row630.model, row630.qty, row630.venue, row630.column) == (
+        "P-DOC-C-SR-4",
+        1,
+        "FLOOR 20",
+        1,
+    )
     # every row's quantity was read as a number
     assert all(ln.qty is not None for ln in rows)
 
@@ -322,6 +330,16 @@ def test_venue_parsing():
     assert bx.parse_venue("Level 16, 22") == bx.Venue("Level 16, 22", ("16", "22"), True)
     link = bx.parse_venue("Link to P-CCS in other building")
     assert link.pooled and link.codes == ()
+
+
+def test_ocr_number_specks():
+    """T109: specks at the ends of an OCR'd number are noise; the text layer stays strict."""
+    for text in ("‘630", "630’", "|630", "'630.", "“630”"):
+        assert bx._int(text, ocr=True) == 630
+    assert bx._int("‘630") is None
+    assert bx._int("1,000", ocr=True) == 1000
+    assert bx._int("6‘30", ocr=True) is None  # inside the number it is not a speck
+    assert bx._int("‘", ocr=True) is None
 
 
 def test_model_normalisation():
