@@ -5,7 +5,10 @@ the model is `CLAUDE_MODEL` (Opus 5.5 by default). Every call logs its tokens an
 `response.usage` (`claude_call` events) and the caller sums them per job.
 
 Tests never call the API: a `Recorder` replays committed answers keyed by a hash of the request
-(model, system, prompt, schema, image bytes). With `RISER_RECORD=1` and a key in `.env`, a missing
+(model, system, prompt, schema, and each image's mode and pixel size — not its bytes: the same
+crop encodes to other PNG bytes under another zlib, and pdfium anti-aliases a few crops a pixel
+apart between Windows and Linux, so a byte key never replayed on CI; the prompt already names the
+sheet, band and crop). With `RISER_RECORD=1` and a key in `.env`, a missing
 answer is fetched live and written to the recording so it can be committed (D189 (1): CI runs
 against committed golden outputs and skips live calls when the key is absent).
 """
@@ -14,12 +17,15 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import json
 import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from PIL import Image
 
 from app.config import settings
 
@@ -80,8 +86,17 @@ def request_key(
         ).encode()
     )
     for img in images:
-        h.update(hashlib.sha256(img).digest())
+        h.update(image_key(img).encode())
     return h.hexdigest()
+
+
+def image_key(img: bytes) -> str:
+    """`RGB:1999x642` for a decodable image; a hash of the bytes otherwise (tests pass stubs)."""
+    try:
+        with Image.open(io.BytesIO(img)) as im:
+            return f"{im.mode}:{im.size[0]}x{im.size[1]}"
+    except (OSError, ValueError):
+        return hashlib.sha256(img).hexdigest()
 
 
 class Recorder:
