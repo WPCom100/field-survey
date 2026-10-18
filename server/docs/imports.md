@@ -106,6 +106,14 @@ two signals, two runs (`&`, `and`, `,`, `/` in the destination) or matching seve
 stays device-only and is listed in the checks (`punch_end_unmatched`). On the master: **46**
 items on their ends, **10** listed (06M #2 "… to Lvl 9 & 6M Equipment Rack", 06M #12 "Terminate
 DMX" on a panel with two DMX ends, the UFMP4 items on 03 whose ends the import could not resolve…).
+Each listed item also waits on Needs review (T122): a `review_item(lint)` with `subject.lint_id =
+import.punch_end_unmatched`, `field = cable_end_id`, `codes` = the cable codes its text names, and
+`candidates` = the item text (`side: import`) then the device's ends with those codes (`side: end`,
+`value` = end id, `label` = `C-07 DMX to Level 09`). The iPad lists the device's ends with those
+codes live and puts the item on the one picked (`setPunchEnd`, one `Reconcile` op on
+`cable_end_id`) or keeps it on the device; an item about two runs goes on one of them and the other
+run gets its own Run draft (D220). The UFMP4 items on 03 come with no end to offer (the DMX run
+to a UFMP4 is an end of its panel, not of the UFMP4).
 
 `missing_part` has no end column: a part reaches its end through its Source — a `Connections
 C-nn` link, or a punch item now on its end — which is what R4b reads (D213 (d)). Adding a

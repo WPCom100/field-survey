@@ -10,7 +10,7 @@ import { Editor } from './editor';
 import { uuidv7 } from './ids';
 import { BetterSqliteDriver } from './node';
 import type { Op } from './op';
-import { PUNCH_DEVICE_LINT, defaultDeviceText, isPunchDeviceItem, linkPunchDevice, punchDeviceText } from './punch';
+import { PUNCH_DEVICE_LINT, PUNCH_END_LINT, defaultDeviceText, isPunchDeviceItem, isPunchEndItem, linkPunchDevice, punchDeviceText, punchEndCodes, setPunchEnd } from './punch';
 import { ReviewError, type ReviewItem } from './review';
 import { Store } from './store';
 
@@ -139,5 +139,89 @@ describe('linkPunchDevice (Needs review → Link to device)', () => {
     });
     await expect(linkPunchDevice(editor, other, station, { deviceLabel: '01-S10' })).rejects.toThrow(/Not a punch item/);
     expect((await store.get<Row>('punch_item', punchId))!.device_id).toBeNull();
+  });
+});
+
+describe('setPunchEnd (Needs review → put a cable item on its end, T122)', () => {
+  let store: Store;
+  let editor: Editor;
+  let punchId: string;
+  let itemId: string;
+  const ends: Record<string, string> = {};
+
+  beforeEach(async () => {
+    store = await Store.open(new BetterSqliteDriver(), { installId: uuidv7(), search: 'like' });
+    await remote(store, 'project', PROJECT, { name: 'Tower' });
+    const group = uuidv7();
+    await remote(store, 'numbering_group', group, { project_id: PROJECT, label: '06M' });
+    await remote(store, 'level', L01, { project_id: PROJECT, level: '06M', floor_order: 8, numbering_group_id: group });
+    const panel = uuidv7();
+    const other = uuidv7();
+    await remote(store, 'device', panel, { level_id: L01, display_id: '06M-02', category: 'Power Distribution', device: 'CT06LCPB' });
+    await remote(store, 'device', other, { level_id: L01, display_id: '06M-04', category: 'Power Distribution', device: 'CT06LCPA' });
+    for (const [label, dev, to] of [['C-07', panel, 'DMX to Level 09'], ['C-12', panel, 'DMX to equipment rack'], ['C-09', other, 'DMX to Level 09']] as const) {
+      const cable = uuidv7();
+      ends[label] = uuidv7();
+      await remote(store, 'cable', cable, { project_id: PROJECT, cable: 'X' });
+      await remote(store, 'cable_end', ends[label]!, { cable_id: cable, side: 'A', level_id: L01, device_id: dev, display_id: label, to_text: to });
+    }
+    punchId = uuidv7();
+    await remote(store, 'punch_item', punchId, { level_id: L01, number: 2, device_id: panel, item: 'Run 2x DMX cables to Lvl 9 & 6M Equipment Rack', type: 'Cable not run' });
+    itemId = uuidv7();
+    await remote(store, 'review_item', itemId, {
+      project_id: PROJECT,
+      level_id: L01,
+      kind: 'lint',
+      subject: { entity_kind: 'punch_item', entity_id: punchId, field: 'cable_end_id', level_id: L01, lint_id: PUNCH_END_LINT, codes: ['X'] },
+      candidates: [{ side: 'import', value: 'Run 2x DMX cables to Lvl 9 & 6M Equipment Rack' }, { side: 'end', value: ends['C-07'], label: 'C-07 DMX to Level 09' }],
+      ruling: false,
+      state: 'open',
+    });
+    editor = new Editor(store, { projectId: PROJECT, userId: ANN, now: tsNext });
+  });
+
+  it('sets cable_end_id on one end of its device and closes the item in one Reconcile group', async () => {
+    const item = (await store.get<ReviewItem>('review_item', itemId))!;
+    expect([isPunchEndItem(item), isPunchDeviceItem(item), punchEndCodes(item)]).toEqual([true, false, ['X']]);
+    const r = await setPunchEnd(editor, itemId, ends['C-07']!, { endLabel: 'C-07', now: () => '2026-10-17T15:00:00.000Z' });
+    expect(r.reason).toBe('Review: put punch item on C-07 ("Run 2x DMX cables to Lvl 9 & 6M Equipment Rack")');
+    expect(r.ops.map((o) => [o.entity_kind, o.field])).toEqual([
+      ['punch_item', 'cable_end_id'],
+      ['review_item', 'resolution'],
+      ['review_item', 'resolved_by_id'],
+      ['review_item', 'resolved_at'],
+      ['review_item', 'state'],
+    ]);
+    expect(new Set(r.ops.map((o) => o.group_id)).size).toBe(1);
+    expect(r.ops.every((o) => o.change_type === 'Reconcile' && o.reason === r.reason)).toBe(true);
+    expect((await store.get<Row>('punch_item', punchId))!).toMatchObject({ cable_end_id: ends['C-07'], item: 'Run 2x DMX cables to Lvl 9 & 6M Equipment Rack' });
+    const done = (await store.get<ReviewItem>('review_item', itemId))!;
+    expect(done).toMatchObject({ state: 'resolved', resolved_at: '2026-10-17T15:00:00.000Z', resolution: { choice: 'link', value: ends['C-07'] } });
+    await expect(setPunchEnd(editor, itemId, ends['C-12']!)).rejects.toThrow(/already resolved/);
+  });
+
+  it('keeps it on the device: no change to the item, the review item closed', async () => {
+    const r = await setPunchEnd(editor, itemId, null);
+    expect(r.ops.map((o) => [o.entity_kind, o.field])).toEqual([
+      ['review_item', 'resolution'],
+      ['review_item', 'resolved_by_id'],
+      ['review_item', 'resolved_at'],
+      ['review_item', 'state'],
+    ]);
+    expect((await store.get<Row>('punch_item', punchId))!.cable_end_id).toBeNull();
+    expect((await store.get<ReviewItem>('review_item', itemId))!.resolution).toMatchObject({ choice: 'keep' });
+  });
+
+  it("refuses an end of another device, an unknown end and a device-link item", async () => {
+    await expect(setPunchEnd(editor, itemId, ends['C-09']!)).rejects.toThrow(/not on the punch item's device/);
+    await expect(setPunchEnd(editor, itemId, uuidv7())).rejects.toThrow(ReviewError);
+    const other = uuidv7();
+    await remote(store, 'review_item', other, {
+      project_id: PROJECT, level_id: L01, kind: 'lint',
+      subject: { entity_kind: 'punch_item', entity_id: punchId, field: 'device_id', level_id: L01, lint_id: PUNCH_DEVICE_LINT },
+      candidates: [], ruling: false, state: 'open',
+    });
+    await expect(setPunchEnd(editor, other, ends['C-07']!)).rejects.toThrow(/Not a cable item/);
+    expect((await store.get<Row>('punch_item', punchId))!.cable_end_id).toBeNull();
   });
 });

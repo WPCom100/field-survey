@@ -14,6 +14,8 @@ import {
   defaultDeviceText,
   displayNumber,
   isPunchDeviceItem,
+  isPunchEndItem,
+  punchEndCodes,
   sideOf,
   type Candidate,
   type ChoiceName,
@@ -201,6 +203,7 @@ export async function loadReviewList(store: Store, projectId: string, q: ReviewQ
     const levelId = item.level_id ?? subj.level_id ?? d.levelId;
     const fields = itemFields(item);
     const master = isPunchDeviceItem(item) ? masterText(item) : null;
+    const endCodes = isPunchEndItem(item) ? punchEndCodes(item) : null;
     all.push({
       id: item.id,
       kind: item.kind,
@@ -209,7 +212,9 @@ export async function loadReviewList(store: Store, projectId: string, q: ReviewQ
       subject: d.label,
       field: master !== null
         ? `Device "${master}" → link`
-        : fields.map(fieldLabel).join(fields.includes('deleted_at') && fields.length === 2 ? ' vs ' : ' + '),
+        : endCodes !== null
+          ? `${endCodes.length ? endCodes.join(' / ') : 'Cable'} item → which connection?`
+          : fields.map(fieldLabel).join(fields.includes('deleted_at') && fields.length === 2 ? ' vs ' : ' + '),
       at: uuidTime(item.id),
       ruling: !!item.ruling,
       pin: subj.entity_kind === 'device' && fields.length === 1 && fields[0] === 'pin',
@@ -317,6 +322,64 @@ async function punchDeviceReview(store: Store, item: ReviewItem, codes: Readonly
   };
 }
 
+/** A connection end of the punch item's device a cable item can go on: `C-07 · DMX to Level 09`. */
+export type EndChoice = { id: string; label: string; code: string | null; to: string | null };
+
+/**
+ * An imported cable item on its device but no end (T122): its text, its device, and the device's
+ * ends with the codes it names, live (an end added since the import shows too). One end is
+ * picked even for an item about two runs; the other run gets its own Run draft (D220).
+ */
+export type PunchEndReview = {
+  punchId: string;
+  /** `Punch #2 Run 2x DMX cables to …`. */
+  punch: string;
+  levelCode: string;
+  /** `06M-02 · CT06LCPB`. */
+  device: string;
+  /** The cable codes the item names (`X`), empty when unknown. */
+  codes: string[];
+  ends: EndChoice[];
+  /** The end it is on now (after Put on, while the item is still shown). */
+  linkedTo: string | null;
+};
+
+async function punchEndReview(store: Store, item: ReviewItem, codes: ReadonlyMap<string, string>): Promise<PunchEndReview | null> {
+  if (!isPunchEndItem(item)) return null;
+  const punch = await store.get<Row>('punch_item', item.subject.entity_id);
+  if (!punch) return null;
+  const levelCode = codes.get(String(punch.level_id)) ?? '?';
+  const deviceId = typeof punch.device_id === 'string' ? punch.device_id : null;
+  const dev = deviceId ? await store.get<Row>('device', deviceId) : null;
+  const want = punchEndCodes(item);
+  const rows = deviceId
+    ? await store.db.query<Row>(
+        `SELECT e.id, e.display_id, e.to_text, c.cable FROM cable_end e JOIN cable c ON c.id = e.cable_id AND c.deleted_at IS NULL
+         WHERE e.device_id = ? AND e.deleted_at IS NULL`,
+        [deviceId],
+      )
+    : [];
+  const ends = rows
+    .filter((e) => !want.length || want.includes(String(e.cable ?? '')))
+    .map((e): EndChoice => ({
+      id: String(e.id),
+      label: typeof e.display_id === 'string' && e.display_id ? e.display_id : 'NEW',
+      code: typeof e.cable === 'string' ? e.cable : null,
+      to: typeof e.to_text === 'string' ? e.to_text : null,
+    }))
+    .sort((a, b) => Number(a.label === 'NEW') - Number(b.label === 'NEW') || a.label.localeCompare(b.label, 'en', { numeric: true }));
+  const text = typeof punch.item === 'string' && punch.item.trim() ? ` ${punch.item.trim()}` : '';
+  return {
+    punchId: String(punch.id),
+    punch: `Punch #${displayNumber('punch_item', punch)}${text}`,
+    levelCode,
+    device: dev ? [displayNumber('device', dev, levelCode), defaultDeviceText(dev)].filter(Boolean).join(' · ') : '(no device)',
+    codes: want,
+    ends,
+    linkedTo: typeof punch.cable_end_id === 'string' ? punch.cable_end_id : null,
+  };
+}
+
 export type ReviewSide = {
   /** "Landry", or "user …abc123" when the team list does not know the id. */
   who: string;
@@ -352,6 +415,8 @@ export type ReviewDetail = {
   resolvable: boolean;
   /** An imported punch row waiting for its device (D148): Link to device / Create device. */
   punchDevice: PunchDeviceReview | null;
+  /** An imported cable item waiting for its end (T122): Put on C-nn / Keep on the device. */
+  punchEnd: PunchEndReview | null;
 };
 
 function side(
@@ -445,6 +510,7 @@ export async function loadReviewDetail(
     pins: isPin ? { a: asPin(as[0]?.value ?? current?.pin), b: asPin(bs[0]?.value) } : null,
     resolvable,
     punchDevice: await punchDeviceReview(store, item, codes),
+    punchEnd: await punchEndReview(store, item, codes),
   };
 }
 

@@ -85,8 +85,11 @@ export type ChoiceName = ResolveChoice['choice'];
 
 /** Stored in `review_item.resolution`; the settle step reads the two op lists. */
 export interface Resolution {
-  /** `link`: a punch item linked to its device from Needs review (T81, `./punch`). */
-  choice: ChoiceName | 'link';
+  /**
+   * `link`: a punch item linked to its device (T81) or put on its connection end (T122) from
+   * Needs review; `keep`: a cable item kept on its device, on no end (T122, `./punch`).
+   */
+  choice: ChoiceName | 'link' | 'keep';
   value?: unknown;
   reason: string;
   reconcile_op_ids: string[];

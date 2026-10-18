@@ -206,6 +206,6 @@ describe.skipIf(missing)(`dashboard over the seeded master${missing ? ' — SKIP
         "neverFound": 0,
       }
     `);
-    expect(readinessLine(data.readiness)).toMatchInlineSnapshot(`"B2 setup · B1 setup (2 review) · 01 setup (4 review) · 02 setup (3 review) · 03 setup (5 review) · 04 setup (6 review) · 06 setup · 06M setup (1 review)"`);
+    expect(readinessLine(data.readiness)).toMatchInlineSnapshot(`"B2 setup (1 review) · B1 setup (2 review) · 01 setup (4 review) · 02 setup (4 review) · 03 setup (9 review) · 04 setup (6 review) · 06 setup · 06M setup (5 review)"`);
   }, 60_000);
 });

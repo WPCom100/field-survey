@@ -12,6 +12,12 @@
  * just created with the + Device form) is one `Reconcile` group: the `set` on
  * `punch_item.device_id`, then the item's `resolution`, `resolved_by_id`, `resolved_at` and
  * `state = resolved`.
+ *
+ * A cable item it left on its device only (T119: its text names no single end) waits with
+ * `lint_id = import.punch_end_unmatched` (T122): Needs review puts it on one end of its device
+ * with the codes it names (`setPunchEnd`, a `Reconcile` set on `punch_item.cable_end_id`) or keeps
+ * it on the device. An item about two runs goes on one of them; the other run gets its own Run
+ * draft (D220).
  */
 
 import type { Editor } from './editor';
@@ -21,6 +27,8 @@ import { roleOfCategory, type Role } from './roles';
 
 /** `review_item.subject.lint_id` of an imported punch row linked to no device. */
 export const PUNCH_DEVICE_LINT = 'import.punch_device_unmatched';
+/** `review_item.subject.lint_id` of an imported cable item on its device but no end (T122). */
+export const PUNCH_END_LINT = 'import.punch_end_unmatched';
 
 /** Roles named by their device alone (D136, D151); so is any device with a panel name. */
 const NAME_ONLY_ROLES: readonly Role[] = ['relay_panel', 'equipment_rack', 'nsps'];
@@ -70,6 +78,17 @@ export function isPunchDeviceItem(item: Pick<ReviewItem, 'kind' | 'subject'>): b
   return item.kind === 'lint' && item.subject?.entity_kind === 'punch_item' && (item.subject as { lint_id?: string }).lint_id === PUNCH_DEVICE_LINT;
 }
 
+/** An open "put this cable item on its end" review item (T122). */
+export function isPunchEndItem(item: Pick<ReviewItem, 'kind' | 'subject'>): boolean {
+  return item.kind === 'lint' && item.subject?.entity_kind === 'punch_item' && (item.subject as { lint_id?: string }).lint_id === PUNCH_END_LINT;
+}
+
+/** The cable codes a `PUNCH_END_LINT` item names (`subject.codes`); empty when it names none. */
+export function punchEndCodes(item: Pick<ReviewItem, 'subject'>): string[] {
+  const codes = (item.subject as { codes?: unknown }).codes;
+  return Array.isArray(codes) ? codes.filter((c): c is string => typeof c === 'string') : [];
+}
+
 export interface LinkPunchResult {
   reason: string;
   /** Every op applied: the punch item's `device_id`, then the review item's fields. */
@@ -101,21 +120,60 @@ export async function linkPunchDevice(
 
   const master = s(punch.device_text);
   const reason = `Review: linked punch item to ${opts.deviceLabel}${master ? ` (master: "${master}")` : ''}`;
-  const head = async (id: string, field: string) => (await officialHead(store, id, field))?.op_id ?? null;
   const ops = await editor.group({ change_type: 'Reconcile', reason }, async (g) => {
-    const set = await g.reconcileSet('punch_item', punchId, 'device_id', deviceId, await head(punchId, 'device_id'));
-    const resolution: Resolution = {
-      choice: 'link',
-      value: deviceId,
-      reason,
-      reconcile_op_ids: [set.op_id],
-      rejected_op_ids: [],
-      superseded_op_ids: [],
-    };
-    await g.reconcileSet('review_item', itemId, 'resolution', resolution, await head(itemId, 'resolution'));
-    await g.reconcileSet('review_item', itemId, 'resolved_by_id', editor.userId, await head(itemId, 'resolved_by_id'));
-    await g.reconcileSet('review_item', itemId, 'resolved_at', (opts.now ?? (() => new Date().toISOString()))(), await head(itemId, 'resolved_at'));
-    await g.reconcileSet('review_item', itemId, 'state', 'resolved', await head(itemId, 'state'));
+    const set = await g.reconcileSet('punch_item', punchId, 'device_id', deviceId, await headOf(editor, punchId, 'device_id'));
+    await closeItem(g, editor, itemId, { choice: 'link', value: deviceId, reason, reconcile_op_ids: [set.op_id], rejected_op_ids: [], superseded_op_ids: [] }, opts.now);
+  });
+  return { reason, ops };
+}
+
+const headOf = async (editor: Editor, id: string, field: string) => (await officialHead(editor.store, id, field))?.op_id ?? null;
+
+type Group = Parameters<Parameters<Editor['group']>[1]>[0];
+
+/** The review item's resolution, who and when, and `state = resolved`, in the caller's group. */
+async function closeItem(g: Group, editor: Editor, itemId: string, resolution: Resolution, now?: () => string): Promise<void> {
+  await g.reconcileSet('review_item', itemId, 'resolution', resolution, await headOf(editor, itemId, 'resolution'));
+  await g.reconcileSet('review_item', itemId, 'resolved_by_id', editor.userId, await headOf(editor, itemId, 'resolved_by_id'));
+  await g.reconcileSet('review_item', itemId, 'resolved_at', (now ?? (() => new Date().toISOString()))(), await headOf(editor, itemId, 'resolved_at'));
+  await g.reconcileSet('review_item', itemId, 'state', 'resolved', await headOf(editor, itemId, 'state'));
+}
+
+/**
+ * Put the cable item of a `import.punch_end_unmatched` review item on `endId` — an end of the
+ * item's own device — or, with `endId = null`, keep it on the device; either closes the review
+ * item, as one `Reconcile` group (T122). `endLabel` names the end in the reason ("C-07").
+ */
+export async function setPunchEnd(
+  editor: Editor,
+  itemId: string,
+  endId: string | null,
+  opts: { endLabel?: string; now?: () => string } = {},
+): Promise<LinkPunchResult> {
+  const store = editor.store;
+  const item = await getReviewItem(store, itemId);
+  if (!item || item.deleted_at) throw new ReviewError(`Unknown review item ${itemId}`);
+  if (!isPunchEndItem(item)) throw new ReviewError('Not a cable item waiting for its end');
+  if (item.state !== 'open') throw new ReviewError(`Review item ${itemId} is already ${item.state}`);
+  const punchId = item.subject.entity_id;
+  const punch = await store.get<Record<string, unknown>>('punch_item', punchId);
+  if (!punch) throw new ReviewError('That punch item is not on this iPad');
+  const text = s(punch.item);
+  if (endId == null) {
+    const reason = `Review: punch item kept on its device, on no connection end${text ? ` ("${text}")` : ''}`;
+    const ops = await editor.group({ change_type: 'Reconcile', reason }, (g) =>
+      closeItem(g, editor, itemId, { choice: 'keep', reason, reconcile_op_ids: [], rejected_op_ids: [], superseded_op_ids: [] }, opts.now),
+    );
+    return { reason, ops };
+  }
+  const end = await store.get<Record<string, unknown>>('cable_end', endId);
+  if (!end || end.deleted_at) throw new ReviewError('That connection end is not on this iPad');
+  if (!punch.device_id || end.device_id !== punch.device_id) throw new ReviewError("The connection end is not on the punch item's device");
+  const label = opts.endLabel ?? (s(end.display_id) || 'its connection end');
+  const reason = `Review: put punch item on ${label}${text ? ` ("${text}")` : ''}`;
+  const ops = await editor.group({ change_type: 'Reconcile', reason }, async (g) => {
+    const set = await g.reconcileSet('punch_item', punchId, 'cable_end_id', endId, await headOf(editor, punchId, 'cable_end_id'));
+    await closeItem(g, editor, itemId, { choice: 'link', value: endId, reason, reconcile_op_ids: [set.op_id], rejected_op_ids: [], superseded_op_ids: [] }, opts.now);
   });
   return { reason, ops };
 }

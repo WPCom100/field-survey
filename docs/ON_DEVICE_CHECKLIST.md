@@ -651,6 +651,17 @@ Decision D219: the Rules tab offers one reword ruling per field (not per new val
 - [ ] **Rulings.** New ruling → Where **Connection end** → condition on **Cable**: the suggestion chips end with `DX`. → saw:
 - [ ] **Search.** With a `DX` connection on the level, type `dx` in the plan's search: the Conns tab shows the DX run only (not a connection whose text merely contains "dx"). The dashboard's project search does the same. → saw:
 
+## T122 — Needs review: put an imported cable item on its end  ·  Needs: no new build (JS update; server deploy first). Only on a project imported **after** this deploy (a scratch import of the master)
+
+**Why it matters:** ten master items name no single connection ("Run 2x DMX cables to Lvl 9 & 6M Equipment Rack", "Terminate DMX" on a panel with two DMX runs…). Until they sit on a connection the rules can draft a second Run / Terminate item for the same run.
+
+- [ ] **Listed.** Import the master into a scratch project. Needs review → Lint shows 10 rows reading "X item → which connection?" (one "U item"). → saw:
+- [ ] **The ends offered.** Open 06M "Punch #2 Run 2x DMX cables to Lvl 9 & 6M Equipment Rack": the panel shows the device (06M-02 · CT06LCPB) and two choices, **C-07** · X · DMX to Level 09 and **C-12** · X · DMX to equipment rack — not the panic or 0-10V ends. → saw:
+- [ ] **Put on.** Tap C-07, confirm: the row leaves the list; the item, on the plan's punch list, still reads the master's text and number. On CT06LCPB's card, C-07 shows no Run draft of its own; C-12, if it is still not run, keeps its own Run draft (accept or reject it as usual). History shows one Reconcile change. → saw:
+- [ ] **Keep.** Open 03 "Terminate DMX" on a UFMP4: it says the device has no X connection; tap **Keep on the device**: the row leaves the list and the item is unchanged. → saw:
+
+Decision D220 (Landry, "One end, no split"): an item about two runs goes on one end you pick and keeps its number and text; the other run gets its own Run draft. → Recorded.
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

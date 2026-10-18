@@ -262,7 +262,11 @@ def test_master_seed_import(session, store, factory, client):
     assert v.device("06M-04").category == "Foundry panel"
     assert v.count(Device, Device.status.is_(None)) == 0
     # every value in the master is in its list: the only lint items are D148's unlinked punch rows
-    assert {r.subject["lint_id"] for r in v.reviews("lint")} == {seed_import.PUNCH_DEVICE_LINT}
+    # and T122's cable items without their end
+    assert {r.subject["lint_id"] for r in v.reviews("lint")} == {
+        seed_import.PUNCH_DEVICE_LINT,
+        seed_import.PUNCH_END_LINT,
+    }
 
     # --- connections: single-row cables
     a = v.end("B2", "C-02")  # 0-10V
@@ -394,6 +398,7 @@ def test_master_seed_import(session, store, factory, client):
         and r.subject["field"] == "device_id"
         and r.subject["entity_kind"] == "punch_item"
         for r in v.reviews("lint")
+        if r.subject["lint_id"] == seed_import.PUNCH_DEVICE_LINT
     )
     assert str(neuron.id) not in {e for _, e in unlinked}
     assert v.punch("01", 37).device_id is None  # two stations named
@@ -415,6 +420,38 @@ def test_master_seed_import(session, store, factory, client):
     assert len(unmatched) == stats["punch_end_unmatched"] == 10
     assert any(c.startswith("Punch List 06M #2:") and "several runs" in c for c in unmatched)
     assert any(c.startswith("Punch List 06M #12:") and "C-09, C-13" in c for c in unmatched)
+    # T122: each waits on Needs review for its end, with its device's ends of the codes it names
+    end_items = {
+        r.subject["entity_id"]: r
+        for r in v.reviews("lint")
+        if r.subject["lint_id"] == seed_import.PUNCH_END_LINT
+    }
+    assert len(end_items) == 10
+    assert all(
+        r.state == "open" and r.subject["field"] == "cable_end_id" and r.level_id is not None
+        for r in end_items.values()
+    )
+
+    def offered(code: str, n: int) -> tuple[list[str], list[str]]:
+        r = end_items[str(v.punch(code, n).id)]
+        return r.subject["codes"], [
+            c["label"].split()[0] for c in r.candidates if c["side"] == "end"
+        ]
+
+    assert end_items[str(v.punch("06M", 2).id)].candidates[0] == {
+        "side": "import",
+        "value": "Run 2x DMX cables to Lvl 9 & 6M Equipment Rack",
+    }
+    assert offered("06M", 2) == (["X"], ["C-07", "C-12"])  # two runs: one is picked (D220)
+    assert offered("06M", 12) == (["X"], ["C-09", "C-13"])
+    assert offered("B2", 6) == (["U"], ["C-06", "C-08"])
+    assert offered("03", 10) == (["X"], [])  # the UFMP4 has no DMX end of its own
+    c07 = next(c for c in end_items[str(v.punch("06M", 2).id)].candidates if c["side"] == "end")
+    assert c07 == {
+        "side": "end",
+        "value": str(v.end("06M", "C-07").id),
+        "label": "C-07 DMX to Level 09",
+    }
     loose_kits = [c for c in checks if "reaches no connection end" in c]
     assert len(loose_kits) == stats["part_end_unmatched"] == 9  # P-NSPS-D-KIT is no term kit
     assert any(c.startswith("Missing Parts 06M #13:") for c in loose_kits)

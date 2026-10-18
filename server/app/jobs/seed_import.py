@@ -50,6 +50,8 @@ IMPORT_CHANGE_TYPE = "Master edit"
 NEURON_ITEM = "Missing all Device Neuron IDs"
 # `review_item(lint)` for a punch row linked to no device (D148); the iPad offers Link / Create
 PUNCH_DEVICE_LINT = "import.punch_device_unmatched"
+# T122: a cable item left on its device only waits on Needs review for its end (one end, D220)
+PUNCH_END_LINT = "import.punch_end_unmatched"
 UNSURVEYED = "Unsurveyed"
 BUS_LABEL = "Stations & Sensors"
 POWER_LABEL = "120v Power"
@@ -279,6 +281,15 @@ class Dev:
     type: str | None
     room: str | None
     panel: str | None
+
+
+@dataclass
+class EndMiss:
+    """T122: a cable item that names no single end of its device — the codes it names and the
+    device's ends with them, for its Needs review item."""
+
+    codes: frozenset[str]
+    candidates: list["End"]
 
 
 @dataclass
@@ -938,7 +949,8 @@ class Builder:
             pid = uuid7()
             item = row.get("item")
             dev = self.device_for_label(row.get("device"), lv.code)
-            end = self.punch_end_for(dev, item, f"Punch List {lv.code} #{number}")
+            found = self.punch_end_for(dev, item, f"Punch List {lv.code} #{number}")
+            end = found if isinstance(found, End) else None
             if end is not None:
                 self.punch_end[pid] = end.id
             self.create(
@@ -985,34 +997,39 @@ class Builder:
             self.punch_by_key[(lv.numbering_group_id, number)] = pid
             if dev is None and row.get("device") and item != NEURON_ITEM:
                 self.punch_device_review(pid, lv, row.get("device"))
+            if isinstance(found, EndMiss):
+                self.punch_end_review(pid, lv, item, found)
             for n in photo_numbers(row.get("photo")):
                 self.punch_photo_refs.setdefault((lv.numbering_group_id, n), []).append(pid)
             self.count("punch_items")
 
-    def punch_end_for(self, dev: Dev | None, item: str | None, where: str) -> End | None:
+    def punch_end_for(self, dev: Dev | None, item: str | None, where: str) -> End | EndMiss | None:
         """T119: the one end of `dev` a cable item names — "Run DMX to B3A Canyon" ↔ C-09 "DMX to
         B3A Canyon", "Land 0-10V control wiring" ↔ its only 0-10V end. The item's verb says it is
         about a cable (Run / Pull / Terminate / Land …) and it names one signal; of the device's
         ends with that code, the one whose To text the item's destination matches (the same words,
         a plural `s` aside, one set inside the other), else the only one. A cable item naming
-        none, or several (two signals, two destinations, two candidates), stays device-only and
-        is listed in the checks."""
+        none, or several (two signals, two destinations, two candidates), stays device-only, is
+        listed in the checks and comes back as an `EndMiss` for its Needs review item (T122)."""
         if dev is None or not item or not CABLE_VERB_RE.match(item.strip()):
             return None
         codes = item_signals(item)
         if codes is None:
             return None
         label = f"{where}: {item!r} on {dev.display_id}"
+        signals = frozenset().union(*codes)
         if len(codes) > 1:
             self.end_unmatched(f"{label} names several signals; linked to the device only")
-            return None
+            return EndMiss(
+                signals, [e for e in self.ends_by_device.get(dev.id, []) if e.code in signals]
+            )
         (code,) = codes
         candidates = [e for e in self.ends_by_device.get(dev.id, []) if e.code in code]
         m = DESTINATION_RE.search(item)
         destination = re.sub(r"\([^)]*\)", " ", m.group(1)) if m else None
         if destination and SEVERAL_RE.search(destination):
             self.end_unmatched(f"{label} names several runs; linked to the device only")
-            return None
+            return EndMiss(signals, candidates)
         hits = candidates
         if destination and (want := word_set(destination)):
             named = [
@@ -1029,11 +1046,40 @@ class Builder:
             f"{label} names no single connection end (candidates: {found}); "
             "linked to the device only"
         )
-        return None
+        return EndMiss(signals, hits or candidates)
 
     def end_unmatched(self, check: str) -> None:
         self.count("punch_end_unmatched")
         self.checks.append(check)
+
+    def punch_end_review(
+        self, pid: uuid.UUID, lv: LevelRef, item: str | None, miss: EndMiss
+    ) -> None:
+        """T122: a cable item left on its device waits on Needs review, where a person puts it on
+        one of its device's ends with the codes it names (`candidates`, as imported; the iPad
+        lists the device's ends live) or keeps it on the device. An item about two runs goes on
+        one of them; the other run gets its own Run draft (D220)."""
+        self.review(
+            "lint",
+            lv.level_id,
+            {
+                "entity_kind": "punch_item",
+                "entity_id": str(pid),
+                "field": "cable_end_id",
+                "level_id": str(lv.level_id),
+                "lint_id": PUNCH_END_LINT,
+                "codes": sorted(miss.codes),
+            },
+            [{"side": "import", "value": item}]
+            + [
+                {
+                    "side": "end",
+                    "value": str(e.id),
+                    "label": f"{e.display_id} {e.to_text or ''}".strip(),
+                }
+                for e in miss.candidates
+            ],
+        )
 
     def punch_device_review(self, pid: uuid.UUID, lv: LevelRef, text: str) -> None:
         """D148: a Punch List row whose Device text links to no single device (no match, a room,

@@ -1,4 +1,4 @@
-import { LIBRARY_STREAM, Editor, linkPunchDevice, resolutionReason, type ResolveChoice, type Store } from '@field-survey/core';
+import { LIBRARY_STREAM, Editor, linkPunchDevice, resolutionReason, setPunchEnd, type ResolveChoice, type Store } from '@field-survey/core';
 import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -19,6 +19,7 @@ import {
   shortStamp,
   type FindingRow,
   type PunchDeviceReview,
+  type PunchEndReview,
   type ReviewDetail,
   type ReviewList,
   type ReviewRow,
@@ -176,6 +177,30 @@ export default function NeedsReviewScreen() {
     [editor, detail],
   );
 
+  const putOnEnd = useCallback(
+    (endId: string | null, endLabel: string | null) => {
+      if (!editor || !detail) return;
+      const run = () =>
+        setPunchEnd(editor, detail.item.id, endId, endLabel ? { endLabel } : {}).then(
+          (r) => {
+            logTo('sync', 'info', 'punch_end_set', { item: detail.item.id, end: endId });
+            setNote(r.reason);
+            setTick((n) => n + 1);
+          },
+          (e: unknown) => setNote(`Not changed: ${String((e as Error)?.message ?? e)}`),
+        );
+      Alert.alert(
+        endId ? 'Put on this connection' : 'Keep on the device',
+        endId ? `Put this punch item on ${endLabel ?? 'that connection'}? It then stands for that run's item (no second draft there).` : 'Keep this punch item on its device, on no connection?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: endId ? 'Put on' : 'Keep', onPress: () => void run() },
+        ],
+      );
+    },
+    [editor, detail],
+  );
+
   const total = list?.tabs.find((t) => t.kind === 'all')?.count ?? 0;
   const extractionLine =
     drafts && drafts.devices + drafts.cables > 0 && (kind === 'all' || kind === 'extraction') && projectId && projectId !== LIBRARY_STREAM ? (
@@ -264,6 +289,8 @@ export default function NeedsReviewScreen() {
         <ScrollView style={styles.panel} contentContainerStyle={{ padding: 16, gap: 12 }}>
           {detail?.punchDevice && store && editor && projectId ? (
             <PunchDevicePanel detail={detail} review={detail.punchDevice} store={store} editor={editor} projectId={projectId} onLink={linkPunch} />
+          ) : detail?.punchEnd ? (
+            <PunchEndPanel detail={detail} review={detail.punchEnd} canEdit={!!editor} onPut={putOnEnd} />
           ) : detail ? (
             <Panel detail={detail} canEdit={!!editor} onResolve={resolve} />
           ) : (
@@ -489,6 +516,49 @@ function PunchDevicePanel(props: {
               </Text>
             </Pressable>
           ))}
+        </>
+      )}
+    </>
+  );
+}
+
+function PunchEndPanel(props: { detail: ReviewDetail; review: PunchEndReview; canEdit: boolean; onPut: (endId: string | null, endLabel: string | null) => void }) {
+  const { detail: d, review: r } = props;
+  const open = d.item.state === 'open';
+  const linked = r.linkedTo ? r.ends.find((x) => x.id === r.linkedTo) : null;
+  const what = r.codes.length ? r.codes.join(' / ') : 'cable';
+  return (
+    <>
+      <Text style={styles.panelTitle}>Cable item without its connection — {r.levelCode}</Text>
+      <Text style={styles.value}>{r.punch}</Text>
+      <View style={styles.side}>
+        <Text style={styles.sub}>On device</Text>
+        <Text style={styles.value}>{r.device}</Text>
+      </View>
+      {!open ? (
+        <Text style={styles.sub}>
+          This item is {d.item.state}
+          {linked ? `: on ${linked.label}${linked.to ? ` · ${linked.to}` : ''}` : d.item.resolution?.choice === 'keep' ? ': kept on the device' : ''}.
+        </Text>
+      ) : (
+        <>
+          <Text style={styles.sub}>
+            The import could not tell which {what} connection of this device the item is about. Put it on one: the rules then treat it as that run&apos;s item and draft no
+            second one there. An item about two runs goes on one of them; the other run gets its own Run draft on the card. Or keep it on the device.
+          </Text>
+          <Text style={styles.sideTitle}>Put on a {what} connection</Text>
+          {r.ends.length === 0 ? <Text style={styles.sub}>This device has no {what} connection. Keep it on the device, or add the connection on the card and come back.</Text> : null}
+          {r.ends.map((x) => (
+            <Pressable key={x.id} onPress={() => props.onPut(x.id, x.label)} style={styles.pick} accessibilityRole="button" disabled={!props.canEdit}>
+              <Text style={styles.pickId}>{x.label}</Text>
+              <Text style={styles.pickText} numberOfLines={1}>
+                {[x.code, x.to].filter(Boolean).join(' · ')}
+              </Text>
+            </Pressable>
+          ))}
+          <View style={styles.btnRow}>
+            <Btn label="Keep on the device" onPress={() => props.onPut(null, null)} disabled={!props.canEdit} />
+          </View>
         </>
       )}
     </>

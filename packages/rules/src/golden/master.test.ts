@@ -396,7 +396,7 @@ async function ruleFindings(m: Master, labels?: Labels) {
 describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing ? ' — SKIPPED: fixtures/master-ops.json is missing (run server/tests/dump_master_ops.py)' : ''}`, () => {
   it('replays the import cleanly into a Node store with the master\'s counts', async () => {
     const m = await openMaster();
-    expect(m.outcomes).toEqual({ applied: 1076, recorded: 375 }); // the project's create + 1,075 import ops (7 numbering groups among them); 375 historical ops recorded, never materialised (Change Log, D124)
+    expect(m.outcomes).toEqual({ applied: 1086, recorded: 375 }); // the project's create + 1,085 import ops (T122: the 10 end review items) (7 numbering groups among them); 375 historical ops recorded, never materialised (Change Log, D124)
     const snap = await m.engine.loadSnapshot();
     expect(snap.project?.name).toBe('Tower');
     expect(snap.levels.map((l) => l.level).sort()).toEqual(['01', '02', '03', '04', '06', '06M', 'B1', 'B2']);

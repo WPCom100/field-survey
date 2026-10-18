@@ -82,10 +82,14 @@ export {
 } from './review';
 export {
   PUNCH_DEVICE_LINT,
+  PUNCH_END_LINT,
   defaultDeviceText,
   punchDeviceText,
   isPunchDeviceItem,
+  isPunchEndItem,
+  punchEndCodes,
   linkPunchDevice,
+  setPunchEnd,
   type DeviceForText,
   type LinkPunchResult,
 } from './punch';
