@@ -101,7 +101,8 @@ export type CableDraftRow = {
   codeGuess: CodeGuess | null;
 };
 
-export type CodeGuess = { value: string; confidence: number | null; source: 'label' | 'model' | null };
+/** A riser line's guessed code (D194); `reason` `load` — a load-circuit label, 120V to Fixtures (D221). */
+export type CodeGuess = { value: string; confidence: number | null; source: 'label' | 'model' | null; reason: 'load' | null };
 
 export type Mismatch = { draftId: string; kind: 'device' | 'cable'; text: string };
 
@@ -289,7 +290,7 @@ export function codeGuessOf(raw: unknown): CodeGuess | null {
   const g = (json<unknown[]>(raw) ?? []).find((v): v is Record<string, unknown> => !!v && typeof v === 'object' && (v as Record<string, unknown>).side === 'code');
   const value = str(g?.value);
   if (!g || !value) return null;
-  return { value, confidence: num(g.confidence), source: g.source === 'label' || g.source === 'model' ? g.source : null };
+  return { value, confidence: num(g.confidence), source: g.source === 'label' || g.source === 'model' ? g.source : null, reason: g.reason === 'load' ? 'load' : null };
 }
 
 /** The candidates list with `pick` as the side's chosen endpoint (added when it was not a candidate); null clears the choice. */
@@ -338,7 +339,7 @@ export function cableMismatches(c: CableDraftRow): string[] {
     if (k === 'endpoint:unresolved') out.push(`${what}: far end not found — pick it`);
     else if (k === 'endpoint:low_confidence') out.push(`${what}: far end "${c.toLabel ?? '?'}" is a guess (${pct(c.confidence)}) — check the crop`);
     else if (k === 'code:unknown' && c.state === 'proposed') {
-      const guess = c.codeGuess ? ` (guess: ${c.codeGuess.value})` : '';
+      const guess = c.codeGuess ? ` (guess: ${c.codeGuess.value}${c.codeGuess.reason === 'load' ? ' (load circuits)' : ''})` : '';
       out.push(`A riser line with no wire code from ${c.fromLabel ?? '?'}${c.toLabel ? ` → "${c.toLabel}"` : ''} — what is it?${guess}`);
     }
   }

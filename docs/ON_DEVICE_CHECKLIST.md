@@ -603,6 +603,17 @@ Decision D220 (Landry, "One end, no split"): an item about two runs goes on one 
 
 Decision D223: type lookups are indexed, a library change re-runs every project's rules (never the stream), pulled pages are applied 100 ops per transaction, and the Sync screen shows a per-cycle timing line. → Approve / change:
 
+## T132 — Riser load-circuit lines are guessed 120V to Fixtures  ·  Needs: no new build (JS update; server deploy first). Only on a riser uploaded **after** this deploy (a new Pipeline-style project, or a revised riser)
+
+**Why it matters:** in the 2026-10-18 round (C-33) you ruled "Load ckts means 120v to fixtures. Always." (D221). A `TO LOAD CKTS` line used to arrive with no guess and To "— pick", and the sheet told you to reject it.
+
+- [ ] **The guess.** Review drafts → Cables, level 03: the two `TO LOAD CKTS` lines (CT03LCPA, CT03LCPB) and the UFMP4's `TO LOAD` read "Guess: 120V (load circuits) to Fixtures (50%, from the text at the line's end) — not applied until you pick it"; the chip reads **120V ?**; To shows **Fixtures (placeholder)**. → saw:
+- [ ] **Still a question.** Accept is greyed with "Pick the cable code." until you tap 120V; Accept all ≥ 0.9 leaves these lines open; Needs review's mismatch list reads "… → "TO LOAD CKTS" — what is it? (guess: 120V (load circuits))". → saw:
+- [ ] **Accept makes the panel's row.** Tap 120V → Confirm on CT03LCPB's load line, and accept its 120V feed arrow too. Once CT03LCPB is placed its card shows a 120V row `CT03LCPB → Fixtures` and, separately, the feed: two 120V rows, not one. → saw:
+- [ ] **Reject still works.** Reject another load line with a reason: ✗, no cable. → saw:
+
+Decision D224 (Claude, from D221): Foundry panels' `TO LOAD` counts as a load-circuit label; the model's guess never replaces it; the accepted row reads `<panel> → Fixtures` and is matched by its two ends only. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

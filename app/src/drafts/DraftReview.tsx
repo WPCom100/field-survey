@@ -542,7 +542,8 @@ function CablePanel({
           <Text style={w.label}>What is this cable? Pick its code</Text>
           {c.codeGuess ? (
             <Text style={styles.dim}>
-              Guess: {c.codeGuess.value} ({pct(c.codeGuess.confidence)}, {c.codeGuess.source === 'label' ? 'from the text at the line’s end' : 'the model’s reading'}) — not applied until you pick it.
+              Guess: {c.codeGuess.value}
+              {c.codeGuess.reason === 'load' ? ' (load circuits) to Fixtures' : ''} ({pct(c.codeGuess.confidence)}, {c.codeGuess.source === 'label' ? 'from the text at the line’s end' : 'the model’s reading'}) — not applied until you pick it.
             </Text>
           ) : null}
           <View style={styles.chips}>
@@ -550,7 +551,7 @@ function CablePanel({
               <Chip key={k} label={k === c.codeGuess?.value && c.code !== k ? `${k} ?` : k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, c.id, k, data.codes))} />
             ))}
           </View>
-          <Text style={styles.dim}>Not a cable to survey (a load or sense feed)? Reject it with a reason. A 0-10V or 120V line becomes the device’s library row, never a second one.</Text>
+          <Text style={styles.dim}>A load-circuit line is the panel’s 120V to Fixtures. Not a cable to survey (a sense feed, something by others)? Reject it with a reason. A 0-10V or 120V line becomes the device’s library row, never a second one.</Text>
         </View>
       ) : null}
       <Text style={styles.dim}>

@@ -135,6 +135,14 @@ GUESS_PLACEHOLDERS: dict[str, tuple[str, str]] = {
 """The library's far end for a guessed code (R2c / R2d, D52): offered as the To candidate so an
 accepted line meets the library's row for the same device (D194)."""
 
+LOAD_LABEL_RE = re.compile(r"^(?:TO\s+)?LOAD(?:\s+(?:CKTS?|CIRCUITS?))?$")
+"""A line's text naming its panel's load circuits — the relay panels' `TO LOAD CKTS`, the
+Foundry panels' `TO LOAD`: that panel's 120V load wiring to the fixtures (D221)."""
+
+LOAD_GUESS = "120V"
+LOAD_PLACEHOLDER = ("Fixtures", "fixtures")
+"""A load-circuit line's guess and its far end (D221), whatever the model guessed."""
+
 ROW_GAP_PT = 2.5
 RUN_GAP_PT = 14.0
 """Tokens further apart than this on one row are separate labels."""
@@ -365,6 +373,7 @@ class Line:
     guess: str | None = None  # a code from GUESS_CODES, never written as the code
     guess_confidence: float = 0.0
     guess_source: str | None = None  # label | model
+    guess_reason: str | None = None  # load: a load-circuit label, 120V to Fixtures (D221)
     confidence: float = 0.0
     endpoint_source: str | None = None  # geometry | model
     note: str | None = None
@@ -1209,8 +1218,16 @@ def _label_at(points: list[tuple[float, float]], runs: list[list[Tok]]) -> str |
     return " ".join(_text(r) for r in block)
 
 
+def is_load_label(label: str | None) -> bool:
+    """`TO LOAD CKTS` / `TO LOAD` / `LOAD CKTS`: the panel's load circuits (D221)."""
+    return bool(LOAD_LABEL_RE.match(re.sub(r"\s+", " ", (label or "").strip().upper())))
+
+
 def label_guess(label: str | None) -> str | None:
-    """A code the line's own text names (`TO 0-10V CONTROL`, `120V`), else None."""
+    """A code the line's own text names (`TO 0-10V CONTROL`, `120V`; a load-circuit label is
+    `120V`, D221), else None."""
+    if is_load_label(label):
+        return LOAD_GUESS
     t = (label or "").upper()
     return next((code for pat, code in LABEL_GUESSES if pat.search(t)), None)
 
@@ -1364,6 +1381,7 @@ def lines_of(
                 guess=guess,
                 guess_confidence=LABEL_GUESS_CONFIDENCE if guess else 0.0,
                 guess_source="label" if guess else None,
+                guess_reason="load" if is_load_label(e["label"]) else None,
                 confidence=TEXT_CONFIDENCE if to else LABEL_GUESS_CONFIDENCE,
                 endpoint_source="geometry",
             )
@@ -1983,7 +2001,11 @@ def apply_lines(
             ln.to_level_code = bx.norm_level(str(item["to_level_code"]))
         ln.label = ln.label or item.get("label") or None
         guess = item.get("code_guess")
-        if guess in GUESS_CODES:
+        if is_load_label(ln.label):
+            # a load-circuit line is 120V to Fixtures, always (D221): the model does not change it
+            ln.guess, ln.guess_source, ln.guess_reason = LOAD_GUESS, "label", "load"
+            ln.guess_confidence = ln.guess_confidence or LABEL_GUESS_CONFIDENCE
+        elif guess in GUESS_CODES:
             ln.guess, ln.guess_confidence, ln.guess_source = guess, conf, "model"
         ln.confidence = conf
         ln.endpoint_source = "model"
@@ -2721,10 +2743,13 @@ class _Build:
                         "value": b.guess,
                         "confidence": round(b.guess_confidence, 3),
                         "source": b.guess_source,
+                        **({"reason": b.guess_reason} if b.guess_reason else {}),
                     }
                 )
-                # the library's far end for that code (D194): an accepted line meets R2c / R2d
-                far_end = GUESS_PLACEHOLDERS.get(b.guess)
+                # the library's far end for that code (D194): an accepted line meets R2c / R2d;
+                # a load-circuit line's is the fixtures (D221)
+                load = b.guess_reason == "load"
+                far_end = LOAD_PLACEHOLDER if load else GUESS_PLACEHOLDERS.get(b.guess)
                 if far_end and frm is not None and not any(c["side"] == "to" for c in candidates):
                     candidates.append(
                         {

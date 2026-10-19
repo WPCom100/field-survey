@@ -662,8 +662,15 @@ def test_lines_with_no_bubble(analysed):
         }
     )
     guesses = Counter(ln.guess for ln in s1.lines)
-    assert guesses == {"0-10V": 14, "120V": GUESS_120V, None: LINES_001 - 14 - GUESS_120V}
+    n120 = GUESS_120V + LOADS_001
+    assert guesses == {"0-10V": 14, "120V": n120, None: LINES_001 - 14 - n120}
     assert all(ln.guess_confidence == rx.LABEL_GUESS_CONFIDENCE for ln in s1.lines if ln.guess)
+    # a load-circuit line is 120V to Fixtures (D221): the relay panels' TO LOAD CKTS and the
+    # Foundry panels' TO LOAD, nothing else
+    loads = [ln for ln in s1.lines if ln.guess_reason == "load"]
+    assert len(loads) == LOADS_001 and all(ln.guess == "120V" for ln in loads)
+    assert {ln.label for ln in loads} == {"TO LOAD CKTS", "TO LOAD"}
+    assert sum(1 for ln in l03.values() if ln.guess_reason == "load") == 3
     # the prompt lists them for the model
     crop = rx.band_crop(FIXTURE.read_bytes(), s1, band(analysed, "03"))
     prompt = rx.band_prompt(s1, band(analysed, "03"), crop, list(TOWER_LEVELS))
@@ -686,15 +693,40 @@ def test_lines_with_no_bubble(analysed):
     ]
     to = next(c for c in row["candidates"] if c["side"] == "to")
     assert to["kind"] == "placeholder" and to["label"] == "Fixtures"
+    fixtures = to
     assert row["source_ref"]["line"] and row["source_ref"]["bbox"][2] > 0
-    load = next(c for c in lines if (c.source_ref["label"] or "") == "TO LOAD CKTS")
-    assert not any(c["side"] == "code" for c in load.candidates)
-    assert "endpoint:unresolved" not in load.conflicts and load.to_label == "TO LOAD CKTS"
+    # the load lines on 03 carry the guess and the Fixtures placeholder; still a question (D194)
+    loads03 = [
+        c
+        for c in lines
+        if c.level_code == "03" and (c.source_ref["label"] or "") in ("TO LOAD CKTS", "TO LOAD")
+    ]
+    assert sorted(c.from_label for c in loads03) == ["CT03LCPA", "CT03LCPB", "UFMP4"]
+    for load in loads03:
+        assert load.code is None and "code:unknown" in load.conflicts
+        assert {
+            "side": "code",
+            "value": "120V",
+            "confidence": 0.5,
+            "source": "label",
+            "reason": "load",
+        } in load.candidates
+        to = [c for c in load.candidates if c["side"] == "to"]
+        assert len(to) == 1 and to[0]["kind"] == "placeholder" and to[0]["label"] == "Fixtures"
+        assert to[0]["id"] == fixtures["id"]  # the one Fixtures placeholder, as the 0-10V's
+        assert "endpoint:unresolved" not in load.conflicts
+        assert load.to_label == load.source_ref["label"]  # what the riser reads stays
     assert res.stats()["code_guesses"]["0-10V"] == 14
+    assert res.stats()["code_guesses"]["120V"] == GUESS_120V + LOADS_001
 
 
 GUESS_120V = 35
 """Feed arrows under the panels, the UFMP 100-277V and the NSPS / rack 120V feeds."""
+
+
+LOADS_001 = 25
+"""Load-circuit arrows on sheet 001 (D221): 15 relay panels' `TO LOAD CKTS`, 10 Foundry
+panels' (UFMPs' and the LCPAs') `TO LOAD`."""
 
 
 def _no_ocr(_pdf: bytes, _page: int, **_kw) -> list[ocr.Word]:
@@ -1025,6 +1057,14 @@ def test_riser_job_with_claude_endpoints(session, store, factory):
     assert all(
         "code:unknown" in c.conflicts and c.source_ref["kind"] == "riser_line" for c in unknown
     )
+    # a load-circuit line is 120V to Fixtures on both sheets, the model-read 002 too (D221)
+    loads = [c for c in unknown if rx.is_load_label(c.source_ref.get("label"))]
+    assert {c.source_ref["sheet"] for c in loads} == {"001", "002"}, len(loads)
+    for c in loads:
+        code = [x for x in c.candidates if x["side"] == "code"]
+        to = [x for x in c.candidates if x["side"] == "to"]
+        assert [(x["value"], x.get("reason")) for x in code] == [("120V", "load")], c.source_ref
+        assert [x["label"] for x in to] == ["Fixtures"], c.source_ref
     # every line leaves a device on its own band: none passes through, none is written backwards
     assert all(any(x["side"] == "from" for x in c.candidates or []) for c in unknown)
     assert (

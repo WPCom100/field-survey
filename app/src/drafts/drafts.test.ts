@@ -428,24 +428,35 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
       from_label: 'Equipment Rack 18U', to_label: '1Ø, 2 WIRE + GND 120V / 60 Hz.', confidence: 0.5, conflicts: ['code:unknown', 'endpoint:low_confidence'], source_ref: lineRef('l41', '1Ø, 2 WIRE + GND 120V'),
       candidates: [{ side: 'from', kind: 'draft_device', id: ids.dRack, label: 'Equipment Rack 18U', confidence: 0.9 }, { side: 'code', value: '120V', confidence: 0.85, source: 'model' }, { side: 'to', kind: 'placeholder', id: power, label: '120v Power', confidence: 0.85 }],
     });
-    // a load arrow: no guess, no far end
-    const load = await line({ from_label: 'CT06LCPA', to_label: 'TO LOAD CKTS', confidence: 0.5, conflicts: ['code:unknown'], source_ref: lineRef('l35', 'TO LOAD CKTS'), candidates: [{ side: 'from', kind: 'draft_device', id: ids.dD, label: 'CT06LCPA', confidence: 0.9 }] });
-    return { ...s, fixtures, power, ctl, feed, load };
+    // a load arrow: the panel's load circuits, guessed 120V to Fixtures (D221)
+    const load = await line({
+      from_label: 'CT06LCPA', to_label: 'TO LOAD CKTS', confidence: 0.5, conflicts: ['code:unknown'], source_ref: lineRef('l35', 'TO LOAD CKTS'),
+      candidates: [{ side: 'from', kind: 'draft_device', id: ids.dD, label: 'CT06LCPA', confidence: 0.9 }, { side: 'code', value: '120V', confidence: 0.5, source: 'label', reason: 'load' }, { side: 'to', kind: 'placeholder', id: fixtures, label: 'Fixtures', confidence: 0.5 }],
+    });
+    // the panel's 120V feed arrow (the library's 120v Power far end)
+    const panelFeed = await line({
+      from_label: 'CT06LCPA', to_label: '(24) 20A. 120V CIRCUITS', confidence: 0.5, conflicts: ['code:unknown'], source_ref: lineRef('l37', '(24) 20A. 120V CIRCUITS'),
+      candidates: [{ side: 'from', kind: 'draft_device', id: ids.dD, label: 'CT06LCPA', confidence: 0.9 }, { side: 'code', value: '120V', confidence: 0.5, source: 'label' }, { side: 'to', kind: 'placeholder', id: power, label: '120v Power', confidence: 0.5 }],
+    });
+    return { ...s, fixtures, power, ctl, feed, load, panelFeed };
   }
 
   it('reads the guess, asks first and never takes the guess as the code', async () => {
-    const { store, ids, ctl, feed, load } = await withLines();
+    const { store, ids, ctl, feed, load, panelFeed } = await withLines();
     const data = await loadDraftReview(store, PROJECT);
     const c = row(data.cables, ctl);
     expect(c).toMatchObject({ code: null, unknownCode: true, flagged: true, codeGuess: { value: '0-10V', confidence: 0.5, source: 'label' } });
     expect(c.ends.to).toMatchObject({ kind: 'placeholder', label: 'Fixtures' });
     expect(c.sources[0]).toMatchObject({ kind: 'riser', label: 'Riser 001 · level 06M · line l36', bbox: [40, 70, 30, 9] });
-    expect(row(data.cables, feed).codeGuess).toEqual({ value: '120V', confidence: 0.85, source: 'model' });
-    expect(row(data.cables, load)).toMatchObject({ codeGuess: null, ends: { to: null } });
+    expect(row(data.cables, feed).codeGuess).toEqual({ value: '120V', confidence: 0.85, source: 'model', reason: null });
+    // a load-circuit line: 120V to Fixtures, still a question (D221, D194)
+    expect(row(data.cables, load)).toMatchObject({ code: null, unknownCode: true, codeGuess: { value: '120V', confidence: 0.5, source: 'label', reason: 'load' }, ends: { to: { kind: 'placeholder', label: 'Fixtures' } } });
+    expect(cableBlockers(row(data.cables, load))).toEqual(['Pick the cable code.']);
+    expect(bulkCables(data, ids.l06m).map((x) => x.id)).not.toContain(load);
     expect(cableBlockers(c)).toEqual(['Pick the cable code.']);
     // the open questions lead the level's cable list
-    expect(cablesOn(data, ids.l06m, 'open').slice(0, 3).map((x) => x.id).sort()).toEqual([ctl, feed, load].sort());
-    expect(mismatchList(data, ids.l06m).map((m) => m.text)).toContain('A riser line with no wire code from CT06LCPA → "TO LOAD CKTS" — what is it?');
+    expect(cablesOn(data, ids.l06m, 'open').slice(0, 4).map((x) => x.id).sort()).toEqual([ctl, feed, load, panelFeed].sort());
+    expect(mismatchList(data, ids.l06m).map((m) => m.text)).toContain('A riser line with no wire code from CT06LCPA → "TO LOAD CKTS" — what is it? (guess: 120V (load circuits))');
     expect(bulkCables(data, ids.l06m).map((x) => x.id)).not.toContain(ctl);
   });
 
@@ -502,10 +513,39 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
     expect(libraryRow('120V', realEnd(data, { kind: 'device', id: ids.panel, label: '', levelId: ids.l06m })!, realEnd(data, { kind: 'placeholder', id: power, label: '', levelId: null })!)).toBeNull(); // no 120V row on a relay panel
   });
 
+  it('Accept on a load-circuit line makes the panel’s 120V → Fixtures row, never linked to its 120V feed (D221)', async () => {
+    const { store, editor, ids, load, panelFeed, fixtures, power } = await withLines();
+    // the panel's feed first: a 120V cable on the panel, to 120v Power
+    await setCableCode(editor, panelFeed, '120V');
+    let data = await loadDraftReview(store, PROJECT);
+    const f = await acceptCable(editor, store, data, row(data.cables, panelFeed), { confirm: false });
+    expect(f).toMatchObject({ linked: false, waiting: false });
+    await setCableCode(editor, load, '120V');
+    data = await loadDraftReview(store, PROJECT);
+    const res = await acceptCable(editor, store, data, row(data.cables, load), { confirm: false, riserBlob: 'ef'.repeat(32) });
+    expect(res).toMatchObject({ linked: false, waiting: false });
+    expect(res.cableId).not.toBe(f.cableId);
+    expect(await store.get<Record<string, unknown>>('cable', res.cableId!)).toMatchObject({ cable: '120V', single_row: true, origin: 'riser', vertical: 'CT06LCPA 120V' });
+    const ends = await store.list<Record<string, unknown>>('cable_end', { where: 'cable_id = ?', params: [res.cableId], orderBy: 'side' });
+    expect(ends.map((e) => [e.side, e.device_id ?? e.placeholder_id, e.from_text, e.to_text])).toEqual([
+      ['A', ids.panel, 'CT06LCPA', 'Fixtures'],
+      ['B', fixtures, 'Fixtures', null],
+    ]);
+    data = await loadDraftReview(store, PROJECT);
+    expect(row(data.cables, load)).toMatchObject({ code: '120V', state: 'edited', unknownCode: false, committed: true });
+    const panel = realEnd(data, { kind: 'device', id: ids.panel, label: '', levelId: ids.l06m })!;
+    expect(libraryRow('120V', panel, realEnd(data, { kind: 'placeholder', id: fixtures, label: '', levelId: null })!)).toMatchObject({ from: 'CT06LCPA', to: 'Fixtures', exact: true });
+    expect(libraryRow('120V', panel, realEnd(data, { kind: 'placeholder', id: power, label: '', levelId: null })!)).toBeNull();
+    // a second iPad's copy of the same line meets that row: linked, one cable not two
+    const again = await editor.create('draft_cable', { project_id: PROJECT, import_batch_id: ids.riser, level_id: ids.l06m, code: '120V', qty: 1, origin: 'riser', state: 'proposed', level_basis: 'riser_band', extraction: 'text', from_label: 'CT06LCPA', to_label: 'TO LOAD CKTS', confidence: 0.5, conflicts: [], candidates: [{ side: 'from', kind: 'draft_device', id: ids.dD, label: 'CT06LCPA', confidence: 0.9 }, { side: 'to', kind: 'placeholder', id: fixtures, label: 'Fixtures', confidence: 0.5 }] }, { change_type: 'Master edit', reason: 'test' });
+    data = await loadDraftReview(store, PROJECT);
+    expect(await acceptCable(editor, store, data, row(data.cables, again.id), { confirm: false })).toMatchObject({ linked: true, cableId: res.cableId });
+  });
+
   it('a line that is not a cable to survey is rejected with a reason', async () => {
     const { store, editor, load } = await withLines();
     let data = await loadDraftReview(store, PROJECT);
-    await rejectDraft(editor, 'cable', row(data.cables, load), 'Load circuits, by others');
+    await rejectDraft(editor, 'cable', row(data.cables, load), 'Not a cable to survey');
     data = await loadDraftReview(store, PROJECT);
     expect(row(data.cables, load)).toMatchObject({ state: 'rejected', code: null });
     expect(await store.list('cable', { where: 'cable IS NULL' })).toHaveLength(0);

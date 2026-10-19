@@ -110,7 +110,10 @@ label; a device's arrows ending at one label are one line (the triple feed arrow
 CONTROL` leaders, the panels' and UFMPs' feed arrows, the EBDK sense feeds, the NSPS / rack 120V
 feeds and the NSPS runs up the trunk. Each gets a guess from its own text (`0-10V` → `0-10V`,
 `120V` / `100-277V` → `120V`, 0.5) that the model's `code_guess` replaces; on sheet 002 the
-model lists the lines itself.
+model lists the lines itself. A **load-circuit** label — the relay panels' `TO LOAD CKTS`, the
+Foundry panels' `TO LOAD`, `LOAD CKTS` (`is_load_label`) — is the panel's 120V load wiring to the
+fixtures (T132, D221): guessed `120V` at 0.5 with `reason: load`, the model's guess never
+replacing it, on both sheets; sheet 001 has 25 of them.
 
 ## The Claude API pass (PLAN §7.3, D21, D189, D190 (4))
 
@@ -156,7 +159,8 @@ sheet 002 (no text layer) as it was; T108's run was $3.10, T43's ≈ $2.00 befor
 no bubble were asked about. All above the Phase 1f estimate ($0.45), which had no thinking
 tokens and one image per band. With the recording: 221 lines with no bubble on the Tower, about
 135 of them load, feed-circuit and sense-feed
-arrows "by others" that the reviewer rejects (kept, D192). Reading the model's lines
+arrows: the load arrows are guessed 120V to Fixtures (D221), the feed and sense arrows "by
+others" the reviewer rejects (kept, D192). Reading the model's lines
 (`apply_lines`): a line written arrow-first (from the note to the device) is turned round so the
 device is its near end, and a trunk that touches no device on the band is dropped there (it is
 asked about on the band whose device it leaves). Effort `medium` would roughly halve it; the overview image is a fifth of the input.
@@ -173,7 +177,7 @@ Everything as trusted ops by the uploading user (`Master edit`, reason `Riser ex
 | `draft_device` set | the merge (D28): a BOM draft of the same model family on the level gets `source_ref.riser` (`shared_with` when several BOM lines share one symbol), `name` from the panel tag (D10), `conflicts` (`qty:bom≠riser`, `cards:bom≠riser`, `pairing:ebdk≠erp`, `network:no_N_run`), `confidence` raised only when the counts agree |
 | `draft_device` delete | a pooled BOM line whose riser placements add up (option cards summed per venue): reason `Placed by the riser: n drafts on levels …` |
 | `draft_cable` create | one per run (a run drawn with a bubble at each end once, D206): `code`, `qty 1`, `origin riser`, `from_label` / `to_label` / `to_level_id`, `candidates[]` (`{side: from\|to, kind: draft_device\|placeholder, id, label, confidence}` — a traced far end on another band is its `draft_device`), `source_ref = {kind: riser_bubble, file, page, sheet, band, bbox, label, bubble, note, level_code, traced?, twin?: {bubble, band, bbox}}`, `extraction`, `confidence`, `conflicts` |
-| `draft_cable` create (line) | one per line with no bubble (D192): `code` **null**, conflict `code:unknown`, `candidates` with the guess as `{side: code, value, confidence, source: label\|model}` (never the code) and, for a guessed `0-10V` / `120V`, the library's placeholder (`Fixtures` / `120v Power`, D194) as the To; `source_ref = {kind: riser_line, …, bbox, line, label, note}` |
+| `draft_cable` create (line) | one per line with no bubble (D192): `code` **null**, conflict `code:unknown`, `candidates` with the guess as `{side: code, value, confidence, source: label\|model, reason?: load}` (never the code) and, for a guessed `0-10V` / `120V`, the library's placeholder (`Fixtures` / `120v Power`, D194; `Fixtures` for a load-circuit line, D221) as the To; `source_ref = {kind: riser_line, …, bbox, line, label, note}` |
 | `review_item` create | `source_conflict` (D30): the riser's count per (level, model family) against the project's live devices on a surveyed floor, `subject = {entity_kind: draft_device, entity_id, field: qty, level_code, model}`, `candidates = [{side: riser}, {side: bom}, {side: master}]` |
 
 Conflicts the reviewer sees on a draft (D11 — anything flagged or under 0.7 waits in Needs
@@ -188,7 +192,10 @@ On the iPad (T44 / T108) a line lists first on its level's Cables tab with the g
 picker (every CLAUDE.md §3 code) and Accept / Reject. Accept writes the picked code and clears
 `code:unknown`; a `0-10V` line from a Relay panel or a `120V` line from an NSPS or rack becomes
 that device's library row — linked to the cable it already has, else made with R2c / R2d's texts
-— so R2c / R2d offer nothing more for it (D194).
+— so R2c / R2d offer nothing more for it (D194). A load-circuit line reads "Guess: 120V (load
+circuits) to Fixtures"; accepted as `120V` from a relay or Foundry panel to the `Fixtures`
+placeholder it is the panel's `120V` row `<panel> → Fixtures`, linked only to a cable with those
+same two ends, never to the panel's 120V feed (D221, T132).
 
 ### Levels the project lacks
 
