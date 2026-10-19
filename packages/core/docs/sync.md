@@ -71,8 +71,21 @@ create op and T26 shows it); the pending badge is only for what is still unsent.
 Backoff: `backoffMs × 2^(failures−1)` capped at `maxBackoffMs` (5 s → 10 → 20 → … → 5 min),
 reset by a successful cycle, `requestSync()` or `setTransport()`. `sync()` inside the backoff
 returns `skipped`. Status fields: `pendingOps` (outbox, all projects), `willReview`,
-`lastServerSeq` per project, `failures`, `nextAttemptAt`. `subscribe(listener)` is called at
-once with the current status and on every change.
+`lastServerSeq` per project, `failures`, `nextAttemptAt`, `lastCycle`. `subscribe(listener)` is
+called at once with the current status and on every change.
+
+## Timing (T131, D223)
+
+`status.lastCycle` (`CycleTiming`) is what the last completed cycle cost: `ms` (the whole cycle,
+every project, the status refresh included), `pushMs` (`POST /ops` calls), `pullMs` (`GET /ops`
+calls, network only), `applyMs` (materialising pulled ops), `pushed`, `pulled`, `projects`, `at`
+and `failed`. The `synced` log event carries the same numbers (`ms`, `push_ms`, `pull_ms`,
+`apply_ms`); the Sync screen shows them as one line (`describeCycle` in `app/src/sync/screen.ts`,
+with the last rules pass from `app/src/rules/engine.ts`). A pulled page is materialised
+`applyChunk` ops per `Store.applyRemoteMany` transaction (default 100): the iPad has one SQLite
+connection, and a screen's query waits for the transaction in progress, so a whole 500-op page in
+one transaction held it for a second. The cursor still moves once per page, after the last chunk;
+a chunk applied again after a crash is a duplicate op.
 
 ## Editing never waits
 

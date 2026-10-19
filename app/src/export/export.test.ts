@@ -40,7 +40,7 @@ function op(entity_kind: Op['entity_kind'], entity_id: string, kind: Op['kind'],
 
 const SYNCED: SyncStatus = {
   state: 'idle', pendingOps: 0, quarantinedOps: 0, willReview: 0, lastSyncAt: '2026-10-12T10:00:00Z', lastServerSeq: { p: 12 },
-  lastError: null, failures: 0, nextAttemptAt: null,
+  lastError: null, failures: 0, nextAttemptAt: null, lastCycle: null,
 };
 
 function row(over: Partial<ExportRow> = {}): ExportRow {

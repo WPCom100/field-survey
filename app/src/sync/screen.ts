@@ -4,7 +4,7 @@
  * store, so the screen works offline.
  */
 
-import type { BlobFiles, Store } from '@field-survey/core';
+import type { BlobFiles, CycleTiming, Store } from '@field-survey/core';
 
 export type OutboxSummary = {
   /** Every op still in the outbox, quarantined ones included. */
@@ -162,4 +162,28 @@ export async function loadServerVersion(serverUrl: string, fetchFn: typeof fetch
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * The Sync screen's timing line (T131): what the last cycle cost and where, and the last rules
+ * pass. One line, so a regression is seen on the iPad without Metro:
+ * "Last cycle 0.4 s · push 0.1 s · pull 0.2 s · apply 0.0 s · 0 pushed, 0 pulled · rules 0.3 s (2 projects, 0 writes)".
+ */
+export function describeCycle(
+  cycle: CycleTiming | null,
+  rules: { projects: number; ms: number; ops: number } | null,
+): string {
+  const s = (ms: number) => `${(Math.max(0, ms) / 1000).toFixed(1)} s`;
+  const parts: string[] = [];
+  if (cycle) {
+    parts.push(`Last cycle ${s(cycle.ms)}${cycle.failed ? ' (failed)' : ''}`);
+    parts.push(`push ${s(cycle.pushMs)}`, `pull ${s(cycle.pullMs)}`, `apply ${s(cycle.applyMs)}`);
+    parts.push(`${cycle.pushed} pushed, ${cycle.pulled} pulled`);
+  } else {
+    parts.push('No cycle yet');
+  }
+  if (rules) {
+    parts.push(`rules ${s(rules.ms)} (${rules.projects} project${rules.projects === 1 ? '' : 's'}, ${rules.ops} write${rules.ops === 1 ? '' : 's'})`);
+  }
+  return parts.join(' · ');
 }

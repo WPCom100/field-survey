@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { formatLine, rotationNames } from '../log/format';
 import { listProjects } from '../home/data';
 import { ensureDemoLevel } from '../plan/demo';
-import { formatBytes, freeUploadedPhotos, loadServerVersion, loadSyncScreen, retryFailedUploads } from './screen';
+import { describeCycle, formatBytes, freeUploadedPhotos, loadServerVersion, loadSyncScreen, retryFailedUploads } from './screen';
 
 async function open() {
   return Store.open(new BetterSqliteDriver(), { installId: 'i', search: 'like' });
@@ -144,5 +144,17 @@ describe('loadServerVersion', () => {
       throw new TypeError('Network request failed');
     }) as unknown as typeof fetch;
     expect(await loadServerVersion('https://s', offline)).toBe('commit unknown (not connected)');
+  });
+});
+
+describe('describeCycle (T131)', () => {
+  it('says what the last cycle and the last rules pass cost, in seconds', () => {
+    const cycle = { at: '2026-10-19T10:00:00Z', ms: 412, pushMs: 90, pullMs: 230, applyMs: 51, pushed: 3, pulled: 12, projects: 2, failed: false };
+    expect(describeCycle(cycle, { projects: 2, ms: 310, ops: 0 })).toBe(
+      'Last cycle 0.4 s · push 0.1 s · pull 0.2 s · apply 0.1 s · 3 pushed, 12 pulled · rules 0.3 s (2 projects, 0 writes)',
+    );
+    expect(describeCycle({ ...cycle, failed: true, pulled: 0 }, null)).toBe('Last cycle 0.4 s (failed) · push 0.1 s · pull 0.2 s · apply 0.1 s · 3 pushed, 0 pulled');
+    expect(describeCycle(null, { projects: 1, ms: 1200, ops: 1 })).toBe('No cycle yet · rules 1.2 s (1 project, 1 write)');
+    expect(describeCycle(null, null)).toBe('No cycle yet');
   });
 });

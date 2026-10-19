@@ -121,6 +121,7 @@ export {
   type PullResponse,
   type SyncState,
   type SyncStatus,
+  type CycleTiming,
   type SyncReport,
   type SyncLog,
   type SyncEngineOptions,

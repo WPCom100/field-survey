@@ -591,6 +591,18 @@ Decision D220 (Landry, "One end, no split"): an item about two runs goes on one 
 - [ ] **Save keeps the form.** Change an alias and add an optional cable, Save: “Saved.”, the form shows what you typed (it does not snap back), Save greys out and “Unsaved changes” goes. Leave the type and come back: the same values. → saw:
 - [ ] **A pull still refreshes it.** With the type open on iPad A and not edited, change its aliases on iPad B and sync both: A’s form shows B’s aliases. → saw:
 
+## T131 — Slow to load during sync  ·  Needs: no new build (JS update only)
+
+**Why it matters:** with the DaVinci catalogue in the library every rules run scanned 1,132 types per device, freezing the app for seconds after each pull and each edit (`docs/perf/t131.md`). The PC numbers are in; these are the iPad's. Do this on the Pipeline project (the one with the BOM / riser drafts), dev build with Metro so the log lines are visible, store already synced once (warm).
+
+- [ ] **Launch to Levels.** Force-quit the app, open it, start a stopwatch at the icon tap: the Levels table is on screen and tappable within **3 s**. Metro shows `[store] open`, then one `[rules] run … "ms":n` per project — copy each line's `ms`. → saw:
+- [ ] **Quiet cycle.** Leave the app on Levels for a minute without touching anything. Sync → Connection: the timing line reads like `Last cycle 0.3 s · push 0.0 s · pull 0.2 s · apply 0.0 s · 0 pushed, 0 pulled · rules …`; the whole cycle is under **1 s** and the numbers barely change from cycle to cycle. Copy one line. → saw:
+- [ ] **No stall during a pull.** On iPad B (or the Library screen on the same iPad) change three aliases and Save; on iPad A stay on Levels and keep scrolling the table while the edits arrive (within ~5 s): the scroll never freezes; afterwards the timing line shows `3 pulled` and `apply` under 0.2 s, and Metro shows one `[rules] run` per project (not one for the library stream). → saw:
+- [ ] **Edit without a freeze.** Open a plan on the Pipeline project, change a device's status: the card answers at once; about half a second later Metro shows `[rules] run … "ms":n` with n well under 1,000 (copy it); pan the plan while it runs — no hitch longer than a blink. → saw:
+- [ ] **Log keeps growing.** Sync → Install → export the log: it contains today's `[sync] synced {… "ms":…, "push_ms":…, "pull_ms":…, "apply_ms":…}` lines and the earlier days' lines are still there (append, not rewrite). → saw:
+
+Decision D223: type lookups are indexed, a library change re-runs every project's rules (never the stream), pulled pages are applied 100 ops per transaction, and the Sync screen shows a per-cycle timing line. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

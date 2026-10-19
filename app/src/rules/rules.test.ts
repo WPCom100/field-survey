@@ -4,14 +4,14 @@
  * shows, "why?" comes from the engine), and the runner re-evaluates a store whose projects change.
  */
 
-import { Editor, Store, uuidv7 } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
 import { loadDeviceCard } from '../card/model';
 import { loadLevelPlan } from '../plan/data';
 import { DEMO_LEVEL_ID, ensureDemoCardExtras, ensureDemoLevel } from '../plan/demo';
-import { engineFor, ruleDecider, startRules } from './engine';
+import { engineFor, lastRulesPass, ruleDecider, startRules } from './engine';
 
 const ME = uuidv7();
 
@@ -95,6 +95,40 @@ describe('startRules', () => {
     await editor.setField('device', plan.devices[0]!.id, 'notes', 'changed', { change_type: 'Field survey', reason: 'test' });
     await new Promise((r) => setTimeout(r, 30));
     expect(seen).toEqual([0, 0]);
+    stop();
+  });
+});
+
+describe('startRules over the app library stream (T131)', () => {
+  it('a pulled library change re-evaluates every project and never runs the stream itself; the pass is timed', async () => {
+    const { store, pid } = await demo();
+    const ran: string[] = [];
+    const engine = engineFor(store, pid, ME);
+    const run = engine.run.bind(engine);
+    engine.run = async () => {
+      ran.push(pid);
+      return run();
+    };
+    const stream = engineFor(store, LIBRARY_STREAM, ME);
+    stream.run = async () => {
+      ran.push(LIBRARY_STREAM);
+      return run();
+    };
+    const stop = startRules(store, ME, async () => [pid], 1);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(ran).toEqual([pid]);
+    // a library type arrives by pull on the stream (D184)
+    const id = uuidv7();
+    await store.applyRemote({
+      op_id: uuidv7(), project_id: LIBRARY_STREAM, user_id: ME, install_id: 'srv', client_ts: new Date().toISOString(),
+      entity_kind: 'library_type', entity_id: id, kind: 'create', change_type: 'Master edit', server_seq: 1, server_ts: new Date().toISOString(),
+      payload: { id, project_id: null, model: 'T131-TYPE', category: 'Station', state: 'accepted' },
+    } as Op);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(ran).toEqual([pid, pid]);
+    const pass = lastRulesPass()!;
+    expect(pass).toMatchObject({ projects: 1, ops: 0 });
+    expect(pass.ms).toBeGreaterThanOrEqual(0);
     stop();
   });
 });

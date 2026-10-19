@@ -9,9 +9,10 @@ import { openAppStore } from '../db';
 import { listProjects } from '../home/data';
 import { useIdentity, useSignOut } from '../identity/IdentityGate';
 import { exportLog } from '../log';
+import { lastRulesPass } from '../rules/engine';
 import { getSyncEngine } from '../sync/engine';
 import { loadInstallLabels, saveInstallLabel } from '../sync/install';
-import { formatBytes, freeUploadedPhotos, loadServerVersion, loadSyncScreen, retryFailedUploads, type SyncScreenData } from '../sync/screen';
+import { describeCycle, formatBytes, freeUploadedPhotos, loadServerVersion, loadSyncScreen, retryFailedUploads, type SyncScreenData } from '../sync/screen';
 import { checkAndFetch, runningInfo, useUpdateCheckState } from '../sync/useAppUpdates';
 import { describeCheck, describeRunning } from '../sync/updates';
 import { describeSync, useSyncStatus } from '../sync/useSyncStatus';
@@ -90,6 +91,7 @@ export default function SyncScreen() {
           Last successful sync {time(sync.lastSyncAt)}
           {seq ? ` (seq ${seq.toLocaleString()})` : ''}
         </Text>
+        <Text style={styles.sub}>{describeCycle(sync.lastCycle, lastRulesPass())}</Text>
         {hasProject === false ? (
           <Text style={styles.sub}>
             No project on this iPad yet, so there is nothing to push or pull; "Synced" means the server answered. The demo plan never syncs.

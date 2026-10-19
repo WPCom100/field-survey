@@ -104,6 +104,27 @@ export interface SyncStatus {
   failures: number;
   /** Earliest time the next automatic attempt will run (ISO 8601), null when none is due. */
   nextAttemptAt: string | null;
+  /** What the last completed cycle cost (T131); null until one has run. */
+  lastCycle: CycleTiming | null;
+}
+
+/** One cycle's timing, for the Sync screen's line and the `synced` log event (T131). */
+export interface CycleTiming {
+  /** End of the cycle (ISO 8601). */
+  at: string;
+  /** Whole cycle, every project, including the status refresh. */
+  ms: number;
+  /** Time in `POST /ops` calls and the acknowledgements they bring. */
+  pushMs: number;
+  /** Time in `GET /ops` calls (network only; the apply is separate). */
+  pullMs: number;
+  /** Time applying pulled ops to the store. */
+  applyMs: number;
+  pushed: number;
+  pulled: number;
+  projects: number;
+  /** The cycle failed (`SyncReport.outcome` `failed`); the counts are what got through. */
+  failed: boolean;
 }
 
 /** A local pending op the server will review (PLAN §3.2 pull: "will be reviewed"). */
@@ -143,6 +164,13 @@ export interface SyncEngineOptions {
   batchSize?: number;
   /** Ops per pull page, ≤ 500. */
   pullLimit?: number;
+  /**
+   * Ops applied per store transaction when a pulled page is materialised (T131); default 100.
+   * The iPad has one SQLite connection, so a screen's query waits for the transaction in
+   * progress: a 500-op page in one transaction held it for a second. The cursor still moves
+   * once per page, after the last chunk; a chunk re-applied after a crash is a duplicate.
+   */
+  applyChunk?: number;
   /** Periodic sync interval while started. */
   intervalMs?: number;
   /** First retry delay after a failure; doubles each time up to `maxBackoffMs`. */
@@ -155,6 +183,7 @@ export interface SyncEngineOptions {
 }
 
 const MAX_BATCH = 500;
+const APPLY_CHUNK = 100;
 
 function defaultLog(level: 'info' | 'warn' | 'error', event: string, data?: Record<string, unknown>) {
   const line = `[sync] ${event}${data ? ' ' + JSON.stringify(data) : ''}`;
@@ -211,11 +240,14 @@ export class SyncEngine {
     lastError: null,
     failures: 0,
     nextAttemptAt: null,
+    lastCycle: null,
   };
   private running: Promise<SyncReport> | null = null;
   private timer: unknown = null;
   private started = false;
   private nextAttemptMs = 0;
+  /** The cycle in progress accumulates here; `cycle()` resets it. */
+  private timing = { pushMs: 0, pullMs: 0, applyMs: 0 };
 
   constructor(
     readonly store: Store,
@@ -228,6 +260,7 @@ export class SyncEngine {
       library: opts.library ?? false,
       batchSize: Math.max(1, Math.min(opts.batchSize ?? MAX_BATCH, MAX_BATCH)),
       pullLimit: Math.max(1, Math.min(opts.pullLimit ?? MAX_BATCH, MAX_BATCH)),
+      applyChunk: Math.max(1, opts.applyChunk ?? APPLY_CHUNK),
       intervalMs: opts.intervalMs ?? 60_000,
       backoffMs: opts.backoffMs ?? 5_000,
       maxBackoffMs: opts.maxBackoffMs ?? 300_000,
@@ -350,6 +383,8 @@ export class SyncEngine {
       return { outcome: 'skipped', pushed: 0, pulled: 0, projects: [] };
     }
     this.set({ state: 'syncing' });
+    const t0 = this.opts.now();
+    this.timing = { pushMs: 0, pullMs: 0, applyMs: 0 };
     const projects = await this.opts.projects();
     let pushed = 0;
     let pulled = 0;
@@ -383,6 +418,15 @@ export class SyncEngine {
       }
     }
     await this.refresh();
+    const lastCycle: CycleTiming = {
+      at: new Date(this.opts.now()).toISOString(),
+      ms: this.opts.now() - t0,
+      ...this.timing,
+      pushed,
+      pulled,
+      projects: projects.length,
+      failed: !!failure,
+    };
     if (failure) {
       const failures = this.current.failures + 1;
       const delay = Math.min(this.opts.backoffMs * 2 ** (failures - 1), this.opts.maxBackoffMs);
@@ -393,6 +437,7 @@ export class SyncEngine {
         failures,
         lastError: failure.message,
         nextAttemptAt: new Date(this.nextAttemptMs).toISOString(),
+        lastCycle,
       });
       return { outcome: 'failed', pushed, pulled, projects, error: failure.message };
     }
@@ -402,9 +447,18 @@ export class SyncEngine {
       failures: 0,
       lastError: null,
       nextAttemptAt: null,
-      lastSyncAt: new Date(this.opts.now()).toISOString(),
+      lastSyncAt: lastCycle.at,
+      lastCycle,
     });
-    this.opts.log('info', 'synced', { projects: projects.length, pushed, pulled });
+    this.opts.log('info', 'synced', {
+      projects: projects.length,
+      pushed,
+      pulled,
+      ms: lastCycle.ms,
+      push_ms: lastCycle.pushMs,
+      pull_ms: lastCycle.pullMs,
+      apply_ms: lastCycle.applyMs,
+    });
     return { outcome: 'ran', pushed, pulled, projects };
   }
 
@@ -429,9 +483,12 @@ export class SyncEngine {
   private async sendBatch(transport: SyncTransport, project: string, batch: StoredOp[]): Promise<number> {
     const since = await this.cursor(project);
     let res: PushResponse;
+    const t0 = this.opts.now();
     try {
       res = await transport.push({ project_id: project, since, ops: batch.map(wire) });
+      this.timing.pushMs += this.opts.now() - t0;
     } catch (e) {
+      this.timing.pushMs += this.opts.now() - t0;
       if (e instanceof TransportError && e.failure === 'rejected') {
         return this.narrowRejection(transport, project, batch, e);
       }
@@ -508,7 +565,13 @@ export class SyncEngine {
     let total = 0;
     for (;;) {
       const since = await this.cursor(project);
-      const page = await transport.pull(project, since, this.opts.pullLimit);
+      const t0 = this.opts.now();
+      let page: PullResponse;
+      try {
+        page = await transport.pull(project, since, this.opts.pullLimit);
+      } finally {
+        this.timing.pullMs += this.opts.now() - t0;
+      }
       if (page.ops.length) {
         await this.applyIncoming(project, page.ops);
         total += page.ops.length;
@@ -525,19 +588,28 @@ export class SyncEngine {
     }
   }
 
+  /** Materialise pulled ops, `applyChunk` per transaction (T131), in the order given. */
   private async applyIncoming(project: string, ops: Op[]): Promise<void> {
-    const results = await this.store.applyRemoteMany(ops);
-    await this.markFromPull(project, ops, results);
-    for (let i = 0; i < ops.length; i++) {
-      if (results[i]!.outcome === 'orphan') {
-        const op = ops[i]!;
-        this.opts.log('warn', 'orphan', {
-          op_id: op.op_id,
-          kind: op.kind,
-          entity_kind: op.entity_kind,
-          entity_id: op.entity_id,
-        });
+    const t0 = this.opts.now();
+    try {
+      for (let start = 0; start < ops.length; start += this.opts.applyChunk) {
+        const chunk = ops.slice(start, start + this.opts.applyChunk);
+        const results = await this.store.applyRemoteMany(chunk);
+        await this.markFromPull(project, chunk, results);
+        for (let i = 0; i < chunk.length; i++) {
+          if (results[i]!.outcome === 'orphan') {
+            const op = chunk[i]!;
+            this.opts.log('warn', 'orphan', {
+              op_id: op.op_id,
+              kind: op.kind,
+              entity_kind: op.entity_kind,
+              entity_id: op.entity_id,
+            });
+          }
+        }
       }
+    } finally {
+      this.timing.applyMs += this.opts.now() - t0;
     }
   }
 

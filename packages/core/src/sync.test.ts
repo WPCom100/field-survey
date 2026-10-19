@@ -614,3 +614,57 @@ describe('TransportError', () => {
     expect(e).toMatchObject({ failure: 'rejected', status: 409, name: 'TransportError' });
   });
 });
+
+describe('T131: a pulled page is applied in chunks, and the cycle is timed', () => {
+  it('materialises a page applyChunk ops per transaction and moves the cursor once per page', async () => {
+    const a = await client(server, ANN, 'ipad-a');
+    const b = await client(server, BOB, 'ipad-b', { pullLimit: 10, applyChunk: 3 });
+    const d = await newDevice(a);
+    for (let i = 0; i < 6; i++) await a.editor.setField('device', d, 'notes', `n${i}`, CTX);
+    await a.engine.sync();
+    expect(server.serverSeq).toBe(7);
+    const sizes: number[] = [];
+    const apply = b.store.applyRemoteMany.bind(b.store);
+    b.store.applyRemoteMany = async (ops) => {
+      sizes.push(ops.length);
+      return apply(ops);
+    };
+    const cursors: number[] = [];
+    const setState = b.store.setState.bind(b.store);
+    b.store.setState = async (key, value) => {
+      if (key === `last_server_seq:${PROJECT}`) cursors.push(value as number);
+      return setState(key, value);
+    };
+    const report = await b.engine.sync();
+    expect(report).toMatchObject({ outcome: 'ran', pulled: 7 });
+    expect(sizes).toEqual([3, 3, 1]);
+    expect(cursors).toEqual([7]);
+    expect(await b.store.get('device', d)).toMatchObject({ notes: 'n5', version: 7, head_seq: 7 });
+    // a chunk applied again (a crash before the cursor moved) is a duplicate, never a second row
+    const again = await b.store.applyRemoteMany(server.log.slice(0, 3));
+    expect(again.map((r) => r.outcome)).toEqual(['duplicate', 'duplicate', 'duplicate']);
+  });
+
+  it('reports what the cycle cost: push, pull and apply times, counts, and whether it failed', async () => {
+    const a = await client(server, ANN, 'ipad-a');
+    expect(a.engine.status().lastCycle).toBeNull();
+    const d = await newDevice(a);
+    const r1 = await a.engine.sync();
+    expect(r1.outcome).toBe('ran');
+    const c1 = a.engine.status().lastCycle!;
+    expect(c1).toMatchObject({ pushed: 1, pulled: expect.any(Number), projects: 1, failed: false });
+    expect(c1.ms).toBeGreaterThanOrEqual(0);
+    expect(c1.pushMs + c1.pullMs + c1.applyMs).toBeLessThanOrEqual(c1.ms);
+    expect(a.engine.status().lastSyncAt).toBe(c1.at);
+    // a quiet cycle: nothing pushed or pulled, nothing applied
+    const quiet = await a.engine.sync();
+    expect(quiet).toMatchObject({ outcome: 'ran', pushed: 0, pulled: 0 });
+    expect(a.engine.status().lastCycle).toMatchObject({ pushed: 0, pulled: 0, applyMs: 0, failed: false });
+    // a failed cycle still reports, marked failed
+    await a.editor.setField('device', d, 'notes', 'x', CTX);
+    server.fail({ on: 'push', failure: 'network' });
+    const failed = await a.engine.sync();
+    expect(failed.outcome).toBe('failed');
+    expect(a.engine.status().lastCycle).toMatchObject({ pushed: 0, failed: true });
+  });
+});

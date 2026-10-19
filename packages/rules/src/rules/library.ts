@@ -98,6 +98,33 @@ const modelKey = (s: string) => s.replace(/\s+/g, '').toUpperCase();
 export type TypeLike = Pick<LibraryTypeRow, 'id' | 'project_id' | 'model' | 'aliases' | 'state'>;
 
 /**
+ * Types by model key (model and every alias), built once per `types` map and kept beside it
+ * (T131). With the catalogue in the library (≈ 1,130 rows, ~3 aliases each) a scan per device
+ * cost a rules run half a second on the PC and seconds on the iPad; the index makes a lookup a
+ * map get. The maps this is called with are built per load and never mutated afterwards; a map
+ * whose size changed is re-indexed all the same.
+ */
+const KEY_INDEX = new WeakMap<ReadonlyMap<string, TypeLike>, { size: number; byKey: Map<string, TypeLike[]> }>();
+
+function keyIndex<T extends TypeLike>(types: ReadonlyMap<string, T>): Map<string, T[]> {
+  const cached = KEY_INDEX.get(types);
+  if (cached && cached.size === types.size) return cached.byKey as Map<string, T[]>;
+  const byKey = new Map<string, T[]>();
+  const add = (k: string, t: T) => {
+    const list = byKey.get(k);
+    if (list) {
+      if (!list.includes(t)) list.push(t);
+    } else byKey.set(k, [t]);
+  };
+  for (const t of types.values()) {
+    add(modelKey(t.model), t);
+    for (const a of t.aliases ?? []) if (typeof a === 'string') add(modelKey(a), t);
+  }
+  KEY_INDEX.set(types, { size: types.size, byKey });
+  return byKey;
+}
+
+/**
  * The type a device belongs to among `types` (live rows of its project and the app library): its
  * `library_type_id`, else a not rejected type whose model or alias matches its Device text, the
  * project's before the app library's.
@@ -106,9 +133,8 @@ export function findDeviceType<T extends TypeLike>(types: ReadonlyMap<string, T>
   if (d.library_type_id) return types.get(d.library_type_id) ?? null;
   const text = str(d.device);
   if (!text) return null;
-  const k = modelKey(text);
-  const matches = [...types.values()]
-    .filter((t) => t.state !== 'rejected' && (modelKey(t.model) === k || (t.aliases ?? []).some((a) => typeof a === 'string' && modelKey(a) === k)))
+  const matches = (keyIndex(types).get(modelKey(text)) ?? [])
+    .filter((t) => t.state !== 'rejected')
     .sort((a, b) => Number(a.project_id == null) - Number(b.project_id == null) || a.id.localeCompare(b.id));
   return matches[0] ?? null;
 }

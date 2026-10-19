@@ -29,9 +29,9 @@ function flush(): void {
         if (from.exists) from.move(to);
       }
     }
-    const f = new File(d, names[0]!);
-    const old = f.exists ? f.textSync() : '';
-    f.write(old + text);
+    // Append (T131): reading the whole file back and rewriting it cost up to a megabyte of
+    // synchronous I/O on the JS thread every flush, every sync cycle.
+    new File(d, names[0]!).write(text, { append: true });
   } catch {
     // never throw from the logger
   }

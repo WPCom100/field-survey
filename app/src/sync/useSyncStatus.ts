@@ -13,6 +13,7 @@ const INITIAL: SyncStatus = {
   lastError: null,
   failures: 0,
   nextAttemptAt: null,
+  lastCycle: null,
 };
 
 /** Live sync status for the global status bar (T18) and the Sync screen (T25). */
