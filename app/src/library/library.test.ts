@@ -25,6 +25,7 @@ import {
   copyTypes,
   createType,
   describeCable,
+  editorStamp,
   libraryGroups,
   loadLibrary,
   matchesQuery,
@@ -86,6 +87,20 @@ describe('device-type library editor (T48)', () => {
     expect((await loadLibrary(store, p.id)).types.at(-1)).toMatchObject({ id: ts, state: 'rejected' });
     await reopenType(p.editor, ts);
     expect((await loadLibrary(store, p.id)).types.find((t) => t.id === ts)!.state).toBe('draft');
+  });
+
+  it('the editor stamp changes only with what the form holds (T125: Save keeps the panel)', async () => {
+    const { store, project } = await setup();
+    const p = await project('Tower');
+    const id = await createType(p.editor, store, p.id, { model: 'ERn2-W-120 Mk2', category: 'Equipment Rack' });
+    const load = async () => (await loadLibrary(store, p.id)).types.find((t) => t.id === id)!;
+    const before = await load();
+    expect(editorStamp(await load())).toBe(editorStamp(before)); // a reload with nothing new keeps the form
+    await updateType(p.editor, store, id, { optionalCables: [{ ...blankCable('N'), to: 'switch', far: 'Network switch' }] });
+    const saved = await load();
+    expect(editorStamp(saved)).not.toBe(editorStamp(before)); // the saved values reach the form
+    await acceptType(p.editor, id);
+    expect(editorStamp(await load())).not.toBe(editorStamp(saved)); // so does a state change
   });
 
   it('saves an edit as one group; an empty cable list is stored as null; bad values are refused', async () => {

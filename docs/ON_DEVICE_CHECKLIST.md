@@ -664,6 +664,15 @@ Decision D219: the Rules tab offers one reword ruling per field (not per new val
 
 Decision D220 (Landry, "One end, no split"): an item about two runs goes on one end you pick and keeps its number and text; the other run gets its own Run draft. → Recorded.
 
+## T125 — Library editor: wider, actions always visible, Save keeps the form  ·  Needs: no new build (JS update only)
+
+**Why it matters:** in the 2026-10-18 round the type editor was too narrow to read (A-2, B-5) and Save seemed to throw away what you had typed (A-3). Re-run A-2, A-3 and B-5 of the round sheet with these.
+
+- [ ] **Wider editor.** Library (app or project) → pick ERn2-W-120 Mk2: the list on the left takes about a third of the screen and the editor the rest, in landscape and in portrait. Optional cables: each run shows its code chips, then **From**, **To** and **Far end** on their own labelled lines, the text readable. → saw:
+- [ ] **Buttons stay.** Scroll the editor to the top and to the bottom: Save, Accept draft (or Back to draft), Reject and Promote stay in a bar at the bottom of the pane the whole time; after an edit it reads “Unsaved changes”. → saw:
+- [ ] **Save keeps the form.** Change an alias and add an optional cable, Save: “Saved.”, the form shows what you typed (it does not snap back), Save greys out and “Unsaved changes” goes. Leave the type and come back: the same values. → saw:
+- [ ] **A pull still refreshes it.** With the type open on iPad A and not edited, change its aliases on iPad B and sync both: A’s form shows B’s aliases. → saw:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

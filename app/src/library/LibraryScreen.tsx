@@ -18,6 +18,7 @@ import {
   createType,
   promoteType,
   describeCable,
+  editorStamp,
   libraryGroups,
   loadLibrary,
   neuronIdDefaultForRole,
@@ -215,16 +216,10 @@ export function LibraryScreen(props: {
             }
           />
         </View>
-        <ScrollView style={styles.pane} contentContainerStyle={styles.paneBody} keyboardShouldPersistTaps="handled">
-          {pane?.kind === 'new' ? (
-            <NewType scope={scope} run={run} onCreated={(id) => setPane({ kind: 'type', id })} />
-          ) : pane?.kind === 'copy' && store ? (
-            <CopyFrom store={store} scope={scope} run={run} onDone={() => setPane(null)} />
-          ) : pane?.kind === 'suggestions' ? (
-            <SuggestionsPane rows={chips} codes={view?.codes ?? CABLE_CODES} noPartCodes={view?.noPartCodes ?? []} library={scope} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
-          ) : selected ? (
+        {selected && pane?.kind === 'type' ? (
+          <View style={styles.pane}>
             <TypeEditor
-              key={`${selected.id}:${tick}`}
+              key={editorStamp(selected)}
               type={selected}
               chips={chips.filter((c) => c.scope === 'type' && c.ref === selected.id)}
               codes={view?.codes ?? CABLE_CODES}
@@ -233,10 +228,20 @@ export function LibraryScreen(props: {
               run={run}
               libraryEditor={props.libraryEditor}
             />
-          ) : (
-            <Text style={styles.sub}>Pick a type to see and edit it.</Text>
-          )}
-        </ScrollView>
+          </View>
+        ) : (
+          <ScrollView style={styles.pane} contentContainerStyle={styles.paneBody} keyboardShouldPersistTaps="handled">
+            {pane?.kind === 'new' ? (
+              <NewType scope={scope} run={run} onCreated={(id) => setPane({ kind: 'type', id })} />
+            ) : pane?.kind === 'copy' && store ? (
+              <CopyFrom store={store} scope={scope} run={run} onDone={() => setPane(null)} />
+            ) : pane?.kind === 'suggestions' ? (
+              <SuggestionsPane rows={chips} codes={view?.codes ?? CABLE_CODES} noPartCodes={view?.noPartCodes ?? []} library={scope} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
+            ) : (
+              <Text style={styles.sub}>Pick a type to see and edit it.</Text>
+            )}
+          </ScrollView>
+        )}
       </View>
     </View>
   );
@@ -409,110 +414,112 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
     );
   const ro = !props.canEdit;
   return (
-    <View style={styles.section}>
-      <View style={styles.row}>
-        <Text style={[styles.sectionTitle, styles.grow]}>
-          {t.state === 'draft' ? <Text style={styles.draft}>DRAFT </Text> : null}
-          {t.model}
-        </Text>
-        <Text style={styles.sub}>
-          {t.devices} device{t.devices === 1 ? '' : 's'} · {t.state}
-        </Text>
-      </View>
-      {t.sourceRef || t.description || t.accessoryOnly ? (
-        <View style={styles.source}>
-          {t.sourceRef ? <Text style={styles.sub}>From {sourceLine(t.sourceRef)}{t.sourceRef.libraryTimestamp ? ` (library ${t.sourceRef.libraryTimestamp.slice(0, 10)})` : ''}</Text> : null}
-          {t.description ? <Text style={styles.desc}>{t.description}</Text> : null}
-          {t.accessoryOnly ? <Text style={styles.sub}>Accessory only: listed as other types' accessory, never offered as a device.</Text> : null}
-          {t.datasheetUrl ? (
-            <Pressable onPress={() => void Linking.openURL(t.datasheetUrl!)}>
-              <Text style={styles.link}>Datasheet ↗</Text>
-            </Pressable>
+    <View style={styles.grow}>
+      <ScrollView style={styles.grow} contentContainerStyle={styles.paneBody} keyboardShouldPersistTaps="handled">
+        <View style={styles.section}>
+          <View style={styles.row}>
+            <Text style={[styles.sectionTitle, styles.grow]}>
+              {t.state === 'draft' ? <Text style={styles.draft}>DRAFT </Text> : null}
+              {t.model}
+            </Text>
+            <Text style={styles.sub}>
+              {t.devices} device{t.devices === 1 ? '' : 's'} · {t.state}
+            </Text>
+          </View>
+          {t.sourceRef || t.description || t.accessoryOnly ? (
+            <View style={styles.source}>
+              {t.sourceRef ? <Text style={styles.sub}>From {sourceLine(t.sourceRef)}{t.sourceRef.libraryTimestamp ? ` (library ${t.sourceRef.libraryTimestamp.slice(0, 10)})` : ''}</Text> : null}
+              {t.description ? <Text style={styles.desc}>{t.description}</Text> : null}
+              {t.accessoryOnly ? <Text style={styles.sub}>Accessory only: listed as other types' accessory, never offered as a device.</Text> : null}
+              {t.datasheetUrl ? (
+                <Pressable onPress={() => void Linking.openURL(t.datasheetUrl!)}>
+                  <Text style={styles.link}>Datasheet ↗</Text>
+                </Pressable>
+              ) : null}
+            </View>
           ) : null}
-        </View>
-      ) : null}
-      <View style={styles.row}>
-      </View>
-      <Field label="Model">
-        <TextInput value={model} onChangeText={setModel} editable={!ro} style={styles.input} />
-      </Field>
-      <Field label="Category">
-        <Chips options={CATEGORIES} value={category} onPick={ro ? undefined : setCategory} />
-      </Field>
-      <Field label="Role" hint="What its devices are to the rules, the ID scheme, the Punch List Device text and the pin shape (T112). Category default = the role the category names, if any.">
-        <View style={styles.wrap}>
-          {([null, ...ROLES] as const).map((v) => (
-            <Pressable key={v ?? 'default'} disabled={ro} onPress={() => setRole(v)} style={[styles.chip, role === v && styles.chipOn]}>
-              <Text style={role === v ? styles.chipTextOn : styles.chipText}>{v === null ? `Category default (${ROLE_LABELS[roleOfCategory(category)]})` : ROLE_LABELS[v]}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </Field>
-      <Field label="Aliases (BOM)" hint="Comma-separated. A device whose Device text is the model or an alias is of this type.">
-        <TextInput value={aliases} onChangeText={setAliases} editable={!ro} placeholder="P-NSPS-D, P-NSPS-D-KIT" placeholderTextColor="#888" style={styles.input} />
-      </Field>
-      <Field label="ID scheme" hint="Level-number: 06M-04. Level-tag: 06M-S16 for stations, 06M-D3 for sensors. The server assigns the ID either way.">
-        <View style={styles.wrap}>
-          {([null, 'level_number', 'level_tag'] as const).map((v) => (
-            <Pressable key={v ?? 'default'} disabled={ro} onPress={() => setScheme(v)} style={[styles.chip, scheme === v && styles.chipOn]}>
-              <Text style={scheme === v ? styles.chipTextOn : styles.chipText}>{v === null ? 'Category default' : v === 'level_number' ? 'Level-number' : 'Level-tag (S/D)'}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </Field>
-      <Field label="Neuron ID" hint="Whether devices of this type carry one. A type that does not hides it on the card and is left out of “Missing all Device Neuron IDs” and the dashboard count.">
-        <View style={styles.wrap}>
-          {([null, true, false] as const).map((v) => (
-            <Pressable key={String(v)} disabled={ro} onPress={() => setNeuron(v)} style={[styles.chip, neuron === v && styles.chipOn]}>
-              <Text style={neuron === v ? styles.chipTextOn : styles.chipText}>
-                {v === null ? `Role default (${neuronIdDefaultForRole(roleOf({ role, category }, null)) ? 'needed' : 'not needed'})` : v ? 'Needed' : 'Not needed'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </Field>
-      <Field
-        label="Default cables (always generated)"
-        hint="Once the type is accepted, the rules offer each run as a draft to every device of this type that lacks it, instead of the category's (R2c / R2d). Unison (U) stays one bus per level (R2e).">
-        <CableList list={defaults} codes={props.codes} onChange={ro ? undefined : setDefaults} />
-      </Field>
-      <Field
-        label="Suggestions"
-        hint="Chips offered for this type's devices, before its category's and the project's (D174): under Notes, under an end's Note, for a punch item or a part. Saved as you add them; copied and promoted with the type (a chip added after the promotion has its own Promote).">
-        <SuggestionList rows={props.chips} scope="type" refKey={t.id} library={props.scope} canEdit={props.canEdit} run={props.run} libraryEditor={t.promotedAs ? props.libraryEditor : null} />
-      </Field>
-      <Field label="Optional cables" hint="Kept with the type; not generated.">
-        <CableList list={optional} codes={props.codes} onChange={ro ? undefined : setOptional} />
-      </Field>
-      <Field label="Optional accessories">
-        {accessories.map((a, i) => (
-          <View key={i} style={styles.row}>
-            <TextInput value={a.model} editable={!ro} onChangeText={(v) => setAccessories(replace(accessories, i, { ...a, model: v }))} placeholder="Model" placeholderTextColor="#888" style={[styles.input, styles.grow]} />
-            <Text style={styles.sub}>expected</Text>
-            <TextInput value={a.expected_qty == null ? '' : String(a.expected_qty)} editable={!ro} onChangeText={(v) => setAccessories(replace(accessories, i, { ...a, expected_qty: toQty(v) }))} keyboardType="number-pad" style={[styles.input, styles.qty]} />
+          <Field label="Model">
+            <TextInput value={model} onChangeText={setModel} editable={!ro} style={styles.input} />
+          </Field>
+          <Field label="Category">
+            <Chips options={CATEGORIES} value={category} onPick={ro ? undefined : setCategory} />
+          </Field>
+          <Field label="Role" hint="What its devices are to the rules, the ID scheme, the Punch List Device text and the pin shape (T112). Category default = the role the category names, if any.">
+            <View style={styles.wrap}>
+              {([null, ...ROLES] as const).map((v) => (
+                <Pressable key={v ?? 'default'} disabled={ro} onPress={() => setRole(v)} style={[styles.chip, role === v && styles.chipOn]}>
+                  <Text style={role === v ? styles.chipTextOn : styles.chipText}>{v === null ? `Category default (${ROLE_LABELS[roleOfCategory(category)]})` : ROLE_LABELS[v]}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Field>
+          <Field label="Aliases (BOM)" hint="Comma-separated. A device whose Device text is the model or an alias is of this type.">
+            <TextInput value={aliases} onChangeText={setAliases} editable={!ro} placeholder="P-NSPS-D, P-NSPS-D-KIT" placeholderTextColor="#888" style={styles.input} />
+          </Field>
+          <Field label="ID scheme" hint="Level-number: 06M-04. Level-tag: 06M-S16 for stations, 06M-D3 for sensors. The server assigns the ID either way.">
+            <View style={styles.wrap}>
+              {([null, 'level_number', 'level_tag'] as const).map((v) => (
+                <Pressable key={v ?? 'default'} disabled={ro} onPress={() => setScheme(v)} style={[styles.chip, scheme === v && styles.chipOn]}>
+                  <Text style={scheme === v ? styles.chipTextOn : styles.chipText}>{v === null ? 'Category default' : v === 'level_number' ? 'Level-number' : 'Level-tag (S/D)'}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Field>
+          <Field label="Neuron ID" hint="Whether devices of this type carry one. A type that does not hides it on the card and is left out of “Missing all Device Neuron IDs” and the dashboard count.">
+            <View style={styles.wrap}>
+              {([null, true, false] as const).map((v) => (
+                <Pressable key={String(v)} disabled={ro} onPress={() => setNeuron(v)} style={[styles.chip, neuron === v && styles.chipOn]}>
+                  <Text style={neuron === v ? styles.chipTextOn : styles.chipText}>
+                    {v === null ? `Role default (${neuronIdDefaultForRole(roleOf({ role, category }, null)) ? 'needed' : 'not needed'})` : v ? 'Needed' : 'Not needed'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Field>
+          <Field
+            label="Default cables (always generated)"
+            hint="Once the type is accepted, the rules offer each run as a draft to every device of this type that lacks it, instead of the category's (R2c / R2d). Unison (U) stays one bus per level (R2e).">
+            <CableList list={defaults} codes={props.codes} onChange={ro ? undefined : setDefaults} />
+          </Field>
+          <Field
+            label="Suggestions"
+            hint="Chips offered for this type's devices, before its category's and the project's (D174): under Notes, under an end's Note, for a punch item or a part. Saved as you add them; copied and promoted with the type (a chip added after the promotion has its own Promote).">
+            <SuggestionList rows={props.chips} scope="type" refKey={t.id} library={props.scope} canEdit={props.canEdit} run={props.run} libraryEditor={t.promotedAs ? props.libraryEditor : null} />
+          </Field>
+          <Field label="Optional cables" hint="Kept with the type; not generated.">
+            <CableList list={optional} codes={props.codes} onChange={ro ? undefined : setOptional} />
+          </Field>
+          <Field label="Optional accessories">
+            {accessories.map((a, i) => (
+              <View key={i} style={styles.row}>
+                <TextInput value={a.model} editable={!ro} onChangeText={(v) => setAccessories(replace(accessories, i, { ...a, model: v }))} placeholder="Model" placeholderTextColor="#888" style={[styles.input, styles.grow]} />
+                <Text style={styles.sub}>expected</Text>
+                <TextInput value={a.expected_qty == null ? '' : String(a.expected_qty)} editable={!ro} onChangeText={(v) => setAccessories(replace(accessories, i, { ...a, expected_qty: toQty(v) }))} keyboardType="number-pad" style={[styles.input, styles.qty]} />
+                {!ro ? (
+                  <Pressable onPress={() => setAccessories(accessories.filter((_, j) => j !== i))}>
+                    <Text style={styles.danger}>Remove</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ))}
             {!ro ? (
-              <Pressable onPress={() => setAccessories(accessories.filter((_, j) => j !== i))}>
-                <Text style={styles.danger}>Remove</Text>
-              </Pressable>
+              <View style={styles.wrap}>
+                <Pressable onPress={() => setAccessories([...accessories, { model: '', expected_qty: 1 }])}>
+                  <Text style={styles.link}>+ add</Text>
+                </Pressable>
+                {roleOf({ role, category }, null) === 'nsps' && !accessories.some((a) => a.model === NSPS_POWER_SUPPLY.model) ? (
+                  <Pressable onPress={() => setAccessories([...accessories, NSPS_POWER_SUPPLY])}>
+                    <Text style={styles.link}>+ {NSPS_POWER_SUPPLY.model} (expected 1, D52)</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             ) : null}
-          </View>
-        ))}
-        {!ro ? (
-          <View style={styles.wrap}>
-            <Pressable onPress={() => setAccessories([...accessories, { model: '', expected_qty: 1 }])}>
-              <Text style={styles.link}>+ add</Text>
-            </Pressable>
-            {roleOf({ role, category }, null) === 'nsps' && !accessories.some((a) => a.model === NSPS_POWER_SUPPLY.model) ? (
-              <Pressable onPress={() => setAccessories([...accessories, NSPS_POWER_SUPPLY])}>
-                <Text style={styles.link}>+ {NSPS_POWER_SUPPLY.model} (expected 1, D52)</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-      </Field>
-      <Text style={styles.sub}>Rules that reference this type: {t.rules.length ? t.rules.join(', ') : 'none'}</Text>
+          </Field>
+          <Text style={styles.sub}>Rules that reference this type: {t.rules.length ? t.rules.join(', ') : 'none'}</Text>
+        </View>
+      </ScrollView>
       {props.canEdit ? (
-        <View style={styles.actions}>
+        <View style={[styles.actions, styles.footer]}>
           <Pressable disabled={!dirty} onPress={() => void save()} style={[styles.btn, !dirty && styles.off]}>
             <Text style={styles.btnText}>Save</Text>
           </Pressable>
@@ -553,7 +560,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
               </Pressable>
             )
           ) : null}
-          {dirty && t.state === 'draft' ? <Text style={styles.sub}>Save before accepting.</Text> : null}
+          {dirty ? <Text style={styles.sub}>{t.state === 'draft' ? 'Unsaved changes: save before accepting.' : 'Unsaved changes.'}</Text> : null}
         </View>
       ) : null}
     </View>
@@ -576,11 +583,9 @@ function CableList(props: { list: LibraryCable[]; codes: readonly string[]; onCh
                 </Pressable>
               ))}
             </View>
-            <View style={styles.row}>
-              <TextInput value={c.from ?? ''} onChangeText={(v) => set({ from: v })} placeholder="From (empty = panel name)" placeholderTextColor="#888" style={[styles.input, styles.grow]} />
-              <TextInput value={c.to ?? ''} onChangeText={(v) => set({ to: v })} placeholder="To" placeholderTextColor="#888" style={[styles.input, styles.grow]} />
-              <TextInput value={c.far ?? ''} onChangeText={(v) => set({ far: v })} placeholder="Far end (placeholder)" placeholderTextColor="#888" style={[styles.input, styles.grow]} />
-            </View>
+            <LabeledInput label="From" value={c.from ?? ''} onChange={(v) => set({ from: v })} placeholder="empty = the device's name" />
+            <LabeledInput label="To" value={c.to ?? ''} onChange={(v) => set({ to: v })} placeholder="e.g. P-NSPS-D Power Supply" />
+            <LabeledInput label="Far end" value={c.far ?? ''} onChange={(v) => set({ far: v })} placeholder="a placeholder, e.g. 120v Power" />
             <View style={styles.row}>
               <Text style={styles.sub}>Single row</Text>
               <Switch value={c.single_row} onValueChange={(v) => set({ single_row: v })} />
@@ -597,6 +602,15 @@ function CableList(props: { list: LibraryCable[]; codes: readonly string[]; onCh
       <Pressable onPress={() => onChange([...list, blankCable()])}>
         <Text style={styles.link}>+ add cable</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function LabeledInput(props: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.sub, styles.inputLabel]}>{props.label}</Text>
+      <TextInput value={props.value} onChangeText={props.onChange} placeholder={props.placeholder} placeholderTextColor="#888" style={[styles.input, styles.grow]} />
     </View>
   );
 }
@@ -644,13 +658,14 @@ const styles = StyleSheet.create({
   note: { paddingHorizontal: 20, paddingBottom: 8, color: '#b3261e', fontSize: 14 },
   noteOk: { color: '#1a7f37' },
   split: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e1e4e8' },
-  list: { flex: 4, borderRightWidth: 1, borderRightColor: '#e1e4e8' },
+  // the list keeps a third of the screen at most, so the editor gets the rest (T125)
+  list: { width: '34%', maxWidth: 380, borderRightWidth: 1, borderRightColor: '#e1e4e8' },
   listBody: { paddingHorizontal: 16, paddingBottom: 16, gap: 2 },
   filters: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, gap: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e1e4e8' },
   wrapLine: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 2 },
   groupHead: { paddingTop: 12 },
   linkSmall: { color: '#1f6feb', fontSize: 14, fontWeight: '600' },
-  pane: { flex: 6 },
+  pane: { flex: 1 },
   paneBody: { padding: 20, gap: 16 },
   groupTitle: { fontSize: 15, fontWeight: '700', color: '#444' },
   typeRow: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, minHeight: 44 },
@@ -672,7 +687,9 @@ const styles = StyleSheet.create({
   qty: { width: 64, textAlign: 'center' },
   cables: { gap: 10 },
   cable: { gap: 6, padding: 10, borderWidth: 1, borderColor: '#e1e4e8', borderRadius: 8 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingTop: 8 },
+  actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 16, paddingTop: 8 },
+  footer: { paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#e1e4e8', backgroundColor: '#fff' },
+  inputLabel: { width: 64 },
   btn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#1565c0' },
   btnOk: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#1a7f37' },
   btnGhost: { paddingHorizontal: 8, paddingVertical: 10 },

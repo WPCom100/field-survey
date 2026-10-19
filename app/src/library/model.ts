@@ -108,6 +108,15 @@ export function clean(text: string | null | undefined): string | null {
   return t === '' ? null : t;
 }
 
+/**
+ * What the type editor's form holds, as one string (T125): the editor is rebuilt only when this
+ * changes, so a Save does not bring back the pre-save values while the reload is on its way, and a
+ * change pulled from another iPad still refreshes the form.
+ */
+export function editorStamp(t: LibraryType): string {
+  return JSON.stringify([t.id, t.model, t.category, t.role, t.aliases, t.idScheme, t.needsNeuronId, t.defaultCables, t.optionalCables, t.optionalAccessories, t.state, t.promotedAs]);
+}
+
 /** "A, B ,a" → ["A", "B"]: comma-separated aliases, deduplicated ignoring case and spaces. */
 export function parseAliases(text: string): string[] {
   const out: string[] = [];
