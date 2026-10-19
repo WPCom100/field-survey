@@ -10,11 +10,13 @@ Things only an iPad can prove. Each finished task adds its checks here; you test
 3. **Logs.** In the Metro terminal press `j` to open React Native DevTools; app logs appear there, not in the terminal.
 4. **Mark results as you go.** Tick `[x]` for pass. For a fail, leave it `[ ]` and write what you saw after "→ saw:". Then paste this file back to Claude.
 
-Pending round started: **2026-10-14**. The M3 close-out round of 2026-10-14 is complete and archived in [on-device-log.md](on-device-log.md): 64 pass, 3 fail, 9 skip, 1 not done. **Part A passed in full** (three review items, nothing lost). Its fails became **T91** (no Surveyed field in Setup → Levels — the last M4 gate item), **T92** (the long-press menu waits for a move) and **T93** / **T94** (export status and speed at TP-3 size); your notes became **T95** (both end devices in a connection search), **T96** (preview the in-between grid bubbles) and **T97** (assign levels). Every decision on the sheet was accepted. What passed has left this file; what is below was skipped, not done, or failed and waits for its fix. New tasks add their checks below.
+Pending round started: **2026-10-19**. The full-pipeline round of 2026-10-18 ran Parts 0–C of the sheet on one iPad (no second iPad) and is archived in [on-device-log.md](on-device-log.md): 54 pass, 9 fail, 19 skip, 3 not done; Parts D–H not started. Three fails (A-2, A-3, B-5: the library editor) were fixed as **T125** during the round and wait for a retest (its section below). The others became **T126** (accessories listed as devices to place), **T127** (dashed proposals missing for the panels; full names in the list), **T128** (a cable draft's code cannot be changed), **T129** (riser crops: no pinch-zoom; the riser stopped loading) and **T130** (NSPS types marked Neuron ID needed). Your C-33 remark is **D221** → **T132**; the slowness during sync you reported is **T131**. No Decision line was answered: the ones below stay. What passed has left this file; what is below was skipped, not done, or failed and waits for its fix.
 
-**Round of 2026-10-18 (full pipeline):** every project on the server was removed (`docs/ops.md` §5.4) and the checks below are rewritten as one run of the whole pipeline in the round sheet https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy (Scratch → Pipeline → Master → exports). Where a check below names the Tower, Tower M3 round, Houston or TP-3 project, the sheet says which new project to use. Server `234fa4a` (migration 0017), JS update `89a75db0` for TestFlight build 15 (runtime `24fe50c2`).
+**The sheet:** keep using https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy with the Scratch and Pipeline projects as they are — Parts D–H were written for them, and A-4…A-6, B-16, B-22…B-24, B-28…B-31, C-7…C-9, C-23, C-26, C-34…C-36, C-38, C-39, C-42…C-47 are still open on it. Where a check below names the Tower, Tower M3 round, Houston or TP-3 project, the sheet says which project to use. Server `b4e787b` (migration 0017), JS update `18f7efe4` (T125) for TestFlight build 15 (runtime `24fe50c2`).
 
-**This round's build:** **new dev build `a5cbf96f`** (T92; replaces `ddf99272`). Install it from the EAS build page before the round; opening a plan must log `[plan] pdf native patch: t92 ink,longpress-move,press-timer` (if it still says `t70`, the old build is running). **Server and JS:** every green push to `main` deploys the server and publishes the update (T85); `curl -s https://survey.wpcom.cloud/health` shows what runs.
+**Decision lines whose sections passed and left this file, still unanswered:** D194 (riser lines with no bubble, T108 — amended by D221), D203 (library screen at catalogue size, T114), D204 (BOM and riser drafts by role, T115). Their text is in DECISIONS.md. → Approve / change each:
+
+**This round's build:** **dev build `a5cbf96f`** (T92; replaces `ddf99272`). Install it from the EAS build page before the long-press checks; opening a plan must log `[plan] pdf native patch: t92 ink,longpress-move,press-timer` (if it still says `t70`, the old build is running). **Server and JS:** every green push to `main` deploys the server and publishes the update (T85); `curl -s https://survey.wpcom.cloud/health` shows what runs.
 
 ---
 
@@ -95,11 +97,10 @@ Skipped 2026-10-14 (close-out C-18, C-19). Everything else in T84 passed.
 
 Decision D157: answered 2026-10-14, **Approved**.
 
-## T87 — The name on the Levels home; one name on two iPads  ·  Needs: no new build
+## T87 — One name on two iPads  ·  Needs: no new build; two iPads
 
-The two-name check passed in the close-out (Part A). These two were not on the sheet.
+The two-name check passed in the close-out (Part A) and the name on the home passed 2026-10-18 (B-1). Sheet D-32.
 
-- [ ] **The name is on the home.** Levels home, above the project name: `Signed in as <your name> · This iPad: Field 1`. On an iPad with no label: `This iPad: iPad …` + six characters and "(name it on the Sync screen)". Rename the label on the Sync screen and come back: the line follows. → saw:
 - [ ] **Same name on two iPads: both inks survive.** Both iPads signed in under the **same** name, both cached 06M, airplane mode on both. A draws over the rack area first; a minute later B circles a station. Airplane mode off on B, wait for Synced; then A. Open 06M on A: within a few seconds A's strokes come back next to B's; the Metro log reads `[plan] ink: merged 1 concurrent write(s) into layer …`. Sync B and open 06M: the same strokes. No review item. → saw:
 
 Decision D162: answered 2026-10-14, **Approved**.
@@ -125,18 +126,14 @@ Decision D164: answered 2026-10-14, **Approved**.
 
 Decision D145: answered 2026-10-14, **Approved**. Whether you want a **Discard** action for an edit the server will never accept is still open (DECISIONS.md, Open now).
 
-## T45 — Replace a plan sheet (leftover)  ·  Needs: no new build; a throw-away project
-
-- [ ] **Replace.** Floor plans → a level with a sheet → Replace… with a different PDF: the level now opens that one; the old pins show as "elsewhere" (T77 carries them over). → saw:
-
 ## T65 — Imported multi-device photos (observation)  ·  Needs: no new build
 
 - [ ] **Imported multi-device photos.** On the Tower project, if a photo shows several devices in the master (`B1-01, B1-02`): note whether only the first device shows it (expected for data imported before T65; see the Tower backfill question in DECISIONS.md). → saw:
 
 ## T91 — Surveyed / Updated dates in Setup → Levels  ·  Needs: no new build (JS update)
 
-- [ ] **Set the date.** Tower M3 round → Setup → 2 Levels: each row has Surveyed and Updated boxes. Type `2026-10-13` in 06M's Surveyed, tap elsewhere. Expect the box to keep the date after a reload of the screen. Why: re-runs close-out B-3 and fills the one-off T89 → ops follow-up. → saw:
-- [ ] **Bad date refused.** Type `13/10/2026` (or `2026-02-30`): red border and a message at the top; nothing saved, the old date returns after the next save elsewhere. Clear the box and tap away: the date empties. → saw:
+Set the date and Bad date refused passed 2026-10-18 (C-2, C-3). Sheet G-1.
+
 - [ ] **Header follows.** Export screen's Floor PDF header line for 06M reads `Surveyed 2026-10-13`; a level with an empty box still shows its newest survey date (D159). → saw:
 
 ## T33 — Rule drafts: Accept / Edit / Reject on the card  ·  Needs: no new build (JS update; server deploy first)
@@ -278,11 +275,11 @@ Decision D183 (Proposed): cable templates `{code, from, to, far, single_row, qty
 
 **Why it matters:** device types added on one job carry into the next: the app library lives apart from any project, syncs between iPads like project data, and every new project starts from it.
 
+Failed 2026-10-18 (sheet A-2, A-3): "The sidebar is too small and all the text is bunched up; the buttons at the bottom should be visible the whole time" and "Upon clicking save you seem to lose the state of the information panel" → **T125** (done; re-run A-2 and A-3 with its section below). Promote (B-27) and New project copies it (C-1) passed. Sheet A-4 … A-6 need the second iPad.
+
 - [ ] **Open it from Projects.** Levels home → Projects → **Device-type library**: `App device-type library`, ◀ Projects back. On a fresh iPad with no project it still opens (and syncs). → saw:
-- [ ] **Add and accept without a project.** **+ New type** → `P-TS7-E`, Touchscreen → Add draft → add a default cable (N → `Network switch`) → Save → **Accept draft**. → saw:
-- [ ] **Second iPad.** Within a few seconds the other iPad's app library shows `P-TS7-E` accepted (no project open needed). → saw:
-- [ ] **Promote.** In a project's Library, pick an accepted type → **Promote to app library**: "Promoted: … new projects copy it."; the button becomes `In the app library ✓`. Promoting a draft is not offered; promoting a model the app library already has is refused. The app library lists the type. → saw:
-- [ ] **New project copies it.** Projects → **+ New project** (any name, one level) → open its Library: the promoted type and `P-TS7-E` are there, accepted. → saw:
+- [ ] **Add and accept without a project.** **+ New type** → `TEST-TS-1`, Touchscreen → Add draft → add a default cable (N → `Network switch`) → Save → **Accept draft**: after Save the form keeps what you typed. → saw:
+- [ ] **Second iPad.** Within a few seconds the other iPad's app library shows `TEST-TS-1` accepted (no project open needed). → saw:
 - [ ] **Conflict.** Both iPads offline (airplane mode), open the same app-library type, change its Aliases differently, Save on both; back online: the library header reads `1 in review ▸` → **App library — needs review** lists `Device type …` · Aliases with A / B; Choose B → both iPads show B's aliases and the item is gone. → saw:
 - [ ] **Offline.** In airplane mode, add an app-library type: it saves at once; the Sync screen counts it as pending and it uploads when back online. → saw:
 
@@ -320,64 +317,40 @@ Decision D186 (Proposed): an optional run is offered once the runs before it of 
 
 **Why it matters:** the BOM and the riser become reviewed drafts per level, with the paper next to each one, before anything is placed or locked. Nothing is accepted for you, and every Accept is recorded under your name. Use a **scratch project** with levels B2–06M (not the Tower round project), so nothing duplicates the seeded master.
 
-- [ ] **Upload.** Setup → **3 Sources** → **BOM and riser** → BOM **Choose PDF…** → `BOM.pdf`. The line reads Queued, then "Done: 108 device drafts, 17 excluded lines…". Then Riser → `riser.pdf`. About 12 minutes later it reads "Done: … cable drafts … Claude $…". → saw:
-- [ ] **Step 4 opens.** After a sync, **4 Review drafts** is live. Level chips show B2…06M plus **Pool** and the floors the project lacks (09, 10…). Each chip shows its open count, and the header reads "Devices n · Cables n · Needs review n". → saw:
-- [ ] **Source crops.** Tap a device row with Src **R+B**. The panel shows two crops: the BOM line and the riser symbol, each outlined in red. Tap a crop: it gets larger with more of the sheet around it. → saw:
-- [ ] **SR / LR.** On 01, a `P-DOC-C-?` row. Accept stays greyed with "Pick the model…". Pick LR → Accept. The row reads ✓ edited. → saw:
-- [ ] **BOM ≠ riser.** On 01, PI1004. The panel offers BOM 1 / Riser 2 radio buttons. Pick one → Accept. Needs review no longer lists that level's source conflict. → saw:
-- [ ] **Accept all ≥ 0.9.** On a level, tap **Accept all ✓ ≥ 0.9 (n)**. The dialog names you; confirm. Only clean rows turn ✓ accepted; flagged and conflict rows stay open. Open a device draft's History if shown, or check the Sync screen's pending count: one change per draft. → saw:
-- [ ] **Edit / Reject / Reopen.** Edit… a draft: change qty and level → **Save & accept** → ✓ edited. Reject another with a reason chip → ✗ rejected, and the **Rejected** filter lists it. **Reopen** → back to Open. → saw:
+Passed 2026-10-18 on the Pipeline project (sheet C-14 … C-21, C-24, C-27: upload — riser 15 min, Claude $2.84 — step 4, crops, SR / LR, BOM ≠ riser, Accept all, Edit / Reject / Reopen, Cables tab, hand drafts). What stays:
+
 - [ ] **Mismatch list.** Under the table, sentences like "BOM qty 1 ≠ riser 2 (PI1004)" and "Riser device not in the BOM: …". Tap one: its draft is selected. → saw:
 - [ ] **Excluded lines.** Devices tab → **Excluded BOM lines ▸** lists service lines, brackets and similar items with their reason. **Promote…** one → it appears as a draft with Src **BOM↑** and asks for a category before Accept. → saw:
-- [ ] **Cables tab.** Switch to Cables on 06M. Rows show Code · From · To · To-lvl; unresolved far ends read "— pick" in orange. The panel shows the riser crop with the **bubble** outlined. → saw:
-- [ ] **Endpoint picker.** On a cable whose To is unresolved, tap **Change…**. Candidates come first, a draft device that is already a device reads "(in the baseline)", and placeholders follow. Search finds devices on other levels. Pick one → the To line updates. → saw:
+- [ ] **Endpoint picker.** Failed 2026-10-18 (C-26): "Not able to change the 0-10v riser connections autodetected at 120v power. Cant change the cable type to 0-10v." → **T128** (the code chips on every open cable draft). Re-run after it: on a cable whose To is unresolved, tap **Change…**. Candidates come first, a draft device that is already a device reads "(in the baseline)", and placeholders follow. Search finds devices on other levels. Pick one → the To line updates. On a cable the riser read with the wrong code, pick the right code chip: the row follows and reads ✓ edited. → saw:
 - [ ] **Confirm endpoint.** Tap **Confirm endpoint ✓**. The note says the cable is made, or that it waits for its device to be placed. Open **Cable / riser**: the new cable is listed **without ⚑**, and its ends read like `DMX to Level 02 UFMP4`. A cable accepted with **Accept unconfirmed** shows ⚑. → saw:
-- [ ] **Hand drafts (K12).** **+ Draft device** → PI1002 · Station · qty 4 on 02 → Add. It lists with Src **hand** and can be accepted. **+ Draft cable** → NG, From `Equipment rack`, To `P-TS7-E` → Add, then pick both ends and Confirm. → saw:
 - [ ] **Needs review link.** Needs review → **Extraction** tab: a line counts the flagged drafts → **Open Setup → Review drafts ▸** opens step 4. A **Source conflict** item has **Open in Review drafts ▸**, which opens that draft selected. → saw:
 - [ ] **Offline.** Airplane mode: Accept, Reject and endpoint picks still save; crops and excluded lines say they need a connection. Back online, the edits sync. → saw:
 - [ ] **Second iPad.** After a sync, the other iPad shows the same states, and an accepted cable appears once in Cable / riser. → saw:
 
 Decision D193 (Proposed): Accept on a device draft only marks it reviewed; its devices are made when placed (step 5, T46), so a level seeded from the master is never duplicated. Accept on a cable draft makes the cable once both ends are real records; if the baseline already has that cable, it is linked instead. A cable whose end is a not-yet-placed draft device waits until that device is placed. **Confirm endpoint** = Accept plus "endpoints confirmed"; Accept all leaves cables unconfirmed. A source conflict is settled by Accept (the drafts' count) or Reject (the baseline's). Flagged drafts get no Needs review items: Needs review counts them and links to step 4. → Approve / change:
 
-## T108 — Riser lines with no bubble: "What is this cable?"  ·  Needs: no new build (JS update; server deploy first, then upload the riser again to a **new scratch project**)
-
-**Why it matters:** the riser draws some cables with no code bubble (feed and note arrows, the last Unison link into an NSPS, trunks marked only by a label). You asked to be asked about each one, so nothing on the drawing goes unaccounted for. Use a fresh scratch project: a riser already extracted for a project is skipped the second time.
-
-- [ ] **They are proposed.** After the riser job finishes, its line in Setup → 3 Sources still reads "Done: … cable drafts …". On **4 Review drafts → Cables** for 03, the first rows have Code **?**: two `TO LOAD CKTS`, two 0-10V control leaders, two feed arrows, the UFMP4's `TO LOAD` and feed, two EBDK sense feeds, the NSPS feed and the NSPS line up the trunk. That is 12 lines on 03; the model may add one it saw. → saw:
-- [ ] **The question and the crop.** Tap the CT03LCPB 0-10V leader. The panel reads **What is this cable? Pick its code**, then "Guess: 0-10V (…)", with the **0-10V ?** chip marked and the To already set to **Fixtures (placeholder)**. The riser crop outlines the leader line, not a bubble, and is labelled "Riser 001 · level 03 · line l…". → saw:
-- [ ] **Nothing is taken for you.** Before you pick a code, Accept stays greyed with "Pick the cable code." **Accept all ≥ 0.9** never takes these lines. → saw:
-- [ ] **Accept → the library row, once.** Pick **0-10V**, then Confirm endpoint. The note says the cable is made. Open the panel's device card once it is placed: Connections shows one 0-10V row, `CT03LCPB → Fixtures`, and **no** R2c draft offering another. Do the same on a panel that **already** had its 0-10V row (accepted from the R2c draft first). The note says the baseline already had it, and the card still shows a single 0-10V row. → saw:
-- [ ] **A 120V feed.** On an NSPS feed line (guess 120V, To **120v Power**): pick 120V → Confirm. The NSPS card's row reads `120v Power → P-NSPS-D Power Supply`, and R2d no longer offers one. → saw:
-- [ ] **Not a cable.** On a `TO LOAD CKTS` line (no guess, To "— pick"), Reject with a reason such as "Load circuits, by others". It reads ✗ rejected and no cable is made. → saw:
-- [ ] **Needs review.** Needs review → Extraction counts these lines among the flagged drafts, and the mismatch list under the table reads "A riser line with no wire code from CT03LCPB → "TO LOAD CKTS" — what is it?". → saw:
-
-Decision D194 (Proposed): a line with no bubble is found by the geometry on text sheets (touching a device's outline, reaching out of it, no bubble) and by the model on sheet 002; its guess comes from the model, else from its own text, and is never the code. Nothing is excluded: you reject what is not a surveyed cable. An accepted 0-10V line (Relay panel) or 120V line (NSPS / rack) **becomes the device's library row**: it is linked to the row the device already has, or made with the library's wording, so R2c / R2d stop offering one. → Approve / change:
-
 ## T106 — Riser crop on cables made from the riser  ·  Needs: no new build (JS update)
 
 **Why it matters:** a cable accepted from a riser draft now shows the riser itself in the Cable / riser view, zoomed to its bubble, so you can check the far end against the drawing without leaving the cable. Use the scratch project from T44 / T108 (it has accepted riser cables).
 
-- [ ] **Download.** Cable / riser → tap a cable you accepted with **Confirm endpoint** in Review drafts → under the end editor, **Riser crop · riser.pdf p.1** reads "Riser not downloaded" with **⤓ Download riser**. Tap it: after a few seconds the riser opens. → saw:
+Failed 2026-10-18 (C-35): "I want to be able to pan and zoom on the cropped image once I click on it to make it bigger. Riser crop was working for a while and is now broken. No riser loads anywhere." → **T129** (why it stopped; a visible error; pinch-zoom on the enlarged crops). Not from the riser (C-37) passed. Re-run after T129:
+
+- [ ] **Download.** Cable / riser → tap a cable you accepted with **Confirm endpoint** in Review drafts → under the end editor, **Riser crop · riser.pdf p.1** reads "Riser not downloaded" with **⤓ Download riser**. Tap it: after a few seconds the riser opens. If it does not, the panel says what failed (not reachable, status, missing file) instead of staying blank. → saw:
 - [ ] **Focused and outlined.** The crop opens **upright** (the drawing reads left to right, not on its side), zoomed to the cable's wire bubble with some of its line around it, and the bubble has a red outline. It is the same bubble the Review drafts crop outlined for that draft. → saw:
-- [ ] **Pinch.** Pinch out and pan: the red outline stays on the bubble (it may trail a moment behind during the gesture). → saw:
+- [ ] **Pinch.** Pinch out and pan: the red outline stays on the bubble (it may trail a moment behind during the gesture). In Review drafts, tap a source crop to enlarge it: it pinches and pans the same way. → saw:
 - [ ] **Page 2.** A cable from a level on sheet 002 (14–28 are out of scope, so pick one whose far end is there if you have one; else skip) opens on **p.2**, focused the same way. → saw:
 - [ ] **Cached.** Pick another riser cable: it opens straight away, no download. Airplane mode: it still opens. → saw:
 - [ ] **Accepted offline.** Airplane mode on: in Review drafts accept another riser cable with Confirm endpoint. Turn airplane mode off, sync, open it in Cable / riser: the crop still finds the riser (by its file name) and opens it. With airplane mode on at that point instead, it says the riser PDF could not be found, with **Try again**. → saw:
-- [ ] **Not from the riser.** A cable from the seeded master or one added on a card reads "No riser crop for this cable: it was not made from a riser draft". → saw:
 
 Decision D195 (Proposed): the riser's boxes are measured on the page as it is displayed (the Tower riser's pages are turned a quarter, `/Rotate 270`); the iPad turns them into PDF coordinates using the rotation the viewer reports, so the crop opens upright on the bubble with no new build. A cable accepted offline finds its riser by file name when it is shown, and nothing is written back to the cable. → Approve / change:
 
 ## T111 — DaVinci library import  ·  Needs: no new build (JS update; server deploy first, and **every iPad on the new JS before the first upload** — an older iPad refuses the new columns on pull until it updates, nothing lost)
 
-**Why it matters:** ETC's whole catalogue becomes app-library drafts in one upload, so types are picked, not typed, and every project created afterwards starts with the accepted ones. Get `library.json` from the PC first: it is at `%LOCALAPPDATA%\ETC\DaVinci\library.json` after a DaVinci launch (≈ 49 MB); copy it and `fixtures/DaVinci_categories.xlsx` to iCloud Drive.
+**Why it matters:** ETC's whole catalogue becomes app-library drafts in one upload, so types are picked, not typed, and every project created afterwards starts with the accepted ones.
 
-- [ ] **Two files, one tap.** Any project → Setup → 3 Sources → **DaVinci library**: tick **Retire the hand-made app-library types first** (D199), then **Choose files…** → in Files select both `library.json` and `DaVinci_categories.xlsx` (tap Select, pick both, Open). The row reads "Uploading library.json and DaVinci_categories.xlsx…", then "Queued", then within a minute "Done: … new drafts, 0 updated, 0 unchanged (501 device types, 631 accessories), 0 protocol drafts, n hand-made types retired". After a sync, Projects → Device-type library no longer lists your hand-made types (History on a project still shows them; the Centennial project's own copies are still there). → saw:
-- [ ] **Only the library picked.** Choose files… again with only `library.json`: it uploads (the mapping is reused) and ends "Already imported — this library and mapping were imported before". → saw:
-- [ ] **The drafts arrive.** Sync, then Projects → **Device-type library**: Power Distribution, Equipment, Station, Touchscreen… groups full of DRAFT types ("added by <you> 10/16 ⚑"), and an **Accessories (not placeable)** group (P-LCD-FBB, ERP-FT-LVD, P-ACP-E Mk2…). Tap **P-NSPS-D**: "From DaVinci · Paradigm / Controllers · NSPS (library 2026-10-13)", the description, **Datasheet ↗** opens ETC's PDF in Safari, aliases `NSPS · 7182A1711`, Default cables U, N, **UV** (its 48 V aux bus, D199) **and 120V** (it is a power supply, D198), Neuron ID "Needed". Tap **ERn2-W-120 Mk2**: Default cables 120V alone (its P-SPM-E module is a power supply). Tap **EBDK**: P and 120V (the Sense wire). → saw:
-- [ ] **A touchscreen's back boxes.** Tap **P-TS7-E**: Default cables NG; Optional accessories list P-LCD-FBB, P-LCD-SBB, P-LCD-SLBB, P-LCD-SBB-5 (expected empty — the "one of these" rule is kept on the row for T113) and P-LCD-LC. On **ERn2-W-120 Mk2**: P-ACP-E Mk2 expected 1. → saw:
-- [ ] **Accessories are not devices.** On a plan, long-press → add device → the type picker: search "LVD" or "P-LCD" — nothing; "P-TS7" — the touchscreen (draft, flagged). → saw:
-- [ ] **Cable codes.** That project's Setup → Vocabulary → **Cable codes**: X N NG U F P UV 0-10V 120V **D** accepted and no drafts (every DaVinci protocol has a ruling now, D199 / D200; a protocol ETC adds later would appear here as a draft). → saw:
-- [ ] **Accepted types stand.** Accept P-NSPS-D as it is. Back on the PC, regroup one row in the mapping sheet (e.g. move `Paradigm / Contact Interfaces` to Equipment) and upload `library.json` + the changed `.xlsx` again: the line reads "Done: 0 new drafts, … updated, …, 1 accepted or rejected left alone"; after a sync UHCI-WM sits under Equipment as a draft, P-NSPS-D is unchanged, and History on UHCI-WM shows the category change by "DaVinci library import". → saw:
+Passed 2026-10-18 (sheet B-2 … B-4, B-6, B-13 … B-15: the upload in 0.5 min, the drafts, the codes, Accept all, accessories not devices, a re-run). What stays:
+
+- [ ] **A touchscreen's back boxes.** Failed 2026-10-18 (B-5): "The sidebar is far too small. Can't read anything in the optional cables area for ERn2-W-120 Mk2" → **T125** (done). Re-run: tap **P-TS7-E**: Default cables NG; Optional accessories list P-LCD-FBB, P-LCD-SBB, P-LCD-SLBB, P-LCD-SBB-5 (expected empty — the "one of these" rule is kept on the row for T113) and P-LCD-LC. On **ERn2-W-120 Mk2**: P-ACP-E Mk2 expected 1, and each cable's From / To / Far end readable on its own line. → saw:
 - [ ] **A hand-made model.** Make a draft type "P-TS7-PE" by hand in the app library, upload again (any newer file) with the Retire box **off**: the line ends "1 model clash"; your type is untouched. → saw:
 
 Decision D197 (Proposed): the import files its batch under the project you start it from (that project's Vocabulary takes the unmapped protocols as Cable codes drafts), writes the types to the app library as drafts with four new columns (description, datasheet, DaVinci provenance, accessory-only), keeps "one of these" accessory rules as a group on each row rather than an expected count, treats a model you already made by hand as a clash it reports and never merges, and never touches an accepted or rejected type on a re-run. → Approve / change:
@@ -389,8 +362,7 @@ Decision D197 (Proposed): the import files its batch under the project you start
 **Order on a project** (D201 (3)): run the DaVinci import first (T111 checks), accept or at least leave the catalogue types as drafts, **then** Vocabulary → Load standard values, **then** fix the old spellings with one ruling.
 
 - [ ] **Category picker.** On a plan, long-press → + Device: the category chips read Power Distribution · Emergency Equipment · Equipment · Equipment Panels · Equipment Rack · Power Supplies · Wall Plates · Lighting Console · Touchscreen · Station · Sensor (the eleven), in that order. The same list in Setup → Review → Edit a device draft, and in the ruling editor's Category options. → saw:
-- [ ] **Role chips in the library editor.** Projects → Device-type library → P-NSPS-D (from DaVinci): a new **Role** field reads **NSPS** (chip selected), with Category default (Other) · Relay panel · Foundry panel · EBDK · Equipment rack · NSPS · Touchscreen · Station · Sensor · Other beside it. The Neuron ID line reads "Role default (not needed)"; "+ P-NSPS-D Power Supply (expected 1, D52)" is offered. Open UFMP4: role Foundry panel; ERn2-W-120 Mk2: Equipment rack; P-TS7-E: Touchscreen; UH10002: Station; UHCI-WM: Sensor; EBDK: EBDK; ERP-FT-LVD (accessory): Category default (Other). Rules that reference this type: R2d, R2e on the NSPS; R2c on a relay panel type. → saw:
-- [ ] **A role corrected by hand stands.** Change P-TS7-E's role to Other and Save; upload the DaVinci library again (any newer file): after the sync P-TS7-E still says Other (D199 (3)); set it back to Touchscreen. → saw:
+- [ ] **Role chips in the library editor.** Failed 2026-10-18 (B-11): "Neuron ID is set to needed for both -D and -KIT" — the DaVinci import writes an explicit Needed, which overrides the role default → **T130** (decision first). Re-run after it: Projects → Device-type library → P-NSPS-D (from DaVinci): the **Role** field reads **NSPS**, and the Neuron ID line reads "Role default (not needed)" on P-NSPS-D and P-NSPS-D-KIT; "+ P-NSPS-D Power Supply (expected 1, D52)" is offered. (The roles of UFMP4, ERn2-W-120 Mk2, P-TS7-E, UH10002, UHCI-WM, EBDK and ERP-FT-LVD read right already; B-12, a role corrected by hand, passed.) → saw:
 - [ ] **Pin shapes follow the role.** On a Centennial plan: the NSPS pin is a pentagon, the rack a hexagon, EBDKs wide rectangles, UFMP4s rounded squares (they match the catalogue's UFMP4 type), relay panels squares, stations circles, sensors diamonds, the touchscreen a triangle. Add a device with a `Power Supplies` type (E-SPS): its pin is an **octagon**. → saw:
 - [ ] **Load standard values on Centennial.** Setup → Vocabulary → Load standard values: the line counts the new values; **Device categories** now lists the eleven (Equipment Rack included) and no longer lists Relay panel / Foundry panel / EBDK / NSPS / Equipment rack (they are old spellings now). Touchscreen, Station and Sensor are the same rows as before. → saw:
 - [ ] **The rename ruling.** Lint → **Value outside vocabulary**: one finding per device still spelled the old way (`06M-04: Category "NSPS" is an old spelling of "Equipment"` …), with **Fix all via ruling**. Tap it: the ruling editor opens one rename per spelling (Relay panel → Power Distribution first); the preview lists every device it changes; Apply. Repeat for the other four. Afterwards the lint is quiet, each device's History shows a Ruling change with your name and the reason, and Device categories shows the old spelling pointing at the new one. → saw:
@@ -404,46 +376,13 @@ Decision D201 (Proposed): (1) `library_type.role`, read instead of category stri
 
 **Why it matters:** the catalogue says "one of these back boxes" and "two ERn modules"; until now only a single accessory found short was flagged. T113 checks the groups and each model's maximum, and the card offers a group's members together.
 
-Set-up: in Projects → Device-type library, **accept** the DaVinci types ERn2-W-120 Mk2 (or another ERn2) and P-TS7-E, and give one device of each on a scratch plan that type (card → type).
+Grouped rows, counting, group findings and max quantity passed 2026-10-18 (B-18 … B-21). B-22 was not understood ("not sure what the type is for? … The only draft I see is the cable connection suggestions"): it is about the **library type**, not a draft on the card — reworded:
 
-- [ ] **Grouped "+ add" rows.** Open the ERn2 device's card → Accessories: the "+ add" rows come in blocks with a left rule; one reads `ERn Modules · needs 2` over its members, another `ERn Accessories · needs 0 to 1`; ungrouped accessories (URTO Mk2…) are single rows. On the P-TS7-E: one block `backbox accessory · needs 1` with the back boxes in it. On an NSPS kit device: `+ add P-NSPS-D Power Supply` · expected 1 is still its own row. → saw:
-- [ ] **Counting fills the head.** On the ERn2, + add P-ACP-E Mk2, set found 1: the block's head now reads `ERn Modules · needs 2 · found 1` and still offers ERn-BM; the block stays where it was. → saw:
-- [ ] **Group findings.** With only that module counted, the card's findings (and Lint → **Accessory group out of range**) show `<ID>: ERn Modules found 1, needs 2 (P-ACP-E Mk2, ERn-BM)`. Add ERn-BM with found 1: the finding goes. On the P-TS7-E add two different back boxes, found 1 each: `backbox accessory found 2, needs 1 (…)`; set one to 0: quiet. → saw:
-- [ ] **Max quantity.** Set an accessory whose catalogue max is 1 (URTO Mk2) to found 2: `<ID>: URTO Mk2 found 2, at most 1`. Back to 1: quiet. → saw:
-- [ ] **Drafts stay quiet; Save keeps groups.** Put the P-TS7-E type back to draft (Back to draft): its group finding disappears, the card still shows the grouped "+ add" rows. Accept it again, change its description or an alias, Save: the groups are still on the card (the editor no longer drops them). → saw:
+- [ ] **Drafts stay quiet; Save keeps groups.** On the Scratch plan the P-TS7-E device still has two back boxes counted (its `backbox accessory found 2, needs 1` finding shows). Now go to **Library → P-TS7-E** (the device type, in the project's library) and tap **Back to draft**: the type is a DRAFT again. Back on the device's card: the group finding is gone (a draft type's groups are not checked), but the grouped "+ add" rows are still there. In the Library tap **Accept draft** on P-TS7-E again, change an alias, **Save**: on the card the finding is back and the groups are still on it (the editor did not drop them). → saw:
 
 Decision D202 (Proposed): (1) only accepted types' groups are checked; (2) a group is checked once one member is counted, found = the members' counted sum; (3) one model above its max quantity is its own finding; (4) `Acc` unchanged beside it; (5) the card's "+ add" rows in blocks by group in slot order, the NSPS power supply its own row, a full group still offers its members; (6) the editor's Save keeps max quantity and group. → Approve / change:
 
 ---
-
-## T114 — Library screen at catalogue size  ·  Needs: no new build
-
-**Why it matters:** after the DaVinci import the app library holds about 500 placeable drafts and 630 accessories; without search, filters and a bulk accept nobody can review it, and the plan's "+ Device" picker becomes a wall of chips.
-
-Set-up: Projects → App device-type library (the imported DaVinci types). Use a **scratch** project for the picker checks.
-
-- [ ] **Opens and scrolls.** The screen opens in a few seconds; the list scrolls smoothly top to bottom; the header still reads `(n types · m drafts)` and the "in review" link (if any) shows the same count as before. Note how long it took to open. → saw:
-- [ ] **Search.** Type `ts7`: only P-TS7-E (and anything else named so) remains, under its group head reading `1 of …`. Type `control station`: the types whose display name has both words. Clear with the ✕: the full list is back. → saw:
-- [ ] **Chips and Drafts only.** Tap the `Station (…)` chip: only stations. Tap it again: all. Turn on Drafts only: accepted types disappear, group heads show `n of m`. → saw:
-- [ ] **Accessories folded.** With no search and no chip, `▸ Accessories (not placeable) (…)` shows as one folded header; tap it: it opens (▾); tap again: folded. Searching a back-box model shows it even while folded. → saw:
-- [ ] **Accept all in a group.** On a small group (e.g. Touchscreen), tap `Accept all n`: a dialog asks "Accept all n drafts in Touchscreen?"; Cancel does nothing; Accept → the note says `Accepted n drafts in Touchscreen.`, the DRAFT flags go, the header's draft count drops by n. With a search typed first, the dialog's n is still the whole group's. Rejected has no Accept all. → saw:
-- [ ] **Picker search.** On the scratch plan, long-press → + Device: the Type list shows at most 60 chips and `n more: type in the box below to narrow`. Type `acp`: the chips narrow to the matching types; tap one: it stays selected. Type a model that matches nothing: "No library type matches …" and the purple "New model … as a draft" line (D55). → saw:
-
-Decision D203 (Proposed): (1) search = every word in model / alias / display name; (2) groups = category, then accessories, then rejected, one chip per group, Drafts only; (3) accessories folded unless chip, search or tap; (4) Accept all = the whole group's drafts after a confirm, one group of per-type accepts, not offered on Rejected; (5) the picker's model box doubles as its search, 60 chips shown; (6) virtualised list. → Approve / change:
-
----
-
-## T115 — BOM and riser drafts by role  ·  Needs: no new build (JS update; server deploy first — Alembic 0013 adds `draft_device.role`; every iPad on the new JS before the next upload, an older iPad refuses the new column on pull until it updates, nothing lost)
-
-**Why it matters:** the extractions wrote the master's old category names (`Relay panel`, `NSPS`…) into drafts and matched trunk labels by them; with the D196 categories and the catalogue types those names no longer say what a device is. Drafts now carry a role and the new category.
-
-Set-up: a **scratch** project with levels B2–06 / 06M and the DaVinci types copied; upload `BOM.pdf`, then `riser.pdf` (Setup → Imports).
-
-- [ ] **New categories in Review drafts.** Devices tab, level 01: the relay panels read `Power Distribution`, the rack `Equipment Panels`, the EBDKs `Emergency Equipment`, the stations / sensors / touchscreen as before; no draft shows `Relay panel`, `NSPS` or `Equipment rack`. A pooled NSPS reads `Equipment`. → saw:
-- [ ] **Trunk ends still resolve.** Cables tab, level 01: an `F` run labelled `TO EQUIP RACK LEVEL 06` has its far end on the 06M rack draft (or the rack device) as before T115; a DMX run `TO RELAY PANEL LEVEL nn` names that level's relay panel. → saw:
-- [ ] **Edit sets the role.** Edit… a station draft, change its category to `Sensor`, Save & accept: it reads `Sensor`; nothing else on the row changes. → saw:
-
-Decision D204 (Proposed): (1) `draft_device.role` written by both extractions, every riser check by role; (2) the library type's role and canonical category first, else the model rule and the rename table's category; (3) the riser schema asks for the role only (the API's 16-union limit); (4) draft review matches the master's device by role; a hand-picked category sets the role it names; (5) placement (T46) takes the type and role from `typeForDraft`. → Approve / change:
 
 ## T46 — Place devices from the unplaced list  ·  Needs: no new build (JS update; no server change)
 
@@ -451,11 +390,11 @@ Decision D204 (Proposed): (1) `draft_device.role` written by both extractions, e
 
 Set-up: the T115 **scratch** project, with its BOM / riser drafts reviewed (some accepted in Review drafts) and 06M's composite uploaded as the display sheet (Setup → Sources → Floor plans), downloaded on this iPad.
 
-- [ ] **Setup → 5 Place devices.** The step is live: one row per in-scope level with Placed n/m, Not on plan, From drafts, Flagged, and Place ▸ (Open plan ▸ when nothing is left). A line under the table counts the pool when it has units. → saw:
-- [ ] **Place ▸ opens the panel.** Tap Place ▸ on 06M: the plan opens with "Place devices — 06M" in the side panel, the banner "Pick a device in the list…", chips `06M n · Pool n · Flagged n` and type chips. A master device without a pin is listed by its ID (`06M-04 · CT06LCPA`, "in the baseline"); an accepted draft that the master already has (same panel tag or model) is **not** listed a second time. → saw:
-- [ ] **Dashed proposals.** On 06M, CT06LCPA / CT06LCPB / EBDK / UFMP8 that are unplaced show as grey dashed pins with "?" at their printed tags; the note above the list counts them. Tap one: its row is selected and the confirm form opens with that spot (grey "+"). → saw:
-- [ ] **Tap to place.** Select a row, tap the plan: the grey "+" appears there and the form shows ID (`06M-04`, or `06M-?` NEW "numbered by the server"), Panel tag (panels only), Drawing Position and Room filled from the grid and the nearest room. Tap the plan again: the "+" moves and the untouched fields follow; a field you typed in keeps your text. Place ✓: the pin appears in its status colour, the row leaves the list, "Placed n of m" goes up. → saw:
-- [ ] **Drag to place.** Select a row, drag "⠿ Drag onto the plan" over the plan: a blue ring follows the finger over the plan; let go: the "+" is where you let go and the form opens. Let go over the side panel: nothing changes. → saw:
+Tap to place (C-40) and Drag to place (C-41) passed 2026-10-18. C-40's note — "Need to include the full names of the devices to be placed. Having only their part numbers doesn't help." — is in **T127**.
+
+- [ ] **Setup → 5 Place devices.** Failed 2026-10-18 (C-38): "Accessories that are found on that level are showing up as devices instead of Accessories for devices." → **T126**. Re-run after it: the step is live: one row per in-scope level with Placed n/m, Not on plan, From drafts, Flagged, and Place ▸ (Open plan ▸ when nothing is left). A line under the table counts the pool when it has units. No back box, option card or other accessory model is counted as a device to place; they sit on their devices' drafts as accessories. → saw:
+- [ ] **Place ▸ opens the panel.** Tap Place ▸ on 06M: the plan opens with "Place devices — 06M" in the side panel, the banner "Pick a device in the list…", chips `06M n · Pool n · Flagged n` and type chips. Each row reads the model **and** the type's name (`ERP24-FT-241P · Echo Relay Panel …`, T127). A master device without a pin is listed by its ID (`06M-04 · CT06LCPA`, "in the baseline"); an accepted draft that the master already has (same panel tag or model) is **not** listed a second time. → saw:
+- [ ] **Dashed proposals.** Failed 2026-10-18 (C-39): "EBDK was the only one that was in the correct spot. No suggestion for relay panels or UFMP8." → **T127**. Re-run after it: on 06M, CT06LCPA / CT06LCPB / EBDK / UFMP8 that are unplaced show as grey dashed pins with "?" at their printed tags; the note above the list counts them. Tap one: its row is selected and the confirm form opens with that spot (grey "+"). → saw:
 - [ ] **A draft unit becomes a device.** Place a unit of an accepted draft (e.g. a sensor ×n on a level): the new device's card shows its model, the category, `06M-?` NEW until the next sync, then a server number; the draft's row reads one fewer (×n-1). → saw:
 - [ ] **The pool.** On another level, Pool chip: a pooled station `PI1002 · pool ×n`. Place one: it lands on this level and the pool reads ×n-1 on every level's panel. → saw:
 - [ ] **Waiting cables.** Place a draft device that an accepted cable draft was waiting on (Review drafts → Cables showed "Make n waiting cables"): the note says "1 waiting cable made"; the cable shows in the Cables view with both ends. → saw:
@@ -479,27 +418,10 @@ Set-up: 06M on a project with cables (the Houston project or the scratch one), p
 
 Decision D167: answered 2026-10-15, **Approved** (both). Nothing to answer here.
 
-## T96 — Manual grid calibration previews the bubbles in between  ·  Needs: no new build (JS update)
+## T97 — Assign levels to people (two-iPad leftovers)  ·  Needs: no new build; two iPads
 
-**Why it matters:** in the close-out round (D-6) a hand calibration showed only the three tapped bubbles, so a wrong tap or label only showed after Finish, when pins read the wrong Drawing Position.
+The tab, assigning several per level and All in scope / None passed 2026-10-18 (C-4 … C-6). Sheet C-7 … C-9 on the Pipeline project:
 
-Set-up: any sheet with lettered and numbered grid bubbles (06M on the Tower round project, or the demo plan), plan open, **⌗ Grid** → **Recalibrate: tap three bubbles**.
-
-- [ ] **Two taps, the bubbles in between.** Tap bubble A, label it `A`; tap bubble H, label it `H`: dashed rings in the new set's colour appear on the printed B … G bubbles (at both ends of each grid line where the sheet prints two), while A and H keep their solid rings. The panel shows the "Dashed rings" line. → saw:
-- [ ] **Third tap, the other axis.** Tap a row bubble (9), label it `9`: dashed rings appear on its neighbours (12 … 6), on the printed bubbles where they line up. → saw:
-- [ ] **A wrong label shows.** **Undo tap** twice (back to A only), tap H again but label it `G`: the dashed B … F rings drift off the printed bubbles (C … F sit between printed bubbles rather than on them). **Undo tap**, re-tap H as `H`: the rings snap back onto the bubbles. → saw:
-- [ ] **Finish unchanged.** Finish: the set is saved as before (columns A–H, rows 12–6 on the set row), the dashed rings are gone and only the tapped bubbles show in the saved set's colour; **Test** on a point reads the same Drawing Position as before T96. Cancel instead: the dashed rings go with the taps. → saw:
-- [ ] **Smooth while panning.** With the dashed rings showing, pinch and pan: the rings stay on their bubbles every frame (no lag, no flicker). → saw:
-
-## T97 — Assign levels to people  ·  Needs: no new build (JS update; no server change)
-
-**Why it matters:** in the close-out round (C-2) there was no way to assign a level, so "Assigned to me", the ● on the Levels screen and Download assigned levels could not be tried.
-
-Set-up: two iPads under two team names (say Landry and Ann), both synced, the Tower round project with B2, 06, 06M in scope.
-
-- [ ] **The tab.** Projects → Setup: below *6 Lock baseline*, after a rule, **Assignments**. It shows the levels down the side (out-of-scope ones dimmed, "out of scope"), one column per team name (yours marked "(you)"), ☐ in every cell and "nobody" under each in-scope level. → saw:
-- [ ] **Assign, several per level.** On Landry's iPad tap 06 × Ann and 06 × Landry, then 06M × Ann: those cells turn ☑ on blue; "nobody" goes from 06 and 06M. Tap 06 × Landry again: back to ☐. Works in airplane mode too. → saw:
-- [ ] **All in scope / None.** Under Landry's column tap **All in scope**: "Landry: 3 levels added" (B2, 06, 06M; never the out-of-scope ones). Tap **None**: "Landry: 3 levels removed". → saw:
 - [ ] **The other iPad follows a sync.** Sync both iPads. On Ann's Levels screen 06 and 06M carry ●, B2 does not; **Assigned to me** shows only 06 and 06M; Ann's Setup → Assignments shows the same ticks Landry set. → saw:
 - [ ] **Only your levels once you have some (D208).** On Ann's iPad Sync → **Download assigned levels**: only 06 and 06M plans download (B2 stays "not cached" unless cached before). On Landry's iPad (no assignment now) the same button fetches every in-scope level. → saw:
 - [ ] **Anyone can change it.** On Ann's iPad untick 06 × Ann, sync both: Landry's Assignments shows 06 × Ann ☐ and Ann's ● on 06 is gone. → saw:
@@ -585,16 +507,12 @@ Decision D213: kits per cable code (`X`, `F`, `N`, `NG` on by default) with a pe
 
 **Why it matters:** the BOM import reads the model map and level aliases, the card's Type now has chips, pin shapes can follow how Landry wants the floor to read, and values Landry trusts can be offered to every new project.
 
-- [ ] **Model map.** Vocabulary → **Model map & levels** → Model map: type `P-DOC-W-WD` → `P-DOC-W`, Add. It shows as `Model: P-DOC-W  draft` with `← P-DOC-W-WD  draft` under it. Add `P-DOC-W-4Z` → `p-doc-w`: it joins the same model (no second `P-DOC-W`). Adding `p-doc-w-wd` again is refused ("already in this list"). → saw:
-- [ ] **Level aliases.** Same tab → Level aliases: `Level 5` → `06M`, Add; Accept both rows. → saw:
-- [ ] **Remove a model.** Remove `P-DOC-W`: its spellings go with it. → saw:
+Model map, level aliases, remove a model, the app library vocabulary, Promote and Copy from app library passed 2026-10-18 (B-25, B-26). Sheet D-15 and G-6:
+
 - [ ] **Device types and the card.** Lists → **Device types**: add `Echo relay panel`, Accept. Open a device's card → **Type** → Edit…: the chip `Echo relay panel` is under the box; tap it, Save. The card's header shows the new type; the pin's label (Labels layer) shows it too; History has the change as Field survey. → saw:
 - [ ] **Pin shapes.** Vocabulary → **Pin shapes**: nine roles, each with nine shape chips, the current one highlighted. Give **Station** the **Square**: the line says "shares its shape with another role" on Relay panel and Station. Open a plan with stations: their pins are squares, fill colours unchanged. Put Station back to **Circle**. → saw:
 - [ ] **Pin shapes on the floor PDF.** With Station set to Square, export a floor PDF of a level with stations: the cover sheet and the crops draw stations as squares. Put it back. → saw:
 - [ ] **Pin shapes on a second iPad.** Change a shape on one iPad and sync both: the other iPad's plan shows the new shape after its sync, with no project-level setting anywhere. → saw:
-- [ ] **App library vocabulary.** Vocabulary → **App library** → Lists: add a device note `Stuck buttons`: it shows `draft`. **Load standard lists** here: "Added n drafts to the app library"; no Placeholders tab in this scope. Back in **This project**, the note is not in the project's list. → saw:
-- [ ] **Promote.** In **This project**, an accepted value shows **Promote**; tap it on a model-map spelling: the App library's Model map now has the model and that spelling as drafts. Promote it again: "The app library already has …". → saw:
-- [ ] **Copy from app library.** In the App library accept the promoted model and spelling. On another project → Vocabulary → **Copy from app library**: "Copied n values"; they are accepted there; tapping it again copies nothing. A new project made from Projects → New gets the accepted app values too. → saw:
 
 Decision D214: app-level vocabulary is `vocab` with no project on the library stream (drafts for Landry; new projects and "Copy from app library" take the accepted ones; a project reads only its own rows), and pin shapes are one app-library setting per role that applies to every project at once, on the iPad and in the floor PDF (no per-project shapes, no draft). → Approve / change:
 

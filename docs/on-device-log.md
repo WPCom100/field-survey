@@ -2,6 +2,68 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## 2026-10-18 / 19 — Full-pipeline round, Parts 0–C (dev build `a5cbf96f`, server `234fa4a` → `b4e787b`, update `89a75db0` → `18f7efe4`)
+
+Landry ran Parts 0 to C of the full-pipeline sheet (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy) on **one** iPad (0-5 not done: no second iPad, so every iPad-B step was skipped), after every project had been removed from the server (0-3). Results pasted 2026-10-19 as "so far": Parts D–H (91 steps) not started. **54 pass, 9 fail, 19 skip, 3 not done** over Parts A–C (A 1 / 2 / 3 / 0, B 22 / 3 / 7 / 0, C 31 / 4 / 9 / 3). Three fails (A-2, A-3, B-5, the library editor) were reported during the round and fixed as **T125** the same day (server `b4e787b`, update `18f7efe4`); the sheet marks them "Retest after T125". No Decision line on the sheet was answered. Landry's remark on C-33 ("Load ckts means 120v to fixtures. Always.") is recorded as **D221**. Separately Landry reported, while pasting: "the app is becoming unbearably slow to load, what seems like during syncing" → **T131**.
+
+| Step | Result | Saw | Finding |
+|---|---|---|---|
+| 0-1 … 0-4, 0-6 | done | | 0-5 (two iPads) not done |
+| A-1 Old projects leave the iPads | pass | | |
+| A-2 T61 the app library opens with no project | **fail** | "The sidebar is too small and all the text is bunched up. Also the buttons at the bottom should be visible the whole time." | **T125** (done 2026-10-19): list a third of the screen, editor the rest, actions pinned at the bottom. Retest |
+| A-3 T61 add and accept without a project | **fail** | "Upon clicking save you seem to lose the state of the information panel." | **T125**: the editor was rebuilt from stale data after a Save. Retest |
+| A-4 … A-6 | skip | no second iPad | carried over |
+| B-1 T87 name on the home | pass | | |
+| B-2 … B-4, B-6 T111 import, drafts, codes | pass | B-2: Upload → Done 0.5 min | |
+| B-5 T111 a touchscreen's back boxes | **fail** | "The sidebar is far too small. Can't read anything in the optional cables area for ERN2-W-120-Mk2" | **T125**: From / To / Far end each on its own labelled line. Retest |
+| B-7 … B-10, B-17 T114 library screen, picker search | pass | | T114's checks all passed (B-13's Accept all included); the section left the checklist |
+| B-11 T112 role chips in the editor | **fail** | "Neuron ID is set to needed for both -d and -kit" | The DaVinci import writes `needs_neuron_id = true` for every type with a Neuron property, which overrides the role default (D185: NSPS and racks need none). **T130** |
+| B-12 T112 a role corrected by hand stands | pass | | |
+| B-13 … B-15 T111 accept, accessories not devices, re-run | pass | | |
+| B-16 T111 hand-made model clash | skip | | carried over |
+| B-18 … B-21 T113 accessory groups | pass | | |
+| B-22 T113 drafts stay quiet; Save keeps groups | **fail** (not understood) | "not sure what the type is for? or what this is asking me to do? The only draft i see is the cable connection suggestions" | Not a defect: the step is about putting the **P-TS7-E library type** back to draft (Library → the type → Back to draft), not a draft on the card. Reworded in the checklist; carried over |
+| B-23, B-24 T102 rule defaults | skip | | carried over |
+| B-25, B-26 T104 app library vocabulary, promote and copy | pass | | |
+| B-27 T61 promote a project type | pass | | |
+| B-28 … B-31 T117 / T121 project cable codes | skip | | carried over |
+| B-32 T45 replace a plan sheet | pass | | the leftover T45 check; section left |
+| C-1 … C-6 T61 / T91 / T97 | pass | | |
+| C-7 … C-9 T97 other iPad | skip | | carried over |
+| C-10 … C-13 T96 grid | pass | | T96 section left the checklist |
+| C-14, C-15 T44 upload, step 4 | pass | Riser → Done 15 min, Claude $2.84 | the sheet said about 12 min |
+| C-16, C-22, C-25 T115 | pass | | T115 section left the checklist |
+| C-17 … C-21, C-24, C-27 T44 | pass | | |
+| C-23 T44 mismatch list and excluded lines | not done | | carried over |
+| C-26 T44 endpoint picker and Confirm | **fail** | "Not able to change the 0-10v riser connections autodetected at 120v power. Cant change the cable type to 0-10v." | `DraftReview.tsx` offers the code chips only on a draft with no code (T108's question); a draft read with the wrong code cannot be corrected. **T128** |
+| C-28 … C-32 T108 riser lines with no bubble | pass | | |
+| C-33 T108 Needs review | pass, with a ruling | "Load ckts means 120v to fixtures. Always" | **D221**: a `TO LOAD CKTS` line is guessed as `120V` → `Fixtures`, not rejected as "by others". **T132**. T108's section left the checklist; D194 stays open |
+| C-34 T44 links, offline, iPad B | skip | | carried over |
+| C-35 T106 download, upright, outlined | **fail** | "I want to be able to pan and zoom on the cropped image once i click on it to make it bigger. Riser crop was working for a while and is now broken. No riser loads anywhere." | Two things: no pinch-zoom on an enlarged crop (feature), and the riser crop stopped loading during the round — the worker ran out of memory on the 14 MB Level 02 sheet the same day (T124) and the API stopped answering. **T129** |
+| C-36 T106 cached, page 2, offline | skip | | carried over |
+| C-37 T106 not from the riser | pass | | |
+| C-38 T46 Setup → 5 Place devices | **fail** | "Accessories that are found on that level are showing up as devices instead of Accessories for devices." | `bom_extract.py` folds accessories by a fixed pattern list (D27); every other BOM line becomes a device draft, and the placement list offers it. The app library now knows 631 accessory-only models. **T126** |
+| C-39 T46 Place ▸ and dashed proposals | **fail** | "EBDK was the only one that was in the correct spot. No suggestion for relay panels or ufmp8." | `tagProposals` matches a sheet tag against the draft's name or model; a BOM relay-panel draft has no panel tag until the riser pairs it, and `UFMP8` ≠ `UFMP4`. **T127** |
+| C-40 T46 tap to place | pass, with a note | "Need to include the full names of the devices to be placed. Having only their part numbers doesn't help." | **T127** (the type's display name after the model) |
+| C-41 T46 drag to place | pass | | |
+| C-42 … C-45 T46 | skip | | carried over |
+| C-46 T46 lock table, C-47 T47 lock offline | not done | | carried over |
+| D-1 … D-35, E-1 … E-44, G-1 … G-10, H-1, H-2 | not done | | the round continues on the same sheet |
+
+Record, as filled:
+
+| Measure | Value |
+|---|---|
+| Crashes (target 0) | not filled |
+| Long press: menu with the finger still | not reached (Part D) |
+| Moments you reached for the spreadsheet | not filled |
+| Readings | DaVinci import 0.5 min; riser job 15 min; riser Claude $2.84 |
+| Reported outside the sheet | "the app is becoming unbearably slow to load, what seems like during syncing" → **T131** |
+
+Decisions: none of the Decision lines was answered (D165, D178–D186, D193–D195, D197, D201–D205, D209, D211–D217, D219, D145 all "unanswered"); they stay. New: **D221** (Landry, load-circuit lines).
+
+Checklist reset: the sections whose checks all passed left the file — T45 (leftover), T96, T108, T114, T115 — and the passed checks left T61, T87, T91, T97, T104, T111, T112, T113, T44, T106 and T46. The Decision lines of the sections that left (D194, D203, D204) are kept in the header block. Everything skipped or not done stays, including all of Parts D–H.
+
 ## 2026-10-14 — M3 close-out round (dev build `ddf99272`, `main` d8724e9 deployed by CI, TP-3 synthetic on the Droplet)
 
 Landry ran the M3 close-out sheet (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy) on two iPads under two names: iPad A Landry, iPad B Zach. Airplane mode 10:05–10:25. 64 pass, 3 fail, 9 skip, 1 not done (C-6). **Part A, the M4 gate that failed on 2026-10-13, passed in full**: three conflicts came back as exactly three review items and nothing was lost (T87 holds). Part B passed except B-3, so T91 is the last gate item. All fourteen decisions on the sheet were accepted and recorded (D140–D147, D151, D157, D158, D162–D164 → Approved 2026-10-14).
