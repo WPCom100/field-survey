@@ -29,11 +29,15 @@ Classification (`build`):
   category canonicalised — then `MODEL_ROLE`, the category being the role's (`ROLE_CATEGORY`).
 - **Accessories** (faceplates, ERP option cards, through-beam parts, touchscreen backboxes, DIN
   enclosures…, `ACCESSORY_PARENT`) attach to the nearest parent line of the right model in the
-  same venue (preceding first), as `accessories[]` on its draft (D27).
+  same venue (preceding first), as `accessories[]` on its draft (D27). So does a line whose model
+  is an **accessory-only** library type (T126, D229): its parent is a line whose type lists it in
+  `optional_accessories`; with none it is a component of the venue's open rack, else excluded as
+  "accessory without a parent line" — never a draft.
 - An **Equipment rack** venue (an `18U RACK` or `ERn4` enclosure line) folds every following
   component line of the venue into one draft, components in `accessories[]` with `role:
   component` (PLAN §7.2); the rack's model is the ERn4 enclosure's when it has one (the master's
-  naming), else the rack line's.
+  naming), else the rack line's. A component is a line that is no device, or one of role `other`
+  or `equipment_rack` (the catalogue's switches, UPSs, patch panels and the ERn4 itself, T126).
 - Everything else (energisation, engineering, manuals, data termination, hardware kits, brackets,
   breakers, boxes, cable…) is **excluded** with a reason and stays in the batch stats, promotable
   by hand (D12).
@@ -129,6 +133,11 @@ RACK_ROOT_RE = re.compile(r"^(?:\d+U RACK|ERN4)")
 """A line that opens an Equipment rack: the rack itself or an ERn4 enclosure (wall mount)."""
 
 PANEL_ROLES = frozenset({ROLE_RELAY, ROLE_FOUNDRY, ROLE_EBDK, ROLE_RACK, ROLE_NSPS})
+
+RACK_COMPONENT_ROLES = frozenset({ROLE_OTHER, ROLE_RACK})
+"""Roles that are components of an open rack, not devices of their own (T126): the catalogue
+files switches, processors, UPSs and patch panels as `Equipment` (`other`) and the ERn4 as a
+rack."""
 """Roles the master keeps on the mezzanine (06M) when a floor is split (Phase 1f §4)."""
 
 ACCESSORY_PARENT: list[tuple[re.Pattern[str], re.Pattern[str]]] = [
@@ -637,6 +646,8 @@ class LibraryModel:
     category: str | None
     aliases: tuple[str, ...] = ()
     role: str | None = None  # `library_type.role` (T112); null = its category's
+    accessory_only: bool = False  # another type's accessory, never a device (T111, T126)
+    accessories: tuple[str, ...] = ()  # the models of its `optional_accessories` rows
 
 
 @dataclass(frozen=True)
@@ -679,9 +690,36 @@ class Target:
                 return t
         return None
 
+    def accessory_type(self, model: str) -> LibraryModel | None:
+        """The model's library type when it is an accessory-only one (T126), else None."""
+        t = self.library_type(model)
+        return t if t is not None and t.accessory_only else None
+
+    def lists_accessory(self, parent_models: tuple[str, ...], accessory: LibraryModel) -> bool:
+        """Whether a parent line's type (by any of its models) lists `accessory` among its optional
+        accessories. A slot names the accessory as the import does — its model, or its renamed
+        `<name> (<part number>)` form when the model was taken (D197) — so the name before the
+        parenthesis counts too, as do the slot model's own type's model and aliases."""
+        want = {_key(accessory.model), *(_key(a) for a in accessory.aliases)}
+        for model in parent_models:
+            t = self.library_type(model)
+            if t is None:
+                continue
+            for slot in t.accessories:
+                keys = {_key(slot), _key(RENAMED_RE.sub("", slot))}
+                if (st := self.library_type(slot)) is not None:
+                    keys |= {_key(st.model), *(_key(a) for a in st.aliases)}
+                if keys & want:
+                    return True
+        return False
+
 
 def _key(text: str) -> str:
     return re.sub(r"\s+", "", text).upper()
+
+
+RENAMED_RE = re.compile(r"\s*\([^()]*\)$")
+"""The ` (7182A1701)` the DaVinci import appends to a model another type already holds (D197)."""
 
 
 # --------------------------------------------------------------- normalise
@@ -875,7 +913,8 @@ def build(lines: list[Line], target: Target) -> Result:
         venue = parse_venue(venue_text) if venue_text is not None else None
         models = {id(ln): normalise_model(ln.model_text, target) for ln in items}
         parents: list[tuple[Line, Draft]] = []
-        pending: list[tuple[Line, Model, re.Pattern[str]]] = []
+        # an accessory line, how its parent is told, and the rack open when it was read
+        pending: list[tuple[Line, Model, Callable[[Line, Draft], bool], Draft | None]] = []
         rack: Draft | None = None
         by_line = {ln.line: ln for ln in items}
 
@@ -886,7 +925,7 @@ def build(lines: list[Line], target: Target) -> Result:
                 continue
             parent_pat = accessory_parent(model.model)
             if parent_pat is not None:
-                pending.append((ln, model, parent_pat))
+                pending.append((ln, model, _by_pattern(parent_pat), None))
                 continue
             # Material List sub-items (`Line 270 delivers for line 260`) are accessories too
             if ln.delivers_for is not None and ln.delivers_for in by_line:
@@ -904,8 +943,11 @@ def build(lines: list[Line], target: Target) -> Result:
                 drafts.append(rack)
                 parents.append((ln, rack))
                 continue
+            if (acc := target.accessory_type(model.model)) is not None:
+                pending.append((ln, model, _by_library(target, acc, models), rack))
+                continue
             kind = classify(model.model, target)
-            if rack is not None and kind is None:
+            if rack is not None and (kind is None or kind.role in RACK_COMPONENT_ROLES):
                 # a component of the open rack (switch, processor, UPS, patch panel…)
                 if RACK_ROOT_RE.match(model.model) and model.model.upper().startswith("ERN4"):
                     rack.model, rack.model_raw = model.model, model.raw
@@ -920,16 +962,21 @@ def build(lines: list[Line], target: Target) -> Result:
             parents.append((ln, draft))
 
         # attach accessories: nearest parent of the right model, preceding first
-        for ln, model, parent_pat in pending:
+        for ln, model, is_parent, open_rack in pending:
             best: Draft | None = None
             best_d = None
             for p, d in parents:
-                if not parent_pat.match(d.model) and not parent_pat.match(d.model_raw):
+                if not is_parent(p, d):
                     continue
                 dist = (p.page, p.column, p.line) <= (ln.page, ln.column, ln.line)
                 score = (0 if dist else 1, abs(_order(p) - _order(ln)))
                 if best_d is None or score < best_d:
                     best, best_d = d, score
+            if best is None and open_rack is not None:
+                # an accessory-only part no rack line lists: a component of the rack
+                open_rack.accessories.append(_accessory_entry(ln, model, "component"))
+                component_lines += 1
+                continue
             if best is None:
                 excluded.append(Excluded(ln, model.model, "accessory without a parent line"))
                 continue
@@ -937,6 +984,24 @@ def build(lines: list[Line], target: Target) -> Result:
             accessory_lines += 1
 
     return Result(drafts, excluded, accessory_lines, component_lines, venues)
+
+
+def _by_pattern(pat: re.Pattern[str]) -> Callable[[Line, Draft], bool]:
+    """A D27 parent: its draft's model (or the BOM's spelling of it) matches."""
+    return lambda _p, d: bool(pat.match(d.model) or pat.match(d.model_raw))
+
+
+def _by_library(
+    target: Target, accessory: LibraryModel, models: dict[int, Model]
+) -> Callable[[Line, Draft], bool]:
+    """A T126 parent: its draft's model, the BOM's spelling or its own line's model (a rack
+    named by its ERn4 but opened on an `18U RACK` line) is a type that lists the accessory."""
+
+    def is_parent(p: Line, d: Draft) -> bool:
+        own = models[id(p)].model if id(p) in models else p.model_text
+        return target.lists_accessory((d.model, d.model_raw, own), accessory)
+
+    return is_parent
 
 
 def _order(ln: Line) -> int:

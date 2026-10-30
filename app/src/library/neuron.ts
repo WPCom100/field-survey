@@ -5,7 +5,7 @@
  */
 
 import { isRole, roleOf, type Role, type Store } from '@field-survey/core';
-import { findDeviceType, needsNeuronId, type TypeLike } from '@field-survey/rules';
+import { findDeviceType, needsNeuronId, parseLibraryAccessories, type TypeLike } from '@field-survey/rules';
 
 /** The row as stored; the card also reads its optional cables and accessories (T105). */
 export type DeviceType = TypeLike & {
@@ -16,6 +16,8 @@ export type DeviceType = TypeLike & {
   default_cables?: unknown;
   optional_cables?: unknown;
   optional_accessories?: unknown;
+  /** T111: another type's accessory, never offered as a device (T126). */
+  accessory_only?: unknown;
 };
 
 export type DeviceTypes = ReadonlyMap<string, DeviceType>;
@@ -59,4 +61,33 @@ export function typeForDraft(types: DeviceTypes, d: { model: string | null; role
 
 export function deviceNeedsNeuron(types: DeviceTypes, d: DeviceLike): boolean {
   return needsNeuronId(typeOf(types, d), { category: text(d.category) });
+}
+
+/** The type a model names (its model or an alias), else null. */
+export function typeOfModel(types: DeviceTypes, model: string | null): DeviceType | null {
+  return findDeviceType(types, { device: text(model), library_type_id: null });
+}
+
+/** The accessory-only type (T111) a model names, else null (T126: such a draft is an accessory, never a device). */
+export function accessoryTypeOf(types: DeviceTypes, model: string | null): DeviceType | null {
+  const t = typeOfModel(types, model);
+  return t && (t.accessory_only === true || t.accessory_only === 1) ? t : null;
+}
+
+const key = (s: string) => s.replace(/\s+/g, '').toUpperCase();
+const keysOf = (t: DeviceType): string[] => [t.model, ...(t.aliases ?? [])].filter((a): a is string => typeof a === 'string').map(key);
+
+/**
+ * Whether `parent` lists `accessory` among its optional accessories (T126, as the BOM extraction
+ * reads it): a slot names the accessory as the DaVinci import does — its model, or the renamed
+ * `<name> (<part number>)` when the model was taken (D197) — so the name before the parenthesis
+ * counts too, as do the slot model's own type's model and aliases.
+ */
+export function listsAccessory(types: DeviceTypes, parent: DeviceType, accessory: DeviceType): boolean {
+  const want = new Set(keysOf(accessory));
+  return parseLibraryAccessories(parent.optional_accessories).some(({ model }) => {
+    const slot = findDeviceType(types, { device: model, library_type_id: null });
+    const keys = [key(model), key(model.replace(/\s*\([^()]*\)$/, '')), ...(slot ? keysOf(slot) : [])];
+    return keys.some((k) => want.has(k));
+  });
 }

@@ -97,6 +97,20 @@ describe('unplaced list (T46)', () => {
     expect((await loadUnplaced(store, PROJECT, ids.l09))!.items).toEqual([]);
   });
 
+  it('never offers a draft whose model is an accessory-only type (T126)', async () => {
+    const { store, editor, ids } = await setup();
+    const before = (await loadPlacementProgress(store, PROJECT)).levels.find((l) => l.levelId === ids.l06m)!;
+    const tAcc = uuidv7();
+    // the catalogue's 8 Outlet Strip, matched by alias; accepted as a device before T126
+    await editor.create('library_type', { id: tAcc, project_id: null, model: 'SGE1552', aliases: ['8 Outlet Strip'], accessory_only: true, state: 'draft' }, { change_type: 'Master edit', reason: 'test' });
+    const dAcc = (await editor.create('draft_device', { project_id: PROJECT, level_id: ids.l06m, model: '8 Outlet Strip', category: 'Equipment', qty: 2, state: 'accepted' }, { change_type: 'Master edit', reason: 'test' })).id;
+    const u = (await loadUnplaced(store, PROJECT, ids.l06m))!;
+    expect(u.items.some((i) => i.key === `draft:${dAcc}`)).toBe(false);
+    expect(u.flagged.some((i) => i.key === `draft:${dAcc}`)).toBe(false);
+    const after = (await loadPlacementProgress(store, PROJECT)).levels.find((l) => l.levelId === ids.l06m)!;
+    expect(after.draftUnits).toBe(before.draftUnits);
+  });
+
   it('places a device of the baseline: its pin and the fields that change, then it leaves the list', async () => {
     const { store, editor, ids } = await setup();
     const u = (await loadUnplaced(store, PROJECT, ids.l06m))!;

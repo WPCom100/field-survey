@@ -20,6 +20,8 @@ import {
   commitWaitingCables,
   deviceBlockers,
   editDevice,
+  foldAccessory,
+  foldBlockers,
   promoteExcluded,
   realEnd,
   rejectDraft,
@@ -235,7 +237,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
               <AddCable levels={data.levels} codes={data.codes} levelId={level.levelId} onAdd={(f) => run(() => addCableDraft(editor, projectId, f, data.codes).then((id) => (setSelected(id), setAdding(false), 'Draft added')))} />
             )
           ) : selDevice ? (
-            <DevicePanel key={selDevice.id} d={selDevice} data={data} batches={batches} identity={identity} editor={editor} run={run} />
+            <DevicePanel key={selDevice.id} d={selDevice} data={data} batches={batches} identity={identity} editor={editor} store={store} run={run} />
           ) : selCable ? (
             <CablePanel key={selCable.id} projectId={projectId} c={selCable} data={data} batches={batches} identity={identity} editor={editor} store={store} riserBlob={riserBlob} run={run} />
           ) : (
@@ -369,16 +371,30 @@ function RejectForm({ onReject }: { onReject: (reason: string) => void }) {
   );
 }
 
-function DevicePanel({ d, data, batches, identity, editor, run }: { d: DeviceDraftRow; data: DraftReviewData; batches: Batch[] | null; identity: ReturnType<typeof useIdentity>; editor: Editor; run: Run }) {
+function DevicePanel({ d, data, batches, identity, editor, store, run }: { d: DeviceDraftRow; data: DraftReviewData; batches: Batch[] | null; identity: ReturnType<typeof useIdentity>; editor: Editor; store: Store; run: Run }) {
   const [choice, setChoice] = useState<DeviceChoice>({});
   const [editing, setEditing] = useState(false);
   const blockers = deviceBlockers(d, choice);
+  const fold = d.accessoryOf && d.state !== 'rejected' ? foldBlockers(data, d) : null;
   const lvl = (id: string | null) => data.levels.find((l) => l.levelId === id)?.code ?? null;
   return (
     <>
       <Text style={styles.h2}>
         Draft device {d.conflicts.length ? '⚠ conflict' : ''} <Text style={styles.dim}>{STATE_LABEL[d.state]}</Text>
       </Text>
+      {fold ? (
+        <View style={styles.form}>
+          <Text style={styles.warn}>
+            ⚑ An accessory, not a device: the library files {d.accessoryOf!.model} as another type's accessory.
+            {d.accessoryOf!.parentLabel ? ` It is an accessory of ${d.accessoryOf!.parentLabel}.` : ' No draft of this level lists it.'}
+          </Text>
+          {fold.length ? <Text style={styles.dim}>{fold.join(' ')}</Text> : null}
+          <View style={styles.btnRow}>
+            {d.accessoryOf!.parentLabel ? <Btn title={`Fold into ${d.accessoryOf!.parentLabel}`} primary small disabled={fold.length > 0} onPress={() => void run(() => foldAccessory(editor, store, data, d), 'Folded into its parent')} /> : null}
+            {d.state !== 'proposed' && d.placed === 0 ? <RejectForm onReject={(r) => void run(() => rejectDraft(editor, 'device', d, r), 'Rejected')} /> : null}
+          </View>
+        </View>
+      ) : null}
       {d.needs.model ? (
         <View>
           <Text style={w.label}>Model — pick one; nothing is chosen for you (D28)</Text>

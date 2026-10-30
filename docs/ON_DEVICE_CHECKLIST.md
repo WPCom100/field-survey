@@ -644,6 +644,18 @@ Decision D227: the correction is a `Correction` op keyed on who last set the fla
 
 Decision D228: the To follows a code change only when it is the old code's placeholder (Fixtures, 120v Power, EBDK panic wire) and was not picked by hand; it moves to the project's placeholder of that label and, when the project has none (EBDK panic wire is not seeded), stays. Picking the riser's guessed code on a line with no code never moves the To (a panel's 120V feed is to 120v Power, its load circuits to Fixtures — D221). → Approve / change:
 
+## T126 — Accessories are no longer devices to place  ·  Needs: no new build (JS update; server deploy first)
+
+**Why it matters:** in the 2026-10-18 round (C-38) accessories on a level showed up in Setup → 5 Place devices as devices. With the DaVinci catalogue in the library, a rack's outlet strip, power modules, switches and UPS each became a draft of their own instead of parts of the rack.
+
+- [ ] **Existing drafts are flagged.** On the project of the 2026-10-18 round, Setup → Review drafts → level 01 (or 06M), Devices, filter All: the drafts of the rack parts (`SGE1552` 8 Outlet Strip, `P-SPM-E`) carry the ⚑ and, selected, read "An accessory, not a device: the library files … as another type's accessory", with **Fold into <parent>** when a draft of that level lists it, else "No draft of this level lists it". The level's mismatch list has a line for each. Accept is greyed with "fold it into its parent or reject it". → saw:
+- [ ] **Fold.** Tap Fold into … on one: the draft leaves the list, and the parent draft's Accessories line now ends with that model ×qty. Its history (the change log) shows "… folded into … as an accessory". → saw:
+- [ ] **Reject the rest.** On one with no parent, Reject… with a reason (e.g. "An accessory of the rack"): it moves to Rejected. → saw:
+- [ ] **Place devices.** Setup → 5 Place devices on that level: no accessory model in the list, Level or Pool, even ones accepted before this update; the level's units-left count dropped by as many. → saw:
+- [ ] **A new BOM upload.** Optional, on a scratch project with levels 01 and 06M: upload `BOM.pdf`. Review drafts → 01 lists one Equipment rack draft (ERN4-RM-120) whose Accessories include `SGE1552` and `P-SPM-E` and the MSCX, MAP and RSN parts (component); no draft of any of them on its own. → saw:
+
+Decision D229: a BOM line whose model is an accessory-only library type attaches to the nearest line whose type lists it (else is a rack component, else excluded); inside an open rack a line of role `other` or `equipment_rack` is a component, as before the catalogue; Fold puts an existing accessory draft on its parent and soft-deletes it. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

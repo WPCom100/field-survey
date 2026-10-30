@@ -9,7 +9,7 @@
 import { canonicalCategory, isRole, roleOfCategory, type Role, type Store } from '@field-survey/core';
 import { cableCodes, loadRuleParams } from '@field-survey/rules';
 
-import { loadDeviceTypes, roleOfDevice } from '../library/neuron';
+import { accessoryTypeOf, listsAccessory, loadDeviceTypes, roleOfDevice, typeOfModel, type DeviceTypes } from '../library/neuron';
 
 // ------------------------------------------------------------------ shapes
 
@@ -58,7 +58,16 @@ export type DeviceDraftRow = {
   reviewItemId: string | null;
   sourceRef: Record<string, unknown> | null;
   importBatchId: string | null;
+  /** T126: its model is an accessory-only library type — an accessory, never a device to place. */
+  accessoryOf: AccessoryOf | null;
 };
+
+/**
+ * What an accessory draft belongs to (T126): the accessory type's model, and the nearest open or
+ * accepted draft of its level whose type lists it (`listsAccessory`) and has no device placed yet —
+ * the one Fold puts it on — or null when there is none (then it can only be rejected).
+ */
+export type AccessoryOf = { model: string; parentId: string | null; parentLabel: string | null };
 
 export type EndpointKind = 'device' | 'draft_device' | 'placeholder';
 export type Endpoint = { kind: EndpointKind; id: string; label: string; levelId: string | null; confidence?: number | null };
@@ -342,6 +351,9 @@ export function deviceMismatches(d: DeviceDraftRow, levelCode: (id: string | nul
     else if (c === 'pairing:ebdk≠erp') out.push(`EBDK and relay panels do not pair one to one (${model})`);
     else if (c === 'network:no_N_run') out.push(`No network (N) run drawn to ${model} on the riser`);
   }
+  if (d.accessoryOf && d.state !== 'rejected') {
+    out.push(d.accessoryOf.parentLabel ? `${model} is an accessory of ${d.accessoryOf.parentLabel} — fold it in` : `${model} is an accessory and no draft here lists it — reject it`);
+  }
   const venue = str(d.sourceRef?.venue);
   const code = levelCode(d.levelId);
   if (venue && code && d.levelBasis === 'venue' && firstNumber(venue) !== firstNumber(code)) out.push(`BOM venue "${venue}" → ${code} (level alias)`);
@@ -460,9 +472,11 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
         reviewItemId: reviewOf.get(String(d.id)) ?? null,
         sourceRef: ref,
         importBatchId: str(d.import_batch_id),
+        accessoryOf: null,
       };
       return row;
     });
+  markAccessories(devices, types);
 
   const draftDevice = new Map(devices.map((d) => [d.id, d]));
   const cables: CableDraftRow[] = rawCables.map((c) => {
@@ -563,6 +577,57 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
   };
 }
 
+// ------------------------------------------------------------------ accessory drafts (T126)
+
+/** A draft's place in its BOM (page, line), for "nearest, preceding first" (D27); a hand draft has none. */
+const bomOrder = (d: DeviceDraftRow): number | null => {
+  const page = num(d.sourceRef?.page);
+  const line = num(d.sourceRef?.line);
+  return page != null && line != null ? page * 100_000 + line : null;
+};
+
+/** `a` sorts before `b`, element by element. */
+function before(a: readonly number[], b: readonly number[]): boolean {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i]! < b[i]!;
+  return false;
+}
+
+/**
+ * Flag every live draft whose model is an accessory-only type (T126) and find its parent: a draft
+ * of the same level key, not rejected, not an accessory itself, nothing placed from it, whose type
+ * lists the accessory — the same import first, then the nearest line before it, then after it.
+ * A flagged draft waits in Needs review.
+ */
+export function markAccessories(devices: DeviceDraftRow[], types: DeviceTypes): void {
+  const accessory = new Map<string, NonNullable<ReturnType<typeof accessoryTypeOf>>>();
+  for (const d of devices) {
+    const t = d.state === 'rejected' ? null : accessoryTypeOf(types, d.model);
+    if (t) accessory.set(d.id, t);
+  }
+  if (!accessory.size) return;
+  for (const d of devices) {
+    const acc = accessory.get(d.id);
+    if (!acc) continue;
+    const key = levelKeyOf(d.levelId, d.sourceRef);
+    const at = bomOrder(d);
+    let best: DeviceDraftRow | null = null;
+    let bestScore: number[] | null = null;
+    for (const p of devices) {
+      if (p === d || p.state === 'rejected' || p.placed > 0 || accessory.has(p.id) || levelKeyOf(p.levelId, p.sourceRef) !== key) continue;
+      const pt = typeOfModel(types, p.model);
+      if (!pt || !listsAccessory(types, pt, acc)) continue;
+      const po = bomOrder(p);
+      const score = [p.importBatchId === d.importBatchId ? 0 : 1, at != null && po != null && po <= at ? 0 : 1, at != null && po != null ? Math.abs(at - po) : Infinity];
+      if (!bestScore || before(score, bestScore)) {
+        best = p;
+        bestScore = score;
+      }
+    }
+    d.accessoryOf = { model: acc.model, parentId: best?.id ?? null, parentLabel: best ? (best.name ? `${best.name} (${best.model ?? '?'})` : (best.model ?? '?')) : null };
+    d.flagged = true;
+  }
+}
+
 // ------------------------------------------------------------------ views
 
 export function matchesFilter(r: { state: DraftState; flagged: boolean; conflicts: string[] }, f: DraftFilter): boolean {
@@ -625,7 +690,8 @@ export function bulkDevices(data: DraftReviewData, key: LevelKey, min = BULK_MIN
       d.confidence != null &&
       d.confidence >= min &&
       d.conflicts.length === 0 &&
-      Object.keys(d.needs).length === 0,
+      Object.keys(d.needs).length === 0 &&
+      !d.accessoryOf,
   );
 }
 

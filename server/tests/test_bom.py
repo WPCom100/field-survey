@@ -14,7 +14,7 @@ from app.auth import upsert_user
 from app.ids import uuid7
 from app.jobs import bom, runner
 from app.jobs import bom_extract as bx
-from app.models import DraftDevice, ImportBatch, Level, Op, Vocab
+from app.models import DraftDevice, ImportBatch, Level, LibraryType, Op, Vocab
 
 FIXTURE = SERVER_DIR.parent / "fixtures" / "BOM.pdf"
 AZLE = SERVER_DIR.parent / "fixtures" / "15090056-BOM.pdf"
@@ -290,6 +290,127 @@ def test_drafts_of_the_whole_bom(result):
     assert stats["drafts_by_level"]["(pool)"] == 15
 
 
+CATALOGUE = [
+    # the BOM's rack lines as the T111 DaVinci import files them (library.json, 2026-10-13)
+    bx.LibraryModel(
+        "18URack",
+        "Equipment Panels",
+        aliases=("18U Equipment Rack", "PJE1098-FIN"),
+        role="equipment_rack",
+        accessories=("18U-VD", "2100K1003", "18U Rack Center Section", "SGE1552"),
+    ),
+    bx.LibraryModel("SGE1552", None, aliases=("8 Outlet Strip",), accessory_only=True),
+    bx.LibraryModel(
+        "ERn4-RM-120",
+        "Equipment",
+        aliases=("ERn4 Rack-mount", "7180A1023"),
+        role="equipment_rack",
+        accessories=("ERn-BM", "P-ACP (7180A1029)", "P-SPM-E (7182A1701)"),
+    ),
+    bx.LibraryModel(
+        "ERn4-W",
+        "Equipment",
+        aliases=("ERn4", "ERN4-W-120"),
+        role="equipment_rack",
+        accessories=("ERn-BM", "P-SPM-E (7182A1701)", "UBPO (7180A1003)"),
+    ),
+    # the DRd's P-SPM-E holds the model; the ERn4's is renamed `P-SPM-E (7182A1701)` (D197)
+    bx.LibraryModel("P-SPM-E", None, aliases=("P-SPM-E (DRd)", "7182A1701"), accessory_only=True),
+    bx.LibraryModel("MSCX10 Mk3", "Equipment", role="other"),
+    bx.LibraryModel("2100K1006", "Equipment", role="other"),
+    bx.LibraryModel("MAP BR1", "Equipment", role="other"),
+    bx.LibraryModel("RSN-DMX4-T-RACK", "Equipment", role="other"),
+    bx.LibraryModel("RSN-DMX4-T", "Equipment", role="other"),
+    bx.LibraryModel("MAP S1000R", "Equipment", role="other"),
+    bx.LibraryModel(
+        "P-TS7-E",
+        "Touchscreen",
+        role="touchscreen",
+        accessories=("P-LCD-FBB", "P-LCD-SBB", "P-LCD-SLBB"),
+    ),
+    bx.LibraryModel("P-LCD-SBB", None, accessory_only=True),
+    bx.LibraryModel("P-LCD-SLBB", None, accessory_only=True),
+]
+
+
+@needs_fixture
+@needs_ocr
+def test_the_catalogue_keeps_accessories_off_the_drafts(parsed):
+    """T126 (D229): with the DaVinci catalogue in the library, rack parts stay in their rack —
+    an accessory-only line (SGE1552, P-SPM-E) attaches to the rack whose type lists it, the
+    catalogue's `Equipment` gear (role `other`) and the ERn4 stay components — so the drafts are
+    the bare pass's 108, not 134."""
+    lines, _ = parsed
+    stats = bx.build(lines, target(library=CATALOGUE)).stats()
+    assert stats["drafts"] == 108 and stats["racks"] == 4
+    assert stats["accessory_lines"] == 63  # 56 + SGE1552 ×3 + P-SPM-E ×4
+    assert stats["component_lines"] == 43
+    assert stats["excluded"] == 17
+    result = bx.build(lines, target(library=CATALOGUE))
+    level1 = draft_at(result, 1, 100)
+    assert level1.model == "ERN4-RM-120"
+    assert {(a["model"], a["role"]) for a in level1.accessories} >= {
+        ("SGE1552", "accessory"),  # 18URack lists it: the rack opened on its `18U RACK` line
+        ("P-SPM-E", "accessory"),  # the ERn4 lists its renamed `P-SPM-E (7182A1701)`
+        ("MSCX10 Mk3", "component"),
+        ("ERN4-RM-120", "component"),
+    }
+    f16 = draft_at(result, 3, 440)
+    assert [(a["model"], a["role"]) for a in f16.accessories] == [
+        ("P-ACP3", "component"),
+        ("P-SPM-E", "accessory"),
+        ("URTO", "accessory"),
+    ]
+
+
+def _item(line: int, model: str, venue: str = "Level 1", qty: int = 1) -> bx.Line:
+    return bx.Line(
+        page=1,
+        line=line,
+        part_number=model,
+        description="",
+        model=model,
+        qty=qty,
+        bbox=(0, 0, 1, 1),
+        extraction="text",
+        confidence=0.95,
+        job="1",
+        venue=venue,
+    )
+
+
+def test_an_accessory_only_line_is_never_a_draft():
+    """T126 (D229): a line of an accessory-only type attaches to the nearest line whose type
+    lists it (preceding first), else is excluded — even when the model rule would read it as a
+    device (`P-LCD-SBB` matches the touchscreen rule)."""
+    t = target(library=CATALOGUE)
+    lines = [
+        _item(10, "P-TS7-E", qty=2),
+        _item(20, "P-LCD-SBB", qty=2),
+        _item(30, "PI1002"),
+        _item(40, "P-TS7-E"),
+        # another venue with no touchscreen: nowhere to go
+        _item(50, "P-LCD-SLBB", venue="Level 2"),
+    ]
+    result = bx.build(lines, t)
+    assert [(d.line.line, d.model) for d in result.drafts] == [
+        (10, "P-TS7-E"),
+        (30, "PI1002"),
+        (40, "P-TS7-E"),
+    ]
+    assert [(a["model"], a["qty"], a["role"]) for a in result.drafts[0].accessories] == [
+        ("P-LCD-SBB", 2, "accessory")
+    ]
+    assert not result.drafts[2].accessories
+    assert result.accessory_lines == 1
+    assert [(e.model, e.reason) for e in result.excluded] == [
+        ("P-LCD-SLBB", "accessory without a parent line")
+    ]
+    # without the catalogue the model rule still reads P-LCD-SBB as a touchscreen (pre-T111)
+    bare = bx.build(lines, target())
+    assert "P-LCD-SBB" in [d.model for d in bare.drafts]
+
+
 @needs_fixture
 def test_vocabulary_and_library_override_the_defaults(parsed):
     """Project `vocab(model_map)` / `vocab(level_alias)` rows and the device-type library win."""
@@ -429,6 +550,31 @@ def _project(session, codes=TOWER_LEVELS) -> tuple[uuid.UUID, dict[str, Level]]:
     pid = uuid.UUID(out.id)
     rows = {lv.level: lv for lv in session.scalars(select(Level).where(Level.project_id == pid))}
     return pid, rows
+
+
+def test_target_reads_accessory_only_types(session):
+    """T126: the job's target carries each type's `accessory_only` and its optional accessories'
+    models, so the extraction can tell an accessory line from a device."""
+    project_id, _ = _project(session, ("01",))
+    session.add_all(
+        [
+            LibraryType(
+                id=uuid7(),
+                project_id=None,
+                model="P-TS7-E",
+                category="Touchscreen",
+                state="accepted",
+                optional_accessories=[{"model": "P-LCD-SBB", "max_quantity": 1}, {"x": 1}],
+            ),
+            LibraryType(
+                id=uuid7(), project_id=None, model="P-LCD-SBB", accessory_only=True, state="draft"
+            ),
+        ]
+    )
+    session.commit()
+    t = bom.target_of(session, project_id)
+    assert t.library_type("P-TS7-E").accessories == ("P-LCD-SBB",)
+    assert t.accessory_type("P-LCD-SBB") is not None and t.accessory_type("P-TS7-E") is None
 
 
 def _run(session, store, factory, project_id, data, name="BOM.pdf"):

@@ -14,13 +14,15 @@
  *   reviewing a level seeded from the master never lists its panels twice (D193 (1)).
  * - A draft flagged **not on this sheet** (`draft_device.not_on_sheet`) leaves the list for the
  *   Flagged section until it is unflagged.
+ * - A draft whose model is an **accessory-only** library type is never offered (T126): it is an
+ *   accessory of another draft, folded into it in Review drafts.
  */
 
 import { canonicalCategory, isRole, type Role, type SheetFeatures, type Store } from '@field-survey/core';
 
 export type Point = { x: number; y: number };
 
-import { loadDeviceTypes, roleOfDevice, typeForDraft, type DeviceTypes } from '../library/neuron';
+import { accessoryTypeOf, loadDeviceTypes, roleOfDevice, typeForDraft, type DeviceTypes } from '../library/neuron';
 
 // ------------------------------------------------------------------ shapes
 
@@ -235,6 +237,8 @@ async function compute(store: Store, projectId: string): Promise<Computed> {
     };
     // a floor the project lacks (`code:09`) is nowhere to place it
     if (!rec.levelId && rec.levelCode) continue;
+    // an accessory is no unit to place (T126)
+    if (accessoryTypeOf(types, rec.model)) continue;
     const placed = placedBy.get(rec.id) ?? 0;
     const { type, role } = typeForDraft(types, rec);
     let covered = 0;

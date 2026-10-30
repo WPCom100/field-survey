@@ -97,10 +97,18 @@ preceding first: Inspire faceplates (`1IFP`) → `PI…` stations or the switch-
 (`EPS05-FP`) → `EPS05`; a Material List sub-item (`Line 270 delivers for line 260`) → line 260.
 An accessory with no parent in its venue is excluded (`accessory without a parent line`).
 
+After those patterns, a line whose model (or alias) is an **accessory-only** library type (the
+631 the DaVinci import files as other types' accessories, T111) is an accessory too (T126, D229):
+its parent is the nearest line of the venue whose type lists it in `optional_accessories` — a
+slot's name counts with its D197 ` (part number)` suffix dropped, so the ERn4's `P-SPM-E
+(7182A1701)` lists `P-SPM-E`, and a rack named by its ERn4 still matches by its `18U RACK` line.
+With no such line it is a component of the venue's open rack, else excluded. Never a draft.
+
 A venue's first `18U RACK` or `ERn4` line opens an **Equipment rack** draft; every later line of
-the venue that is not itself a lighting-control device folds into it as `role: component`
-(processors, station power modules, Mosaic controller, switch, UPS, patch panel, fibre, rack
-ears…). The draft's `model` is the ERn4 enclosure's when the rack has one (`ERN4-RM-120`, the
+the venue that is not itself a lighting-control device — or whose library type's role is
+`other` or `equipment_rack` (the catalogue's `Equipment` gear and the ERn4, T126) — folds into it
+as `role: component` (processors, station power modules, Mosaic controller, switch, UPS, patch
+panel, fibre, rack ears…). The draft's `model` is the ERn4 enclosure's when the rack has one (`ERN4-RM-120`, the
 master's naming), else the rack line's.
 
 ### Excluded lines (D12)
@@ -118,7 +126,10 @@ a draft by hand.
 lines**, **17 excluded** (`tests/test_bom.py::test_drafts_of_the_whole_bom`). Phase 1f's report
 counted 258 lines, 113 drafts, 56 accessory lines and 17 excluded; this pass matches the line,
 accessory and excluded counts and folds rack component lines into their rack, which is where its
-draft count differs (see TASKS T42).
+draft count differs (see TASKS T42). With the DaVinci catalogue in the library
+(`test_the_catalogue_keeps_accessories_off_the_drafts`) the drafts stay 108 and 4 racks (134 and
+7 before T126), **63 accessory lines** (the racks' `SGE1552` ×3 and `P-SPM-E` ×4 now as
+accessories), 43 component lines, 17 excluded.
 
 The OCR page in detail: tesseract's own page layout drops the white-on-blue header bar, so
 `app.ocr.ocr_page` OCRs each dark filled band of a panel again as a single line (plain and in

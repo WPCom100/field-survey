@@ -79,6 +79,7 @@ export type DeviceChoice = { model?: string | null; qty?: number | null; levelId
 export function deviceBlockers(d: DeviceDraftRow, choice: DeviceChoice = {}): string[] {
   const out: string[] = [];
   if (d.state !== 'proposed') out.push(`This draft is ${d.state}.`);
+  if (d.accessoryOf) out.push('An accessory, never a device: fold it into its parent or reject it.');
   if (d.needs.model && !(choice.model && d.needs.model.options.includes(choice.model))) out.push(`Pick the model: ${d.needs.model.options.join(' or ')}.`);
   if (d.needs.qty && !(typeof choice.qty === 'number' && choice.qty >= 1)) out.push('Pick the quantity: BOM or riser.');
   if (d.needs.level && !(choice.levelId && d.needs.level.options.some((o) => o.id === choice.levelId))) out.push(`Pick the level: ${d.needs.level.options.map((o) => o.code).join(' or ')}.`);
@@ -152,6 +153,50 @@ export async function reopenDraft(editor: Editor, kind: 'device' | 'cable', d: D
   if (kind === 'device' && (d as DeviceDraftRow).placed > 0) throw new DraftError('Devices were already placed from this draft.');
   if (kind === 'cable' && (d as CableDraftRow).committed) throw new DraftError('Its cable exists; change it in the cable view.');
   return editor.setField(kind === 'device' ? 'draft_device' : 'draft_cable', d.id, 'state', 'proposed', ctx('Draft review: reopened'));
+}
+
+// ------------------------------------------------------------------ accessory drafts (T126)
+
+/** What Fold into the parent still waits for (empty = it can go). */
+export function foldBlockers(data: Pick<DraftReviewData, 'cables'>, d: DeviceDraftRow): string[] {
+  if (!d.accessoryOf) return ['This draft is not an accessory.'];
+  const out: string[] = [];
+  if (d.state === 'rejected') out.push('Reopen the draft first.');
+  if (d.placed > 0) out.push('Devices were already placed from this draft; delete them on the plan instead.');
+  if (!d.accessoryOf.parentId) out.push(`No draft of this level lists ${d.accessoryOf.model}: reject it.`);
+  const end = data.cables.some((c) => c.state !== 'rejected' && (['from', 'to'] as const).some((s) => c.ends[s]?.kind === 'draft_device' && c.ends[s]?.id === d.id));
+  if (end) out.push('A cable draft runs to it: give that cable another end first.');
+  return out;
+}
+
+/**
+ * Fold an accessory draft into its parent (T126): the line joins the parent draft's
+ * `accessories[]` as the BOM extraction would have put it (D27), and the accessory draft is
+ * soft-deleted — its history keeps it. An open source conflict on it is settled. One group.
+ */
+export async function foldAccessory(editor: Editor, store: Store, data: DraftReviewData, d: DeviceDraftRow, opts: { now?: () => string } = {}): Promise<Op[]> {
+  const blockers = foldBlockers(data, d);
+  if (blockers.length) throw new DraftError(blockers.join(' '));
+  const parentId = d.accessoryOf!.parentId!;
+  const parent = await store.get<Record<string, unknown>>('draft_device', parentId);
+  if (!parent || parent.deleted_at != null) throw new DraftError('Its parent draft is not on this iPad.');
+  const raw = typeof parent.accessories === 'string' ? (JSON.parse(parent.accessories) as unknown) : parent.accessories;
+  const list = Array.isArray(raw) ? raw : [];
+  const entry = {
+    model: d.model,
+    model_raw: d.modelRaw,
+    qty: d.qty,
+    role: 'accessory',
+    source_ref: d.sourceRef,
+    extraction: d.extraction,
+    confidence: d.confidence,
+    folded_from: d.id,
+  };
+  return editor.group(ctx(`Draft review: ${label(d)} folded into ${d.accessoryOf!.parentLabel ?? 'its parent'} as an accessory`), async (g) => {
+    await g.setField('draft_device', parentId, 'accessories', [...list, entry]);
+    await settleReview(g, editor, d.reviewItemId, { choice: 'baseline', reason: 'Folded into its parent as an accessory' }, (opts.now ?? iso)());
+    await g.delete('draft_device', d.id);
+  });
 }
 
 // ------------------------------------------------------------------ hand-entered and promoted drafts

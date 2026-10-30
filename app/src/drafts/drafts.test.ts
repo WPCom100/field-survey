@@ -23,6 +23,8 @@ import {
   deviceBlockers,
   editDevice,
   excludedKey,
+  foldAccessory,
+  foldBlockers,
   libraryRow,
   promoteExcluded,
   realEnd,
@@ -720,5 +722,70 @@ describe('draft roles (T115, D201)', () => {
     expect(typeForDraft(types, { model: 'erp24-ft-241p', role: 'relay_panel', category: 'Power Distribution' })).toMatchObject({ type: { id: 'a' }, role: 'relay_panel' });
     expect(typeForDraft(types, { model: 'P-GWY', role: 'other', category: 'Equipment' })).toMatchObject({ type: { id: 'c' }, role: 'other' });
     expect(typeForDraft(types, { model: 'PI1002', role: null, category: 'Station' })).toEqual({ type: null, role: 'station' });
+  });
+});
+
+describe('accessory drafts (T126, round 2026-10-18 C-38)', () => {
+  const ctx = { change_type: 'Master edit' as const, reason: 'test' };
+  /** The catalogue's touchscreen with its backboxes, the 18U rack with its outlet strip; drafts of them on 01. */
+  async function seed() {
+    const s = await setup();
+    const { editor, ids } = s;
+    const lt = (f: Record<string, unknown>) => editor.create('library_type', { project_id: null, state: 'accepted', ...f }, ctx);
+    await lt({ model: 'P-TS7-E', category: 'Touchscreen', role: 'touchscreen', optional_accessories: [{ model: 'P-LCD-SBB', expected_qty: null }] });
+    await lt({ model: 'P-LCD-SBB', aliases: ['7" Touchscreen Surface Back Box'], accessory_only: true, state: 'draft' });
+    await lt({ model: 'SGE1552', aliases: ['8 Outlet Strip'], accessory_only: true, state: 'draft' });
+    const bom = (page: number, line: number) => ({ kind: 'bom_line', file: 'BOM.pdf', page, line, bbox: [10, 20, 300, 32], venue: 'Level 1' });
+    const dd = async (f: Record<string, unknown>) => (await editor.create('draft_device', { project_id: PROJECT, import_batch_id: ids.bom, level_id: ids.l01, state: 'proposed', confidence: 0.95, qty: 1, ...f }, ctx)).id;
+    const far = await dd({ model: 'P-TS7-E', category: 'Touchscreen', source_ref: bom(1, 900) });
+    const near = await dd({ model: 'P-TS7-E', category: 'Touchscreen', source_ref: bom(1, 500) });
+    const backbox = await dd({ model: 'P-LCD-SBB', category: 'Touchscreen', qty: 2, source_ref: bom(1, 510) });
+    const strip = await dd({ model: '8 Outlet Strip', category: 'Equipment', state: 'accepted', source_ref: bom(1, 520) });
+    return { ...s, far, near, backbox, strip };
+  }
+
+  it('flags a draft of an accessory-only model with its nearest parent, out of Accept and Accept all', async () => {
+    const { store, ids, near, backbox, strip } = await seed();
+    const data = await loadDraftReview(store, PROJECT);
+    const b = row(data.devices, backbox);
+    expect(b.accessoryOf).toEqual({ model: 'P-LCD-SBB', parentId: near, parentLabel: 'P-TS7-E' });
+    expect(b.flagged).toBe(true);
+    expect(deviceBlockers(b)).toContain('An accessory, never a device: fold it into its parent or reject it.');
+    expect(bulkDevices(data, ids.l01).map((d) => d.id)).not.toContain(backbox);
+    // the strip's 18U rack is not a draft here: only Reject
+    expect(row(data.devices, strip).accessoryOf).toEqual({ model: 'SGE1552', parentId: null, parentLabel: null });
+    expect(mismatchList(data, ids.l01).map((m) => m.text)).toEqual(
+      expect.arrayContaining(['P-LCD-SBB is an accessory of P-TS7-E — fold it in', '8 Outlet Strip is an accessory and no draft here lists it — reject it']),
+    );
+    expect(row(data.devices, near).accessoryOf).toBeNull();
+    // the unplaced list never offers either (accepted or not)
+    const { loadUnplaced } = await import('../placement/model');
+    expect((await loadUnplaced(store, PROJECT, ids.l01))!.items.some((i) => i.kind === 'draft' && (i.draftId === strip || i.draftId === backbox))).toBe(false);
+  });
+
+  it('Fold puts the line on the parent and deletes the accessory draft, in one group', async () => {
+    const { store, editor, near, backbox, strip } = await seed();
+    let data = await loadDraftReview(store, PROJECT);
+    expect(foldBlockers(data, row(data.devices, strip))).toEqual(['No draft of this level lists SGE1552: reject it.']);
+    await expect(foldAccessory(editor, store, data, row(data.devices, strip))).rejects.toThrow(DraftError);
+    const ops = await foldAccessory(editor, store, data, row(data.devices, backbox));
+    expect(new Set(ops.map((o) => o.group_id)).size).toBe(1);
+    expect(ops.map((o) => o.kind)).toEqual(['set', 'delete']);
+    expect(ops[0]!.reason).toBe('Draft review: P-LCD-SBB ×2 folded into P-TS7-E as an accessory');
+    data = await loadDraftReview(store, PROJECT);
+    expect(data.devices.some((d) => d.id === backbox)).toBe(false);
+    expect(row(data.devices, near).accessories).toEqual([{ model: 'P-LCD-SBB', qty: 2, role: 'accessory' }]);
+    const raw = await store.get<Record<string, unknown>>('draft_device', near);
+    expect(raw!.accessories).toEqual([expect.objectContaining({ model: 'P-LCD-SBB', qty: 2, role: 'accessory', folded_from: backbox, source_ref: expect.objectContaining({ page: 1, line: 510 }) })]);
+    // the strip is rejected instead
+    await rejectDraft(editor, 'device', row(data.devices, strip), 'An accessory of the 18U rack');
+    expect(row((await loadDraftReview(store, PROJECT)).devices, strip)).toMatchObject({ state: 'rejected', accessoryOf: null });
+  });
+
+  it('Fold waits while a cable draft runs to the accessory', async () => {
+    const { store, editor, ids, backbox } = await seed();
+    await editor.create('draft_cable', { project_id: PROJECT, level_id: ids.l01, code: 'N', qty: 1, origin: 'riser', state: 'proposed', candidates: [{ side: 'to', kind: 'draft_device', id: backbox, label: 'P-LCD-SBB' }] }, ctx);
+    const data = await loadDraftReview(store, PROJECT);
+    expect(foldBlockers(data, row(data.devices, backbox))).toEqual(['A cable draft runs to it: give that cable another end first.']);
   });
 });
