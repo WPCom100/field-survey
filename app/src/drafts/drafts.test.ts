@@ -378,11 +378,11 @@ describe('cable drafts (T44, D6, D191)', () => {
 
   it("the project's own cable codes (T121): offered and accepted once its Rules give them a signal word", async () => {
     const { store, editor, ids } = await setup();
-    await expect(setCableCode(editor, ids.c3, 'DX', (await loadDraftReview(store, PROJECT)).codes)).rejects.toThrow(/Cable code must be one of: X · N .* · D\.$/);
+    await expect(setCableCode(editor, store, await loadDraftReview(store, PROJECT), ids.c3, 'DX')).rejects.toThrow(/Cable code must be one of: X · N .* · D\.$/);
     await setRuleParam(editor, 'R3', 'signal', { DX: 'DALI-2' });
     const { codes } = await loadDraftReview(store, PROJECT);
     expect(codes).toEqual([...CABLE_CODES, 'DX']);
-    await setCableCode(editor, ids.c3, 'DX', codes);
+    await setCableCode(editor, store, await loadDraftReview(store, PROJECT), ids.c3, 'DX');
     const hand = await addCableDraft(editor, PROJECT, { levelId: ids.l02, code: 'DX', fromLabel: 'CT02LCPA', toLabel: 'DALI-2 bus' }, codes);
     await expect(addCableDraft(editor, PROJECT, { levelId: ids.l02, code: 'DX', fromLabel: 'a', toLabel: 'b' })).rejects.toThrow(/Cable code/); // the master's ten by default
     const data = await loadDraftReview(store, PROJECT);
@@ -391,8 +391,8 @@ describe('cable drafts (T44, D6, D191)', () => {
 
   it('a code is chosen for a line without one; panic and single-row texts', async () => {
     const { store, editor, ids } = await setup();
-    await expect(setCableCode(editor, ids.c3, 'Z')).rejects.toThrow(/Cable code/);
-    await setCableCode(editor, ids.c3, 'NG');
+    await expect(setCableCode(editor, store, await loadDraftReview(store, PROJECT), ids.c3, 'Z')).rejects.toThrow(/Cable code/);
+    await setCableCode(editor, store, await loadDraftReview(store, PROJECT), ids.c3, 'NG');
     const data = await loadDraftReview(store, PROJECT);
     expect(row(data.cables, ids.c3).code).toBe('NG');
     expect(data.codes).toEqual(CABLE_CODES);
@@ -466,7 +466,7 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
     await engine.run();
     const r2c = async () => (await loadDeviceCard(store, ids.panel))!.drafts.filter((d) => d.ruleId === 'R2c').map((d) => (d.payload.cable as { cable: string }).cable).sort();
     expect(await r2c()).toEqual(['0-10V', 'P']);
-    await setCableCode(editor, ctl, '0-10V');
+    await setCableCode(editor, store, await loadDraftReview(store, PROJECT), ctl, '0-10V');
     let data = await loadDraftReview(store, PROJECT);
     const res = await acceptCable(editor, store, data, row(data.cables, ctl), { confirm: true, riserBlob: 'ab'.repeat(32) });
     expect(res).toMatchObject({ linked: false, waiting: false });
@@ -493,7 +493,7 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
     const { id: lib } = await editor.create('cable', { project_id: PROJECT, cable: '0-10V', qty: 1, single_row: true, origin: 'library', endpoint_confirmed: true, end_a_id: ends[0], end_b_id: ends[1] }, MASTER);
     await editor.create('cable_end', { id: ends[0], cable_id: lib, side: 'A', endpoint_kind: 'device', device_id: ids.panel, level_id: ids.l06m, from_text: 'CT06LCPA', to_text: 'Fixtures' }, MASTER);
     await editor.create('cable_end', { id: ends[1], cable_id: lib, side: 'B', endpoint_kind: 'placeholder', placeholder_id: ids.canyon, from_text: 'B3A Canyon' }, MASTER);
-    await setCableCode(editor, ctl, '0-10V');
+    await setCableCode(editor, store, await loadDraftReview(store, PROJECT), ctl, '0-10V');
     let data = await loadDraftReview(store, PROJECT);
     const res = await acceptCable(editor, store, data, row(data.cables, ctl), { confirm: false, riserBlob: 'cd'.repeat(32) });
     expect(res).toMatchObject({ linked: true, cableId: lib });
@@ -501,7 +501,7 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
     expect(((await store.get<Record<string, unknown>>('cable', lib))!.riser_ref as Record<string, unknown>).draft).toBe(ctl);
     expect(fixtures).toBeTruthy();
     // the rack's 120V feed, accepted first: it is the library's row (R2d's texts, D52)
-    await setCableCode(editor, feed, '120V');
+    await setCableCode(editor, store, await loadDraftReview(store, PROJECT), feed, '120V');
     data = await loadDraftReview(store, PROJECT);
     const r = await acceptCable(editor, store, data, row(data.cables, feed), { confirm: true });
     const e = await store.list<Record<string, unknown>>('cable_end', { where: 'cable_id = ?', params: [r.cableId], orderBy: 'side' });
@@ -516,11 +516,11 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
   it('Accept on a load-circuit line makes the panel’s 120V → Fixtures row, never linked to its 120V feed (D221)', async () => {
     const { store, editor, ids, load, panelFeed, fixtures, power } = await withLines();
     // the panel's feed first: a 120V cable on the panel, to 120v Power
-    await setCableCode(editor, panelFeed, '120V');
+    await setCableCode(editor, store, await loadDraftReview(store, PROJECT), panelFeed, '120V');
     let data = await loadDraftReview(store, PROJECT);
     const f = await acceptCable(editor, store, data, row(data.cables, panelFeed), { confirm: false });
     expect(f).toMatchObject({ linked: false, waiting: false });
-    await setCableCode(editor, load, '120V');
+    await setCableCode(editor, store, await loadDraftReview(store, PROJECT), load, '120V');
     data = await loadDraftReview(store, PROJECT);
     const res = await acceptCable(editor, store, data, row(data.cables, load), { confirm: false, riserBlob: 'ef'.repeat(32) });
     expect(res).toMatchObject({ linked: false, waiting: false });
@@ -549,6 +549,91 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
     data = await loadDraftReview(store, PROJECT);
     expect(row(data.cables, load)).toMatchObject({ state: 'rejected', code: null });
     expect(await store.list('cable', { where: 'cable IS NULL' })).toHaveLength(0);
+  });
+});
+
+describe('changing an open cable draft’s code (T128, round 2026-10-18 C-26)', () => {
+  const MASTER = { change_type: 'Master edit', reason: 'test' } as const;
+
+  async function withMisread() {
+    const s = await setup();
+    const { editor, ids } = s;
+    const fixtures = (await editor.create('placeholder', { project_id: PROJECT, label: 'Fixtures', kind: 'fixtures' }, MASTER)).id;
+    const power = (await editor.create('placeholder', { project_id: PROJECT, label: '120v Power', kind: 'power' }, MASTER)).id;
+    // the panel's 0-10V leader the riser read as 120V, to the library's 120v Power far end
+    const misread = (
+      await editor.create('draft_cable', {
+        project_id: PROJECT, import_batch_id: ids.riser, level_id: ids.l06m, code: '120V', qty: 1, origin: 'riser', state: 'proposed', level_basis: 'riser_band', extraction: 'text',
+        from_label: 'CT06LCPA', to_label: '120v Power', confidence: 0.95, conflicts: [],
+        candidates: [{ side: 'from', kind: 'draft_device', id: ids.dD, label: 'CT06LCPA', confidence: 0.95 }, { side: 'to', kind: 'placeholder', id: power, label: '120v Power', confidence: 0.95 }],
+      }, MASTER)
+    ).id;
+    return { ...s, fixtures, power, misread };
+  }
+  const change = async (s: Awaited<ReturnType<typeof withMisread>>, id: string, code: string) => setCableCode(s.editor, s.store, await loadDraftReview(s.store, PROJECT), id, code);
+
+  it('offers the code on a draft with one, the To follows it, and Accept writes edited (120V → 0-10V)', async () => {
+    const s = await withMisread();
+    const { store, editor, ids, misread, fixtures } = s;
+    expect(row((await loadDraftReview(store, PROJECT)).cables, misread)).toMatchObject({ code: '120V', unknownCode: false, codeEdited: false, codeWas: undefined });
+    await change(s, misread, '0-10V');
+    let data = await loadDraftReview(store, PROJECT);
+    const c = row(data.cables, misread);
+    expect(c).toMatchObject({ code: '0-10V', codeWas: '120V', codeEdited: true, state: 'proposed', handPicked: { from: false, to: false } });
+    expect(c.ends.to).toMatchObject({ kind: 'placeholder', id: fixtures, label: 'Fixtures' });
+    expect(cableBlockers(c)).toEqual([]);
+    const res = await acceptCable(editor, store, data, c, { confirm: true });
+    const ends = await store.list<Record<string, unknown>>('cable_end', { where: 'cable_id = ?', params: [res.cableId], orderBy: 'side' });
+    expect(ends.map((e) => [e.side, e.device_id ?? e.placeholder_id, e.from_text, e.to_text])).toEqual([
+      ['A', ids.panel, 'CT06LCPA', 'Fixtures'],
+      ['B', fixtures, 'Fixtures', null],
+    ]);
+    expect(await store.get<Record<string, unknown>>('cable', res.cableId!)).toMatchObject({ cable: '0-10V', single_row: true });
+    data = await loadDraftReview(store, PROJECT);
+    expect(row(data.cables, misread)).toMatchObject({ code: '0-10V', state: 'edited', committed: true });
+  });
+
+  it('back to its own code is no edit; the same code is no op', async () => {
+    const s = await withMisread();
+    const { store, editor, misread, power } = s;
+    expect(await change(s, misread, '120V')).toEqual([]);
+    await change(s, misread, '0-10V');
+    await change(s, misread, '120V');
+    const data = await loadDraftReview(store, PROJECT);
+    const c = row(data.cables, misread);
+    expect(c).toMatchObject({ code: '120V', codeWas: '120V', codeEdited: false });
+    expect(c.ends.to).toMatchObject({ id: power, label: '120v Power' });
+    await acceptCable(editor, store, data, c, { confirm: false });
+    expect(row((await loadDraftReview(store, PROJECT)).cables, misread).state).toBe('accepted');
+  });
+
+  it('a To picked by hand, or a code with no placeholder in the project, stays', async () => {
+    const s = await withMisread();
+    const { store, editor, misread, fixtures, power } = s;
+    // P: the project has no EBDK panic wire placeholder, so the To is left as it is
+    await change(s, misread, 'P');
+    expect(row((await loadDraftReview(store, PROJECT)).cables, misread).ends.to).toMatchObject({ id: power });
+    const panic = (await editor.create('placeholder', { project_id: PROJECT, label: 'EBDK panic wire', kind: 'custom' }, MASTER)).id;
+    await change(s, misread, '0-10V');
+    await change(s, misread, 'P');
+    expect(row((await loadDraftReview(store, PROJECT)).cables, misread).ends.to).toMatchObject({ id: panic, label: 'EBDK panic wire' });
+    // the reviewer picks Fixtures by hand: a later code change leaves it
+    await setEndpoint(editor, store, misread, 'to', { kind: 'placeholder', id: fixtures, label: 'Fixtures', levelId: null });
+    await change(s, misread, '120V');
+    const c = row((await loadDraftReview(store, PROJECT)).cables, misread);
+    expect(c).toMatchObject({ code: '120V', handPicked: { to: true } });
+    expect(c.ends.to).toMatchObject({ id: fixtures });
+  });
+
+  it('a To that is not a code placeholder never follows; a closed draft asks to be reopened', async () => {
+    const s = await withMisread();
+    const { store, editor, ids, misread } = s;
+    // c2: X to B3A Canyon (a fixture run) — the code changes, the far end stays
+    await change(s, ids.c2, 'N');
+    expect(row((await loadDraftReview(store, PROJECT)).cables, ids.c2)).toMatchObject({ code: 'N', codeEdited: true, ends: { to: { id: ids.canyon } } });
+    await expect(change(s, ids.c2, 'Z')).rejects.toThrow(/Cable code/);
+    await rejectDraft(editor, 'cable', row((await loadDraftReview(store, PROJECT)).cables, misread), 'Not a cable to survey');
+    await expect(change(s, misread, '0-10V')).rejects.toThrow(/Reopen/);
   });
 });
 

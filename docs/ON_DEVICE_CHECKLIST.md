@@ -633,6 +633,17 @@ Decision D226: the vector pass is streamed (output unchanged), a page with more 
 
 Decision D227: the correction is a `Correction` op keyed on who last set the flag (the import's reason); a person's flag is left alone on drafts too; the same library re-uploaded once after the deploy is not skipped, so the correction runs. → Approve / change:
 
+## T128 — Change a cable draft's code on any open draft  ·  Needs: no new build (JS update only)
+
+**Why it matters:** in the 2026-10-18 round (C-26) the panels' 0-10V riser lines came in as 120V to 120v Power, and the code could not be changed: the chips only showed on a line with no code, so the only way out was Reject and redraw by hand.
+
+- [ ] **The chips are there.** Setup → Review drafts → Cables, any open cable draft that already has a code (e.g. one of the 0-10V lines read as 120V): under the title a **Cable code** row of chips shows, the current code highlighted. A line with no code still asks "What is this cable? Pick its code" with the guess. An accepted or rejected draft shows no chips. → saw:
+- [ ] **The To follows.** On a 120V line whose To is **120v Power (placeholder)**, tap **0-10V**: the title reads `Draft cable 0-10V`, the label reads "Cable code (was 120V)" and the To line now reads **Fixtures (placeholder)**. Tap 120V again: the To is back to 120v Power and "(was …)" is gone. → saw:
+- [ ] **Accept writes edited.** Pick 0-10V again and Confirm endpoint: the draft reads ✓ edited (not accepted); once its panel is placed, the panel's card shows one 0-10V row `<panel> → Fixtures` (the library's, not a second one) and no 120V row from this line. → saw:
+- [ ] **Your own To stays.** On another open line, tap Change… on To and pick a placeholder by hand (e.g. Fixtures), then change the code: the To stays what you picked. A line to a fixture run or `Level nn` keeps its To whatever the code. → saw:
+
+Decision D228: the To follows a code change only when it is the old code's placeholder (Fixtures, 120v Power, EBDK panic wire) and was not picked by hand; it moves to the project's placeholder of that label and, when the project has none (EBDK panic wire is not seeded), stays. Picking the riser's guessed code on a line with no code never moves the To (a panel's 120V feed is to 120v Power, its load circuits to Fixtures — D221). → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

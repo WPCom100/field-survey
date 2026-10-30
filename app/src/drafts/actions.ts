@@ -21,6 +21,7 @@ import {
   RISER_KINDS,
   bulkCables,
   bulkDevices,
+  candidateList,
   deviceForDraft,
   loadDraftReview,
   withChosen,
@@ -262,9 +263,46 @@ export async function setEndpoint(editor: Editor, store: Store, draftId: string,
   return editor.setField('draft_cable', draftId, 'candidates', withChosen(raw.candidates, side, pick), ctx(`Draft review: ${side} end ${pick ? `→ ${pick.label}` : 'cleared'}`));
 }
 
-export async function setCableCode(editor: Editor, draftId: string, code: string, codes: readonly string[] = CABLE_CODES): Promise<Op | null> {
-  checkCode(code, codes);
-  return editor.setField('draft_cable', draftId, 'code', code, ctx(`Draft review: cable code ${code}`));
+/** A code's placeholder far end (CLAUDE.md §3, R2c / R2d): the To that follows a changed code (T128). */
+export const CODE_TO: Readonly<Record<string, string>> = { '0-10V': 'Fixtures', '120V': '120v Power', P: 'EBDK panic wire' };
+const CODE_TO_LABELS = new Set(Object.values(CODE_TO).map((l) => l.toLowerCase()));
+
+/**
+ * Set an open cable draft's code (T108 / T128): on any open draft, the project's codes. A change
+ * from the code the draft had (or, with none, from the riser's guess) moves a To that is one of
+ * the codes' placeholders (`CODE_TO`) to the new code's — unless the To was picked by hand or the
+ * project has no such placeholder. The first change keeps the draft's own code (`code_set`), so
+ * Accept writes `edited`. One group.
+ */
+export async function setCableCode(editor: Editor, store: Store, data: DraftReviewData, draftId: string, code: string): Promise<Op[]> {
+  checkCode(code, data.codes);
+  const raw = await store.get<Record<string, unknown>>('draft_cable', draftId);
+  const c = data.cables.find((x) => x.id === draftId);
+  if (!raw || !c) throw new DraftError('That draft is not on this iPad.');
+  if (raw.state !== 'proposed') throw new DraftError('Reopen the draft to change its code.');
+  const was = (raw.code as string | null) ?? null;
+  if (was === code) return [];
+  let candidates = candidateList(raw.candidates);
+  let changed = false;
+  if (!candidates.some((v) => v.side === 'code_set')) {
+    candidates = [...candidates, { side: 'code_set', was }];
+    changed = true;
+  }
+  const to = c.ends.to;
+  const prev = was ?? c.codeGuess?.value ?? null;
+  const target = CODE_TO[code];
+  if (prev !== code && target && to?.kind === 'placeholder' && !c.handPicked.to && CODE_TO_LABELS.has(to.label.toLowerCase())) {
+    const p = data.placeholders.find((x) => x.label.toLowerCase() === target.toLowerCase());
+    if (p && p.id !== to.id) {
+      const pick: Endpoint = { kind: 'placeholder', id: p.id, label: p.label, levelId: p.levelId };
+      candidates = withChosen(candidates, 'to', pick).map((v) => (v.side === 'to' && v.id === p.id && v.chosen === true ? { ...v, follows_code: true } : v));
+      changed = true;
+    }
+  }
+  return editor.group(ctx(`Draft review: cable code ${was ?? '?'} → ${code}`), async (g) => {
+    await g.setField('draft_cable', draftId, 'code', code);
+    if (changed) await g.setField('draft_cable', draftId, 'candidates', candidates);
+  });
 }
 
 /** The master's words for a run's far end, by code (CLAUDE.md §3 and the master's Connections). */
@@ -471,7 +509,7 @@ export async function acceptCable(
   const a = realEnd(data, c.ends.from);
   const b = realEnd(data, c.ends.to);
   let result: { cableId: string; linked: boolean } | null = null;
-  const edited = c.handPicked.from || c.handPicked.to || c.conflicts.includes('code:unknown');
+  const edited = c.handPicked.from || c.handPicked.to || c.codeEdited || c.conflicts.includes('code:unknown');
   const what = `${c.code} ${c.ends.from!.label} → ${c.ends.to!.label}`;
   const reason = opts.reason ?? `Draft review: ${opts.confirm ? 'endpoint confirmed' : 'accepted'} ${what}`;
   const ops = await editor.group(ctx(reason), async (g) => {

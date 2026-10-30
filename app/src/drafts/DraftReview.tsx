@@ -537,7 +537,7 @@ function CablePanel({
       <Text style={styles.h2}>
         Draft cable {c.code ?? '?'} {c.conflicts.length ? '⚠' : ''} <Text style={styles.dim}>{STATE_LABEL[c.state]}</Text>
       </Text>
-      {!c.code || (open && c.conflicts.includes('code:unknown')) ? (
+      {open && c.unknownCode ? (
         <View>
           <Text style={w.label}>What is this cable? Pick its code</Text>
           {c.codeGuess ? (
@@ -548,10 +548,20 @@ function CablePanel({
           ) : null}
           <View style={styles.chips}>
             {data.codes.map((k) => (
-              <Chip key={k} label={k === c.codeGuess?.value && c.code !== k ? `${k} ?` : k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, c.id, k, data.codes))} />
+              <Chip key={k} label={k === c.codeGuess?.value && c.code !== k ? `${k} ?` : k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, store, data, c.id, k))} />
             ))}
           </View>
           <Text style={styles.dim}>A load-circuit line is the panel’s 120V to Fixtures. Not a cable to survey (a sense feed, something by others)? Reject it with a reason. A 0-10V or 120V line becomes the device’s library row, never a second one.</Text>
+        </View>
+      ) : open ? (
+        <View>
+          <Text style={w.label}>Cable code{c.codeEdited ? `  (was ${c.codeWas ?? 'none'})` : ''}</Text>
+          <View style={styles.chips}>
+            {data.codes.map((k) => (
+              <Chip key={k} label={k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, store, data, c.id, k))} />
+            ))}
+          </View>
+          <Text style={styles.dim}>Read wrong? Pick the right code. A To of Fixtures, 120v Power or EBDK panic wire follows the code unless you picked it.</Text>
         </View>
       ) : null}
       <Text style={styles.dim}>

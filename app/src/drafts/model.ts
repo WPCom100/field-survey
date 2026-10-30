@@ -99,6 +99,10 @@ export type CableDraftRow = {
   unknownCode: boolean;
   /** The extraction's guess at its code (`candidates` side `code`); never written as the code. */
   codeGuess: CodeGuess | null;
+  /** The code a reviewer changed by hand (T128): the draft's code before its first change (`candidates` side `code_set`), else undefined. */
+  codeWas?: string | null;
+  /** The code differs from the one the draft came with (T128): Accept writes `edited`. */
+  codeEdited: boolean;
 };
 
 /** A riser line's guessed code (D194); `reason` `load` — a load-circuit label, 120V to Fixtures (D221). */
@@ -255,12 +259,12 @@ export const isChoiceConflict = (c: string): boolean => CHOICE_CONFLICTS.has(c);
 
 // ------------------------------------------------------------------ cable endpoints
 
-function endpointOf(v: Record<string, unknown>): (Endpoint & { side: Side; chosen: boolean; manual: boolean; confirmed: boolean }) | null {
+function endpointOf(v: Record<string, unknown>): (Endpoint & { side: Side; chosen: boolean; manual: boolean; confirmed: boolean; follows: boolean }) | null {
   const side = v.side === 'from' || v.side === 'to' ? v.side : null;
   const kind = v.kind === 'device' || v.kind === 'draft_device' || v.kind === 'placeholder' ? v.kind : null;
   const id = str(v.id);
   if (!side || !kind || !id) return null;
-  return { side, kind, id, label: str(v.label) ?? id, levelId: str(v.level_id), confidence: num(v.confidence), chosen: v.chosen === true, manual: v.manual === true, confirmed: v.confirmed === true };
+  return { side, kind, id, label: str(v.label) ?? id, levelId: str(v.level_id), confidence: num(v.confidence), chosen: v.chosen === true, manual: v.manual === true, confirmed: v.confirmed === true, follows: v.follows_code === true };
 }
 
 /** A cable draft's candidates per side, and the endpoint each side resolves to: the chosen one, else the only candidate. */
@@ -279,7 +283,8 @@ export function cableEnds(raw: unknown): Pick<CableDraftRow, 'candidates' | 'end
     const e = pick ?? only ?? null;
     ends[side] = e ? { kind: e.kind, id: e.id, label: e.label, levelId: e.levelId, confidence: e.confidence } : null;
     chosen[side] = !!pick;
-    handPicked[side] = !!pick && (pick.manual || mine.length > 1);
+    // a To set by a code change (T128, `follows_code`) is not the reviewer's pick
+    handPicked[side] = !!pick && !pick.follows && (pick.manual || mine.length > 1);
     if (!pick?.confirmed) confirmed = false;
   }
   return { candidates, ends, chosen, handPicked, confirmed };
@@ -293,16 +298,27 @@ export function codeGuessOf(raw: unknown): CodeGuess | null {
   return { value, confidence: num(g.confidence), source: g.source === 'label' || g.source === 'model' ? g.source : null, reason: g.reason === 'load' ? 'load' : null };
 }
 
+/** The draft's code before a reviewer first changed it (T128: the `{side: 'code_set', was}` entry); undefined when never changed. */
+export function codeWasOf(raw: unknown): string | null | undefined {
+  const g = (json<unknown[]>(raw) ?? []).find((v): v is Record<string, unknown> => !!v && typeof v === 'object' && (v as Record<string, unknown>).side === 'code_set');
+  return g ? (str(g.was) ?? null) : undefined;
+}
+
+/** A draft cable's `candidates` as a list of objects (stored as JSON). */
+export function candidateList(raw: unknown): Record<string, unknown>[] {
+  return (json<unknown[]>(raw) ?? []).filter((v): v is Record<string, unknown> => !!v && typeof v === 'object');
+}
+
 /** The candidates list with `pick` as the side's chosen endpoint (added when it was not a candidate); null clears the choice. */
 export function withChosen(raw: unknown, side: Side, pick: Endpoint | null, confirmed = false): Record<string, unknown>[] {
-  const list = (json<unknown[]>(raw) ?? []).filter((v): v is Record<string, unknown> => !!v && typeof v === 'object');
+  const list = candidateList(raw);
   const flag = confirmed ? { confirmed: true } : {};
   const same = (v: Record<string, unknown>) => !!pick && v.kind === pick.kind && v.id === pick.id;
   const out = list
     .filter((v) => !(v.side === side && v.manual === true && !same(v)))
     .map((v) => {
       if (v.side !== side) return v;
-      const rest = Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'chosen' && k !== 'confirmed'));
+      const rest = Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'chosen' && k !== 'confirmed' && k !== 'follows_code'));
       return same(v) ? { ...rest, chosen: true, ...flag } : rest;
     });
   if (pick && !out.some((v) => v.side === side && same(v))) {
@@ -488,7 +504,10 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
       importBatchId: str(c.import_batch_id),
       unknownCode: conflicts.includes('code:unknown'),
       codeGuess: codeGuessOf(c.candidates),
+      codeWas: codeWasOf(c.candidates),
+      codeEdited: false,
     };
+    row.codeEdited = row.codeWas !== undefined && row.codeWas !== row.code;
     // a draft-device endpoint shows that draft's current label
     for (const side of ['from', 'to'] as const) {
       const end = row.ends[side];
