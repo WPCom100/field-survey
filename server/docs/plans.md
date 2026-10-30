@@ -32,7 +32,18 @@ on the batch and leaves the project untouched. CLI: `python -m app.jobs.plans <p
 ## The text pass (`plan_analysis.analyse_sheet`)
 
 Vector sheets only (A11): pdfplumber words with font size and position, pdfplumber curves /
-lines / rects for the bubble rings, pypdf for the content stream and the rewrite. Coordinates are
+lines / rects for the bubble rings, pypdf for the content stream and the rewrite.
+
+**Memory (T124, D226).** One pdfminer pass reads the page (`_read_page`): characters go into
+pdfplumber's layout as usual, but every painted path is handed to `Rings` as it is painted and
+then dropped (`_PathSink`), keeping only a circle's box or a short segment's midpoint. Before,
+pdfplumber kept a dict per curve, line and rect: the 14 MB `Level 02 Concourse - Composite
+(vector).pdf` (143,000 characters, 1.33 million lines) took 4.9 GB on the PC and ran the Droplet's
+worker out of memory on 2026-10-19. Now it peaks at 600 MB (06M: 600 → 94 MB) with byte-identical
+output; most of what is left is the characters. A page drawing more than `MAX_CHARS` = 500,000
+characters fails the batch with "the sheet draws more than … characters" (`SheetTooLarge`), and the
+worker container has a 2 GB cap (`docker-compose.prod.yml`), so a sheet that still outgrows it
+kills the worker alone; the batch then fails on its second try (`imports.md`). Coordinates are
 **sheet** coordinates (CropBox top-left origin, y down, PDF points — `app/src/plan/viewport.ts`).
 The composite overlays its source sheets, so text is often printed twice a point apart; words are
 deduplicated by (text, position within 1.5 pt).

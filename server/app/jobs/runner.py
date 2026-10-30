@@ -51,6 +51,12 @@ SEED_KINDS = ("master_xlsx", "floor_xlsx")
 # DaVinci library (T111).
 FILE_KINDS = ("plans", "bom", "riser", "davinci")
 STATES = ("queued", "running", "done", "failed", "skipped")
+MAX_RESTARTS = 1
+"""A batch the worker died under (out of memory, a deploy) runs once more, then fails (T124)."""
+INTERRUPTED = (
+    "the server stopped twice while reading this file, most likely out of memory; "
+    "upload a smaller or flattened PDF"
+)
 
 
 def _event(event: str, **data: Any) -> None:
@@ -320,8 +326,11 @@ def run_batch(
             raise ImportError_(f"unknown batch {batch_id}")
         if batch.job_state not in ("queued", "failed"):
             return batch.job_state
+        restarts = (batch.stats or {}).get("restarts") if batch.job_state == "queued" else None
         batch.job_state = "running"
         batch.stats = {"started_at": datetime.now(UTC).isoformat()}
+        if restarts:
+            batch.stats["restarts"] = restarts
         s.commit()
     state = "failed"
     stats: dict[str, Any]
@@ -345,6 +354,28 @@ def run_batch(
         s.commit()
     _event("import_finished", batch=str(batch_id), state=state)
     return state
+
+
+def recover_interrupted(session_factory: SessionFactory) -> list[str]:
+    """Worker start: a batch left `running` died with the worker. It is queued again once (a
+    deploy restarted it; jobs are one transaction, so it simply runs again); a second time it
+    fails with `INTERRUPTED`, so a file that runs the worker out of memory cannot loop (T124)."""
+    with session_factory() as s:
+        rows = s.scalars(select(ImportBatch).where(ImportBatch.job_state == "running")).all()
+        now = datetime.now(UTC).isoformat()
+        for row in rows:
+            restarts = int((row.stats or {}).get("restarts") or 0) + 1
+            if restarts > MAX_RESTARTS:
+                row.job_state = "failed"
+                row.stats = {"error": INTERRUPTED, "restarts": restarts, "finished_at": now}
+            else:
+                row.job_state = "queued"
+                row.stats = {"restarts": restarts, "restarted_at": now}
+        s.commit()
+        out = [f"{r.id}:{r.job_state}" for r in rows]
+    if out:
+        _event("import_recovered", batches=out)
+    return out
 
 
 def run_queued(

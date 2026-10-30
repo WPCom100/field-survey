@@ -187,7 +187,7 @@ DigitalOcean → Droplet → Power off → Resize → **CPU and RAM only** (keep
 |---|---|
 | Status | `docker compose ps` |
 | Logs | `docker compose logs -f --tail=200 api` (or `worker`, `caddy`) |
-| Memory / swap | `free -h` |
+| Memory / swap | `free -h`; per container `docker stats --no-stream`. The worker is capped at 2 GB (`docker-compose.prod.yml`, T124): a job past it kills the worker alone, the API keeps answering, and `docker compose logs worker \| grep import_recovered` shows the batch re-queued (first time) or failed (second) |
 | Disk | `df -h /` and `docker system df` |
 | Prune old images | `docker image prune -f` after an update |
 | Rotate the shared token | new `SURVEY_SHARED_TOKEN` in `.env`, `docker compose up -d api`, then re-enter it on each iPad |

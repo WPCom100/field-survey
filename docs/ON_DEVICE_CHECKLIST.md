@@ -614,6 +614,15 @@ Decision D223: type lookups are indexed, a library change re-runs every project'
 
 Decision D224 (Claude, from D221): Foundry panels' `TO LOAD` counts as a load-circuit label; the model's guess never replaces it; the accepted row reads `<panel> → Fixtures` and is matched by its two ends only. → Approve / change:
 
+## T124 — A large plan sheet no longer runs the server out of memory  ·  Needs: no new build (server deploy only)
+
+**Why it matters:** on 2026-10-19 uploading `Level 02 Concourse - Composite (vector).pdf` grew the worker to 3.2 GB, the server stopped answering every iPad until it was restarted by hand, and the batch never finished. The same morning the riser crops went blank (C-35, T129).
+
+- [ ] **The Level 02 sheet loads.** Setup → Sources → Floor plans, level 02 (on a scratch project, or the Tower if you want it there): Choose… → `Level 02 Concourse - Composite (vector).pdf` as the display sheet. Within about 2 minutes the row reads Done with its grid sets (about 43, most `auto`); open the level's plan: the drawing shows, Layers → Boundaries draws the source-sheet outlines. → saw:
+- [ ] **Everything else keeps working meanwhile.** While that upload runs, on the same or another iPad pull to sync and open another level's plan: sync finishes and the plan opens without waiting for the upload (before, the server stopped answering). → saw:
+
+Decision D226: the vector pass is streamed (output unchanged), a page with more than 500,000 characters is refused with a reason, the worker is capped at 2 GB, and a batch the worker died under runs once more, then fails with "the server stopped twice … upload a smaller or flattened PDF". → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

@@ -241,7 +241,10 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
     blobs_stored = 0
     source_sha: str | None = None
     for i in pages:
-        a = plan_analysis.analyse_sheet(data, i, boundaries=sheet_kind == "display")
+        try:
+            a = plan_analysis.analyse_sheet(data, i, boundaries=sheet_kind == "display")
+        except plan_analysis.SheetTooLarge as e:
+            raise runner.ImportError_(str(e)) from e
         if sheet_kind == "display":
             sha, stored = _store_blob(session, store, a.display_pdf or data)
         else:

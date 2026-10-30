@@ -19,10 +19,15 @@ services:
     <<: *prod
     build: *build
     depends_on: !reset [postgres]
+  # A job that outgrows its cap is killed alone instead of starving the API (T124): the
+  # container restarts and the batch fails on its second try (runner.recover_interrupted).
+  # The largest sheet so far (Level 02, 14 MB) peaks near 600 MB.
   worker:
     <<: *prod
     build: *build
     depends_on: !reset [postgres]
+    mem_limit: 2g
+    memswap_limit: 2g
   postgres:
     <<: *prod
     ports: !reset []

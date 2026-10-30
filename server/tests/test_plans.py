@@ -4,6 +4,7 @@ turns an upload into `sheet` ops."""
 
 import io
 import json
+import math
 import uuid
 
 import pypdfium2 as pdfium
@@ -195,6 +196,170 @@ def test_label_key_order():
     assert pa.label_key("A") < pa.label_key("B") < pa.label_key("Z") < pa.label_key("AA")
     assert pa.label_key("G") < pa.label_key("G.9") < pa.label_key("H")
     assert pa.label_key("9") < pa.label_key("9.5") < pa.label_key("13.5")
+
+
+# ------------------------------------------------- a sheet with many paths (T124)
+
+
+def _vector_pdf(lines: int, chars: int = 0) -> bytes:
+    """One page drawing `lines` short strokes in rows, a ring of twelve separate segments around
+    a "C", a Bézier circle around a "7", a big rectangle, and `chars` more letters. The MediaBox
+    and CropBox are both off the origin so the coordinate conversions are exercised."""
+    ops = [b"0.5 w"]
+    for i in range(lines):
+        x, y = 40 + (i % 300) * 12, 1000 + (i // 300) * 3
+        ops.append(b"%d %d m %d %d l S" % (x, y, x + 10, y))
+    for k in range(12):  # the Walter Tower ring: short segments, each painted alone
+        a0, a1 = math.radians(k * 30), math.radians(k * 30 + 30)
+        ops.append(
+            b"%.2f %.2f m %.2f %.2f l S"
+            % (
+                300 + 12 * math.cos(a0),
+                300 + 12 * math.sin(a0),
+                300 + 12 * math.cos(a1),
+                300 + 12 * math.sin(a1),
+            )
+        )
+    k = 12.0 * 0.5523  # a circle of radius 12 as four Béziers around (500, 300)
+    ops.append(
+        (
+            f"512 300 m 512 {300 + k} {500 + k} 312 500 312 c "
+            f"{500 - k} 312 488 {300 + k} 488 300 c "
+            f"488 {300 - k} {500 - k} 288 500 288 c "
+            f"{500 + k} 288 512 {300 - k} 512 300 c S"
+        ).encode()
+    )
+    ops.append(b"100 100 400 200 re S")
+    ops.append(b"BT /F1 10 Tf 297 296 Td (C) Tj ET BT /F1 10 Tf 497 296 Td (7) Tj ET")
+    for i in range(chars):
+        ops.append(b"BT /F1 6 Tf %d %d Td (x) Tj ET" % (40 + (i % 500) * 7, 2000 + (i // 500) * 7))
+    content = b"\n".join(ops)
+    objs = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [5 7 4005 3007] /CropBox [15 27 3995 3002]"
+        b" /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.7\n")
+    offsets = []
+    for n, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % n + body + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    return bytes(out)
+
+
+def test_streamed_paths_match_what_pdfplumber_kept():
+    """`_PathSink` hands `Rings` exactly the circles and segment midpoints the old pass took from
+    pdfplumber's `curves`, `lines` and `rects` (T124), in the same sheet coordinates."""
+    import pdfplumber
+
+    data = _vector_pdf(400)
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        page = pdf.pages[0]
+        cx, cy = page.cropbox[0], page.cropbox[1]
+        circles = [
+            (c["x0"] - cx, c["top"] - cy, c["x1"] - cx, c["bottom"] - cy)
+            for c in page.curves
+            if 8 <= c["width"] <= 60 and abs(c["width"] - c["height"]) < 2
+        ]
+        mids = sorted(
+            ((o["x0"] + o["x1"]) / 2 - cx, (o["top"] + o["bottom"]) / 2 - cy)
+            for o in page.lines + page.rects
+            if 4 <= max(o["width"], o["height"]) <= 36
+        )
+        total = len(page.curves) + len(page.lines) + len(page.rects)
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        rings = pa._read_page(pdf, pdf.pages[0])
+        assert pdf.pages[0].curves == [] and pdf.pages[0].lines == []  # nothing kept
+        words = {w.text: w for w in pa._page_words(pdf.pages[0])}
+    assert sorted(words) == ["7", "C"]
+    assert len(circles) == 1 and len(mids) == 400 + 12
+    assert rings.circles == pytest.approx(circles)
+    got = sorted(
+        (pts[k], pts[k + 1]) for pts in rings.cells.values() for k in range(0, len(pts), 2)
+    )
+    assert got == pytest.approx(mids)
+    assert rings.paths == total == 400 + 12 + 2
+    assert rings.around(words["C"].x, words["C"].y)  # the segment ring
+    assert rings.around(words["7"].x, words["7"].y)  # the Bézier circle
+    assert not rings.around(words["C"].x + 100, words["C"].y)
+
+
+def test_many_paths_stay_small_in_memory():
+    """A sheet's vector count no longer sets the job's memory (T124): 60,000 strokes used to be
+    60,000 pdfplumber dicts (≈ 120 MB); streamed into `Rings` they cost about 2 MB."""
+    import tracemalloc
+
+    data = _vector_pdf(60_000)
+    tracemalloc.start()
+    try:
+        a = pa.analyse_sheet(data)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert a.stats["paths"] == 60_000 + 12 + 2
+    assert peak < 40e6, f"peak {peak / 1e6:.0f} MB"
+
+
+def test_a_sheet_past_the_character_cap_fails_with_a_reason(session, store, factory, monkeypatch):
+    """Over `MAX_CHARS` the batch fails with a message the iPad shows (`Failed: …`), not a crash."""
+    monkeypatch.setattr(pa, "MAX_CHARS", 100)
+    project_id, level, _ = _project_with_level(session)
+    batch = _run(session, store, factory, project_id, level, _vector_pdf(10, chars=200))
+    assert batch.job_state == "failed"
+    assert "more than 100 characters" in batch.stats["error"]
+    assert "traceback" not in batch.stats
+    session.expire_all()
+    assert session.get(Level, level.id).display_sheet_id is None
+
+
+class _WorkerKilled(BaseException):
+    """What the kernel's OOM killer looks like from inside: the job never returns."""
+
+
+def test_a_batch_the_worker_died_under_runs_once_more_then_fails(session, store, factory):
+    """A batch left `running` (out of memory, a deploy) is queued again at worker start; dying
+    a second time fails it with a reason instead of looping (T124)."""
+    project_id, level, user = _project_with_level(session)
+    batch = plans.create_sheet_batch(
+        session,
+        store,
+        project_id=project_id,
+        level_id=level.id,
+        sheet_kind="display",
+        filename="big.pdf",
+        data=_small_pdf(),
+        user=user,
+    )
+
+    def dies(*_):
+        raise _WorkerKilled
+
+    def state():
+        session.expire_all()
+        b = session.get(ImportBatch, batch.id)
+        return b.job_state, b.stats
+
+    with pytest.raises(_WorkerKilled):
+        runner.run_batch(factory, store, batch.id, job=dies)
+    assert state()[0] == "running"
+    assert runner.recover_interrupted(factory) == [f"{batch.id}:queued"]
+    assert state() == ("queued", {"restarts": 1, "restarted_at": state()[1]["restarted_at"]})
+    with pytest.raises(_WorkerKilled):
+        runner.run_batch(factory, store, batch.id, job=dies)
+    assert state()[1]["restarts"] == 1  # carried through the second start
+    assert runner.recover_interrupted(factory) == [f"{batch.id}:failed"]
+    st, stats = state()
+    assert st == "failed" and stats["error"] == runner.INTERRUPTED
+    assert runner.recover_interrupted(factory) == []  # nothing left running
+    # a failed batch can still be run again by hand
+    assert runner.run_batch(factory, store, batch.id, job=plans.import_sheets) == "done"
 
 
 # ------------------------------------------------------------------ the job

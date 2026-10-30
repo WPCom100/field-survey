@@ -28,11 +28,16 @@ import io
 import math
 import re
 import statistics
+from array import array
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
 import pdfplumber
+from pdfminer.converter import PDFPageAggregator
+from pdfminer.layout import LTLine, LTRect
+from pdfminer.pdfinterp import PDFPageInterpreter
+from pdfplumber.page import PDFPageAggregatorWithMarkedContent
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import ArrayObject, ContentStream, NameObject
 
@@ -73,6 +78,10 @@ TAG_RES = (
     re.compile(r"^NSPS$"),
     re.compile(r"^P-[A-Z]{2,5}(?:-[A-Z]{1,2})?$"),  # rack components (P-ACP, P-SPM-E, P-REP)
 )
+
+MAX_CHARS = 500_000
+"""Characters one page may draw before the job gives up (T124): the 14 MB Level 02 composite
+draws 143,000; each one kept costs pdfplumber about 2 KB."""
 
 BOUNDARY_OCG_WORD = "boundar"
 DEDUPE_PT = 1.5
@@ -169,21 +178,32 @@ RING_RADIUS = 22.0
 class Rings:
     """Where the sheet draws a ring a bubble label could sit in: a circle-like curve, or (the
     Walter Tower style) a small polygon of short line segments. Segment midpoints are bucketed
-    so `around(x, y)` stays cheap on a sheet with 150,000 lines."""
+    so `around(x, y)` stays cheap on a sheet with 1,300,000 lines.
 
-    def __init__(self, page: pdfplumber.page.Page):
-        cx, cy = page.cropbox[0], page.cropbox[1]
+    Fed one painted path at a time by `_PathSink` (T124): nothing but a circle's box or a short
+    segment's midpoint is kept, so a sheet's vector count no longer sets the job's memory."""
+
+    def __init__(self, cx: float = 0.0, cy: float = 0.0):
+        self.cx, self.cy = cx, cy  # the CropBox origin in pdfplumber's top-down space
         self.circles: list[tuple[float, float, float, float]] = []
-        for c in page.curves:
-            w, h = c["width"], c["height"]
+        self.cells: dict[tuple[int, int], array[float]] = {}
+        self.paths = 0
+
+    def add(self, kind: str, x0: float, top: float, x1: float, bottom: float) -> None:
+        """One pdfplumber-classified object (`curve`, `line` or `rect`) in pdfplumber's
+        coordinates (top-down, MediaBox origin)."""
+        self.paths += 1
+        w, h = x1 - x0, bottom - top
+        if kind == "curve":
             if 8 <= w <= 60 and abs(w - h) < 2:
-                self.circles.append((c["x0"] - cx, c["top"] - cy, c["x1"] - cx, c["bottom"] - cy))
-        self.cells: dict[tuple[int, int], list[Point]] = defaultdict(list)
-        for o in list(page.lines) + list(page.rects):
-            if max(o["width"], o["height"]) > 36 or max(o["width"], o["height"]) < 4:
-                continue
-            mx, my = (o["x0"] + o["x1"]) / 2 - cx, (o["top"] + o["bottom"]) / 2 - cy
-            self.cells[(int(mx // RING_CELL), int(my // RING_CELL))].append((mx, my))
+                self.circles.append((x0 - self.cx, top - self.cy, x1 - self.cx, bottom - self.cy))
+            return
+        if max(w, h) > 36 or max(w, h) < 4:
+            return
+        mx, my = (x0 + x1) / 2 - self.cx, (top + bottom) / 2 - self.cy
+        cell = self.cells.setdefault((int(mx // RING_CELL), int(my // RING_CELL)), array("d"))
+        cell.append(mx)
+        cell.append(my)
 
     def around(self, x: float, y: float) -> bool:
         if any(x0 <= x <= x1 and y0 <= y <= y1 for x0, y0, x1, y1 in self.circles):
@@ -192,10 +212,57 @@ class Rings:
         near = 0
         for di in (-1, 0, 1):
             for dj in (-1, 0, 1):
-                for mx, my in self.cells.get((i + di, j + dj), ()):
-                    if math.hypot(mx - x, my - y) <= RING_RADIUS:
+                pts = self.cells.get((i + di, j + dj), ())
+                for k in range(0, len(pts), 2):
+                    if math.hypot(pts[k] - x, pts[k + 1] - y) <= RING_RADIUS:
                         near += 1
         return near >= 3
+
+
+class SheetTooLarge(ValueError):
+    """A page past `MAX_CHARS`; the plans job fails the batch with this message (T124)."""
+
+
+class _PathSink(PDFPageAggregatorWithMarkedContent):
+    """pdfplumber's layout device, except that a painted path goes to `Rings` and never into the
+    layout (T124): pdfplumber kept a dict per curve, line and rect, and the Level 02 composite's
+    1.3 million lines took the worker past 3 GB. Only the characters stay for `_page_words`."""
+
+    def __init__(self, pdf: pdfplumber.PDF, page: pdfplumber.page.Page, rings: Rings):
+        super().__init__(pdf.rsrcmgr, pageno=page.page_number, laparams=pdf.laparams)
+        self.rings = rings
+        self.mb_x0, self.mb_top = float(page.mediabox[0]), float(page.mediabox[1])
+        self.height = float(page.height)
+        self.chars = 0
+
+    def paint_path(self, gstate, stroke, fill, evenodd, path):  # type: ignore[no-untyped-def]
+        objs = self.cur_item._objs  # noqa: SLF001 - where pdfminer puts what it builds
+        n = len(objs)
+        PDFPageAggregator.paint_path(self, gstate, stroke, fill, evenodd, path)
+        for o in objs[n:]:  # pdfplumber's own coordinates (Page.process_object)
+            kind = "line" if type(o) is LTLine else "rect" if type(o) is LTRect else "curve"
+            top = self.height - o.y1 + self.mb_top
+            self.rings.add(kind, o.x0 + self.mb_x0, top, o.x1 + self.mb_x0, top + o.height)
+        del objs[n:]
+
+    def render_char(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        self.chars += 1
+        if self.chars > MAX_CHARS:
+            raise SheetTooLarge(
+                f"the sheet draws more than {MAX_CHARS:,} characters on one page; "
+                "upload it as a smaller or flattened PDF"
+            )
+        return super().render_char(*args, **kwargs)
+
+
+def _read_page(pdf: pdfplumber.PDF, page: pdfplumber.page.Page) -> Rings:
+    """One pdfminer pass over the page: characters into pdfplumber's layout, paths into the
+    returned `Rings`."""
+    rings = Rings(float(page.cropbox[0]), float(page.cropbox[1]))
+    device = _PathSink(pdf, page, rings)
+    PDFPageInterpreter(pdf.rsrcmgr, device).process_page(page.page_obj)
+    page._layout = device.get_result()  # noqa: SLF001 - pdfplumber reads its chars from here
+    return rings
 
 
 # ------------------------------------------------------------- grid bubbles
@@ -286,13 +353,16 @@ def _direction_hypotheses(bubbles: list[Bubble]) -> list[Point]:
                 if math.hypot(dx, dy) >= MIN_SPACING_PT:
                     angles.append(_angle_deg((dx, dy)))
     clusters: list[list[float]] = []
+    medians: list[float] = []  # each cluster's median, kept as it grows (T124: 10,000 bubbles)
     for a in sorted(angles):
-        for c in clusters:
-            if _angle_diff(a, statistics.median(c)) <= ANGLE_TOL_DEG:
+        for i, c in enumerate(clusters):
+            if _angle_diff(a, medians[i]) <= ANGLE_TOL_DEG:
                 c.append(a)
+                medians[i] = statistics.median(c)
                 break
         else:
             clusters.append([a])
+            medians.append(a)
     good = [c for c in clusters if len(c) >= 2]
     if good:
         return [_from_angle(_circular_median(c)) for c in good]
@@ -867,8 +937,8 @@ def analyse_sheet(data: bytes, page_index: int = 0, *, boundaries: bool = True) 
     reader = PdfReader(io.BytesIO(data))
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         page = pdf.pages[page_index]
+        rings = _read_page(pdf, page)
         words = _page_words(page)
-        rings = Rings(page)
         crop = page.cropbox
         width, height = float(crop[2] - crop[0]), float(crop[3] - crop[1])
     bubbles = _bubbles(words)
@@ -896,6 +966,7 @@ def analyse_sheet(data: bytes, page_index: int = 0, *, boundaries: bool = True) 
         "auto_sets": sum(1 for s in sets if s["mode"] == "auto"),
         "rooms": len(rooms),
         "tags": len(tags),
+        "paths": rings.paths,
         "boundaries": len(lines),
         "ocg_off": display is not None,
     }

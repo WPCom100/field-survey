@@ -25,6 +25,12 @@ multipart: project_id=<uuid> · kind=master_xlsx|floor_xlsx · file=<.xlsx> · m
 GET  /imports/{id}       → job_state ∈ queued · running · done · skipped · failed, stats
 ```
 
+**A worker that dies mid-job (T124, D226).** A batch is `running` only while the worker holds
+it; if the worker dies (out of memory against its 2 GB cap, a deploy), `runner.recover_interrupted`
+at the next worker start queues it again once (`stats.restarts: 1`). Dying a second time fails it
+with "the server stopped twice while reading this file, most likely out of memory; upload a
+smaller or flattened PDF", which the iPad shows as `Failed: …`. Logged as `import_recovered`.
+
 The worker picks the batch up within 5 s. From the server shell (the Droplet, before T28 exists):
 
 ```
