@@ -5,7 +5,7 @@ is read from the bucket itself (a dump object for today, a marker for this ISO w
 local state. A restart, a redeploy or a missed night just runs the job on the next tick.
 
     python -m app.backup dump        # take a dump now and upload it
-    python -m app.backup copy        # run the bucket copy now
+    python -m app.backup copy [ARGS] # copy now; ARGS go to rclone, e.g. -vv --dump headers
     python -m app.backup prune       # delete dumps past BACKUP_RETENTION_DAYS (keeps the newest)
     python -m app.backup list        # list dumps in R2
     python -m app.backup fetch KEY   # download one dump to stdout (for restores, docs/ops.md §3)
@@ -128,10 +128,18 @@ def rclone_env() -> dict[str, str]:
     }
 
 
-def copy(s3=None, now: dt.datetime | None = None) -> bool:
+# `--checksum` compares size + MD5 and `--no-update-modtime` never rewrites an object that is
+# already there: objects are content-addressed and never overwritten (A14). The modtime fix-up
+# rclone otherwise sends (a CopyObject of an object onto itself) is what R2 most likely answered
+# with 501 NotImplemented when the 2026-10-18 copy failed on every object (T123, D225).
+RCLONE_FLAGS = ["--checksum", "--no-update-modtime", "--stats-one-line", "-v"]
+
+
+def copy(s3=None, now: dt.datetime | None = None, extra: list[str] | None = None) -> bool:
     """rclone copy (never sync: nothing is deleted downstream) of the whole main bucket.
 
-    Returns False, logging a warning, when no copy bucket is configured.
+    Returns False, logging a warning, when no copy bucket is configured. Killed after
+    `backup_copy_timeout_minutes`, so it can hold the serial worker only that long.
     """
     if not settings.backup_copy_bucket:
         _event("backup_copy_skipped", reason="BACKUP_COPY_BUCKET not set")
@@ -147,11 +155,12 @@ def copy(s3=None, now: dt.datetime | None = None) -> bool:
             dst,
             "--exclude",
             f"/{COPY_MARKER_PREFIX}**",
-            "--stats-one-line",
-            "-v",
+            *RCLONE_FLAGS,
+            *(extra or []),
         ],
         env={**os.environ, **rclone_env()},
         check=True,
+        timeout=settings.backup_copy_timeout_minutes * 60,
     )
     s3.put_object(
         Bucket=settings.s3_bucket, Key=week_marker_key(now), Body=now.isoformat().encode()
@@ -172,7 +181,8 @@ def _exists(s3, key: str) -> bool:
 
 def due(s3, now: dt.datetime) -> list[str]:
     """Which jobs should run now: dump at or after `backup_hour_utc` once a day; copy on
-    `backup_copy_weekday` (ISO, 1 = Monday) after that day's dump, once per ISO week."""
+    `backup_copy_weekday` (ISO, 1 = Monday) after that day's dump, once per ISO week, and not
+    again on a day it has already failed."""
     jobs: list[str] = []
     if now.hour < settings.backup_hour_utc:
         return jobs
@@ -181,6 +191,7 @@ def due(s3, now: dt.datetime) -> list[str]:
     if (
         settings.backup_copy_bucket
         and now.isoweekday() >= settings.backup_copy_weekday
+        and _copy_failed_on != now.date()
         and not _exists(s3, week_marker_key(now))
     ):
         jobs.append("copy")
@@ -189,12 +200,14 @@ def due(s3, now: dt.datetime) -> list[str]:
 
 JOBS = {"dump": dump, "prune": prune, "copy": copy}
 _idle_on: dt.date | None = None  # a day already found to have nothing left due
+_copy_failed_on: dt.date | None = None  # a day the copy failed: not retried until the next (T123)
 
 
 def tick(s3=None, now: dt.datetime | None = None) -> list[str]:
-    """Run whatever is due. A failure is logged and retried on a later tick (never crashes).
+    """Run whatever is due. A failure is logged and retried on a later tick (never crashes),
+    except a failed copy, which waits for the next day so it cannot starve the job queue.
     Once a day has nothing left due, R2 is not asked again until the next day."""
-    global _idle_on
+    global _idle_on, _copy_failed_on
     now = now or dt.datetime.now(dt.UTC)
     if not settings.backup_enabled or _idle_on == now.date():
         return []
@@ -203,7 +216,13 @@ def tick(s3=None, now: dt.datetime | None = None) -> list[str]:
         s3 = s3 or storage.client()
         jobs = due(s3, now)
         for job in jobs:
-            JOBS[job](s3, now)
+            try:
+                JOBS[job](s3, now)
+            except Exception:
+                if job == "copy":
+                    _copy_failed_on = now.date()
+                    _event("backup_copy_backoff", until=str(now.date() + dt.timedelta(days=1)))
+                raise
             ran.append(job)
         if not jobs and now.hour >= settings.backup_hour_utc:
             _idle_on = now.date()
@@ -217,8 +236,8 @@ def main(argv: list[str]) -> None:
     match argv:
         case ["dump"]:
             print(dump())
-        case ["copy"]:
-            copy()
+        case ["copy", *extra]:
+            copy(extra=extra)
         case ["prune"]:
             prune()
         case ["list"]:

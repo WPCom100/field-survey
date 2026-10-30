@@ -47,7 +47,9 @@ def cfg(monkeypatch):
     monkeypatch.setattr(settings, "backup_copy_weekday", 7)
     monkeypatch.setattr(settings, "backup_copy_bucket", "survey-copy")
     monkeypatch.setattr(settings, "backup_retention_days", 90)
+    monkeypatch.setattr(settings, "backup_copy_timeout_minutes", 60)
     monkeypatch.setattr(backup, "_idle_on", None)
+    monkeypatch.setattr(backup, "_copy_failed_on", None)
     return settings
 
 
@@ -104,7 +106,7 @@ def test_copy_only_on_the_weekday_and_only_when_configured(cfg, monkeypatch):
 def test_tick_runs_dump_then_copy_and_is_idempotent(cfg, monkeypatch):
     calls = []
 
-    def fake_run(argv, env, check):
+    def fake_run(argv, env, check, timeout=None):
         calls.append(argv)
         if argv[0] == "pg_dump":
             with open(argv[argv.index("-f") + 1], "wb") as f:
@@ -120,6 +122,7 @@ def test_tick_runs_dump_then_copy_and_is_idempotent(cfg, monkeypatch):
     assert "backups/copy-markers/2026-W41" in s3.objects
     assert [c[0] for c in calls] == ["pg_dump", "rclone"]
     assert calls[1][1:4] == ["copy", f"src:{settings.s3_bucket}", "dst:survey-copy"]
+    assert "--checksum" in calls[1] and "--no-update-modtime" in calls[1]  # T123: no self-copy
     assert backup.tick(s3, SUN + dt.timedelta(minutes=1)) == []
     lists = s3.lists
     assert backup.tick(s3, SUN + dt.timedelta(minutes=2)) == []
@@ -160,3 +163,55 @@ def test_rclone_copy_remote_defaults_to_main_credentials(cfg, monkeypatch):
     assert env["RCLONE_CONFIG_SRC_PROVIDER"] == "Cloudflare"
     assert env["RCLONE_CONFIG_DST_ENDPOINT"] == "https://acct.r2.cloudflarestorage.com"
     assert env["RCLONE_CONFIG_DST_ACCESS_KEY_ID"] == "k"
+
+
+def test_failed_copy_backs_off_until_the_next_day(cfg, monkeypatch):
+    """T123: a failing copy ran again every minute and held queued jobs in the serial worker."""
+    runs = []
+
+    def fake_run(argv, env, check, timeout=None):
+        runs.append((argv[0], timeout))
+        if argv[0] == "pg_dump":
+            with open(argv[argv.index("-f") + 1], "wb") as f:
+                f.write(b"PGDMP")
+        else:
+            raise backup.subprocess.CalledProcessError(1, argv)  # 501 NotImplemented
+
+    monkeypatch.setattr(backup.subprocess, "run", fake_run)
+    s3 = FakeS3()
+    assert backup.tick(s3, SUN) == ["dump", "prune"]
+    assert runs == [("pg_dump", None), ("rclone", 3600)]  # the copy is time-boxed
+    for minutes in (1, 2, 60, 14 * 60):  # the rest of Sunday: no retry
+        assert backup.tick(s3, SUN + dt.timedelta(minutes=minutes)) == []
+    assert [r for r, _ in runs].count("rclone") == 1
+    assert "backups/copy-markers/2026-W41" not in s3.objects
+    # a new day lets the copy run again (shown with a Monday copy day, since the next
+    # Sunday is a new ISO week)
+    monkeypatch.setattr(settings, "backup_copy_weekday", 1)
+    monkeypatch.setattr(backup.subprocess, "run", lambda argv, env, check, timeout=None: None)
+    mon = SUN + dt.timedelta(days=1)
+    s3.objects[backup.dump_key(mon)] = b"PGDMP"
+    assert backup.tick(s3, mon) == ["copy"]
+    assert "backups/copy-markers/2026-W42" in s3.objects
+
+
+def test_a_copy_past_its_timeout_backs_off_too(cfg, monkeypatch):
+    def slow(argv, env, check, timeout=None):
+        if argv[0] == "rclone":
+            raise backup.subprocess.TimeoutExpired(argv, timeout)
+
+    monkeypatch.setattr(backup.subprocess, "run", slow)
+    s3 = FakeS3(["backups/pg/survey-2026-10-11T080100Z.dump"])
+    assert backup.tick(s3, SUN) == []
+    assert backup._copy_failed_on == SUN.date()
+    assert backup.due(s3, SUN + dt.timedelta(hours=1)) == []
+
+
+def test_copy_cli_passes_extra_rclone_args(cfg, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        backup.subprocess, "run", lambda argv, env, check, timeout=None: seen.update(argv=argv)
+    )
+    monkeypatch.setattr(backup.storage, "client", lambda: FakeS3())
+    backup.main(["copy", "-vv", "--dump", "headers"])
+    assert seen["argv"][-3:] == ["-vv", "--dump", "headers"]

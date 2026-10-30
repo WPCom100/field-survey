@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     backup_copy_endpoint: str = ""
     backup_copy_access_key: str = ""
     backup_copy_secret_key: str = ""
+    # The copy runs inside the serial worker loop: it is killed after this long, and a failed
+    # copy is not retried until the next day (T123).
+    backup_copy_timeout_minutes: int = 60
     # Daily master export backup (D149, T82): from BACKUP_HOUR_UTC, gated by BACKUP_ENABLED; one
     # xlsx export per project by the `export` system user, skipped when nothing changed; files
     # older than this are deleted (each project's newest is kept).

@@ -112,9 +112,9 @@ The `worker` runs `app/backup.py` once a minute (`backup.tick()`). With `BACKUP_
 | Dump | daily, first tick at or after `BACKUP_HOUR_UTC` (08 = 03:00 Houston CDT / 02:00 CST) | `pg_dump -Fc` → `S3_BUCKET/backups/pg/survey-<UTC stamp>.dump` |
 | Prune | right after each dump | deletes dumps older than `BACKUP_RETENTION_DAYS` (90), always keeping the newest. Done in code because the R2 token is Object Read & Write only and gets AccessDenied on bucket lifecycle rules |
 | Master export | daily, first tick at or after `BACKUP_HOUR_UTC` (D149, D152, T82) | one xlsx export per project by the `export` user into the bucket (`blobs/<sha256>`, in the export history), **skipped when the project has no edit since its last one**; files older than `EXPORT_BACKUP_RETENTION_DAYS` (183 ≈ 6 months) are deleted, each project's newest always kept. See `server/docs/exports.md` |
-| Copy | once per ISO week, on or after `BACKUP_COPY_WEEKDAY` (7 = Sunday), after that day's dump | `rclone copy` (never `sync`) of the **whole** main bucket (photos, sheets, dumps) to `BACKUP_COPY_BUCKET`; writes `backups/copy-markers/<year>-W<nn>` when done. Skipped (log `backup_copy_skipped`) while `BACKUP_COPY_BUCKET` is empty |
+| Copy | once per ISO week, on or after `BACKUP_COPY_WEEKDAY` (7 = Sunday), after that day's dump | `rclone copy --checksum --no-update-modtime` (never `sync`) of the **whole** main bucket (photos, sheets, dumps) to `BACKUP_COPY_BUCKET`; writes `backups/copy-markers/<year>-W<nn>` when done. Skipped (log `backup_copy_skipped`) while `BACKUP_COPY_BUCKET` is empty. Killed after `BACKUP_COPY_TIMEOUT_MINUTES` (60); a failed copy logs `backup_copy_backoff` and is not tried again until the next day (T123, D225) |
 
-"Already done" is read from R2 (today's dump key, this week's marker), so a restart or a missed night simply runs on the next tick. A failure logs `backup_failed` and retries a minute later. It never stops the worker. The copy bucket keeps everything it has ever received, because dumps pruned in the main bucket are not deleted there.
+"Already done" is read from R2 (today's dump key, this week's marker), so a restart or a missed night simply runs on the next tick. A failure logs `backup_failed` and retries a minute later. A failed **copy** waits for the next day instead, because the worker is serial and a copy retried every minute starved the job queue (2026-10-18, T123). With the copy on Sunday, a failed copy is not retried until the next week unless it is run by hand. Nothing stops the worker. The copy bucket keeps everything it has ever received, because dumps pruned in the main bucket are not deleted there.
 
 By hand (in `/opt/field-survey/server`):
 
@@ -122,12 +122,15 @@ By hand (in `/opt/field-survey/server`):
 docker compose exec worker python -m app.backup list            # dumps in R2
 docker compose exec worker python -m app.backup dump            # dump now
 docker compose exec worker python -m app.backup copy            # copy now
+docker compose exec worker python -m app.backup copy -vv --dump headers   # copy now, every request and response logged (T123)
 docker compose exec worker python -m app.backup prune
 docker compose logs worker | grep backup_                        # backup_dump / backup_prune / backup_copy / backup_failed
 docker compose logs worker | grep export_                        # export_daily_unchanged / export_backup_pruned / export_daily_failed
 ```
 
 **Copy bucket:** `field-survey-backup`, same account and same token as the main bucket (set up 2026-10-10; first copy 06:01:35Z, `rclone check` 0 differences). To set one up again: In Cloudflare → R2, create the bucket (suggested `<S3_BUCKET>-copy`). Then create an API token with *Object Read & Write* on **both** buckets, or a separate token for the copy bucket. In `server/.env.production` set `BACKUP_COPY_BUCKET`, and `BACKUP_COPY_ACCESS_KEY`/`BACKUP_COPY_SECRET_KEY` (+ `BACKUP_COPY_ENDPOINT` if it is in another account) when the token differs from `S3_*`. Then `scp` it as in §1.6, run `docker compose up -d worker`, run the copy by hand once and check the bucket in the dashboard.
+
+**rclone and R2 (T123, D225).** The image installs rclone from its own release (`RCLONE_RELEASE` + `RCLONE_ZIP_SHA256` in `server/Dockerfile`), not Debian's 1.60. The weekly copy failed on 2026-10-18 with `NotImplemented` (501) on every object, the first copy onto a non-empty copy bucket. The likely cause (to confirm with the hand run below) is the self-copy rclone sends to fix a destination object's modtime, which R2 refuses, so the copy compares by size + MD5 (`--checksum`) and never rewrites what is already there (`--no-update-modtime`). That is safe because objects are never overwritten (A14). If a copy fails again, run it by hand with `-vv --dump headers` and look for the request just before the 501.
 
 ### 3.2 Manual dump
 
