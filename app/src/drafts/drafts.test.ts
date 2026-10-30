@@ -570,6 +570,7 @@ describe('draft review server helpers (T44)', () => {
     expect(extractionLine('bom', bom)).toBe('Done: 108 device drafts, 1 excluded lines, 9 flagged');
     const davinci: Batch = { id: 'd1', kind: 'davinci', job_state: 'done', files: [{ name: 'library.json' }, { name: 'DaVinci_categories.xlsx' }], stats: { created: 1130, updated: 2, unchanged: 0, placeable: 501, accessory_only: 631, vocab_drafts: 33, kept_accepted: 1, kept_rejected: 0, retired: ['P-NSPS-D-KIT', 'PI1002'], clashes: [{ type_id: 'x', model: 'P-NSPS-D', held_by: null }] } };
     expect(extractionLine('davinci', davinci)).toBe('Done: 1130 new drafts, 2 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts, 1 accepted or rejected left alone, 2 hand-made types retired, 1 model clash');
+    expect(extractionLine('davinci', { ...davinci, stats: { ...davinci.stats, neuron_flags_corrected: 2 } })).toBe('Done: 1130 new drafts, 2 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts, 1 accepted or rejected left alone, 2 Neuron flags corrected, 2 hand-made types retired, 1 model clash');
     expect(extractionLine('davinci', { ...davinci, job_state: 'skipped' })).toBe('Already imported — this library and mapping were imported before');
   });
 

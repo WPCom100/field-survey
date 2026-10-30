@@ -623,6 +623,16 @@ Decision D224 (Claude, from D221): Foundry panels' `TO LOAD` counts as a load-ci
 
 Decision D226: the vector pass is streamed (output unchanged), a page with more than 500,000 characters is refused with a reason, the worker is capped at 2 GB, and a batch the worker died under runs once more, then fails with "the server stopped twice … upload a smaller or flattened PDF". → Approve / change:
 
+## T130 — The DaVinci import corrects the NSPS / rack Neuron flag  ·  Needs: no new build (JS update; server deploy first)
+
+**Why it matters:** in the 2026-10-18 round (B-11) the library editor read Neuron ID **Needed** on P-NSPS-D and P-NSPS-D-KIT: the import had written DaVinci's IP properties over the NSPS default. You ruled "import should correct the flag" (D222).
+
+- [ ] **Re-upload once.** Setup → Sources → DaVinci library → Choose files… → `library.json` (the same file as last time is fine; the mapping is reused). The job card reads Done with "… 2 Neuron flags corrected" (or however many NSPS / rack types had it) after "accepted or rejected left alone". → saw:
+- [ ] **The flag follows the role.** Library → P-NSPS-D and P-NSPS-D-KIT: Neuron ID reads **Category default (not needed)**, state unchanged (accepted stays accepted); History shows one `Correction` "DaVinci library import" Needed → default. A touchscreen (P-TS7-E) or ERn-Net still reads Needed. → saw:
+- [ ] **Your own choice stands.** Set Neuron ID to Needed by hand on one NSPS type, re-upload the library again (a newer copy from DaVinci, since the same files are now skipped): that type still reads Needed and the Done line does not count it. → saw:
+
+Decision D227: the correction is a `Correction` op keyed on who last set the flag (the import's reason); a person's flag is left alone on drafts too; the same library re-uploaded once after the deploy is not skipped, so the correction runs. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

@@ -55,6 +55,7 @@ UH10002 = "0df62e93-5094-4ef3-8e28-97611c11164e"
 LVD = "d22fb480-10b7-4bb9-9b07-e5520d880ea1"
 ERP24 = "e55eba99-a39f-453f-b94c-3560fa3af0ea"
 FACEPLATE = "73007934-a2bb-4fce-9d6d-30d4dc12da74"
+NSPS_KIT = "1d37a7d1-f519-4710-8a37-46930085cff6"
 
 
 @pytest.fixture(scope="module")
@@ -192,7 +193,8 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     assert nsps["aliases"] == ["NSPS", "7182A1711"]
     # Ethernet → N off a station; 48 V aux → UV (D199); a power supply needs its 120 V feed (D198)
     assert codes(nsps) == [("U", 1, False), ("N", 1, False), ("UV", 1, False), ("120V", 1, True)]
-    assert nsps["needs_neuron_id"] is True  # IP / subnet / gateway properties
+    # IP / subnet / gateway properties, but the NSPS role needs no Neuron ID (D185, D222)
+    assert nsps["needs_neuron_id"] is None
     assert nsps["description"] == "Paradigm Network Station Power Supply"
     assert nsps["datasheet_url"].startswith("https://www.etcconnect.com/")
     assert nsps["accessory_only"] is None and nsps["optional_accessories"] is None
@@ -217,6 +219,8 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     assert ts7["category"] == "Touchscreen" and codes(ts7) == [("NG", 1, False)]
     assert ts7["model"] == "P-TS7-E" and "P-TS7-E-4" in ts7["aliases"]
     assert ts7["needs_neuron_id"] is True
+    assert p[NSPS_KIT]["needs_neuron_id"] is None and p[ERN2]["needs_neuron_id"] is None
+    assert p[ERP24]["needs_neuron_id"] is True  # a relay panel with the properties keeps it
 
     uh = p[UH10002]
     assert uh["category"] == "Station" and uh["model"] == "UH10002"
@@ -386,7 +390,8 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     )
     nsps = types[NSPS]
     assert nsps.model == "P-NSPS-D" and nsps.category == "Equipment"
-    assert nsps.needs_neuron_id is True and nsps.accessory_only is None
+    assert nsps.needs_neuron_id is None and nsps.accessory_only is None
+    assert s["neuron_flags_corrected"] == 0
     assert nsps.description == "Paradigm Network Station Power Supply"
     assert [c["code"] for c in nsps.default_cables] == ["U", "N", "UV", "120V"]
     assert types[LVD].accessory_only is True and types[LVD].category is None
@@ -473,6 +478,64 @@ def test_rerun_updates_drafts_by_type_id_and_leaves_accepted_types(
     ).all()
     assert {o.field for o in sets} == {"description", "source_ref"}
     assert all(o.base_op_id is not None and o.state == "applied" for o in sets)
+
+
+@needs_sample
+@needs_categories
+def test_rerun_corrects_neuron_flags_the_import_wrote_on_nsps_and_racks(
+    session, store, factory, sample, categories, monkeypatch
+):
+    """D222: an earlier import wrote `needs_neuron_id = true` on the NSPS and its kit (DaVinci's IP
+    properties). A re-run clears it on the accepted NSPS and the rejected kit in one Correction op
+    each, unless a person set the flag after the import; a hand-corrected role counts."""
+    pid = _project(session)
+    with monkeypatch.context() as m:  # the import as it was before D222
+        m.setattr(dl, "neuron_flag", lambda prop, role: True if prop else None)
+        first = _run(session, store, factory, pid, sample, categories)
+    assert first.job_state == "done", first.stats
+    first.stats = {k: v for k, v in first.stats.items() if k != "neuron_flags_corrected"}
+    types = _app_types(session)
+    assert types[NSPS].needs_neuron_id is True and types[NSPS_KIT].needs_neuron_id is True
+    types[NSPS].state = "accepted"
+    types[NSPS_KIT].state = "rejected"
+    types[ERN2].state = "accepted"
+    types[TS7].state = "accepted"
+    session.commit()
+    # Ann sets the touchscreen's flag by hand, then makes it an NSPS (an odd but legal edit)
+    ann = upsert_user(session, "Ann")
+    hand = dl._Ops(dl.LIBRARY_STREAM, ann.id)
+    for f, was, now in (("needs_neuron_id", True, True), ("role", "touchscreen", "nsps")):
+        hand.set("library_type", types[TS7].id, f, was, now, dl._head(session, types[TS7].id, f))
+    for op in hand.ops:
+        op.change_type, op.reason = "Field survey", None
+    dl._push(session, dl.LIBRARY_STREAM, hand.ops, library=True)
+    session.commit()
+
+    second = _run(session, store, factory, pid, sample, categories)
+    assert second.job_state == "done", second.stats  # the pre-D222 batch does not skip it
+    s = second.stats
+    assert s["neuron_flags_corrected"] == 2
+    assert s["kept_accepted"] == 3 and s["kept_rejected"] == 1
+    session.expire_all()
+    types = _app_types(session)
+    assert types[NSPS].needs_neuron_id is None and types[NSPS].state == "accepted"
+    assert types[NSPS_KIT].needs_neuron_id is None and types[NSPS_KIT].state == "rejected"
+    assert types[TS7].needs_neuron_id is True and types[TS7].role == "nsps"  # Ann's stands
+    assert types[ERP24].needs_neuron_id is True  # a draft relay panel keeps DaVinci's flag
+    fixes = session.scalars(
+        select(Op).where(
+            Op.entity_kind == "library_type", Op.kind == "set", Op.field == "needs_neuron_id"
+        )
+    ).all()
+    fixes = [o for o in fixes if o.reason == "DaVinci library import"]
+    assert {o.entity_id for o in fixes} == {types[NSPS].id, types[NSPS_KIT].id}
+    assert all(
+        o.change_type == "Correction" and o.was is True and o.now is None and o.base_op_id
+        for o in fixes
+    )
+    # the same files again: nothing left to correct, so the D222 batch now skips them
+    third = _run(session, store, factory, pid, sample, categories)
+    assert third.job_state == "skipped" and third.stats["earlier_batch"] == str(second.id)
 
 
 @needs_sample

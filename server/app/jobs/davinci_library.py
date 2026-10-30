@@ -26,14 +26,16 @@ row too (D198: every power supply needs a 120 V line in). `optional_accessories`
 accessory slots with `max_quantity`, `expected_qty`
 for forced (`userDefinable = false`) and `SetMinAccessories` slots, and the `MaxAccessoryMonitor`
 group each slot belongs to (`{label, min, max}`); `needs_neuron_id` = true when the type carries
-IP / subnet / gateway properties; `description`, the first datasheet URL and `source_ref`
-(`{kind: "davinci", type_id, …}`). Accessories a kept type references are imported too, even from
-an `Ignore` row, as `accessory_only` types (never offered as a device). From / To templates,
-far-end placeholders and the NSPS -KIT power-supply expectation (D52) are not written: the
-reviewer adds them.
+IP / subnet / gateway properties, null on an NSPS or rack (the role decides, D185, D222);
+`description`, the first datasheet URL and `source_ref` (`{kind: "davinci", type_id, …}`).
+Accessories a kept type references are imported too, even from an `Ignore` row, as
+`accessory_only` types (never offered as a device). From / To templates, far-end placeholders and
+the NSPS -KIT power-supply expectation (D52) are not written: the reviewer adds them.
 
 Re-running on a newer file updates **draft** rows by DaVinci `typeId` (field by field, as `set`
-ops with history) and never touches an accepted or rejected type. With `retire_hand_made` the
+ops with history) and never touches an accepted or rejected type — except a Neuron flag `true`
+the import itself wrote on an NSPS or rack type, which it clears in a `Correction` op (D222); a
+flag a person set (any later op) stays. With `retire_hand_made` the
 run first soft-deletes every app-library type that has no `source_ref` (hand-made, any state) —
 Landry's ruling once the catalogue covers them (D199); the project copies of those types stay.
 The same pair of files is not imported twice (`skipped`). Everything is one transaction through
@@ -62,7 +64,8 @@ from sqlalchemy.orm import Session
 from app.auth import system_user, upsert_user
 from app.ids import uuid7
 from app.jobs import runner
-from app.models import FieldHead, ImportBatch, LibraryType, Project, User, Vocab
+from app.models import FieldHead, ImportBatch, LibraryType, Op, Project, User, Vocab
+from app.roles import NO_NEURON_ROLES, role_of, role_of_category
 from app.storage import ObjectStore
 from app.sync import LIBRARY_STREAM, SERVER_INSTALL_ID, OpIn, Push, jsonable
 
@@ -72,6 +75,7 @@ DAVINCI_KIND = "davinci"
 JSON_MIME = "application/json"
 XLSX_MIME = runner.XLSX_MIME
 CHANGE_TYPE = "Master edit"
+CORRECTION = "Correction"  # the D222 Neuron flag fix on an accepted or rejected type
 REASON = "DaVinci library import"
 IMPORT_USER_NAME = "davinci"
 RETIRE_REASON = "Replaced by the DaVinci library import"
@@ -529,6 +533,8 @@ class TypePlan:
     """Port protocols with no cable code."""
     role: str | None = None
     """T112 (D199 (3)): the role a **created** type gets; a re-run never writes it."""
+    neuron_property: bool = False
+    """DaVinci lists IP / subnet / gateway properties (the Neuron flag, unless the role says no)."""
 
 
 @dataclass
@@ -674,6 +680,14 @@ def role_of_davinci(t: DType, category: str | None) -> str | None:
     return "other"
 
 
+def neuron_flag(neuron_property: bool, role: str | None) -> bool | None:
+    """`needs_neuron_id` as the import writes it (D222): null on an NSPS or rack (the role's
+    default, D185, decides), true where DaVinci lists a Neuron property, else null."""
+    if role in NO_NEURON_ROLES:
+        return None
+    return True if neuron_property else None
+
+
 def source_ref_of(t: DType, category: str, timestamp: str | None, filename: str) -> dict[str, Any]:
     ports = Counter((p.protocol, p.direction) for p in t.ports)
     return {
@@ -797,15 +811,15 @@ def build_plan(
             ref["power_supply"] = cables.power_supply
             power_feeds += 1
         load_outputs += cables.load_outputs
+        role = None if is_accessory else role_of_davinci(t, category)
+        neuron = any(p.startswith(NEURON_PROPERTIES) for p in t.properties)
         payload: dict[str, Any] = {
             "model": model_of[tid],
             "aliases": aliases_of[tid] or None,
             "category": category,
             "default_cables": cables.rows or None,
             "optional_accessories": accessories_of(t, model_of) or None,
-            "needs_neuron_id": (
-                True if any(p.startswith(NEURON_PROPERTIES) for p in t.properties) else None
-            ),
+            "needs_neuron_id": neuron_flag(neuron, role or role_of_category(category)),
             "description": t.description or None,
             "datasheet_url": t.datasheet_url,
             "source_ref": ref,
@@ -816,7 +830,8 @@ def build_plan(
                 type_id=tid,
                 payload=payload,
                 unmapped=tuple(cables.unmapped),
-                role=None if is_accessory else role_of_davinci(t, category),
+                role=role,
+                neuron_property=neuron,
             )
         )
         if not is_accessory:
@@ -983,8 +998,9 @@ class _Ops:
         was: Any,
         now: Any,
         base: uuid.UUID | None,
+        change_type: str = CHANGE_TYPE,
     ) -> None:
-        self._op(
+        op = self._op(
             entity_kind=entity_kind,
             entity_id=entity_id,
             kind="set",
@@ -993,6 +1009,7 @@ class _Ops:
             now=jsonable(now),
             base_op_id=base,
         )
+        op.change_type = change_type
 
     def delete(self, entity_kind: str, entity_id: uuid.UUID, base: uuid.UUID | None) -> None:
         op = self._op(entity_kind=entity_kind, entity_id=entity_id, kind="delete", base_op_id=base)
@@ -1003,6 +1020,11 @@ def _head(session: Session, entity_id: uuid.UUID, field: str) -> uuid.UUID | Non
     return session.scalar(
         select(FieldHead.op_id).where(FieldHead.entity_id == entity_id, FieldHead.field == field)
     )
+
+
+def _set_by_import(session: Session, head: uuid.UUID | None) -> bool:
+    """The field's head op is the import's own (its reason), not a person's (D222)."""
+    return head is None or session.scalar(select(Op.reason).where(Op.op_id == head)) == REASON
 
 
 def _same(a: Any, b: Any) -> bool:
@@ -1042,6 +1064,9 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
     ).all()
     pair = {lib_entry.get("sha256"), cat_entry.get("sha256")}
     for b in earlier:
+        # a batch from before D222 does not count: the same files must still correct the flags
+        if "neuron_flags_corrected" not in (b.stats or {}):
+            continue
         if {f.get("sha256") for f in (b.files or [])} == pair:
             return {"skipped": "already imported", "earlier_batch": str(b.id)}
 
@@ -1109,13 +1134,28 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
             )
             counts["created"] += 1
             continue
+        # The Neuron flag follows the row's role (a role edited by hand counts) and is never
+        # written over a person's value (D222).
+        role = role_of(row, None)
+        neuron_head = _head(session, row.id, "needs_neuron_id")
+        by_import = _set_by_import(session, neuron_head)
+        if row.needs_neuron_id is True and role in NO_NEURON_ROLES and by_import:
+            counts["neuron_flags_corrected"] += 1
         if row.state != "draft":
             counts["kept_" + row.state] += 1
+            if row.needs_neuron_id is True and role in NO_NEURON_ROLES and by_import:
+                ops.set(
+                    "library_type", row.id, "needs_neuron_id", True, None, neuron_head, CORRECTION
+                )
             continue
         changed = 0
         for f in UPDATED_FIELDS:
             was = getattr(row, f)
             now = tp.payload.get(f)
+            if f == "needs_neuron_id":
+                if not by_import:
+                    continue
+                now = neuron_flag(tp.neuron_property, role)
             if _same(was, now):
                 continue
             ops.set("library_type", row.id, f, was, now, _head(session, row.id, f))
@@ -1157,6 +1197,7 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
         "fields_set": counts["fields_set"],
         "kept_accepted": counts["kept_accepted"],
         "kept_rejected": counts["kept_rejected"],
+        "neuron_flags_corrected": counts["neuron_flags_corrected"],
         "retired": retired,
         "vocab_drafts": len(vocab_ops.ops),
         "ops": len(ops.ops) + len(vocab_ops.ops),

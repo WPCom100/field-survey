@@ -65,7 +65,7 @@ product classifications, document types), `propertyTypes` (names), `scripts` (na
 | any protocol nobody has ruled on (a newer library) | **never a code**: one `vocab(cable_code)` **draft** per protocol in the uploading project, for Landry to accept or reject as a decision (D197); `stats.unmapped_protocols`. |
 | `accessories[]` (`typeId`, `maxQuantity`, `userDefinable`) | `optional_accessories` rows `{model, expected_qty, max_quantity, group?}`: `expected_qty` = the slot max for a forced slot (`userDefinable = false`, e.g. the UH10002's faceplate, the ERn2's P-ACP-E Mk2) and the `SetMinAccessories` minimum where a type has one; else null. |
 | `scripts[]` `MaxAccessoryMonitor` (`rules[]: accessoryIds, minCount, maxCount, minValueMessage`) | each slot in a rule carries `group: {label, min, max}` — "one of these back boxes" (P-TS7-E: four boxes, min 1 max 1), "two ERn modules incl. the forced processor" (ERn2-W-120 Mk2: min 2 max 2). A group is an expectation across alternatives, which `expected_qty` cannot say; the D52 lint reads `expected_qty` only (the group lint is T113). |
-| `propertyTypes[]` names | `needs_neuron_id` = true when the type carries `IP Address` / `Subnet Mask` / `Gateway Address` (any port), else null (the category default, D185). |
+| `propertyTypes[]` names | `needs_neuron_id` = true when the type carries `IP Address` / `Subnet Mask` / `Gateway Address` (any port), else null (the category default, D185); always null on an `nsps` or `equipment_rack` type (the role decides, D222). |
 | `typeInformation.description`, `documents[]` of type Datasheet (English preferred) | `description`, `datasheet_url`. |
 | everything above plus `typeId`, family, category, classification, legacy flag, part numbers, the port summary, the library's `timestamp` and the file name | `source_ref` — `{kind: "davinci", type_id, display_name, family, category, mapped_to, classification, legacy, model_pattern, part_numbers, ports[{protocol, direction, count}], library_timestamp, file}`. Re-runs match by `type_id`; T112 reads the family / category for the type's role. |
 
@@ -111,13 +111,20 @@ op each in the library log. A later run (a newer `library.json`, or a regrouped 
   `set` op (`was` / `now` / `base_op_id` = the field head), so History shows what ETC changed; the
   `source_ref` always changes (timestamp, file), so every draft counts as `updated`;
   **accepted** or **rejected** → untouched (`stats.kept_accepted`, `kept_rejected`) — Landry's
-  edits and decisions stand, however ETC's data moved;
+  edits and decisions stand, however ETC's data moved — with one exception (D222, T130): a
+  `needs_neuron_id = true` that the import itself wrote (the field head's `reason` is "DaVinci
+  library import") on a type whose role (its own, else its category's) is `nsps` or
+  `equipment_rack` is cleared in one `Correction` op, in any state (`stats.neuron_flags_corrected`,
+  "n Neuron flags corrected" on the Sources card). A flag a person set after the import is never
+  touched, on a draft either;
 - a new `typeId` → created; a type ETC removed → its row stays (nothing is deleted);
-- the `cable_code` drafts already in the uploading project are not written again.
+- the `cable_code` drafts already in the uploading project are not written again;
+- the same pair of files is `skipped` only against a batch run since D222 (its stats carry
+  `neuron_flags_corrected`), so re-uploading the same library still corrects the flags once.
 
 `stats`: `types_in_file`, `placeable`, `accessory_only`, `by_category`, `power_supplies`,
 `load_outputs`, `created`, `updated`, `unchanged`, `fields_set`, `kept_accepted`,
-`kept_rejected`, `retired[]`, `clashes[]`, `renamed[]`, `not_surveyed_protocols{}`,
+`kept_rejected`, `neuron_flags_corrected`, `retired[]`, `clashes[]`, `renamed[]`, `not_surveyed_protocols{}`,
 `aliases_dropped`, `rows_not_in_mapping[]`, `rows_unassigned[]`, `unmapped_protocols{}`,
 `vocab_drafts`, `library_timestamp`, `categories_file`, `categories_reused_from`, `ops`,
 `last_library_seq`.

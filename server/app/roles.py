@@ -135,6 +135,11 @@ _ROLE_OF_CATEGORY = {
 }
 
 
+# Roles whose devices need no Neuron ID unless their type says so (D185, D201; `NO_NEURON_ROLES`
+# in packages/rules).
+NO_NEURON_ROLES = frozenset({"nsps", "equipment_rack"})
+
+
 def is_role(v: object) -> bool:
     return isinstance(v, str) and v in ROLES
 

@@ -98,6 +98,8 @@ function davinciLine(s: Record<string, unknown>, n: (k: string) => number | null
     `${n('vocab_drafts') ?? 0} protocol drafts`,
   ];
   if (kept) parts.push(`${kept} accepted or rejected left alone`);
+  const corrected = n('neuron_flags_corrected') ?? 0;
+  if (corrected) parts.push(`${corrected} Neuron flag${corrected === 1 ? '' : 's'} corrected`);
   if (retired) parts.push(`${retired} hand-made type${retired === 1 ? '' : 's'} retired`);
   if (clashes) parts.push(`${clashes} model clash${clashes === 1 ? '' : 'es'}`);
   return parts.join(', ');
