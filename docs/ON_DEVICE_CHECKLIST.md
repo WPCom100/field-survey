@@ -666,6 +666,19 @@ Decision D229: a BOM line whose model is an accessory-only library type attaches
 
 Decision D230: proposals also go to a device whose category names no role when its exact tag is printed, and a left-over tag is offered by role (CT…LCP relay/Foundry, UFMPn Foundry, ERPn relay, EBDK, NSPS) to one unproposed item of the level each; rows show the type's display name / description after the model. → Approve / change:
 
+## T129 — Riser crops load or say why; enlarged crops pinch and pan  ·  Needs: no new build (JS update only)
+
+**Why it matters:** in the 2026-10-18 round (C-35) the riser crops stopped loading everywhere with no word on screen — the server had run out of memory that day (T124) — and an enlarged crop could not be zoomed.
+
+- [ ] **Review drafts crops load.** Setup → Review drafts → Cables, select a riser draft: the crop shows "Loading crop…" then the picture with the red outline. → saw:
+- [ ] **Enlarge, pinch, pan.** Tap the crop: it opens full screen with more around it. Pinch: it zooms about your fingers up to about 8×; drag: it pans but never off the picture; double-tap: 3× on that spot, double-tap again: back to fit. The red outline stays on its bubble throughout. **Close** returns to the draft. → saw:
+- [ ] **A failure says why.** Airplane mode on, select a draft whose crop you have **not** opened yet: within a few seconds the crop reads "The crop did not load: the server is not reachable (no connection?)." with **Try again** (a crop you already opened still shows: it is cached). Airplane mode off, Try again: it loads. → saw:
+- [ ] **Cable / riser.** Cables → a cable made from a riser draft → Riser crop: it loads (⤓ Download riser first if asked). Pinch and pan in the small frame: the red outline stays on the bubble **while** your fingers move, not after. Scroll to another page: no outline there. → saw:
+- [ ] **Riser full screen.** Tap **⤢ Enlarge**: the riser fills the screen focused on the bubble, outlined; pinch / pan as above; Close. → saw:
+- [ ] **Riser download failure.** On a cable whose riser is not downloaded on this iPad, airplane mode on, ⤓ Download riser: a red line says the server is not reachable and the button reads ⤓ Try again (before: a grey "no connection … or not uploaded yet"). → saw:
+
+Decision D231: source crops are downloaded and cached by the app with a 45 s timeout so a failure has a reason on screen; tapping a crop opens it full screen with pinch / pan / double-tap; the riser keeps PDFKit's own pinch with the outline following on the UI thread and gains ⤢ Enlarge. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

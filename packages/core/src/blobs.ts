@@ -40,6 +40,9 @@ export interface RemoteBlob {
   chunks_received: number[];
 }
 
+/** What `BlobQueue.fetchLocal` found: the cached path, or why there is none. */
+export type LocalFetch = { path: string; failure?: undefined } | { path: null; failure: 'no_transport' | Error };
+
 export interface BlobMeta {
   size: number;
   mime: string;
@@ -243,7 +246,7 @@ export class BlobQueue {
   private timer: unknown = null;
   private started = false;
   private nextAttemptMs = 0;
-  private readonly inflight = new Map<string, Promise<string | null>>();
+  private readonly inflight = new Map<string, Promise<LocalFetch>>();
 
   constructor(
     readonly store: Store,
@@ -348,7 +351,15 @@ export class BlobQueue {
    * The bytes on demand (full-size photos, PLAN §3.4): the cached file, or a download now.
    * Null when offline, not uploaded yet, or there is no server; never throws for those.
    */
-  ensureLocal(sha256: string, kind: BlobKind): Promise<string | null> {
+  async ensureLocal(sha256: string, kind: BlobKind): Promise<string | null> {
+    return (await this.fetchLocal(sha256, kind)).path;
+  }
+
+  /**
+   * `ensureLocal` with the reason a download failed (T129): `no_transport` before sync has a
+   * server, else the transport's error (a `TransportError` 404 = not uploaded yet). Never throws.
+   */
+  fetchLocal(sha256: string, kind: BlobKind): Promise<LocalFetch> {
     const pending = this.inflight.get(sha256);
     if (pending) return pending;
     const p = this.fetchNow(sha256, kind).finally(() => this.inflight.delete(sha256));
@@ -356,19 +367,19 @@ export class BlobQueue {
     return p;
   }
 
-  private async fetchNow(sha256: string, kind: BlobKind): Promise<string | null> {
+  private async fetchNow(sha256: string, kind: BlobKind): Promise<LocalFetch> {
     const cached = await this.localPath(sha256);
-    if (cached) return cached;
+    if (cached) return { path: cached };
     const transport = this.transport;
-    if (!transport) return null;
+    if (!transport) return { path: null, failure: 'no_transport' };
     try {
       const path = await this.downloadOne(transport, sha256, kind);
       await this.evict();
       await this.refresh();
-      return path;
+      return { path };
     } catch (e) {
       this.opts.log('warn', 'on_demand_failed', { sha256, kind, error: String((e as Error).message) });
-      return null;
+      return { path: null, failure: e instanceof Error ? e : new Error(String(e)) };
     }
   }
 

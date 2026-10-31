@@ -136,8 +136,9 @@ describe('plan worklets on the UI runtime', () => {
     const matrix: { value: unknown } = { value: null };
     const handler = code('uiViewportTs1');
     const fromJs = code('uiViewportTs2');
-    expect(inline.find((w) => w.name === 'uiViewportTs1')!.closure).toEqual(['parseViewportMessage', 'uiDriven', 'matrix', 'sheetToView']);
-    const handlerThis = { __closure: [parse, uiDriven, matrix, ui('sheetToView')] };
+    expect(inline.find((w) => w.name === 'uiViewportTs1')!.closure).toEqual(['parseViewportMessage', 'uiDriven', 'matrix', 'sheetToView', 'page']);
+    const page: { value: number } = { value: -1 }; // the riser crop's page output (T129); the plan passes none
+    const handlerThis = { __closure: [parse, uiDriven, matrix, ui('sheetToView'), page] };
     const fromJsThis = { __closure: [uiDriven, matrix] };
 
     fromJs.call(fromJsThis, { a: 9 }); // before the UI handler is live, the JS copy seeds the matrix
@@ -149,7 +150,10 @@ describe('plan worklets on the UI runtime', () => {
     const m = matrix.value as viewportModule.Affine;
     const expected = sheetToView(parse(message)!);
     for (const k of ['a', 'b', 'c', 'd', 'tx', 'ty'] as const) expect(m[k]).toBeCloseTo(expected[k], 9);
+    expect(page.value).toBe(1);
     fromJs.call(fromJsThis, { a: 1 }); // a later (stale) JS copy is ignored
     expect(matrix.value).toBe(m);
+    handler.call({ __closure: [parse, uiDriven, matrix, ui('sheetToView'), undefined] }, { message }); // no page output (the plan): no throw
+    expect(matrix.value).toEqual(m);
   });
 });

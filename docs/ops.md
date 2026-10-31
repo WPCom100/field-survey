@@ -188,6 +188,7 @@ DigitalOcean → Droplet → Power off → Resize → **CPU and RAM only** (keep
 | Status | `docker compose ps` |
 | Logs | `docker compose logs -f --tail=200 api` (or `worker`, `caddy`) |
 | Memory / swap | `free -h`; per container `docker stats --no-stream`. The worker is capped at 2 GB (`docker-compose.prod.yml`, T124): a job past it kills the worker alone, the API keeps answering, and `docker compose logs worker \| grep import_recovered` shows the batch re-queued (first time) or failed (second) |
+| Crops / riser blank on the iPads | Since T129 the iPad says why (timeout, not reachable, 404, 5xx). On the server: `curl -s https://survey.wpcom.cloud/health`; `docker compose logs --timestamps api \| grep -E '/crop\|/blobs/.*/content\|GET /imports' \| tail -50` (status and time of each crop and download); `docker compose logs --timestamps caddy \| grep -E '50[234]' \| tail` (the API not answering behind Caddy); then the Memory row above. Logs are capped at 5 × 10 MB per container, so an old window may be gone |
 | Disk | `df -h /` and `docker system df` |
 | Prune old images | `docker image prune -f` after an update |
 | Rotate the shared token | new `SURVEY_SHARED_TOKEN` in `.env`, `docker compose up -d api`, then re-enter it on each iPad |

@@ -147,6 +147,7 @@ export {
   type BlobReport,
   type BlobLog,
   type BlobQueueOptions,
+  type LocalFetch,
 } from './blobs';
 export { HttpBlobTransport, type HttpBlobTransportOptions } from './http-blob-transport';
 export {

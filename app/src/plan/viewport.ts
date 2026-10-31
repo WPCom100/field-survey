@@ -127,6 +127,11 @@ export function sheetRectToPage(vp: PdfViewport, r: Rect): Rect {
   };
 }
 
+/** Page rect (PDF user space, y up) → sheet rect: the inverse of `sheetRectToPage`. */
+export function pageRectToSheet(vp: PdfViewport, r: Rect): Rect {
+  return { x: r.x - vp.cropBox.x, y: vp.cropBox.y + vp.cropBox.height - (r.y + r.height), width: r.width, height: r.height };
+}
+
 /** The whole sheet (the CropBox) in sheet coordinates: what "fit" shows. */
 export function sheetRect(vp: PdfViewport): Rect {
   return { x: 0, y: 0, width: vp.cropBox.width, height: vp.cropBox.height };
@@ -214,6 +219,7 @@ export function nativeFocusRect(rotation: Rotation, page: Rect): Rect {
 
 /** A page rect's bounds in view points (the outline drawn over a focused region). */
 export function pageRectToView(m: Affine, r: Rect): Rect {
+  'worklet';
   const a = apply(m, { x: r.x, y: r.y });
   const b = apply(m, { x: r.x + r.width, y: r.y + r.height });
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };

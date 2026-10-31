@@ -460,6 +460,21 @@ describe('downloads', () => {
     expect(await queue(store).ensureLocal(sha, 'image')).not.toBeNull();
   });
 
+  it('says why an on-demand fetch found nothing (T129)', async () => {
+    const { store } = await openStore();
+    const sha = server.seed(bytes(10));
+    expect(await queue(store, null).fetchLocal(sha, 'sheet')).toEqual({ path: null, failure: 'no_transport' });
+    server.fail({ on: 'download', failure: 'network' });
+    const offline = await queue(store).fetchLocal(sha, 'sheet');
+    expect(offline.failure).toBeInstanceOf(TransportError);
+    expect((offline.failure as TransportError).failure).toBe('network');
+    const missing = await queue(store).fetchLocal('f'.repeat(64), 'sheet');
+    expect((missing.failure as TransportError).status).toBe(404);
+    const ok = await queue(store).fetchLocal(sha, 'sheet');
+    expect(ok.path).toBe(files.pathFor(sha, 'sheet'));
+    expect(ok.failure).toBeUndefined();
+  });
+
   it('downloads again when a cached file disappeared', async () => {
     const { store } = await openStore();
     const q = queue(store);

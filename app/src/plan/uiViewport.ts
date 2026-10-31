@@ -21,9 +21,10 @@ type WorkletEventHandle = {
  * the event goes on to JS, and Reanimated runs the mappers right after it, so the pin picture
  * (`PinOverlay`) is recorded and handed to Skia before PDFKit's frame is committed. The JS-thread
  * copy of the same event arrives frames later; it only seeds the matrix until the UI handler has
- * seen an event, so a stale JS value never overwrites a fresh one.
+ * seen an event, so a stale JS value never overwrites a fresh one. `page` (optional) gets the
+ * 0-based page the matrix belongs to (the riser crop's outline, T129).
  */
-export function useUiViewport(matrix: SharedValue<Affine | null>) {
+export function useUiViewport(matrix: SharedValue<Affine | null>, page?: SharedValue<number>) {
   const uiDriven = useSharedValue(false);
   const handle = useEvent<{ message?: string }>(
     (e) => {
@@ -33,6 +34,7 @@ export function useUiViewport(matrix: SharedValue<Affine | null>) {
       if (!vp) return;
       uiDriven.value = true;
       matrix.value = sheetToView(vp);
+      if (page) page.value = vp.page;
     },
     ['onChange'],
   ) as unknown as WorkletEventHandle;
