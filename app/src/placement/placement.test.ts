@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import { loadLockTable, lockQuestion, lockWarnings } from '../setup/lock';
 import { flagNotOnSheet, perUnit, placeItem } from './actions';
-import { itemLine, itemsIn, loadPlacementProgress, loadUnplaced, rolesIn, tagProposals, type UnplacedDraft, type UnplacedItem } from './model';
+import { itemLine, itemsIn, loadPlacementProgress, loadUnplaced, rolesIn, tagProposals, tagRoles, typeNameOf, type UnplacedDevice, type UnplacedDraft, type UnplacedItem } from './model';
 
 const PROJECT = uuidv7();
 const ME = uuidv7();
@@ -109,6 +109,27 @@ describe('unplaced list (T46)', () => {
     expect(u.flagged.some((i) => i.key === `draft:${dAcc}`)).toBe(false);
     const after = (await loadPlacementProgress(store, PROJECT)).levels.find((l) => l.levelId === ids.l06m)!;
     expect(after.draftUnits).toBe(before.draftUnits);
+  });
+
+  it("every row shows the type's name after the model (T127, D197)", async () => {
+    const { store, editor, ids } = await setup();
+    const tERP = uuidv7();
+    const opts = { change_type: 'Master edit' as const, reason: 'test' };
+    await editor.create('library_type', { id: tERP, project_id: null, model: 'ERP24-FT-241P', aliases: ['Echo Relay Panel 24'], description: 'Echo Relay Panel, 24 relays\nFeed-through', source_ref: { kind: 'davinci', display_name: 'Echo Relay Panel 24' }, category: 'Power Distribution', role: 'relay_panel', state: 'accepted' }, opts);
+    const dERP = (await editor.create('draft_device', { project_id: PROJECT, level_id: ids.l02, model: 'ERP24-FT-241P', category: 'Power Distribution', role: 'relay_panel', qty: 1, state: 'accepted' }, opts)).id;
+    // a master panel given its type on the card
+    await editor.setField('device', ids.panel, 'library_type_id', tERP, opts);
+    const l02 = (await loadUnplaced(store, PROJECT, ids.l02))!;
+    const erp = draftOf(l02.items, dERP);
+    expect(erp.typeName).toBe('Echo Relay Panel 24');
+    expect(itemLine(erp)).toBe('ERP24-FT-241P · Echo Relay Panel 24 · ×1');
+    const l06m = (await loadUnplaced(store, PROJECT, ids.l06m))!;
+    expect(itemLine(l06m.items.find((i) => i.key === `device:${ids.panel}`)!)).toBe('06M-04 · CT06LCPA · Echo Relay Panel 24');
+    // no type, or a type that says nothing more: the line as before
+    expect(itemLine(draftOf(l02.items, ids.dUfmp))).toBe('UFMP4 · ×1');
+    expect(typeNameOf({ model: 'P-NSPS-D-KIT', aliases: ['NSPS-KIT', '7186A1001'], description: 'P-NSPS-D Kit with DIN8 Enclosure', source_ref: { display_name: 'NSPS-KIT' } }, 'P-NSPS-D-KIT')).toBe('P-NSPS-D Kit with DIN8 Enclosure');
+    expect(typeNameOf({ model: 'UFMP4', aliases: ['Foundry 4-circuit panel'], description: null, source_ref: null }, 'UFMP4')).toBe('Foundry 4-circuit panel');
+    expect(typeNameOf({ model: 'PI1002', aliases: null, description: null, source_ref: null }, 'PI1002')).toBeNull();
   });
 
   it('places a device of the baseline: its pin and the fields that change, then it leaves the list', async () => {
@@ -221,7 +242,7 @@ describe('unplaced list (T46)', () => {
 
 describe('proposals from the sheet text tags (T46)', () => {
   const item = (key: string, f: Partial<UnplacedDraft>): UnplacedItem =>
-    ({ kind: 'draft', key, draftId: key, levelId: 'L', pool: false, title: key, model: null, name: null, category: null, role: 'relay_panel', panelName: null, qty: 1, placed: 0, covered: 0, remaining: 1, notOnSheet: false, libraryTypeId: null, deviceCategory: null, accessories: [], ...f }) as UnplacedDraft;
+    ({ kind: 'draft', key, draftId: key, levelId: 'L', pool: false, title: key, model: null, name: null, category: null, role: 'relay_panel', panelName: null, typeName: null, qty: 1, placed: 0, covered: 0, remaining: 1, notOnSheet: false, libraryTypeId: null, deviceCategory: null, accessories: [], ...f }) as UnplacedDraft;
 
   it('proposes a panel at its tag, merges repeated tags, skips taken tags and stations', () => {
     const items = [
@@ -251,5 +272,50 @@ describe('proposals from the sheet text tags (T46)', () => {
     // the exact tag goes before a model part: ERP48 is a part of a's model, but a is already proposed
     const q = tagProposals({ tags: [{ text: 'ERP48', x: 5, y: 5 }] }, [item('a', { model: 'ERP48-FT-481P' })], []);
     expect(q.map((x) => x.itemKey)).toEqual(['a']);
+  });
+  it('a master panel whose category names no role is proposed at its printed tag (T127, D201 (2))', () => {
+    // after the rename ruling 06M-02 / 06M-04 are `Power Distribution` with no type: role `other`
+    const dev = (key: string, panelName: string): UnplacedItem =>
+      ({ kind: 'device', key, deviceId: key, levelId: 'L', label: key, isNew: false, title: key, model: panelName, category: 'Power Distribution', role: 'other', panelName, typeName: null, room: null, drawingPosition: null }) as UnplacedDevice;
+    const items = [dev('06M-02', 'CT06LCPB'), dev('06M-04', 'CT06LCPA'), item('e', { model: 'EBDK', role: 'ebdk' }), dev('rack', 'Equipment Rack 18U')];
+    const tags = [
+      { text: 'CT06LCPA', x: 100, y: 100 },
+      { text: 'CT06LCPB', x: 400, y: 100 },
+      { text: 'EBDK', x: 300, y: 100 },
+      { text: 'P-ACP', x: 50, y: 50 },
+    ];
+    expect(tagProposals({ tags }, items, []).map((x) => [x.itemKey, x.tag])).toEqual([
+      ['06M-02', 'CT06LCPB'],
+      ['06M-04', 'CT06LCPA'],
+      ['e', 'EBDK'],
+    ]);
+  });
+
+  it('a tag left over goes to an item of its role on the level with none yet, one each (T127)', () => {
+    expect(tagRoles('CT06LCPA')).toEqual(['relay_panel', 'foundry_panel']);
+    expect(tagRoles('ufmp8')).toEqual(['foundry_panel']);
+    expect(tagRoles('P-ACP')).toEqual([]);
+    const items = [
+      // a BOM relay panel with no tag yet, two of them; a Foundry panel of another model
+      item('r', { model: 'ERP24-FT-241P', remaining: 2 }),
+      item('f', { model: 'UFMP4', role: 'foundry_panel' }),
+      // already proposed by its own tag: no second one by role
+      item('a', { panelName: 'CT06LCPA', model: 'UFMP8', role: 'foundry_panel' }),
+      // the pool is not the level's
+      item('p', { model: 'UFMP4', role: 'foundry_panel', pool: true, levelId: null }),
+      item('s', { model: 'PI1002', role: 'station' }),
+    ];
+    const tags = [
+      { text: 'CT06LCPA', x: 100, y: 100 },
+      { text: 'CT06LCPB', x: 400, y: 100 },
+      { text: 'CT06LCPC', x: 600, y: 100 },
+      { text: 'UFMP8', x: 700, y: 700 },
+      { text: 'UFMP8', x: 900, y: 900 },
+    ];
+    expect(tagProposals({ tags }, items, []).map((x) => [x.itemKey, x.tag, x.at.x])).toEqual([
+      ['a', 'CT06LCPA', 100],
+      ['r', 'CT06LCPB', 400],
+      ['f', 'UFMP8', 700],
+    ]);
   });
 });

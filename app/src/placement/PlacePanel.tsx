@@ -195,7 +195,8 @@ function Selected(props: {
     if (!typed.current.dp) setDp(existing.dp ?? props.defaults?.drawingPosition ?? '');
     if (!typed.current.room) setRoom(existing.room ?? props.defaults?.room ?? '');
   }, [props.defaults?.drawingPosition, props.defaults?.room]);
-  const tagged = TAGGED_ROLES.has(item.role) && item.role !== 'equipment_rack';
+  // a master panel of `Power Distribution` with no type is `other` but has its tag (T127)
+  const tagged = (TAGGED_ROLES.has(item.role) && item.role !== 'equipment_rack') || (item.role === 'other' && !!item.panelName);
   const [panel, setPanel] = useState(item.panelName ?? '');
 
   const onDrag = useRef(props.onDrag);

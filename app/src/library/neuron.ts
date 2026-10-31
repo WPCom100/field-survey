@@ -18,6 +18,9 @@ export type DeviceType = TypeLike & {
   optional_accessories?: unknown;
   /** T111: another type's accessory, never offered as a device (T126). */
   accessory_only?: unknown;
+  /** T111 (D197): the catalogue's description, and `source_ref.display_name`. */
+  description?: string | null;
+  source_ref?: unknown;
 };
 
 export type DeviceTypes = ReadonlyMap<string, DeviceType>;

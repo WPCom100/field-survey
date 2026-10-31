@@ -656,6 +656,16 @@ Decision D228: the To follows a code change only when it is the old code's place
 
 Decision D229: a BOM line whose model is an accessory-only library type attaches to the nearest line whose type lists it (else is a rack component, else excluded); inside an open rack a line of role `other` or `equipment_rack` is a component, as before the catalogue; Fold puts an existing accessory draft on its parent and soft-deletes it. → Approve / change:
 
+## T127 — Dashed proposals for every panel the sheet names; full names in the list  ·  Needs: no new build (JS update only)
+
+**Why it matters:** in the 2026-10-18 round (C-39, C-40) only the EBDK got a dashed pin on 06M — the master's relay and Foundry panels lost their role in the `Power Distribution` rename, so their printed tags were ignored — and the list showed bare part numbers.
+
+- [ ] **Panels at their tags.** Pipeline project, Setup → 5 Place devices → Place ▸ on 06M (CT06LCPA, CT06LCPB not yet pinned): grey dashed "?" pins sit on the printed `CT06LCPA` and `CT06LCPB` tags as well as `EBDK`; the note above the list counts them. Tap the CT06LCPB one: the `06M-02 · CT06LCPB` row is selected and the confirm form shows its Panel tag field filled. → saw:
+- [ ] **By role when no tag matches.** On a level whose list has a Foundry or relay-panel draft with no tag (e.g. a `UFMP4` draft where the sheet prints `UFMP8`, or an `ERP24-FT-241P` draft with no `CT…` name), a dashed pin is offered at a left-over tag of that kind — one per draft, never two drafts on one tag, none for pool rows. → saw:
+- [ ] **Full names.** Every row whose model is in the library reads the model then the type's name (`ERP24-FT-241P · Echo Relay Panel … · ×1`; a master panel given its type on the card: `06M-04 · CT06LCPA · …`). A model the library lacks reads as before. The selected item's title above the form reads the same. → saw:
+
+Decision D230: proposals also go to a device whose category names no role when its exact tag is printed, and a left-over tag is offered by role (CT…LCP relay/Foundry, UFMPn Foundry, ERPn relay, EBDK, NSPS) to one unproposed item of the level each; rows show the type's display name / description after the model. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".
