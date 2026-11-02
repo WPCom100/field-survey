@@ -19,7 +19,7 @@ import {
 } from './filters';
 import { hitTest, layoutPins, type RenderPin } from './layout';
 import { pinShape, pinStyleFor, statusRank } from './pins';
-import { focusRect, inView, sheetRectToPage, sheetToView, apply, displayRectToPage, nativeFocusRect, pageRectToView, rotationOf, type PdfViewport, type Rotation } from './viewport';
+import { focusRect, inView, sheetRectToPage, sheetToView, apply, displayRectToPage, nativeFocusRect, pageRectToView, parseViewportMessage, rotationOf, type PdfViewport, type Rotation } from './viewport';
 
 const CROP = { x: 0, y: 0, width: 4235.48, height: 3604.72 };
 
@@ -181,7 +181,7 @@ describe('focus and fit', () => {
       180: { a: -1, b: 0, c: 0, d: 1, tx: w + cx, ty: -cy },
       270: { a: 0, b: -1, c: -1, d: 0, tx: h + cy, ty: w + cx },
     }[r];
-    return { a: m.a * s, b: m.b * s, c: m.c * s, d: m.d * s, tx: m.tx * s, ty: m.ty * s, cropBox: box, page: 0 };
+    return { a: m.a * s, b: m.b * s, c: m.c * s, d: m.d * s, tx: m.tx * s, ty: m.ty * s, cropBox: box, page: 1 };
   };
 
   it('reads the rotation off the map and takes display-frame rects (riser bboxes) to the page and back to view', () => {
@@ -202,6 +202,13 @@ describe('focus and fit', () => {
     expect(f.x + f.width / 2).toBeCloseTo(p.x + p.width / 2);
     expect(f.y + f.height / 2).toBeCloseTo(p.y + p.height / 2);
     expect(nativeFocusRect(0, p)).toBe(p);
+  });
+
+  it('keeps the patch message page 1-based, as sheet.page and the riser ref (T134)', () => {
+    // RNPDFPdfView.mm sends `pageIndex + 1`; the riser crop compares it with its 1-based page.
+    const msg = (page: string) => `viewport|0.5|0|0|-0.5|0|100|0|0|2448|3168|${page}`;
+    expect(parseViewportMessage(msg('1'))?.page).toBe(1);
+    expect(parseViewportMessage(msg('3'))?.page).toBe(3);
   });
 });
 

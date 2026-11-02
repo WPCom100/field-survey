@@ -19,6 +19,7 @@ export type Point = { x: number; y: number };
 /** What the patched `react-native-pdf` reports on every pan/zoom (page → view). */
 export type PdfViewport = Affine & {
   cropBox: { x: number; y: number; width: number; height: number };
+  /** 1-based, as `sheet.page` and the `page` prop: the patch sends `pageIndex + 1` (T134). */
   page: number;
 };
 

@@ -317,7 +317,7 @@ Decision D193 (Proposed): Accept on a device draft only marks it reviewed; its d
 
 Failed 2026-10-18 (C-35): "I want to be able to pan and zoom on the cropped image once I click on it to make it bigger. Riser crop was working for a while and is now broken. No riser loads anywhere." → **T129** (why it stopped; a visible error; pinch-zoom on the enlarged crops). Not from the riser (C-37) passed. Re-run after T129:
 
-C-35 failed 2026-11-01 in three ways: no outline and no focus on the bubble → **T134**; the N line set on the riser draft (To: the 06M rack draft) is waiting for placement and nothing but Review drafts says so → **T136**; the riser’s printed label (`PARADIGM P-NSPS-DIN`) shown for the draft instead of its model → **T137**. Download and upright passed; re-run the rest after T134.
+C-35 failed 2026-11-01 in three ways: no outline and no focus on the bubble → **T134**; the N line set on the riser draft (To: the 06M rack draft) is waiting for placement and nothing but Review drafts says so → **T136**; the riser’s printed label (`PARADIGM P-NSPS-DIN`) shown for the draft instead of its model → **T137**. Download and upright passed; re-run the rest after T134 (landed 2026-11-02: see its section below).
 
 - [ ] **Focused and outlined.** The crop opens **upright** (the drawing reads left to right, not on its side), zoomed to the cable's wire bubble with some of its line around it, and the bubble has a red outline. It is the same bubble the Review drafts crop outlined for that draft. → saw:
 - [ ] **Pinch.** Pinch out and pan: the red outline stays on the bubble (it may trail a moment behind during the gesture). In Review drafts, tap a source crop to enlarge it: it pinches and pans the same way. → saw:
@@ -573,12 +573,19 @@ Decision D229: a BOM line whose model is an accessory-only library type attaches
 
 **Why it matters:** in the 2026-10-18 round (C-35) the riser crops stopped loading everywhere with no word on screen — the server had run out of memory that day (T124) — and an enlarged crop could not be zoomed.
 
-Failed 2026-11-01: "Enlarge, pinch, pan" — "Pinch zoom does not work; only double tap." → **T135**; "Cable / riser" — "No red outline." → **T134** (the viewer reports pages 1-based; the guard compared with `page - 1`, so nothing focused or outlined). Re-run the two below after them; the other four passed.
+Failed 2026-11-01: "Enlarge, pinch, pan" — "Pinch zoom does not work; only double tap." → **T135**; "Cable / riser" — "No red outline." → **T134** (the viewer reports pages 1-based; the guard compared with `page - 1`, so nothing focused or outlined). Re-run the two below after them (T134 landed 2026-11-02, so "Cable / riser" can be re-run now; "Enlarge, pinch, pan" waits for T135); the other four passed.
 
 - [ ] **Enlarge, pinch, pan.** Tap the crop: it opens full screen with more around it. Pinch: it zooms about your fingers up to about 8×; drag: it pans but never off the picture; double-tap: 3× on that spot, double-tap again: back to fit. The red outline stays on its bubble throughout. **Close** returns to the draft. → saw:
 - [ ] **Cable / riser.** Cables → a cable made from a riser draft → Riser crop: it loads (⤓ Download riser first if asked). Pinch and pan in the small frame: the red outline stays on the bubble **while** your fingers move, not after. Scroll to another page: no outline there. → saw:
 
 Decision D231: source crops are downloaded and cached by the app with a 45 s timeout so a failure has a reason on screen; tapping a crop opens it full screen with pinch / pan / double-tap; the riser keeps PDFKit's own pinch with the outline following on the UI thread and gains ⤢ Enlarge. → Approve / change:
+
+## T134 — Riser crop: focus and red outline on the bubble  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01 the riser crop opened at fit with no red outline (T129 "Cable / riser", C-35): the viewer counts pages from 1 and the crop compared with a count from 0, so it never recognised its own page. Use `pipeline test` (riser cables accepted on 03). After this, re-run **T106** "Focused and outlined", "Pinch", "Page 2" and **T129** "Cable / riser" above.
+
+- [ ] **Opens on the bubble.** Cables → a cable made from a riser draft (sheet 001) → Riser crop: it opens zoomed to that cable's wire bubble with a little of its line around it, not the whole page, and the bubble has a red outline. → saw:
+- [ ] **Enlarged too.** ⤢ Enlarge on the same cable: full screen, the same bubble outlined in red. Close. → saw:
 
 ## Rules for this file
 

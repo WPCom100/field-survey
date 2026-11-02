@@ -188,7 +188,7 @@ function RiserPdf({ uri, page, riser, onError }: { uri: string; page: number; ri
       attach(pdfNativeTag(pdfRef.current));
       setFromJs(sheetToView(vp));
       shownPage.value = vp.page;
-      if (vp.page !== page - 1) return; // the viewer reports page 1 before it turns to ours
+      if (vp.page !== page) return; // both 1-based (T134); the viewer reports page 1 before it turns to ours
       const rotation = rotationOf(vp);
       const b = riser.bbox;
       const box = riser.kind === 'blob' ? displayRectToPage(vp, rotation, b) : sheetRectToPage(vp, b);
@@ -205,7 +205,7 @@ function RiserPdf({ uri, page, riser, onError }: { uri: string; page: number; ri
   const markStyle = useAnimatedStyle(() => {
     const m = matrix.value;
     const r = mark.value;
-    if (!m || !r || shownPage.value !== page - 1) return { opacity: 0 };
+    if (!m || !r || shownPage.value !== page) return { opacity: 0 };
     const v = pageRectToView(m, r);
     return { opacity: 1, left: v.x - 3, top: v.y - 3, width: v.width + 6, height: v.height + 6 };
   });

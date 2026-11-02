@@ -22,7 +22,7 @@ type WorkletEventHandle = {
  * (`PinOverlay`) is recorded and handed to Skia before PDFKit's frame is committed. The JS-thread
  * copy of the same event arrives frames later; it only seeds the matrix until the UI handler has
  * seen an event, so a stale JS value never overwrites a fresh one. `page` (optional) gets the
- * 0-based page the matrix belongs to (the riser crop's outline, T129).
+ * 1-based page the matrix belongs to (the riser crop's outline, T129).
  */
 export function useUiViewport(matrix: SharedValue<Affine | null>, page?: SharedValue<number>) {
   const uiDriven = useSharedValue(false);
