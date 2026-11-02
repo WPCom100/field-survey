@@ -265,6 +265,7 @@ Two row types. A **build** row has the profile, the EAS build id and the build n
 | 2026-10-18 | deploy | CI run `39098414955` | migration 0017 | Droplet `b23bf52` → `234fa4a`: every push since 2026-10-15 had failed CI on `test_riser_job_with_claude_endpoints` (the recording's byte keys never matched Linux's PNG bytes), so deploy and update were skipped; fixed by keying the replay on image size (`234fa4a`) |
 | 2026-10-18 | update | `89a75db0-7dca-454d-8c43-e6ed4959c51f` | `24fe50c2` | from CI, commit `234fa4a`; carries T95–T122 to TestFlight build 15 |
 | 2026-10-18 | data | all six projects | server `234fa4a` | Cleared for the full-pipeline iPad round (Landry): Scratch, meth cooking lab, Houston Methodist Hospital, Tower M3 Round Testing, cuck chair, TP-3 synthetic soft-deleted by one `delete` op each through the push loop (`Correction`, user Landry), so iPads hide them at their next pull; restore = a `restore` op. Dump first: `/root/survey-before-clear-2026-10-18-0459.dump` |
+| 2026-11-01 | data | both live projects | server `f6c6aa0` | Cleared again for a fresh iPad round (Landry): Pipeline Test (`01a15283-40ce-7cd1-96b0-2ed5c2e0a311`) and Scratch (`01a14e08-3673-7821-b08e-c50df471ee28`) soft-deleted by one `delete` op each through `apply_push` (`Correction`, user Landry, reason "Cleared for a fresh iPad round"), run in the api container with `PYTHONPATH=/srv`; the app library is untouched; restore = a `restore` op. Dump first: `/root/survey-before-clear-2026-11-02-0124.dump` |
 
 ### 5.5 JS updates (T84, D153, D157)
 

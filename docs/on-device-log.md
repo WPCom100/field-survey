@@ -2,6 +2,66 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## 2026-11-01 / 02 — Fresh-start round, Parts 0–C and the start of D (dev build `a5cbf96f` / TestFlight 15, server `f6c6aa0`, update `bf9eef31`)
+
+Landry ran the fresh-start sheet (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy as **ROUND-1101**, collection `round1101`) on **one** iPad after every project had been cleared (0-2): new projects `Scratch1` and `pipeline test`, the Pipeline checks on **level 03** ("it has more varied device types and connections"). Results pasted 2026-11-02 with notes outside the sheet; this session archived them, filed the tasks and rebuilt the sheet. **40 pass, 3 fail, 13 skip, 109 not done** (D-6 onward, Parts E, G, H and the two-iPad Part I).
+
+| Step | Result | Saw | Finding |
+|---|---|---|---|
+| A-2 T125 editor wide, buttons stay (before the fresh start) | pass, with a remark | "The ERN is listed a equipment. Should it be listed as an equipment panel since it is just a housing to hold the accessories?" | **Q-ERn** on the sheet, still open: the import gives ERn enclosures the role `equipment_rack` (pins, rules, IDs treat them as racks); only the Category text is `Equipment`. Landry's call |
+| A-3 T125 Save keeps the form; A-5 T61 offline add | pass | | T125's A-checks left; T61's offline check left |
+| B-16 T111 hand-made model clash | skip | "library already imported" | covered by `test_a_hand_made_model_is_a_clash_never_overwritten`; stays |
+| T126-1 … T126-3 old accessory drafts flagged, Fold, Reject | not run | the old drafts were cleared | covered by the app tests; left the sheet |
+| 0-1 … 0-6 | done | | |
+| T130-1 re-upload once; B-11 role and Neuron line | pass | Upload → Done 0.1 min | |
+| T130-3 your own choice stands | skip | | needs a newer `library.json`; stays |
+| B-5 T125 a touchscreen's back boxes | pass | | T125's section: only T125-4 (two iPads) left |
+| T124-1 the Level 02 sheet loads | pass | Upload → Done 1 min | |
+| T124-2 everything else keeps working meanwhile | skip | | stays |
+| B-22 T113; B-23, B-24 T102; B-28 … B-31 T117 / T121 | pass | | T113, T117, T121 sections left; T102's B-checks left |
+| C-14 upload BOM and riser | pass, with a note | "Server reported offline when uploading the riser and BOM briefly." Riser → Done 15 min, Claude $2.80 | The api / worker logs for 2026-11-01/02 show no error, timeout, restart or out-of-memory; the worker finished the BOM 02:25Z and the riser 02:39Z. Most likely the iPad's health probe timed out while the riser job ran on the shared CPU. Watch; no task |
+| T126-5; T132-1 … T132-4; T128-1 … T128-4; C-26 | pass | on level 03 | T132 and T128 sections left |
+| T129-1, T129-3, T129-5, T129-6 crops | pass | | |
+| T129-2 enlarge, pinch, pan | **fail** | "Pinch zoom does not work; only double tap. Vary hard to use." | `ZoomableImage` composes `Exclusive(doubleTap, Simultaneous(pinch, pan))` in a Modal; the tap reaches JS, pinch and pan never activate; not reproducible on the PC → **T135** (measure on the dev iPad; fall back to the native ScrollView zoom) |
+| C-35 riser: download, upright, outlined | **fail** | "Cables shown as expected. I added a N run for the NSPS in the review screen. It is not shown in this riser or connected to the device on the plan view. My only option to create a new N connection via the punch list. … it calls the device a P-NSPS-DIN, while everything else calls it a P-NSPS-D. When i searched for the 3rd floor P-NSPS-D and selected it, it auto input the P-NSPS-DIN." | Three things, from the live rows. (1) The N line is the riser's no-bubble line set to `N` with its To hand-picked as the 06M `Equipment Rack 18U` draft: `edited`, `placed = false` — the cable is made only when that draft is placed (D193, `commitWaitingCables`) and nothing but the review's end line says "waiting" → **T136**. (2) `P-NSPS-DIN` is the riser symbol's printed label (`PARADIGM P-NSPS-DIN`) stored on the candidate and shown as is; the draft's BOM model is `P-NSPS-D` → **T137**. (3) The outline: see T129-4 → **T134** (the riser also never zoomed to its bubble, which "shown as expected" did not catch) |
+| T129-4 riser pinch in the frame | **fail** | "No red outline." | `RiserCrop.onViewport` returns unless `vp.page === page - 1`, but the patch reports pages **1-based** (`pageIndex + 1`, JS event and UI message alike), so on page 1 nothing focuses and the outline's `mark` is never set → **T134** |
+| C-36 cached, page 2, offline | skip | | stays |
+| C-23 mismatch list and excluded lines | skip | "No idea where you are asking me to do this at in the app." | not a defect: the check never said where. The sheet now reads "Setup → 4 Review drafts → a level → below the Devices table on the left" |
+| C-34 needs review links; offline | pass | | |
+| C-38 Setup → 5 Place devices | pass, with a note | "The pdf is very slow to load and lags when moving around. We need to find a way to handle big files and make the movement seamless. This issue carries over to the survey tab as well." | PDFKit redraws the whole vector page per zoom; the 03 composite is heavier than the 06M sheet TP-6 measured → **T141** (measure; rasterised display sheet over a threshold, decision first) |
+| C-39 dashed proposals | pass, with notes | "some suggestions are good. A lot are very off. I would think it would be easy to match up and place ontop of text that matches the thing we are looking for. None of the stations or sensors had suggestions. Also there is no way to remove a placed device if you accidently place one incorrectly. Put it back into the list per say." | The text pass keeps only panel-shaped tags and the third pass puts a draft on *any* left-over tag of its role (the "very off" ones); the 06M sheet prints no station IDs (`PIR` ×4, `TS` ×2 by the symbols) → **T140**. Undo / put back → **T139** (Delete… under ⋯ does it today, unnamed) |
+| T127-2, C-40 | pass | | T127's section left |
+| C-42 draft unit, pool, waiting cables | pass | | |
+| C-43 flag not on this sheet | pass, with a question | "Does this go back into the review items to be moved to another floor? Or placed someone where into the pool so it can be placed where it was actually installed?" | Answered: a flag only parks the draft under Flagged until unflagged; to move it, Review drafts → the draft → Edit… → Level (or "pool (no level)"), refused once a unit was placed from it → **T143** (Move to… on the Flagged row) |
+| C-44 entry points | skip | | stays |
+| C-46 lock table columns; C-47 lock offline | pass | | T47: only the two-iPad part left |
+| T131-1, T131-2, T131-4, T131-5, D-1, D-2 | skip | "skipping all dev logging for now" | stay (Metro group at the end of Part D) |
+| D-3 T92 tap and draw mode; D-4, D-5 T70 long press | pass | | **the long press opens with the finger still** (close-out D-15 is closed); T70's section left; T92's two Metro checks stay |
+| D-6 … D-35, E-1 … E-44, G-1 … G-10, H-1, H-2, Part I | not done | | the round continues on the rebuilt sheet |
+
+Notes outside the sheet:
+
+| Note | Finding |
+|---|---|
+| "No way to move a field device from draft to approved/added. or maybe i am missing it" | Not placed yet: asked which screen (Review drafts' greyed Accept names what it still needs; Place devices lists accepted drafts only; the Library's Accept draft) |
+| "C: project create 422 showed no reason (two-way 06/06M share)" | **T142**: the form shows the server's `detail` and refuses a share that loops before Create |
+| "After settleing all review items on lvl 3, There are still 3 warnings on the mismatch list, all three resolved in the review. 1. No N run to drown P-NSPS-D 2./3. SR or LR? P-DOC-C-SR / P-DOC-C-LR - pick one" | **T133**: `mismatchList` keeps a device draft's conflicts unless it is rejected, and Accept never clears them |
+| "when i added a connection via the punch list, i have no way to remove the connection if it was added in error. … I want to remove the one i added via punch list to see if I can retest using my N cable added via review screen." | **T138**: Delete… on a connection (the card's + add row made an `origin = library` N cable with no far end); the review's N line itself is waiting for the 06M rack (T136) |
+
+Record, as filled:
+
+| Measure | Value |
+|---|---|
+| Crashes (target 0) | not filled |
+| Long press: menu with the finger still | yes (D-4) |
+| Still slow anywhere during sync | not filled (the Metro checks were skipped) |
+| Moments you reached for the spreadsheet | not filled |
+| Readings | DaVinci re-upload 0.1 min; Level 02 sheet 1 min; riser job 15 min; riser Claude $2.80 |
+
+Decisions: none of the Decision lines was answered (all "unanswered"); Q-ERn (ERn enclosures' category) was asked again. No new decision this session: T140 and T141 each start with one.
+
+Checklist reset: the sections whose checks all passed left the file — T70, T113, T117, T121, T127, T128, T132 — and the passed checks left T61, T92, T102, T111, T112, T124, T125, T126, T129, T130, T44, T46, T47 and T106; the fails are marked with their task numbers (T134, T135, T136, T137). The sheet is the same artifact, rebuilt as **ROUND-1102** (collection `round1102`): only what is open, the fails as "Retest after T13n", the existing `Scratch1` and `pipeline test` projects kept, C-23 reworded.
+
 ## 2026-10-18 / 19 — Full-pipeline round, Parts 0–C (dev build `a5cbf96f`, server `234fa4a` → `b4e787b`, update `89a75db0` → `18f7efe4`)
 
 Landry ran Parts 0 to C of the full-pipeline sheet (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy) on **one** iPad (0-5 not done: no second iPad, so every iPad-B step was skipped), after every project had been removed from the server (0-3). Results pasted 2026-10-19 as "so far": Parts D–H (91 steps) not started. **54 pass, 9 fail, 19 skip, 3 not done** over Parts A–C (A 1 / 2 / 3 / 0, B 22 / 3 / 7 / 0, C 31 / 4 / 9 / 3). Three fails (A-2, A-3, B-5, the library editor) were reported during the round and fixed as **T125** the same day (server `b4e787b`, update `18f7efe4`); the sheet marks them "Retest after T125". No Decision line on the sheet was answered. Landry's remark on C-33 ("Load ckts means 120v to fixtures. Always.") is recorded as **D221**. Separately Landry reported, while pasting: "the app is becoming unbearably slow to load, what seems like during syncing" → **T131**.
