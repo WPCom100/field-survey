@@ -7,6 +7,7 @@
 import { defaultDeviceText, displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
 import { CABLE_CODES, cableCodes, cableTitle, editableKeys, loadRuleParams, parseLibraryAccessories, parseLibraryCables, type LibraryCable } from '@field-survey/rules';
 
+import { loadDraftEndLabels, waitsForDraft } from '../cables/draftEnds';
 import { deviceNeedsNeuron, loadNeuronTypes, typeOf } from '../library/neuron';
 import { photoStrip } from '../photo/links';
 import { baselineEvents, type BaselineEvent } from '../setup/lock';
@@ -139,6 +140,8 @@ export type CardConnection = {
   singleRow: boolean;
   /** The far end's device, when it is one (placeholders have nowhere to jump). */
   jump: JumpTarget | null;
+  /** The far end waits for its draft device to be placed (D235): `Equipment Rack 18U (draft on 06M, not placed yet)`. */
+  farDraft: string | null;
 };
 
 export type CardPunch = {
@@ -518,6 +521,8 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     }
   }
 
+  const draftLabels = await loadDraftEndLabels(store, [...others.values()]);
+
   const connections: CardConnection[] = [];
   for (const e of ends) {
     const cable = cables.get(String(e.cable_id));
@@ -525,7 +530,9 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     const other = others.get(String(e.cable_id) + '|' + (e.side === 'A' ? 'B' : 'A')) ?? null;
     const far = other && str(other.device_id) ? (farDevices.get(String(other.device_id)) ?? null) : null;
     const farLabel = far ? displayNumber('device', far, farCodes.get(String(far.level_id)) ?? null) : null;
-    const farText = farLabel ?? (other && str(other.placeholder_id) ? (placeholders.get(String(other.placeholder_id)) ?? null) : null);
+    const farDraft = waitsForDraft(other) ? (draftLabels.get(String(other!.draft_device_id)) ?? null) : null;
+    const farPlaceholder = other && str(other.placeholder_id) ? (placeholders.get(String(other.placeholder_id)) ?? null) : null;
+    const farText = farLabel ?? farPlaceholder ?? farDraft;
     connections.push({
       id: String(e.id),
       label: displayNumber('cable_end', e),
@@ -539,6 +546,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
         far && farLabel
           ? { deviceId: String(far.id), levelId: String(far.level_id), label: farLabel, sameLevel: far.level_id === d.level_id }
           : null,
+      farDraft,
     });
   }
   connections.sort(

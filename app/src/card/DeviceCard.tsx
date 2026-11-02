@@ -311,6 +311,11 @@ export function DeviceCard(props: DeviceCardProps) {
                     <Text style={styles.jumpText}>{c.jump.label} ▸</Text>
                   </Pressable>
                 ) : null}
+                {c.farDraft ? (
+                  <Text style={styles.itemSub} numberOfLines={2}>
+                    → {c.farDraft}
+                  </Text>
+                ) : null}
                 {props.onOpenEnd ? <Text style={styles.chev}>›</Text> : null}
               </View>
             </Pressable>

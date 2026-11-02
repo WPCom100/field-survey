@@ -263,6 +263,8 @@ export const ENTITIES = {
       endpoint_kind: enumCol(v.ENDPOINT_KIND),
       device_id: t(),
       placeholder_id: t(),
+      // T136 (D235): the unplaced draft device this end waits for; `device_id` is set when it is placed
+      draft_device_id: t(),
       level_id: t(),
       display_id: t({ serverAssigned: true }),
       from_text: t(),
@@ -273,7 +275,7 @@ export const ENTITIES = {
       surveyed_at: t(),
       status_source: enumCol(v.STATUS_SOURCE),
     },
-    [['cable_id'], ['device_id'], ['level_id']],
+    [['cable_id'], ['device_id'], ['level_id'], ['draft_device_id']],
   ),
 
   placeholder: record(

@@ -226,12 +226,13 @@ function EndSection(props: {
   onOpenPhoto?: EndEditorProps['onOpenPhoto'];
 }) {
   const { end, view, run } = props;
-  const readOnly = props.readOnly || end.deleted;
   const ep = end.endpoint;
+  // a draft's end is surveyed once its device is placed (D235; R5: far-end items wait)
+  const readOnly = props.readOnly || end.deleted || ep.kind === 'draft';
   const who = end.surveyedBy ? (props.names.get(end.surveyedBy) ?? `user …${end.surveyedBy.slice(-4)}`) : null;
   const review = (f: string) => end.inReview.has(f);
   const marks = (f: string) => [review(f) ? 'in review' : null, end.pending.has(f) ? '↑' : null].filter(Boolean).join(' ');
-  const where = ep.kind === 'device' ? `${ep.label}${ep.model ? ` ${ep.model}` : ''}` : ep.kind === 'placeholder' ? ep.label : '(no endpoint)';
+  const where = ep.kind === 'device' ? `${ep.label}${ep.model ? ` ${ep.model}` : ''}` : ep.kind === 'placeholder' || ep.kind === 'draft' ? ep.label : '(no endpoint)';
   const level = end.levelCode ? ` (Level ${end.levelCode})` : '';
   const [picking, setPicking] = useState(false);
   const canPick = !readOnly && !!props.editor && ep.kind !== 'device';
@@ -246,6 +247,7 @@ function EndSection(props: {
         </Text>
         <Text style={styles.endLabel}>{end.label}</Text>
       </View>
+      {ep.kind === 'draft' ? <Text style={styles.muted}>Its device is not on the plan yet: place the draft (Setup → Place devices), then survey this end.</Text> : null}
       {canPick && !picking ? (
         <Pressable onPress={() => setPicking(true)} style={styles.btn}>
           <Text style={styles.btnText}>{ep.kind === 'placeholder' ? 'Change placeholder…' : 'Choose placeholder…'}</Text>

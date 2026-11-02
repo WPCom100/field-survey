@@ -9,7 +9,19 @@ from sqlalchemy import func, select
 
 from app import sync
 from app.ids import uuid7
-from app.models import Cable, FieldHead, Level, NumberingGroup, Op, Project, ReviewItem, Sheet, User
+from app.models import (
+    Cable,
+    CableEnd,
+    DraftDevice,
+    FieldHead,
+    Level,
+    NumberingGroup,
+    Op,
+    Project,
+    ReviewItem,
+    Sheet,
+    User,
+)
 
 T0 = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
 
@@ -787,3 +799,56 @@ def test_second_create_of_an_existing_row_keeps_the_first_heads_and_number(clien
     res = w.push(client, [p, again])
     assert outcomes(res) == ["applied", "applied"]
     assert [o["now"] for o in res["server_ops"]] == [1]
+
+
+def test_end_naming_a_draft_is_numbered_then_linked_with_one_set(client, w):
+    """D235: a cable accepted with one placed end has its other end name the draft device
+    (`draft_device_id`, no device yet); it is numbered on the draft's level like any end, and
+    placing the draft links it with one `device_id` set — the draft stays as provenance."""
+    draft = DraftDevice(
+        id=uuid7(), project_id=w.project.id, level_id=w.l06m.id, name="Equipment Rack 18U"
+    )
+    w.session.add(draft)
+    w.session.commit()
+    panel = w.create(w.ann, "device")
+    cable = w.create(w.ann, "cable", {"cable": "N"})
+    a = w.create(
+        w.ann,
+        "cable_end",
+        {
+            "cable_id": cable["entity_id"],
+            "endpoint_kind": "device",
+            "device_id": panel["entity_id"],
+            "to_text": "Network to Level 06M Equipment rack",
+        },
+    )
+    b = w.create(
+        w.ann,
+        "cable_end",
+        {
+            "cable_id": cable["entity_id"],
+            "side": "B",
+            "level_id": str(w.l06m.id),
+            "endpoint_kind": "device",
+            "device_id": None,
+            "draft_device_id": str(draft.id),
+            "from_text": "Equipment rack",
+        },
+    )
+    res = w.push(client, [panel, cable, a, b])
+    assert outcomes(res) == ["applied"] * 4
+    assert sorted(o["now"] for o in res["server_ops"] if o["field"] == "display_id") == [
+        "C-01",
+        "C-02",
+    ]
+    rack = w.create(w.bob, "device", {"level_id": str(w.l06m.id), "display_id": "06M-01"})
+    link = w.set(w.bob, "cable_end", b["entity_id"], "device_id", rack["entity_id"], b["op_id"])
+    res = w.push(client, [rack, link])
+    assert outcomes(res) == ["applied", "applied"] and w.review_items() == []
+    w.session.expire_all()
+    end = w.session.get(CableEnd, uuid.UUID(b["entity_id"]))
+    assert (str(end.device_id), end.draft_device_id, end.display_id) == (
+        rack["entity_id"],
+        draft.id,
+        "C-02",
+    )

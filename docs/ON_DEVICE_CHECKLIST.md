@@ -597,6 +597,19 @@ Decision D231: source crops are downloaded and cached by the app with a 45 s tim
 
 Decision D236: an enlarged source crop zooms with the native iOS scroll view (pinch, pan, bounce by UIKit) and a JS-timed double tap; gesture-handler is no longer used in that modal. → Approve / change:
 
+## T136 — A connection with one placed end is made at once  ·  Needs: no new build (JS update; server deploy first — Alembic 0018 adds `cable_end.draft_device_id`; **every iPad on the new JS before anyone accepts a cable draft to an unplaced draft**, an older iPad refuses those ops on pull until it updates, nothing lost)
+
+**Why it matters:** on 2026-11-01 (C-35) the N line set to the 06M `Equipment Rack 18U` draft was confirmed and then was nowhere but Review drafts: "if one side of a device is placed, I should be able to begin surveying the connection at that side." Now Accept makes the cable at once on the placed side, and its far end follows when the draft is placed (D235). Use `pipeline test` (or any project with a riser in and a device draft not placed yet). After this, re-run **T106 / C-35** above.
+
+- [ ] **Accept makes it.** Setup → 4 Review drafts → a cable draft whose From is a placed device and whose To is a draft device not placed yet (set it with Change… if needed) → **Confirm endpoint ✓**: the message says the cable is made on the placed end and its far end follows when that draft is placed; no "waits for placing" in the State column. (A line accepted before this update: **Make n waiting cables**, or placing any device, makes it the same way.) → saw:
+- [ ] **On the placed device's card.** Open that device's plan → tap it → Connections: the new row reads `<code> → <signal> to Level <nn> <device>` with `→ <draft> (draft on <nn>, not placed yet)` under it (e.g. `→ Equipment Rack 18U (draft on 06M, not placed yet)`). The plan's **Conns** tab shows the same far end after `↔`. → saw:
+- [ ] **Survey the placed end.** Tap that connection: the end editor shows this end editable and the far end titled with the draft and "Its device is not on the plan yet…", its status, note, From / To greyed and no Choose placeholder. Set this end `Not installed`, note "Not run": after the rules run, the card proposes `Run <signal> to Level <nn> <device>`; Lint shows no "Cable with missing far end" for it. → saw:
+- [ ] **Cable / riser.** Cables → the cable: side B reads `<draft> (draft on <nn>, not placed yet)`, no ⚑ missing far end. → saw:
+- [ ] **Placing links it.** Place the draft (Setup → 5 Place devices, or ⊕ Place on its level's plan) and sync: the first device's card now shows the far end's ID with a jump ▸ instead of the draft line; the new device's card lists the same connection (one cable, not two — Cables shows one row). → saw:
+- [ ] **Export.** Before placing (or on another such cable), sync and run an export: the Connections tab has a row on the draft's level for the far end, `Unsurveyed`, with its To text. → saw:
+
+Decision D237 (Proposed): the waiting end is a device end with no device and `draft_device_id` (kept after placement as provenance); a draft to a placeholder is made too; the waiting end is read-only in the end editor until its device is placed; placement links by the device placed from the draft (or the one device on its level that plainly is it); lines accepted before this are made by the next placement or "Make n waiting cables". → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

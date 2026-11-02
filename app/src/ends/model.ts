@@ -8,6 +8,7 @@
 import { displayNumber, reviewFields, riserCheck, type RiserCheck, type Store } from '@field-survey/core';
 import { loadRuleParams } from '@field-survey/rules';
 
+import { draftEndLabel, loadDraftEndLabels, waitsForDraft } from '../cables/draftEnds';
 import type { CardPhoto, JumpTarget } from '../card/model';
 import { photoStrip } from '../photo/links';
 import { chipsFor, loadChipRows } from '../suggestions/model';
@@ -43,6 +44,8 @@ export const CABLE_NAME: Readonly<Record<string, string>> = {
 export type EndEndpoint =
   | { kind: 'device'; deviceId: string; label: string; model: string | null; levelId: string; levelCode: string | null; deleted: boolean }
   | { kind: 'placeholder'; label: string }
+  /** Waits for its draft device to be placed (D235): `Equipment Rack 18U (draft on 06M, not placed yet)`. */
+  | { kind: 'draft'; draftId: string; label: string }
   | { kind: 'none' };
 
 export type EndView = {
@@ -123,6 +126,9 @@ async function endView(store: Store, e: Row, fromDeviceLevel: string | null): Pr
   } else if (str(e.placeholder_id)) {
     const p = await store.get<Row>('placeholder', String(e.placeholder_id));
     endpoint = { kind: 'placeholder', label: p ? String(p.label) : '(placeholder)' };
+  } else if (waitsForDraft(e)) {
+    const draftId = String(e.draft_device_id);
+    endpoint = { kind: 'draft', draftId, label: (await loadDraftEndLabels(store, [e])).get(draftId) ?? draftEndLabel(undefined, null) };
   }
   if (!levelCode && levelId) {
     const lv = await store.get<Row>('level', levelId);

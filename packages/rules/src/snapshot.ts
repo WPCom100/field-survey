@@ -93,6 +93,8 @@ export interface CableEndRow extends Deletable {
   endpoint_kind: 'device' | 'placeholder' | null;
   device_id: string | null;
   placeholder_id: string | null;
+  /** The unplaced draft device this end waits for (T136, D235); `device_id` is set when it is placed. */
+  draft_device_id?: string | null;
   level_id: string | null;
   display_id: string | null;
   from_text: string | null;

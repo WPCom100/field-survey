@@ -17,6 +17,7 @@
 import { displayNumber, isNew, punchDeviceText, type Store } from '@field-survey/core';
 import { cableCodes, loadRuleParams } from '@field-survey/rules';
 
+import { loadDraftEndLabels, waitsForDraft } from '../cables/draftEnds';
 import type { PlanDevice } from './data';
 import { ownerMatches, statusKey, type PlanFilter } from './filters';
 
@@ -147,16 +148,17 @@ export async function loadLevelLists(
       cables.set(String(c.id), c);
     }
     for (const e of await store.db.query<Row>(
-      `SELECT id, cable_id, side, endpoint_kind, device_id, placeholder_id, deleted_at FROM cable_end WHERE cable_id IN (${marks})`,
+      `SELECT id, cable_id, side, endpoint_kind, device_id, placeholder_id, draft_device_id, deleted_at FROM cable_end WHERE cable_id IN (${marks})`,
       cableIds,
     )) {
       endsOf.set(String(e.cable_id), [...(endsOf.get(String(e.cable_id)) ?? []), e]);
     }
   }
   const endLabels = await loadEndLabels(store, [...endsOf.values()].flat());
-  /** What an end is called: its device ID, its placeholder's text, or `?` when it is not set yet. */
+  const draftLabels = await loadDraftEndLabels(store, [...endsOf.values()].flat());
+  /** What an end is called: its device ID, its placeholder's text, the draft it waits for (D235), or `?` when it is not set yet. */
   const endLabel = (e: Row | undefined) =>
-    (e && (endLabels.get(str(e.device_id) ?? '') ?? endLabels.get(str(e.placeholder_id) ?? ''))) ?? '?';
+    (e && (endLabels.get(str(e.device_id) ?? '') ?? endLabels.get(str(e.placeholder_id) ?? '') ?? (waitsForDraft(e) ? draftLabels.get(String(e.draft_device_id)) : undefined))) ?? '?';
   /** The cable's other end: the opposite side, a live one before a deleted one. */
   const farEnd = (e: Row) =>
     (endsOf.get(String(e.cable_id)) ?? [])

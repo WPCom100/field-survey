@@ -198,14 +198,15 @@ export const LintVocab: Rule = {
 
 // ------------------------------------------------------------------ cables
 
+/** A device, a placeholder, or a draft device not placed yet (D235; R5: far-end items wait). */
 function hasEndpoint(e: CableEndRow): boolean {
-  return !!(e.device_id || e.placeholder_id);
+  return !!(e.device_id || e.placeholder_id || e.draft_device_id);
 }
 
 export const LintFarEnd: Rule = {
   id: 'lint.far_end',
   title: 'Cable with missing far end',
-  text: 'A cable has two ends, each a device or a placeholder (D26); a cable with one end, or an end naming neither, is flagged on the end that has one.',
+  text: 'A cable has two ends, each a device or a placeholder (D26), or a draft device not placed yet (D235); a cable with one end, or an end naming none, is flagged on the end that has one.',
   run(ctx) {
     for (const cable of ctx.index.cable.values()) {
       const ends = (ctx.index.endsByCable.get(cable.id) ?? []).slice().sort((a, b) => a.side.localeCompare(b.side));

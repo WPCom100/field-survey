@@ -114,6 +114,8 @@ describe('cable lints', () => {
     const lonely = b.cable('X', { device: panel, display_id: 'C-01' }, null);
     const loose = b.cable('N', { device: panel, display_id: 'C-02' }, { from_text: 'UFMP4 #1, #2' });
     b.cable('0-10V', { device: panel, display_id: 'C-03' }, { placeholder: fixtures }, { single_row: true });
+    // a far end that names a draft device not placed yet waits for it (D235, R5): not missing
+    b.cable('N', { device: panel, display_id: 'C-04' }, { endpoint_kind: 'device', draft_device_id: 'draft-rack', level: b.level('06M'), from_text: 'Equipment rack' });
     expect(found(b, [LintFarEnd])).toEqual([
       ['lint.far_end', lonely.a.id, 'C-01: DMX cable has no far end'],
       ['lint.far_end', loose.a.id, 'C-02: network cable, the far end "UFMP4 #1, #2" names no device or placeholder'],

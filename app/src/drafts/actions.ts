@@ -5,11 +5,12 @@
  * Confirm endpoint (D6). Every edit is an op through the `Editor` (`Master edit`, setup work
  * before the baseline lock). No React or Expo imports: tested in Node.
  *
- * What Accept writes (D193): a device draft only changes state — its devices are made when they
- * are placed (T46, `baseline_ref`); a cable draft becomes its `cable` with both ends once both
- * endpoints are real records (a device or a placeholder), or links to the matching cable already
- * in the baseline; until an endpoint draft device is placed it waits, accepted, and
- * `commitWaitingCables` makes it then.
+ * What Accept writes (D193, D235): a device draft only changes state — its devices are made when
+ * they are placed (T46, `baseline_ref`); a cable draft becomes its `cable` with both ends once one
+ * endpoint is a real record (a device or a placeholder) — the other, while still an unplaced draft
+ * device, an end that names the draft (`draft_device_id`, no device yet) and is linked to the
+ * device when the draft is placed (`commitWaitingCables`) — or links to the matching cable already
+ * in the baseline; a draft with both ends unplaced waits, accepted, until one is placed.
  */
 
 import type { EditBatch, EditContext, Editor, Op, Store } from '@field-survey/core';
@@ -23,6 +24,7 @@ import {
   bulkDevices,
   candidateList,
   deviceForDraft,
+  draftRole,
   loadDraftReview,
   withChosen,
   type CableDraftRow,
@@ -363,8 +365,11 @@ const SIGNAL_TO: Readonly<Record<string, string>> = {
 };
 const SINGLE_ROW = new Set(['P', '0-10V', '120V']);
 
-/** An endpoint as a record: a device or a placeholder, with the From text it reads as. */
-export type RealEnd = { kind: 'device' | 'placeholder'; id: string; levelId: string | null; levelCode: string | null; text: string; category?: string | null; role?: Role; placeholderKind?: string };
+/**
+ * An endpoint as a record: a device or a placeholder, with the From text it reads as — or (`draft`,
+ * D235) an unplaced draft device the end will name until it is placed.
+ */
+export type RealEnd = { kind: 'device' | 'placeholder' | 'draft'; id: string; levelId: string | null; levelCode: string | null; text: string; category?: string | null; role?: Role; placeholderKind?: string };
 
 /** A device reads as its panel tag, a rack (by role, T112) as "Equipment rack", else its Device text (the master's From column). */
 function deviceText(d: DraftReviewData['devicesLive'][number]): string {
@@ -390,6 +395,28 @@ export function realEnd(data: DraftReviewData, e: Endpoint | null): RealEnd | nu
 }
 
 /**
+ * `realEnd`, or — for a draft device not placed yet — the draft itself (D235): its level and the
+ * text its device will read as (`deviceText`'s rule: a rack "Equipment rack", else its tag or
+ * model). Null when the endpoint is unset or names nothing on this iPad.
+ */
+export function endOrDraft(data: DraftReviewData, e: Endpoint | null): RealEnd | null {
+  const real = realEnd(data, e);
+  if (real || e?.kind !== 'draft_device') return real;
+  const dd = data.devices.find((x) => x.id === e.id);
+  if (!dd || dd.state === 'rejected') return null;
+  const role = draftRole(dd);
+  const text = role === 'equipment_rack' ? 'Equipment rack' : (dd.name ?? dd.model ?? dd.category ?? 'device');
+  return { kind: 'draft', id: dd.id, levelId: dd.levelId, levelCode: dd.levelCode, text, category: dd.category, role };
+}
+
+/** The two ends a cable draft is made with — at least one real (D235) — else null: it waits. */
+export function makeEnds(data: DraftReviewData, c: Pick<CableDraftRow, 'ends'>): { a: RealEnd; b: RealEnd } | null {
+  const a = endOrDraft(data, c.ends.from);
+  const b = endOrDraft(data, c.ends.to);
+  return a && b && (a.kind !== 'draft' || b.kind !== 'draft') ? { a, b } : null;
+}
+
+/**
  * The library's one row per device for a riser line accepted as `0-10V` or `120V` (D194, R2c /
  * R2d, D52): a Relay panel's 0-10V run to its far end (`Fixtures`), an NSPS's or rack's 120V row
  * `120v Power` → `P-NSPS-D Power Supply` / `Equipment rack`; and a relay or Foundry panel's load
@@ -398,7 +425,8 @@ export function realEnd(data: DraftReviewData, e: Endpoint | null): RealEnd | nu
  * category's) or the ends (one device, one placeholder) do not fit the table.
  */
 export function libraryRow(code: string, a: RealEnd, b: RealEnd): { device: RealEnd; far: RealEnd; from: string; to: string; exact: boolean } | null {
-  const [device, far] = a.kind === 'device' && b.kind === 'placeholder' ? [a, b] : b.kind === 'device' && a.kind === 'placeholder' ? [b, a] : [null, null];
+  const isDevice = (e: RealEnd) => e.kind === 'device' || e.kind === 'draft';
+  const [device, far] = isDevice(a) && b.kind === 'placeholder' ? [a, b] : isDevice(b) && a.kind === 'placeholder' ? [b, a] : [null, null];
   if (!device || !far) return null;
   const role = device.role ?? roleOfCategory(device.category);
   if (code === '0-10V' && role === 'relay_panel') return { device, far, from: device.text, to: far.text, exact: false };
@@ -435,13 +463,16 @@ export function cablePayload(
   const code = c.code!;
   const far = (from: RealEnd, to: RealEnd) => {
     if (code === 'P') return 'EBDK panic wire';
-    const where = to.kind === 'device' && to.levelId && to.levelId !== from.levelId && to.levelCode ? `Level ${to.levelCode} ` : '';
+    const where = to.kind !== 'placeholder' && to.levelId && to.levelId !== from.levelId && to.levelCode ? `Level ${to.levelCode} ` : '';
     return `${SIGNAL_TO[code] ?? code} to ${where}${to.text}`;
   };
   const end = (side: 'A' | 'B', me: RealEnd, other: RealEnd, fallbackLevel: string | null): Record<string, unknown> =>
     me.kind === 'device'
       ? { side, endpoint_kind: 'device', device_id: me.id, level_id: me.levelId ?? fallbackLevel, from_text: me.text, to_text: far(me, other) }
-      : { side, endpoint_kind: 'placeholder', placeholder_id: me.id, level_id: me.levelId ?? fallbackLevel, from_text: me.text, to_text: null };
+      : me.kind === 'draft'
+        ? // the draft's device-to-be (D235): `device_id` is set when it is placed
+          { side, endpoint_kind: 'device', device_id: null, draft_device_id: me.id, level_id: me.levelId ?? fallbackLevel, from_text: me.text, to_text: far(me, other) }
+        : { side, endpoint_kind: 'placeholder', placeholder_id: me.id, level_id: me.levelId ?? fallbackLevel, from_text: me.text, to_text: null };
   const ref = c.sourceRef;
   const riser = ref && RISER_KINDS.has(String(ref.kind)) && Array.isArray(ref.bbox);
   return {
@@ -490,7 +521,8 @@ export async function matchingCable(store: Store, projectId: string, code: strin
   return null;
 }
 
-export type CableAcceptResult = { ops: Op[]; cableId: string | null; linked: boolean; waiting: boolean };
+/** `pending`: the cable was made with an end that waits for its draft device to be placed (D235). */
+export type CableAcceptResult = { ops: Op[]; cableId: string | null; linked: boolean; waiting: boolean; pending: boolean };
 
 async function writeCable(
   g: EditBatch,
@@ -504,7 +536,9 @@ async function writeCable(
   // a 0-10V / 120V line meets the library's row for its device: one cable, not two (D194); a
   // panel's load circuits only the cable with the same two ends (D221)
   const lib = libraryRow(c.code!, a, b);
-  const existing = lib && !lib.exact ? await deviceCableOfCode(store, projectId, c.code!, lib.device.id) : await matchingCable(store, projectId, c.code!, a, b);
+  // an end that is still a draft has no cable in the baseline yet: nothing to link to
+  const draftEnd = a.kind === 'draft' || b.kind === 'draft';
+  const existing = draftEnd ? null : lib && !lib.exact ? await deviceCableOfCode(store, projectId, c.code!, lib.device.id) : await matchingCable(store, projectId, c.code!, a, b);
   const p = lib ? libraryPayload(c, lib, opts) : cablePayload(c, a, b, opts);
   if (existing) {
     const id = String(existing.id);
@@ -536,8 +570,9 @@ export function cableBlockers(c: CableDraftRow): string[] {
 /**
  * Accept a cable draft — **Confirm endpoint** (D6) is Accept with `confirm`: the cable is made
  * with `endpoint_confirmed`, else it shows ⚑ in the cable view until someone confirms it there.
- * Both ends real → the cable (or the link to the one the baseline has); an end still an unplaced
- * draft device → accepted and waiting (`commitWaitingCables`). One group.
+ * Both ends real → the cable (or the link to the one the baseline has); one end real and the other
+ * an unplaced draft device → the cable now, its far end naming the draft (D235, `pending`); both
+ * ends unplaced drafts → accepted and waiting (`commitWaitingCables`). One group.
  */
 export async function acceptCable(
   editor: Editor,
@@ -551,8 +586,7 @@ export async function acceptCable(
   const raw = await store.get<Record<string, unknown>>('draft_cable', c.id);
   if (!raw) throw new DraftError('That draft is not on this iPad.');
   const projectId = String(raw.project_id);
-  const a = realEnd(data, c.ends.from);
-  const b = realEnd(data, c.ends.to);
+  const ends = makeEnds(data, c);
   let result: { cableId: string; linked: boolean } | null = null;
   const edited = c.handPicked.from || c.handPicked.to || c.codeEdited || c.conflicts.includes('code:unknown');
   const what = `${c.code} ${c.ends.from!.label} → ${c.ends.to!.label}`;
@@ -563,10 +597,11 @@ export async function acceptCable(
     // the reviewer said what the line is: its question is answered (T108)
     if (c.conflicts.includes('code:unknown')) await g.setField('draft_cable', c.id, 'conflicts', c.conflicts.filter((k) => k !== 'code:unknown'));
     await g.setField('draft_cable', c.id, 'state', edited ? 'edited' : 'accepted');
-    if (a && b) result = await writeCable(g, store, projectId, c, a, b, opts);
+    if (ends) result = await writeCable(g, store, projectId, c, ends.a, ends.b, opts);
   });
   const r = result as { cableId: string; linked: boolean } | null;
-  return { ops, cableId: r?.cableId ?? null, linked: r?.linked ?? false, waiting: !r };
+  const pending = !!r && !!ends && (ends.a.kind === 'draft' || ends.b.kind === 'draft');
+  return { ops, cableId: r?.cableId ?? null, linked: r?.linked ?? false, waiting: !r, pending };
 }
 
 /**
@@ -605,28 +640,55 @@ export async function acceptAll(
       if (!raw) continue;
       await g.setField('draft_cable', c.id, 'candidates', withChosen(withChosen(raw.candidates, 'from', c.ends.from), 'to', c.ends.to));
       await g.setField('draft_cable', c.id, 'state', 'accepted');
-      const a = realEnd(data, c.ends.from);
-      const b = realEnd(data, c.ends.to);
-      if (a && b) await writeCable(g, store, String(raw.project_id), c, a, b, { confirm: false, riserBlob: opts.riserBlob });
+      const ends = makeEnds(data, c);
+      if (ends) await writeCable(g, store, String(raw.project_id), c, ends.a, ends.b, { confirm: false, riserBlob: opts.riserBlob });
     }
   });
   return rows.length;
 }
 
+/** The waiting drafts `commitWaitingCables` makes now: accepted, a code, one end real (D235). */
+export function readyCables(data: DraftReviewData): { c: CableDraftRow; a: RealEnd; b: RealEnd }[] {
+  return data.cables.flatMap((c) => {
+    const ends = c.waiting && c.code ? makeEnds(data, c) : null;
+    return ends ? [{ c, ...ends }] : [];
+  });
+}
+
 /**
- * Make the cables of accepted drafts that were waiting for an endpoint device to be placed (T46
- * calls this after it places devices; the review screen offers it as "Make n waiting cables").
- * Returns how many.
+ * Cable ends that name a draft device (D235) whose device now exists — placed from it (T46), or
+ * plainly the same device on its level (`deviceForDraft`) — with that device's id.
+ */
+export async function draftEndsToLink(store: Store, data: DraftReviewData, projectId: string): Promise<{ endId: string; deviceId: string }[]> {
+  const rows = await store.db.query<{ id: string; draft_device_id: string }>(
+    `SELECT e.id, e.draft_device_id FROM cable_end e JOIN cable c ON c.id = e.cable_id
+     WHERE c.project_id = ? AND e.draft_device_id IS NOT NULL AND e.device_id IS NULL AND e.placeholder_id IS NULL
+       AND e.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY e.id`,
+    [projectId],
+  );
+  const draftById = new Map(data.devices.map((d) => [d.id, d]));
+  return rows.flatMap((r) => {
+    const dd = draftById.get(r.draft_device_id);
+    const dev = dd ? deviceForDraft(data, dd) : null;
+    return dev ? [{ endId: r.id, deviceId: dev.id }] : [];
+  });
+}
+
+/**
+ * After devices are placed (T46 calls this; the review screen offers it as "Make n waiting
+ * cables"): link each end that named a draft now placed to its device — one `device_id` op, never
+ * a second cable (D235) — and make the cables of accepted drafts that were waiting (both ends
+ * drafts then, or accepted before D235) once one end is real. One group. Returns how many cables
+ * were made or linked.
  */
 export async function commitWaitingCables(editor: Editor, store: Store, projectId: string, opts: { riserBlob?: string | null } = {}): Promise<number> {
   const data = await loadDraftReview(store, projectId);
-  const ready = data.cables
-    .filter((c) => c.waiting && c.code)
-    .map((c) => ({ c, a: realEnd(data, c.ends.from), b: realEnd(data, c.ends.to) }))
-    .filter((x): x is { c: CableDraftRow; a: RealEnd; b: RealEnd } => !!x.a && !!x.b);
-  if (!ready.length) return 0;
+  const links = await draftEndsToLink(store, data, projectId);
+  const ready = readyCables(data);
+  if (!ready.length && !links.length) return 0;
   await editor.group(ctx('Draft review: cables of accepted drafts, endpoints now placed'), async (g) => {
+    for (const l of links) await g.setField('cable_end', l.endId, 'device_id', l.deviceId);
     for (const { c, a, b } of ready) await writeCable(g, store, projectId, c, a, b, { confirm: c.confirmed, riserBlob: opts.riserBlob });
   });
-  return ready.length;
+  return ready.length + links.length;
 }

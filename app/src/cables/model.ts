@@ -10,6 +10,7 @@ import { displayNumber, riserCheck, type Store } from '@field-survey/core';
 import { cableCodes, loadRuleParams, type RuleParams } from '@field-survey/rules';
 
 import { CABLE_NAME } from '../ends/model';
+import { loadDraftEndLabels, waitsForDraft } from './draftEnds';
 import type { Rect } from '../plan/viewport';
 
 export type CheckId = 'far_end' | 'code' | 'status' | 'riser' | 'unconfirmed' | 'not_started';
@@ -36,7 +37,7 @@ export type CableEndCell = {
   label: string;
   levelId: string | null;
   levelCode: string | null;
-  /** The device's ID (`06M-02`), the placeholder's label, or null when the end names neither. */
+  /** The device's ID (`06M-02`), the placeholder's label, the draft it waits for (D235), or null when the end names none. */
   endpoint: string | null;
   deviceId: string | null;
   status: string | null;
@@ -234,6 +235,7 @@ export async function loadCables(store: Store, projectId: string): Promise<Cable
   );
   const deviceById = new Map(devices.map((d) => [String(d.id), d]));
   const placeholders = new Map((await store.list<Row>('placeholder', { where: 'project_id = ?', params: [projectId] })).map((p) => [String(p.id), p]));
+  const draftLabels = await loadDraftEndLabels(store, ends);
   const reviews = await store.list<Row>('review_item', { where: `project_id = ? AND state = 'open'`, params: [projectId], orderBy: 'id' });
   const reviewBy = new Map<string, string>();
   for (const r of reviews) {
@@ -258,7 +260,15 @@ export async function loadCables(store: Store, projectId: string): Promise<Cable
       const levelCode = levelId ? (levelById.get(levelId)?.code ?? null) : null;
       const devCode = dev ? (levelById.get(String(dev.level_id))?.code ?? null) : null;
       const ph = str(e.placeholder_id) ? placeholders.get(String(e.placeholder_id)) : undefined;
-      const endpoint = dev ? displayNumber('device', dev, devCode) : str(e.placeholder_id) ? (ph ? String(ph.label) : '(placeholder)') : null;
+      const endpoint = dev
+        ? displayNumber('device', dev, devCode)
+        : str(e.placeholder_id)
+          ? ph
+            ? String(ph.label)
+            : '(placeholder)'
+          : waitsForDraft(e)
+            ? (draftLabels.get(String(e.draft_device_id)) ?? null)
+            : null;
       const outOfScope = (levelId != null && levelById.has(levelId) && !levelById.get(levelId)!.inScope) || ph?.kind === 'level_not_in_scope';
       return {
         id: String(e.id),

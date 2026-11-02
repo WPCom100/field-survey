@@ -2,8 +2,8 @@
  * Draft review (T44, Phase 3 §3.3, D193): the read model over BOM / riser / hand-entered drafts
  * (levels incl. the pool and floors the project lacks, sources and crop boxes, the choices Accept
  * needs, the mismatch list, filters, bulk) and the edits (Accept / Edit / Reject / Reopen, Accept
- * all ≥ 0.9, Promote, hand drafts, cable endpoints, Confirm endpoint, the waiting cable made once
- * its endpoint device is placed, the link to a cable the baseline already has).
+ * all ≥ 0.9, Promote, hand drafts, cable endpoints, Confirm endpoint, the cable made with one
+ * placed end and its draft end linked on placement (D235), the link to a cable the baseline already has).
  */
 
 import { Editor, Store, uuidv7, type Op } from '@field-survey/core';
@@ -22,11 +22,14 @@ import {
   commitWaitingCables,
   deviceBlockers,
   editDevice,
+  endOrDraft,
   excludedKey,
   foldAccessory,
   foldBlockers,
   libraryRow,
+  makeEnds,
   promoteExcluded,
+  readyCables,
   realEnd,
   rejectDraft,
   reopenDraft,
@@ -34,7 +37,11 @@ import {
   setEndpoint,
   DraftError,
 } from './actions';
+import { draftEndLabel } from '../cables/draftEnds';
 import { loadCables } from '../cables/model';
+import { setEndPlaceholder, setEndStatus } from '../ends/actions';
+import { loadCableEnds } from '../ends/model';
+import { loadLevelLists } from '../plan/lists';
 import { typeForDraft, type DeviceType } from '../library/neuron';
 import { loadDeviceCard } from '../card/model';
 import { engineFor } from '../rules/engine';
@@ -331,28 +338,94 @@ describe('cable drafts (T44, D6, D191)', () => {
     await expect(reopenDraft(editor, 'cable', row(data.cables, ids.c3))).rejects.toThrow(/cable exists/);
   });
 
-  it('a draft-device endpoint not placed yet waits; placing it makes the cable across levels', async () => {
+  it('one placed end makes the cable at once; placing the draft links its end, never a second cable (D235)', async () => {
     const { store, editor, ids } = await setup();
-    const data = await loadDraftReview(store, PROJECT);
+    let data = await loadDraftReview(store, PROJECT);
+    // 06M panel (in the baseline by its tag) → the 02 UFMP4 draft, not placed yet
     const res = await acceptCable(editor, store, data, row(data.cables, ids.c1), { confirm: true });
-    expect(res).toMatchObject({ waiting: true, cableId: null });
-    expect(await commitWaitingCables(editor, store, PROJECT)).toBe(0);
-    let after = await loadDraftReview(store, PROJECT);
-    expect(row(after.cables, ids.c1)).toMatchObject({ state: 'accepted', waiting: true, committed: false, confirmed: true });
-    // T46 places the UFMP4 from its draft
-    const { id: ufmp } = await editor.create('device', { level_id: ids.l02, category: 'Foundry panel', device: 'UFMP4', baseline_ref_id: ids.dE, origin: 'baseline' }, { change_type: 'Master edit', reason: 'Place' });
-    expect(await commitWaitingCables(editor, store, PROJECT)).toBe(1);
-    after = await loadDraftReview(store, PROJECT);
-    expect(row(after.cables, ids.c1)).toMatchObject({ waiting: false, committed: true });
-    expect(row(after.devices, ids.dE).placed).toBe(1);
-    const ends = await store.db.query<Record<string, unknown>>(`SELECT e.* FROM cable_end e JOIN cable c ON c.id = e.cable_id WHERE c.cable = 'X' AND e.device_id IN (?, ?) ORDER BY e.side`, [ids.panel, ufmp]);
-    expect(ends.map((e) => [e.side, e.from_text, e.to_text, e.level_id])).toEqual([
-      ['A', 'CT06LCPA', 'DMX to Level 02 UFMP4', ids.l06m],
-      ['B', 'UFMP4', 'DMX to Level 06M CT06LCPA', ids.l02],
+    expect(res).toMatchObject({ waiting: false, pending: true, linked: false });
+    data = await loadDraftReview(store, PROJECT);
+    expect(row(data.cables, ids.c1)).toMatchObject({ state: 'accepted', waiting: false, committed: true });
+    const endsOf = () => store.list<Record<string, unknown>>('cable_end', { where: 'cable_id = ?', params: [res.cableId], orderBy: 'side' });
+    expect((await endsOf()).map((e) => [e.side, e.endpoint_kind, e.device_id, e.draft_device_id, e.level_id, e.from_text, e.to_text])).toEqual([
+      ['A', 'device', ids.panel, null, ids.l06m, 'CT06LCPA', 'DMX to Level 02 UFMP4'],
+      ['B', 'device', null, ids.dE, ids.l02, 'UFMP4', 'DMX to Level 06M CT06LCPA'],
     ]);
-    const cable = await store.get<Record<string, unknown>>('cable', String(ends[0]!.cable_id));
-    expect(cable!.endpoint_confirmed).toBe(true);
+    const farEnd = (await endsOf())[1]!;
+
+    // the placed device's card, the plan's Conns, the end editor and the cable view show it
+    const waiting = 'UFMP4 (draft on 02, not placed yet)';
+    const conn = (await loadDeviceCard(store, ids.panel))!.connections.find((c) => c.cable === 'X' && c.to === 'DMX to Level 02 UFMP4')!;
+    expect(conn).toMatchObject({ farDraft: waiting, jump: null });
+    const conns = (await loadLevelLists(store, PROJECT, ids.l06m, '06M', [])).connections.find((r) => r.title === 'X → DMX to Level 02 UFMP4')!;
+    expect(conns.sub).toBe(`06M-04 ↔ ${waiting} · Not started`);
+    const view = (await loadCableEnds(store, conn.id))!;
+    expect(view.ends[1]!.endpoint).toEqual({ kind: 'draft', draftId: ids.dE, label: waiting });
+    await expect(setEndPlaceholder(editor, farEnd.id as string, ids.canyon)).rejects.toThrow(/waits for its draft/);
+    const inView = (await loadCables(store, PROJECT)).rows.find((r) => r.id === res.cableId)!;
+    expect(inView.b).toMatchObject({ endpoint: waiting, deviceId: null, status: null, levelId: ids.l02 });
+    expect(inView.checks.map((k) => k.id)).not.toContain('far_end');
+
+    // its placed end is surveyed: the R3a Run item on that end; no far-end finding, no far-end item (R5)
+    await setEndStatus(editor, conn.id, 'Not installed');
+    const engine = engineFor(store, PROJECT, ME);
+    await engine.run();
+    const card = (await loadDeviceCard(store, ids.panel))!;
+    expect(card.drafts.filter((d) => d.ruleId === 'R3a').map((d) => d.payload.item)).toEqual(['Run DMX to Level 02 UFMP4']);
+    const farFindings = await store.list<Record<string, unknown>>('finding', { where: `project_id = ? AND lint_id = 'lint.far_end'`, params: [PROJECT] });
+    expect(farFindings.map((f) => (f.subject as { entity_id: string }).entity_id)).not.toContain(conn.id);
+    const farDrafts = await store.db.query<Record<string, unknown>>(`SELECT rule_id FROM proposal WHERE state = 'proposed' AND (subject LIKE ? OR payload LIKE ?)`, [`%${farEnd.id as string}%`, `%${farEnd.id as string}%`]);
+    expect(farDrafts).toEqual([]);
+
+    // T46 places the UFMP4 from its draft: the far end is linked, one op, the same cable
+    const { id: ufmp } = await editor.create('device', { level_id: ids.l02, category: 'Foundry panel', device: 'UFMP4', baseline_ref_id: ids.dE, origin: 'baseline' }, { change_type: 'Master edit', reason: 'Place' });
+    const before = (await store.opsFor(farEnd.id as string)).length;
+    expect(await commitWaitingCables(editor, store, PROJECT)).toBe(1);
+    const linkOps = (await store.opsFor(farEnd.id as string)).slice(before);
+    expect(linkOps.map((o) => [o.kind, o.field, o.now])).toEqual([['set', 'device_id', ufmp]]);
+    expect((await endsOf()).map((e) => [e.side, e.device_id, e.draft_device_id, e.to_text])).toEqual([
+      ['A', ids.panel, null, 'DMX to Level 02 UFMP4'],
+      ['B', ufmp, ids.dE, 'DMX to Level 06M CT06LCPA'],
+    ]);
+    const xCables = await store.db.query<Record<string, unknown>>(`SELECT DISTINCT c.id FROM cable c JOIN cable_end e ON e.cable_id = c.id WHERE c.cable = 'X' AND e.device_id IN (?, ?)`, [ids.panel, ufmp]);
+    expect(xCables.map((c) => c.id)).toEqual([res.cableId]);
+    expect((await loadDeviceCard(store, ids.panel))!.connections.find((c) => c.id === conn.id)).toMatchObject({ farDraft: null, jump: { deviceId: ufmp, sameLevel: false } });
+    expect((await loadDeviceCard(store, ufmp))!.connections.map((c) => c.to)).toEqual(['DMX to Level 06M CT06LCPA']);
+    expect(row((await loadDraftReview(store, PROJECT)).devices, ids.dE).placed).toBe(1);
     expect(await commitWaitingCables(editor, store, PROJECT)).toBe(0);
+  });
+
+  it('both ends unplaced drafts still wait; placing one makes the cable with the other end waiting', async () => {
+    const { store, editor, ids } = await setup();
+    // the 01 stations draft (12 units, none placed) → the 02 UFMP4 draft
+    await setEndpoint(editor, store, ids.c1, 'from', { kind: 'draft_device', id: ids.dA, label: 'PI1002', levelId: ids.l01 });
+    let data = await loadDraftReview(store, PROJECT);
+    const res = await acceptCable(editor, store, data, row(data.cables, ids.c1), { confirm: false });
+    expect(res).toMatchObject({ waiting: true, pending: false, cableId: null });
+    expect(await commitWaitingCables(editor, store, PROJECT)).toBe(0);
+    data = await loadDraftReview(store, PROJECT);
+    expect(row(data.cables, ids.c1)).toMatchObject({ state: 'edited', waiting: true, committed: false });
+    expect(readyCables(data)).toEqual([]);
+    await editor.create('device', { level_id: ids.l02, category: 'Foundry panel', device: 'UFMP4', baseline_ref_id: ids.dE, origin: 'baseline' }, { change_type: 'Master edit', reason: 'Place' });
+    expect(readyCables(await loadDraftReview(store, PROJECT)).map((r) => [r.c.id, r.a.kind, r.b.kind])).toEqual([[ids.c1, 'draft', 'device']]);
+    expect(await commitWaitingCables(editor, store, PROJECT)).toBe(1);
+    const ends = await store.db.query<Record<string, unknown>>(`SELECT e.* FROM cable_end e JOIN cable c ON c.id = e.cable_id WHERE c.cable = 'X' AND (e.draft_device_id = ? OR e.level_id = ?) ORDER BY e.side`, [ids.dA, ids.l02]);
+    expect(ends.map((e) => [e.side, e.device_id === null, e.draft_device_id, e.from_text, e.to_text])).toEqual([
+      ['A', true, ids.dA, 'PI1002', 'DMX to Level 02 UFMP4'],
+      ['B', false, null, 'UFMP4', 'DMX to Level 01 PI1002'],
+    ]);
+    expect(row((await loadDraftReview(store, PROJECT)).cables, ids.c1)).toMatchObject({ waiting: false, committed: true });
+  });
+
+  it('endOrDraft: a placed draft is its device, an unplaced one the draft with the text its device will read as', async () => {
+    const { store, ids } = await setup();
+    const data = await loadDraftReview(store, PROJECT);
+    expect(endOrDraft(data, { kind: 'draft_device', id: ids.dD, label: 'CT06LCPA', levelId: ids.l06m })).toMatchObject({ kind: 'device', id: ids.panel });
+    expect(endOrDraft(data, { kind: 'draft_device', id: ids.dE, label: 'UFMP4', levelId: ids.l02 })).toMatchObject({ kind: 'draft', id: ids.dE, levelCode: '02', text: 'UFMP4' });
+    expect(endOrDraft(data, { kind: 'draft_device', id: ids.dG, label: 'PI1002', levelId: null })).toMatchObject({ kind: 'draft', levelId: null, text: 'PI1002' });
+    expect(draftEndLabel({ model: 'ERN4-RM-120', name: 'Equipment Rack 18U' }, '06M')).toBe('Equipment Rack 18U (draft on 06M, not placed yet)');
+    expect(draftEndLabel(undefined, null)).toBe('draft device (draft, not placed yet)');
+    expect(makeEnds(data, { ends: { from: { kind: 'draft_device', id: ids.dA, label: 'PI1002', levelId: ids.l01 }, to: { kind: 'draft_device', id: ids.dE, label: 'UFMP4', levelId: ids.l02 } } })).toBeNull();
   });
 
   it('a run the baseline already has is linked, not duplicated; Accept all makes unconfirmed cables', async () => {

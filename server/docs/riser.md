@@ -238,8 +238,10 @@ Setup → 4 Review drafts reads these rows per level (D193). Its source crops co
 `GET /imports/{id}/crop?page&bbox=x,y,w,h&pad&px` (`app/jobs/crops.py`): the stored PDF around
 the box with the box outlined in red, PNG, cacheable. Accept on a device draft only marks it
 reviewed (devices are made at placement, T46); Accept / **Confirm endpoint** on a cable draft
-makes the cable with both ends once both endpoints are records, or links the matching cable a
-seeded master already has.
+makes the cable with both ends once one endpoint is a record, or links the matching cable a
+seeded master already has. An end that is still an unplaced draft device names it
+(`cable_end.draft_device_id`, no device) and is linked by one `device_id` op when the draft is
+placed (D235); the export writes it `Unsurveyed` with its To. Both ends unplaced drafts wait.
 - Trunk lines on a text sheet are traced (T107); on sheet 002 (outlined, no text layer) the
   model still reads them, and a run whose bubble has no vector ink (CT02LCPB) goes to the model
   with the trace's hint.

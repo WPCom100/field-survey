@@ -23,6 +23,7 @@ import {
   foldAccessory,
   foldBlockers,
   promoteExcluded,
+  readyCables,
   realEnd,
   rejectDraft,
   reopenDraft,
@@ -168,7 +169,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
   const selDevice = data.devices.find((d) => d.id === selected) ?? null;
   const selCable = data.cables.find((c) => c.id === selected) ?? null;
   const riserBlob = batches ? riserBlobFor(batches, typeof selCable?.sourceRef?.file === 'string' ? selCable.sourceRef.file : null) : null;
-  const ready = data.cables.filter((c) => c.waiting && realEnd(data, c.ends.from) && realEnd(data, c.ends.to)).length;
+  const ready = readyCables(data).length;
 
   const bulkCount = tab === 'devices' ? bulkDevices(data, level.key).length : bulkCables(data, level.key).length;
   const bulk = () => {
@@ -624,8 +625,9 @@ function CablePanel({
   );
 }
 
-function cableNote(r: { linked: boolean; waiting: boolean }): string {
-  if (r.waiting) return 'Accepted — waits for its device to be placed';
+function cableNote(r: { linked: boolean; waiting: boolean; pending: boolean }): string {
+  if (r.waiting) return 'Accepted — both ends are drafts: it waits for one of them to be placed';
+  if (r.pending) return 'Accepted — the cable is made on the placed end; its far end follows when that draft is placed';
   return r.linked ? 'Accepted — the baseline already had this cable; the riser crop is now on it' : 'Accepted — the cable is made';
 }
 

@@ -25,7 +25,18 @@ from app.blobs import object_key
 from app.config import settings
 from app.ids import uuid7
 from app.jobs import export_xlsx, exports, markup
-from app.models import Blob, Device, Export, Level, Op, PunchItem
+from app.models import (
+    Blob,
+    Cable,
+    CableEnd,
+    Device,
+    DraftDevice,
+    Export,
+    Level,
+    NumberingGroup,
+    Op,
+    PunchItem,
+)
 
 # Master quirks TP-4 documents: cells whose master value cannot come back from the records.
 ALLOW = {
@@ -225,6 +236,81 @@ def test_punch_device_text_follows_the_device(session, store, factory, client):
     assert unlinked.device_id is None
     assert device_of[("04", 22)] == "Elec XX04-1E01"  # the room, as the master wrote it
     assert device_of[("B2", 9)] == "All devices"  # the Neuron ID row
+
+
+# ------------------------------------------------------- a far end not placed yet
+
+
+def test_far_end_waiting_for_its_draft_exports_unsurveyed_with_its_to(
+    session, store, factory, client
+):
+    """D235: a cable made with one placed end names the draft at its other end until the draft
+    is placed; that end's row is `Unsurveyed` with its stored To text (D32, D110)."""
+    project_id = new_project(session, "Draft end")
+    group = NumberingGroup(id=uuid7(), project_id=project_id, label="06/06M")
+    l06 = Level(id=uuid7(), project_id=project_id, level="06", floor_order=1)
+    l06m = Level(id=uuid7(), project_id=project_id, level="06M", floor_order=2)
+    for lv in (l06, l06m):
+        lv.numbering_group_id = group.id
+    panel = Device(id=uuid7(), level_id=l06.id, display_id="06-04", category="Power Distribution")
+    draft = DraftDevice(id=uuid7(), project_id=project_id, level_id=l06m.id, name="Rack 18U")
+    cable = Cable(id=uuid7(), project_id=project_id, cable="N", qty=1)
+    near = CableEnd(
+        id=uuid7(),
+        cable_id=cable.id,
+        side="A",
+        endpoint_kind="device",
+        device_id=panel.id,
+        level_id=l06.id,
+        display_id="C-01",
+        from_text="CT06LCPA",
+        to_text="Network to Level 06M Equipment rack",
+        status="Not installed",
+        note="Not run",
+    )
+    far = CableEnd(
+        id=uuid7(),
+        cable_id=cable.id,
+        side="B",
+        endpoint_kind="device",
+        draft_device_id=draft.id,
+        level_id=l06m.id,
+        display_id="C-02",
+        from_text="Equipment rack",
+        to_text="Network to Level 06 CT06LCPA",
+    )
+    session.add_all([group, l06, l06m])
+    session.flush()
+    session.add_all([panel, draft, cable])
+    session.flush()
+    session.add_all([near, far])
+    session.commit()
+
+    got = run_export_via_api(client, factory, store, project_id)
+    ws = openpyxl.load_workbook(io.BytesIO(store.read(object_key(got["blob"]))))["Connections"]
+    rows = [[c.value for c in r[:8]] for r in ws.iter_rows(min_row=4) if r[1].value]
+    assert rows == [
+        [
+            "06",
+            "C-01",
+            "CT06LCPA",
+            "N",
+            "Network to Level 06M Equipment rack",
+            1,
+            "Not installed",
+            "Not run",
+        ],
+        [
+            "06M",
+            "C-02",
+            "Equipment rack",
+            "N",
+            "Network to Level 06 CT06LCPA",
+            1,
+            "Unsurveyed",
+            None,
+        ],
+    ]
 
 
 # ------------------------------------------------------------- empty project

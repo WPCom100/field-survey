@@ -231,6 +231,8 @@ class CableEnd(Id, Synced, Base):
     endpoint_kind: Mapped[str | None]
     device_id: Mapped[uuid.UUID | None] = mapped_column(fk("device.id"), index=True)
     placeholder_id: Mapped[uuid.UUID | None] = mapped_column(fk("placeholder.id"))
+    # The unplaced draft device this end waits for; device_id is set when it is placed (D235).
+    draft_device_id: Mapped[uuid.UUID | None] = mapped_column(fk("draft_device.id"), index=True)
     level_id: Mapped[uuid.UUID | None] = mapped_column(fk("level.id"), index=True)
     display_id: Mapped[str | None]
     from_text: Mapped[str | None]
