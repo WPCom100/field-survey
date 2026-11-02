@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useCropFile } from '../crops/useCropFile';
 import { ZoomableImage } from '../crops/ZoomableImage';
@@ -60,7 +59,7 @@ function BigCrop({ identity, batch, source, onClose }: { identity: Identity; bat
   const crop = useCropFile(url, authHeaders(identity));
   return (
     <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <GestureHandlerRootView style={styles.modal}>
+      <View style={styles.modal}>
         <View style={styles.bar}>
           <Text style={styles.barTitle} numberOfLines={1}>
             {source.label}
@@ -79,7 +78,7 @@ function BigCrop({ identity, batch, source, onClose }: { identity: Identity; bat
         ) : (
           <Text style={[styles.pad, styles.dim]}>Loading crop…</Text>
         )}
-      </GestureHandlerRootView>
+      </View>
     </Modal>
   );
 }

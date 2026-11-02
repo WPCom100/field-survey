@@ -2,7 +2,7 @@ import { TransportError } from '@field-survey/core';
 import { describe, expect, it } from 'vitest';
 
 import { apply, displayRectToPage, pageRectToSheet, pageRectToView, sheetRectToPage, sheetToView, type PdfViewport } from '../plan/viewport';
-import { clampZoom, cropCacheName, doubleTapZoom, downloadError, failureText, MAX_ZOOM, panZoom, pinchZoom, TAP_ZOOM } from './model';
+import { cropCacheName, DOUBLE_TAP_MS, downloadError, failureText, isDoubleTap, tapZoomRect } from './model';
 
 const view = { width: 400, height: 300 };
 
@@ -40,35 +40,26 @@ describe('failure text (T129)', () => {
   });
 });
 
-describe('pinch and pan (T129)', () => {
-  it('keeps the point under the fingers still while zooming', () => {
-    const focal = { x: 300, y: 100 };
-    const z = pinchZoom({ scale: 1, x: 0, y: 0 }, 2, focal, { x: 0, y: 0 }, view);
-    expect(z.scale).toBe(2);
-    // content point p (centre-relative) is shown at p * scale + t
-    const p = { x: focal.x - view.width / 2, y: focal.y - view.height / 2 };
-    expect(p.x * z.scale + z.x).toBeCloseTo(p.x);
-    expect(p.y * z.scale + z.y).toBeCloseTo(p.y);
+describe('double tap on an enlarged crop (T135)', () => {
+  it('zooms in three times on the spot, and back to fit', () => {
+    expect(tapZoomRect(1, { x: 300, y: 150 }, view)).toEqual({ x: 300 - view.width / 6, y: 150 - view.height / 6, width: view.width / 3, height: view.height / 3 });
+    expect(tapZoomRect(2.5, { x: 300, y: 150 }, view)).toEqual({ x: 0, y: 0, width: view.width, height: view.height });
   });
 
-  it('clamps the scale and never pans the content off the view', () => {
-    expect(pinchZoom({ scale: 4, x: 0, y: 0 }, 10, { x: 200, y: 150 }, { x: 0, y: 0 }, view).scale).toBe(MAX_ZOOM);
-    expect(pinchZoom({ scale: 2, x: 50, y: 0 }, 0.1, { x: 200, y: 150 }, { x: 0, y: 0 }, view)).toEqual({ scale: 1, x: 0, y: 0 });
-    expect(panZoom({ scale: 1, x: 0, y: 0 }, 80, 40, view)).toEqual({ scale: 1, x: 0, y: 0 });
-    expect(panZoom({ scale: 2, x: 0, y: 0 }, 500, -500, view)).toEqual({ scale: 2, x: 200, y: -150 });
-    expect(clampZoom({ scale: 3, x: 10, y: -20 }, view)).toEqual({ scale: 3, x: 10, y: -20 });
+  it('keeps the zoom rect inside the image near an edge', () => {
+    const r = tapZoomRect(1, { x: 5, y: view.height - 5 }, view);
+    expect(r.x).toBe(0);
+    expect(r.y + r.height).toBeCloseTo(view.height);
   });
 
-  it('pans with two fingers during a pinch', () => {
-    const z = pinchZoom({ scale: 2, x: 0, y: 0 }, 1, { x: 200, y: 150 }, { x: 30, y: -10 }, view);
-    expect(z).toEqual({ scale: 2, x: 30, y: -10 });
-  });
-
-  it('double tap zooms in on the spot, and back to fit', () => {
-    const z = doubleTapZoom({ scale: 1, x: 0, y: 0 }, { x: 250, y: 150 }, view);
-    expect(z.scale).toBe(TAP_ZOOM);
-    expect(50 * z.scale + z.x).toBeCloseTo(50);
-    expect(doubleTapZoom(z, { x: 0, y: 0 }, view)).toEqual({ scale: 1, x: 0, y: 0 });
+  it('pairs two quick taps on the same spot, not a slow or distant second tap', () => {
+    const first = { t: 1000, x: 100, y: 100 };
+    expect(isDoubleTap(null, first, 1)).toBe(false);
+    expect(isDoubleTap(first, { t: 1200, x: 110, y: 95 }, 1)).toBe(true);
+    expect(isDoubleTap(first, { t: 1000 + DOUBLE_TAP_MS + 1, x: 100, y: 100 }, 1)).toBe(false);
+    expect(isDoubleTap(first, { t: 1200, x: 160, y: 100 }, 1)).toBe(false);
+    // zoomed in 4×, 15 image points is 60 on screen
+    expect(isDoubleTap(first, { t: 1200, x: 115, y: 100 }, 4)).toBe(false);
   });
 });
 

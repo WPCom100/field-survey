@@ -573,7 +573,7 @@ Decision D229: a BOM line whose model is an accessory-only library type attaches
 
 **Why it matters:** in the 2026-10-18 round (C-35) the riser crops stopped loading everywhere with no word on screen — the server had run out of memory that day (T124) — and an enlarged crop could not be zoomed.
 
-Failed 2026-11-01: "Enlarge, pinch, pan" — "Pinch zoom does not work; only double tap." → **T135**; "Cable / riser" — "No red outline." → **T134** (the viewer reports pages 1-based; the guard compared with `page - 1`, so nothing focused or outlined). Re-run the two below after them (T134 landed 2026-11-02, so "Cable / riser" can be re-run now; "Enlarge, pinch, pan" waits for T135); the other four passed.
+Failed 2026-11-01: "Enlarge, pinch, pan" — "Pinch zoom does not work; only double tap." → **T135**; "Cable / riser" — "No red outline." → **T134** (the viewer reports pages 1-based; the guard compared with `page - 1`, so nothing focused or outlined). Re-run the two below after them (T134 landed 2026-11-02, so "Cable / riser" can be re-run now; "Enlarge, pinch, pan" is re-run in the T135 section below, landed 2026-11-02); the other four passed.
 
 - [ ] **Enlarge, pinch, pan.** Tap the crop: it opens full screen with more around it. Pinch: it zooms about your fingers up to about 8×; drag: it pans but never off the picture; double-tap: 3× on that spot, double-tap again: back to fit. The red outline stays on its bubble throughout. **Close** returns to the draft. → saw:
 - [ ] **Cable / riser.** Cables → a cable made from a riser draft → Riser crop: it loads (⤓ Download riser first if asked). Pinch and pan in the small frame: the red outline stays on the bubble **while** your fingers move, not after. Scroll to another page: no outline there. → saw:
@@ -586,6 +586,16 @@ Decision D231: source crops are downloaded and cached by the app with a 45 s tim
 
 - [ ] **Opens on the bubble.** Cables → a cable made from a riser draft (sheet 001) → Riser crop: it opens zoomed to that cable's wire bubble with a little of its line around it, not the whole page, and the bubble has a red outline. → saw:
 - [ ] **Enlarged too.** ⤢ Enlarge on the same cable: full screen, the same bubble outlined in red. Close. → saw:
+
+## T135 — Enlarged source crop: pinch and pan  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01 an enlarged source crop only answered a double tap (T129 "Enlarge, pinch, pan"): "Pinch zoom does not work; only double tap. Very hard to use." It now zooms the way Photos does, with iPadOS's own scroll-view pinch instead of gesture-handler's. This replaces T129's "Enlarge, pinch, pan" above. Use Setup → Review drafts → any draft with a BOM or riser source.
+
+- [ ] **Pinch.** Tap the source crop: it opens full screen. Pinch out: it zooms about your fingers, smoothly, up to about 8×; pinch in: back to fit, with a little bounce past either end. → saw:
+- [ ] **Pan.** Zoomed in, drag with one finger: it pans and coasts, and stops at the picture's edges (a short bounce, never off into grey). At fit, a drag does nothing. → saw:
+- [ ] **Double tap.** At fit, double-tap a spot: it zooms to 3× on that spot. Double-tap again: back to fit. Two slow taps or taps far apart do nothing. The red outline stays on its bubble throughout. **Close** returns to the draft. → saw:
+
+Decision D236: an enlarged source crop zooms with the native iOS scroll view (pinch, pan, bounce by UIKit) and a JS-timed double tap; gesture-handler is no longer used in that modal. → Approve / change:
 
 ## Rules for this file
 

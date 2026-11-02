@@ -1,6 +1,6 @@
 /**
  * Source crops and the riser crop (T44, T106, T129): what to say when one does not load, and the
- * pinch / pan maths of an enlarged crop. Pure (the zoom functions are worklets too), tested in Node.
+ * double-tap maths of an enlarged crop (T135). Pure, tested in Node.
  */
 
 import { TransportError } from '@field-survey/core';
@@ -60,53 +60,37 @@ export function cropCacheName(url: string): string {
   return `crop-${h1.toString(16).padStart(8, '0')}${h2.toString(16).padStart(8, '0')}.png`;
 }
 
-// ------------------------------------------------------------------ zoom and pan
+// ------------------------------------------------------------------ zoom and double tap
 
-/** Scale (1 = fit) and translation in view points, about the view's centre. */
-export type Zoom = { scale: number; x: number; y: number };
+/**
+ * An enlarged crop zooms in UIKit's scroll view (T135): it pinches and pans by itself, and the
+ * double tap zooms to a rect in the image's own (unzoomed) points.
+ */
 export type ViewSize = { width: number; height: number };
+export type Rect = { x: number; y: number; width: number; height: number };
+/** A tap: when (ms) and where (image points). */
+export type Tap = { t: number; x: number; y: number };
 
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 8;
 /** Double tap on a fitted crop zooms to this. */
 export const TAP_ZOOM = 3;
+/** Two taps this close in time (ms) and on screen (points) are a double tap. */
+export const DOUBLE_TAP_MS = 300;
+export const DOUBLE_TAP_SLOP = 40;
 
-export function clampScale(s: number): number {
-  'worklet';
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, s));
+/** Double tap: back to fit when zoomed, else `TAP_ZOOM` centred on the tapped point, kept inside the image. */
+export function tapZoomRect(scale: number, at: { x: number; y: number }, view: ViewSize): Rect {
+  if (scale > MIN_ZOOM + 0.01) return { x: 0, y: 0, width: view.width, height: view.height };
+  const width = view.width / TAP_ZOOM;
+  const height = view.height / TAP_ZOOM;
+  const x = Math.min(view.width - width, Math.max(0, at.x - width / 2));
+  const y = Math.min(view.height - height, Math.max(0, at.y - height / 2));
+  return { x, y, width, height };
 }
 
-/** Keep the zoomed content over the view: no pan at scale 1, at most the overhang beyond. */
-export function clampZoom(z: Zoom, view: ViewSize): Zoom {
-  'worklet';
-  const scale = clampScale(z.scale);
-  const mx = (view.width * (scale - 1)) / 2;
-  const my = (view.height * (scale - 1)) / 2;
-  return { scale, x: Math.min(mx, Math.max(-mx, z.x)), y: Math.min(my, Math.max(-my, z.y)) };
-}
-
-/**
- * A pinch from `start` by the gesture's `factor` about `focal` (view points, top-left origin): the
- * point under the fingers stays put, plus the focal point's own drift (`drift`, two-finger pan).
- */
-export function pinchZoom(start: Zoom, factor: number, focal: { x: number; y: number }, drift: { x: number; y: number }, view: ViewSize): Zoom {
-  'worklet';
-  const scale = clampScale(start.scale * factor);
-  const k = scale / start.scale;
-  const fx = focal.x - view.width / 2;
-  const fy = focal.y - view.height / 2;
-  return clampZoom({ scale, x: fx - (fx - start.x) * k + drift.x, y: fy - (fy - start.y) * k + drift.y }, view);
-}
-
-/** A one-finger drag from `start` by (dx, dy). */
-export function panZoom(start: Zoom, dx: number, dy: number, view: ViewSize): Zoom {
-  'worklet';
-  return clampZoom({ scale: start.scale, x: start.x + dx, y: start.y + dy }, view);
-}
-
-/** Double tap: back to fit when zoomed, else `TAP_ZOOM` about the tapped point. */
-export function doubleTapZoom(current: Zoom, at: { x: number; y: number }, view: ViewSize): Zoom {
-  'worklet';
-  if (current.scale > MIN_ZOOM + 0.01) return { scale: MIN_ZOOM, x: 0, y: 0 };
-  return pinchZoom({ scale: MIN_ZOOM, x: 0, y: 0 }, TAP_ZOOM, at, { x: 0, y: 0 }, view);
+/** Whether `tap` completes a double tap after `prev`; the distance is measured on screen (image points × `scale`). */
+export function isDoubleTap(prev: Tap | null, tap: Tap, scale: number): boolean {
+  if (!prev || tap.t - prev.t > DOUBLE_TAP_MS) return false;
+  return Math.hypot(tap.x - prev.x, tap.y - prev.y) * scale <= DOUBLE_TAP_SLOP;
 }
