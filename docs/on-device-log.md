@@ -43,7 +43,7 @@ Notes outside the sheet:
 
 | Note | Finding |
 |---|---|
-| "No way to move a field device from draft to approved/added. or maybe i am missing it" | Not placed yet: asked which screen (Review drafts' greyed Accept names what it still needs; Place devices lists accepted drafts only; the Library's Accept draft) |
+| "No way to move a field device from draft to approved/added. or maybe i am missing it" | Asked which screen (Review drafts' greyed Accept names what it still needs; Place devices lists accepted drafts only; the Library's Accept draft). Landry, 2026-11-02: "unfortunately I don’t remember" — dropped until it recurs |
 | "C: project create 422 showed no reason (two-way 06/06M share)" | **T142**: the form shows the server's `detail` and refuses a share that loops before Create |
 | "After settleing all review items on lvl 3, There are still 3 warnings on the mismatch list, all three resolved in the review. 1. No N run to drown P-NSPS-D 2./3. SR or LR? P-DOC-C-SR / P-DOC-C-LR - pick one" | **T133**: `mismatchList` keeps a device draft's conflicts unless it is rejected, and Accept never clears them |
 | "when i added a connection via the punch list, i have no way to remove the connection if it was added in error. … I want to remove the one i added via punch list to see if I can retest using my N cable added via review screen." | **T138**: Delete… on a connection (the card's + add row made an `origin = library` N cable with no far end); the review's N line itself is waiting for the 06M rack (T136) |
@@ -58,7 +58,7 @@ Record, as filled:
 | Moments you reached for the spreadsheet | not filled |
 | Readings | DaVinci re-upload 0.1 min; Level 02 sheet 1 min; riser job 15 min; riser Claude $2.80 |
 
-Decisions: none of the Decision lines was answered (all "unanswered"); Q-ERn (ERn enclosures' category) was asked again. No new decision this session: T140 and T141 each start with one.
+Decisions: none of the Decision lines was answered (all "unanswered"). Landry's answers of 2026-11-02 became **D232** (ERn enclosures are Equipment Panels → T144), **D233** (heavy sheets rasterised → T141), **D234** (proposals match the printed type → T140) and **D235** (a cable with one placed end is made at once, the far end follows placement → T136 rewritten); the Level 03 composite is in `fixtures/`.
 
 Checklist reset: the sections whose checks all passed left the file — T70, T113, T117, T121, T127, T128, T132 — and the passed checks left T61, T92, T102, T111, T112, T124, T125, T126, T129, T130, T44, T46, T47 and T106; the fails are marked with their task numbers (T134, T135, T136, T137). The sheet is the same artifact, rebuilt as **ROUND-1102** (collection `round1102`): only what is open, the fails as "Retest after T13n", the existing `Scratch1` and `pipeline test` projects kept, C-23 reworded.
 
