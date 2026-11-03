@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { BetterSqliteDriver } from '../node';
 import { ENTITIES, entity } from './entities';
 import { MIGRATIONS, MigrationError, SCHEMA_VERSION, migrate, schemaVersion } from './migrations';
-import { SEARCH_SOURCES } from './search';
+import { SEARCH_SOURCES, searchDocTriggerSql } from './search';
+import { statements as m0020 } from './migrations/0020_search_addresses';
 
 type TableInfo = { name: string; type: string; notnull: number; pk: number; dflt_value: string | null };
 
@@ -110,6 +111,32 @@ describe('migrations', () => {
     expect(docs).toEqual([{ entity_id: 'd1', text: '06M-04 Reterminated - all good' }]);
     await db.exec(`DELETE FROM device WHERE id = 'd1'`);
     expect(await db.query('SELECT * FROM search_doc')).toEqual([]);
+    db.close();
+  });
+
+  it('0020 recreates the device search triggers from SEARCH_SOURCES and indexes the addresses', async () => {
+    const [ai, au] = searchDocTriggerSql(['device']);
+    expect(m0020.slice(2, 4)).toEqual([ai, au]);
+    // a version-19 database with an address captured before 0020
+    const db = new BetterSqliteDriver();
+    await db.exec(
+      `CREATE TABLE schema_migration (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)`,
+    );
+    for (const m of MIGRATIONS.filter((m) => m.version < 20)) {
+      for (const st of m.statements) await db.exec(st);
+      await db.exec(`INSERT INTO schema_migration VALUES (?, ?, '2026-11-03')`, [m.version, m.name]);
+    }
+    await db.exec(`INSERT INTO device (id, level_id, display_id, ip_address, dmx_address) VALUES ('d1', 'l1', '06M-05', '10.101.4.23', '1/001')`);
+    await db.exec(`INSERT INTO device (id, level_id, display_id, deleted_at) VALUES ('d2', 'l1', '06M-06', '2026-11-01')`);
+    await db.exec(`INSERT INTO punch_item (id, level_id, number, item) VALUES ('p1', 'l1', 12, 'Run DMX')`);
+    const texts = async () =>
+      (await db.query<{ entity_id: string; text: string }>('SELECT entity_id, text FROM search_doc ORDER BY entity_id'))
+        .map((r) => `${r.entity_id}: ${r.text.replace(/\s+/g, ' ')}`);
+    expect(await texts()).toEqual(['d1: 06M-05', 'p1: #12 Run DMX']);
+    expect(await migrate(db)).toBe(SCHEMA_VERSION);
+    expect(await texts()).toEqual(['d1: 06M-05 10.101.4.23 1/001', 'p1: #12 Run DMX']);
+    await db.exec(`UPDATE device SET dmx_address = '2/017' WHERE id = 'd1'`);
+    expect(await texts()).toEqual(['d1: 06M-05 10.101.4.23 2/017', 'p1: #12 Run DMX']);
     db.close();
   });
 });

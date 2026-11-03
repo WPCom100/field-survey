@@ -32,6 +32,7 @@ async function seeded(search: 'auto' | 'like'): Promise<Store> {
     create('device', { level_id: LEVEL, display_id: '06M-04', category: 'Relay panel', room_location: 'ELEC 6M-01', notes: 'Empty box on wall.' }),
     create('device', { level_id: LEVEL, display_id: '06M-S3', category: 'Station', neuron_id: '00A1B2C3D4E5' }),
     create('device', { level_id: OTHER_LEVEL, display_id: '02-04', category: 'Relay panel' }),
+    create('device', { level_id: LEVEL, display_id: '06M-05', category: 'Equipment', ip_address: '10.101.4.23', dmx_address: '1/001' }),
     create('punch_item', { level_id: LEVEL, item: 'Run DMX to 06M-04', type: 'Cable not run', owner: 'EC' }),
     create('missing_part', { level_id: LEVEL, part: 'DMX termination kit', owner: 'EC', notes: 'Need to be ordered' }),
     create('photo', { level_id: LEVEL, subject: 'Relay panel interior', what_it_shows: 'wire nuts' }),
@@ -46,13 +47,15 @@ describe.each(['auto', 'like'] as const)('search (%s)', (mode) => {
     expect(await store.getState('search_mode')).toBe(store.searchMode);
   });
 
-  it('finds devices by ID, room, notes and Neuron ID', async () => {
+  it('finds devices by ID, room, notes, Neuron ID, IP and DMX address', async () => {
     const store = await seeded(mode);
     const kinds = async (q: string) => (await store.search(q)).map((h) => h.entity_kind);
     expect(await kinds('06M-04')).toEqual(expect.arrayContaining(['device', 'punch_item']));
     expect(await kinds('elec')).toEqual(['device']);
     expect(await kinds('empty box')).toEqual(['device']);
     expect(await kinds('00A1B2C3')).toEqual(['device']);
+    expect(await kinds('10.101.4.23')).toEqual(['device']);
+    expect(await kinds('1/001')).toEqual(['device']);
     expect(await kinds('wire nuts')).toEqual(['photo']);
     expect(await kinds('termination')).toEqual(['missing_part']);
     expect(await kinds('nothing-here')).toEqual([]);
@@ -64,7 +67,7 @@ describe.each(['auto', 'like'] as const)('search (%s)', (mode) => {
     expect((await store.search('relay', { levelId: LEVEL })).length).toBe(2);
     expect((await store.search('relay')).length).toBe(3);
     expect((await store.search('relay', { levelId: LEVEL, kinds: ['device'] })).length).toBe(1);
-    expect((await store.search('06M', { kinds: ['device'] })).length).toBe(2);
+    expect((await store.search('06M', { kinds: ['device'] })).length).toBe(3);
     expect((await store.search('relay', { projectId: uuidv7() })).length).toBe(0);
   });
 

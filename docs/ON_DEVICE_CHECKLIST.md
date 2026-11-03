@@ -734,6 +734,14 @@ Decision D247 (Proposed): "gets a wire" = the device's live cable ends (any stat
 - [ ] **Counts follow a capture.** Type an IP address on 01-06 and a DMX address on 01-01 (card → Type…), then back to the Dashboard: IP reads 1/9 and DMX 1/16; neither device is in its list any more. Clear both afterwards if this is the real project. → saw:
 - [ ] **Levels filter.** Pick Level 01 in the Levels chips: the three counts cover level 01 only (IP n/2, DMX n/3), and each list holds only 01 devices. → saw:
 
+## T148 — Project search finds IP and DMX addresses  ·  Needs: no new build (JS update only; client migration 0020 runs on the first launch)
+
+**Why it matters:** T146 gave devices an IP address and a DMX address, but the dashboard search did not index them, so "which device is 10.101.4.23?" had no answer. Migration 0020 adds both to the search index and re-indexes every device once, so addresses typed before this update are found too. Use the Tower project.
+
+- [ ] **Placeholder.** Dashboard: the search field reads `Search the project: ID, tag, room, item, notes, Neuron ID, IP, DMX`. → saw:
+- [ ] **Find by IP.** Type an IP address on 01-06 (card → IP address → Type…, e.g. `10.101.4.23`), go back to the Dashboard and search `10.101.4.23`: 01-06 is the one device result; tap it and its card opens on the plan. A partial `10.101` finds it too. → saw:
+- [ ] **Find by DMX address.** Type a DMX address on 01-01 (e.g. `1/001`) and search `1/001`: 01-01 is a device result. Change it to `2/017`, search again: `2/017` finds it and `1/001` no longer does. Clear both addresses afterwards if this is the real project. → saw:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

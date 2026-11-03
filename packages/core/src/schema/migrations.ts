@@ -24,6 +24,7 @@ import { statements as m0016 } from './migrations/0016_vocab_app_level';
 import { statements as m0017 } from './migrations/0017_cable_end_draft_device';
 import { statements as m0018 } from './migrations/0018_vocab_patterns';
 import { statements as m0019 } from './migrations/0019_addresses';
+import { statements as m0020 } from './migrations/0020_search_addresses';
 
 export interface Migration {
   version: number;
@@ -51,6 +52,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 17, name: 'cable_end_draft_device', statements: m0017 },
   { version: 18, name: 'vocab_patterns', statements: m0018 },
   { version: 19, name: 'addresses', statements: m0019 },
+  { version: 20, name: 'search_addresses', statements: m0020 },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

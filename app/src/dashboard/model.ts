@@ -374,7 +374,7 @@ export type SearchGroup = { kind: SearchKind; title: string; results: SearchResu
 
 /**
  * Project-wide search (Phase 3 §7): FTS (or its LIKE fallback) over devices, punch items, parts
- * and photos — ID, tag, room, item text, notes, Neuron ID — and, as the plan's side lists do
+ * and photos — ID, tag, room, item text, notes, Neuron ID, IP and DMX address — and, as the plan's side lists do
  * (connections are not in the index), a text match over connection ends with T88's term rules:
  * a cable code term means that code, a `C-nn` / number term that connection number exactly.
  * Every level of the project, in scope or not; groups in the wireframe's order, empty ones left out.

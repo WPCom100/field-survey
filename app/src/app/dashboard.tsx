@@ -137,7 +137,7 @@ export default function DashboardScreen() {
           style={styles.search}
           value={query}
           onChangeText={setQuery}
-          placeholder="Search the project: ID, tag, room, item, notes, Neuron ID"
+          placeholder="Search the project: ID, tag, room, item, notes, Neuron ID, IP, DMX"
           autoCapitalize="none"
           autoCorrect={false}
           clearButtonMode="while-editing"

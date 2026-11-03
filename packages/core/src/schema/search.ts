@@ -26,6 +26,8 @@ export const SEARCH_SOURCES: Record<string, { level: string; text: string[] }> =
       'notes',
       'neuron_id',
       'panel_name',
+      'ip_address',
+      'dmx_address',
     ],
   },
   punch_item: { level: 'level_id', text: ['#number', 'item', 'type', 'notes'] },
@@ -46,10 +48,14 @@ function textExpr(cols: string[]): string {
     .join(" || ' ' || ");
 }
 
-/** Triggers that keep `search_doc` current; part of migration 0001. */
-export function searchDocTriggerSql(): string[] {
+/**
+ * Triggers that keep `search_doc` current, for every source table or only `tables`. Written out
+ * frozen in migration 0001; 0020 recreates the device pair with the T146 addresses.
+ */
+export function searchDocTriggerSql(tables?: string[]): string[] {
   const out: string[] = [];
   for (const [table, src] of Object.entries(SEARCH_SOURCES)) {
+    if (tables && !tables.includes(table)) continue;
     const insert =
       `INSERT INTO search_doc (entity_kind, entity_id, level_id, text) ` +
       `SELECT '${table}', NEW.id, NEW.${src.level}, trim(${textExpr(src.text)}) ` +
