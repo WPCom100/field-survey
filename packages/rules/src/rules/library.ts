@@ -153,34 +153,94 @@ export function deviceRole(ctx: RuleContext, d: DeviceRow): Role {
   return roleOf(typeOfDevice(ctx, d), d);
 }
 
-/** Roles whose devices carry no Neuron ID unless their type says so (T68, D185). */
+// ------------------------------------------------------------------ addresses (T146, D245)
+
+/** The three addresses a device may need: Neuron ID (Unison), IP address (network), DMX address. */
+export type AddressKind = 'neuron' | 'ip' | 'dmx';
+export const ADDRESS_KINDS: readonly AddressKind[] = ['neuron', 'ip', 'dmx'];
+
+export interface AddressNeeds {
+  neuron: boolean;
+  ip: boolean;
+  dmx: boolean;
+}
+
+/** The device column each kind is stored in, the type's override flag, and the `R3c` code map. */
+export const ADDRESS_FIELD: Readonly<Record<AddressKind, 'neuron_id' | 'ip_address' | 'dmx_address'>> = { neuron: 'neuron_id', ip: 'ip_address', dmx: 'dmx_address' };
+export const ADDRESS_FLAG: Readonly<Record<AddressKind, 'needs_neuron_id' | 'needs_ip_address' | 'needs_dmx_address'>> = { neuron: 'needs_neuron_id', ip: 'needs_ip_address', dmx: 'needs_dmx_address' };
+export const ADDRESS_CODES_KEY: Readonly<Record<AddressKind, 'neuron_codes' | 'ip_codes' | 'dmx_codes'>> = { neuron: 'neuron_codes', ip: 'ip_codes', dmx: 'dmx_codes' };
+/** How each kind is named in messages ("3 devices still without a Neuron ID"). */
+export const ADDRESS_LABEL: Readonly<Record<AddressKind, string>> = { neuron: 'Neuron ID', ip: 'IP address', dmx: 'DMX address' };
+export const ADDRESS_ARTICLE: Readonly<Record<AddressKind, string>> = { neuron: 'a Neuron ID', ip: 'an IP address', dmx: 'a DMX address' };
+
+/** Roles whose devices carry no Neuron ID unless their type says so (T68, D185): they host the Unison pair without a Neuron chip. */
 export const NO_NEURON_ROLES: readonly Role[] = ['equipment_rack', 'nsps'];
 
-/** A role's Neuron ID default: off for racks and NSPS, on otherwise. */
-export function neuronIdDefaultForRole(role: Role): boolean {
-  return !NO_NEURON_ROLES.includes(role);
-}
+/** Roles whose wire is the `Stations & Sensors` placeholder end (D50, R2e): always on their level's Unison pair. */
+export const BUS_ROLES: readonly Role[] = ['station', 'sensor'];
 
-/** A category's Neuron ID default for a device with no type: off for a rack or NSPS category, on otherwise. */
-export function neuronIdDefault(category: string | null | undefined): boolean {
-  return neuronIdDefaultForRole(roleOf(null, { category: category ?? null }));
-}
+/** What `addressNeeds` reads of a type; the app's own rows satisfy it too. */
+export type AddressTypeLike = {
+  needs_neuron_id?: boolean | null;
+  needs_ip_address?: boolean | null;
+  needs_dmx_address?: boolean | null;
+  category?: string | null;
+  role?: unknown;
+  state?: string;
+  default_cables?: unknown;
+};
 
 /**
- * Whether a device needs a Neuron ID (T68, D185): its type's `needs_neuron_id`, else the default of
- * its role (the type's, else the type's category's, else the device's own category's — D201).
+ * Which addresses a device needs (T146, D245, D246, D247): read off the **wires it gets** — the
+ * codes of its live cable ends (`codes`, any end status: an unpulled run still lands here), else,
+ * for a device with no cable record, the codes of its accepted type's default cables — through
+ * the `R3c.neuron_codes` / `ip_codes` / `dmx_codes` maps (U → Neuron ID, N / NG → IP address,
+ * X → DMX address by default). A `station` / `sensor` role device always counts as on its
+ * level's Unison pair (its wire is the `Stations & Sensors` placeholder end, never a cable end
+ * of its own). The type's explicit flag (true / false) overrides; null means "by the wires". An
+ * `nsps` / `equipment_rack` hosts the Unison pair but carries no Neuron chip, so its U end counts
+ * for nothing unless its type says Needed (D185's exception, kept).
  */
-export function needsNeuronId(
-  type: { needs_neuron_id?: boolean | null; category?: string | null; role?: unknown } | null,
-  d: { category: string | null },
-): boolean {
-  if (type?.needs_neuron_id != null) return type.needs_neuron_id;
-  return neuronIdDefaultForRole(roleOf(type, d));
+export function addressNeeds(type: AddressTypeLike | null, d: { category: string | null }, codes: Iterable<string> | null | undefined, params: RuleParams = DEFAULT_PARAMS): AddressNeeds {
+  const role = roleOf(type, d);
+  const wires = new Set(codes ?? []);
+  if (!wires.size && type && type.state === 'accepted') {
+    for (const c of parseLibraryCables(type.default_cables, cableCodes(params))) wires.add(c.code);
+  }
+  if (BUS_ROLES.includes(role)) wires.add('U');
+  const need = (kind: AddressKind): boolean => {
+    const flag = type?.[ADDRESS_FLAG[kind]];
+    if (flag != null) return flag;
+    if (kind === 'neuron' && NO_NEURON_ROLES.includes(role)) return false;
+    for (const c of wires) if (params.flagCode('R3c', ADDRESS_CODES_KEY[kind], c)) return true;
+    return false;
+  };
+  return { neuron: need('neuron'), ip: need('ip'), dmx: need('dmx') };
 }
 
-/** `needsNeuronId` with the device's type looked up in the snapshot. */
+/** Whether a device needs a Neuron ID: `addressNeeds(…).neuron` (the name T68 gave it; D185 (2)). */
+export function needsNeuronId(type: AddressTypeLike | null, d: { category: string | null }, codes?: Iterable<string> | null, params?: RuleParams): boolean {
+  return addressNeeds(type, d, codes, params).neuron;
+}
+
+/** The codes of the device's live cable ends. */
+export function deviceCodes(ctx: RuleContext, d: Pick<DeviceRow, 'id'>): string[] {
+  const out: string[] = [];
+  for (const e of ctx.index.endsByDevice.get(d.id) ?? []) {
+    const code = cableOf(ctx, e)?.cable;
+    if (code) out.push(code);
+  }
+  return out;
+}
+
+/** `addressNeeds` with the device's type and wires looked up in the snapshot. */
+export function deviceAddressNeeds(ctx: RuleContext, d: DeviceRow): AddressNeeds {
+  return addressNeeds(typeOfDevice(ctx, d), d, deviceCodes(ctx, d), ctx.params);
+}
+
+/** `deviceAddressNeeds(…).neuron`. */
 export function deviceNeedsNeuronId(ctx: RuleContext, d: DeviceRow): boolean {
-  return needsNeuronId(typeOfDevice(ctx, d), d);
+  return deviceAddressNeeds(ctx, d).neuron;
 }
 
 /** The default cables an accepted type imposes on the device, or null when the category table applies. */

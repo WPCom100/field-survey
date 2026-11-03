@@ -1,16 +1,20 @@
 /**
- * A device's type, role and Neuron ID need, for the screens that read the store directly (card,
- * dashboard, plan). The rules themselves are `needsNeuronId` and `roleOf` (packages/rules and
- * core); this loads the types they read: the project's own and the app library's (D183 (4)).
+ * A device's type, role and address needs, for the screens that read the store directly (card,
+ * dashboard, plan). The rules themselves are `addressNeeds` and `roleOf` (packages/rules and
+ * core); this loads the types they read — the project's own and the app library's (D183 (4)) —
+ * and the wires each device gets (T146, D245: the codes of its live cable ends).
  */
 
 import { isRole, roleOf, type Role, type Store } from '@field-survey/core';
-import { findDeviceType, needsNeuronId, parseLibraryAccessories, type TypeLike } from '@field-survey/rules';
+import { DEFAULT_PARAMS, addressNeeds, findDeviceType, parseLibraryAccessories, type AddressNeeds, type RuleParams, type TypeLike } from '@field-survey/rules';
 
 /** The row as stored; the card also reads its optional cables and accessories (T105). */
 export type DeviceType = TypeLike & {
   category: string | null;
   needs_neuron_id: boolean | null;
+  /** T146 (D245): null = by the wires, like `needs_neuron_id`. */
+  needs_ip_address?: boolean | null;
+  needs_dmx_address?: boolean | null;
   /** T112 (D201): what its devices are; null = the category's role. */
   role?: string | null;
   default_cables?: unknown;
@@ -62,8 +66,43 @@ export function typeForDraft(types: DeviceTypes, d: { model: string | null; role
   return { type, role: roleOf(type, { category: text(d.category) }) };
 }
 
-export function deviceNeedsNeuron(types: DeviceTypes, d: DeviceLike): boolean {
-  return needsNeuronId(typeOf(types, d), { category: text(d.category) });
+/**
+ * Which addresses a device needs (T146, D245): by its type's flags, else by the wires it gets —
+ * `codes`, the cable codes of its live ends (`loadDeviceCodes` / `codesOfDevice`), else its
+ * accepted type's default cables; stations and sensors ride the Unison bus.
+ */
+export function deviceAddressNeeds(types: DeviceTypes, d: DeviceLike, codes: Iterable<string> | null | undefined, params: RuleParams = DEFAULT_PARAMS): AddressNeeds {
+  return addressNeeds(typeOf(types, d), { category: text(d.category) }, codes, params);
+}
+
+export function deviceNeedsNeuron(types: DeviceTypes, d: DeviceLike, codes: Iterable<string> | null | undefined, params: RuleParams = DEFAULT_PARAMS): boolean {
+  return deviceAddressNeeds(types, d, codes, params).neuron;
+}
+
+/** The cable codes of every live end on a device of the project, by device id (one query). */
+export async function loadDeviceCodes(store: Store, projectId: string): Promise<Map<string, string[]>> {
+  const rows = await store.db.query<{ device_id: string; cable: string | null }>(
+    `SELECT e.device_id, c.cable FROM cable_end e JOIN cable c ON c.id = e.cable_id
+     WHERE c.project_id = ? AND e.device_id IS NOT NULL AND e.deleted_at IS NULL AND c.deleted_at IS NULL`,
+    [projectId],
+  );
+  const out = new Map<string, string[]>();
+  for (const r of rows) {
+    if (!r.cable) continue;
+    const list = out.get(r.device_id);
+    if (list) list.push(r.cable);
+    else out.set(r.device_id, [r.cable]);
+  }
+  return out;
+}
+
+/** The cable codes of one device's live ends. */
+export async function codesOfDevice(store: Store, deviceId: string): Promise<string[]> {
+  const rows = await store.db.query<{ cable: string | null }>(
+    `SELECT c.cable FROM cable_end e JOIN cable c ON c.id = e.cable_id WHERE e.device_id = ? AND e.deleted_at IS NULL AND c.deleted_at IS NULL`,
+    [deviceId],
+  );
+  return rows.map((r) => r.cable).filter((c): c is string => !!c);
 }
 
 /** The type a model names (its model or an alias), else null. */

@@ -131,6 +131,59 @@ export function saveNeuronId(editor: Editor, deviceId: string, input: string): P
   return editor.setFields('device', deviceId, { neuron_id: value, neuron_method: 'typed' }, FIELD_SURVEY);
 }
 
+// ------------------------------------------------------------------ IP address, DMX address (T146, D246)
+
+/** An IPv4 dotted quad with no subnet (`10.101.4.23`): the four octets, or why not. */
+export function checkIpAddress(input: string): { value: string; error: string | null } {
+  const value = input.trim();
+  if (!value) return { value, error: 'Type the IP address.' };
+  if (/\//.test(value)) return { value, error: 'No subnet: type the address only, e.g. 10.101.4.23.' };
+  const parts = value.split('.');
+  if (parts.length !== 4 || parts.some((p) => !/^\d{1,3}$/.test(p))) return { value, error: 'An IPv4 address is four numbers separated by dots, e.g. 10.101.4.23.' };
+  const octets = parts.map(Number);
+  if (octets.some((n) => n > 255)) return { value, error: 'Each number of an IPv4 address is 0–255.' };
+  return { value: octets.join('.'), error: null };
+}
+
+/** `<universe>/<address>` with the address 1–512 (`1/001`): normalised to a three-digit address, or why not. */
+export function checkDmxAddress(input: string): { value: string; error: string | null } {
+  const value = input.trim().replace(/\s+/g, '');
+  if (!value) return { value, error: 'Type the DMX address.' };
+  const m = /^(\d{1,5})\/(\d{1,3})$/.exec(value);
+  if (!m) return { value, error: 'A DMX address is <universe>/<address>, e.g. 1/001.' };
+  const universe = Number(m[1]);
+  const address = Number(m[2]);
+  if (universe < 1) return { value, error: 'The universe is 1 or more.' };
+  if (address < 1 || address > 512) return { value, error: 'The address is 1–512.' };
+  return { value: `${universe}/${String(address).padStart(3, '0')}`, error: null };
+}
+
+/** Other live devices of the project with this IP address (a duplicate is a warning and a lint, never a refusal — D247). */
+export async function ipDuplicates(store: Store, projectId: string, ip: string, exceptDeviceId: string): Promise<{ id: string; label: string }[]> {
+  const rows = await store.db.query<Record<string, unknown>>(
+    `SELECT d.id, d.display_id, l.level FROM device d JOIN level l ON l.id = d.level_id
+     WHERE l.project_id = ? AND d.ip_address = ? AND d.id <> ? AND d.deleted_at IS NULL ORDER BY d.display_id`,
+    [projectId, ip, exceptDeviceId],
+  );
+  return rows.map((r) => ({ id: String(r.id), label: displayNumber('device', r) }));
+}
+
+/** Typed IP address: one `Field survey` op; an empty box clears it. Refuses an invalid address. */
+export function saveIpAddress(editor: Editor, deviceId: string, input: string): Promise<Op | null> {
+  if (!input.trim()) return editor.setField('device', deviceId, 'ip_address', null, FIELD_SURVEY);
+  const { value, error } = checkIpAddress(input);
+  if (error) throw new OpError(error);
+  return editor.setField('device', deviceId, 'ip_address', value, FIELD_SURVEY);
+}
+
+/** Typed DMX address: one `Field survey` op; an empty box clears it. Refuses an invalid address. */
+export function saveDmxAddress(editor: Editor, deviceId: string, input: string): Promise<Op | null> {
+  if (!input.trim()) return editor.setField('device', deviceId, 'dmx_address', null, FIELD_SURVEY);
+  const { value, error } = checkDmxAddress(input);
+  if (error) throw new OpError(error);
+  return editor.setField('device', deviceId, 'dmx_address', value, FIELD_SURVEY);
+}
+
 // ------------------------------------------------------------------ [⋯] corrections
 
 export function deleteDevice(editor: Editor, deviceId: string, reason: string): Promise<Op> {

@@ -12,7 +12,9 @@
 
 import { vocab, type Store } from '@field-survey/core';
 
-import { deviceNeedsNeuron, loadNeuronTypes } from '../library/neuron';
+import { loadRuleParams } from '@field-survey/rules';
+
+import { deviceNeedsNeuron, loadDeviceCodes, loadDeviceTypes } from '../library/neuron';
 import { connectionMatches, projectCableCodes } from '../plan/lists';
 
 export const UNSURVEYED = 'Unsurveyed';
@@ -59,7 +61,7 @@ export type AsFound = {
   neverFound: number;
   /** Captured among the devices that need one. */
   neuronCaptured: number;
-  /** Devices whose type needs a Neuron ID (T68, D185: not racks or NSPS by default). */
+  /** Devices that need a Neuron ID (T68 / D185, T146 / D245: by their type's flag, else the wires they get). */
   neuronDevices: number;
   devices: number;
 };
@@ -119,13 +121,15 @@ export async function loadDashboard(store: Store, projectId: string): Promise<Da
   const deviceFacts: DashboardData['deviceFacts'] = new Map();
   const devices = await store.db.query<Row>(`SELECT * FROM device WHERE deleted_at IS NULL AND ${inLevels}`, [projectId]);
   const deviceLabel = new Map<string, string>();
-  const types = await loadNeuronTypes(store, projectId);
+  const types = await loadDeviceTypes(store, projectId);
+  const codes = await loadDeviceCodes(store, projectId);
+  const ruleParams = await loadRuleParams(store, projectId);
   for (const d of devices) {
     const levelId = String(d.level_id);
     const label = str(d.display_id) ?? `${code.get(levelId)}-? NEW`;
     deviceLabel.set(String(d.id), label);
     rows.push({ entity: 'device', id: String(d.id), levelId, levelCode: code.get(levelId)!, status: str(d.status) ?? UNSURVEYED, owner: null, label, text: join(d.device ?? d.type ?? d.category, d.room_location), deviceId: String(d.id) });
-    deviceFacts.set(String(d.id), { fieldAddition: d.origin === 'field_addition', neverFound: d.found_on_site === 0 || d.found_on_site === false, neuron: !!str(d.neuron_id), needsNeuron: deviceNeedsNeuron(types, d) });
+    deviceFacts.set(String(d.id), { fieldAddition: d.origin === 'field_addition', neverFound: d.found_on_site === 0 || d.found_on_site === false, neuron: !!str(d.neuron_id), needsNeuron: deviceNeedsNeuron(types, d, codes.get(String(d.id)), ruleParams) });
   }
   const punches = await store.db.query<Row>(`SELECT * FROM punch_item WHERE deleted_at IS NULL AND ${inLevels}`, [projectId]);
   for (const p of punches) {

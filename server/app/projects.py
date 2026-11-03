@@ -404,6 +404,8 @@ def _copy(
                 "optional_cables": t.optional_cables,
                 "optional_accessories": t.optional_accessories,
                 "needs_neuron_id": t.needs_neuron_id,
+                "needs_ip_address": t.needs_ip_address,  # T146
+                "needs_dmx_address": t.needs_dmx_address,
                 "role": t.role,  # T112
                 "state": "accepted",
                 "created_by_id": user.id,

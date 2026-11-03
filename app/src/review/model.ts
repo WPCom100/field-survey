@@ -49,6 +49,8 @@ const FIELD_LABELS: Record<string, string> = {
   pin: 'Pin position',
   deleted_at: 'Deleted',
   neuron_id: 'Neuron ID',
+  ip_address: 'IP address',
+  dmx_address: 'DMX address',
   display_id: 'ID',
   room_location: 'Room / location',
   from_text: 'From',

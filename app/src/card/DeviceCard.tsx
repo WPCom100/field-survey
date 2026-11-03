@@ -25,12 +25,17 @@ import {
   addOptionalAccessory,
   addOptionalCable,
   appendPhrase,
+  checkDmxAddress,
+  checkIpAddress,
   checkNeuronId,
   deleteCable,
   deleteDevice,
+  ipDuplicates,
   neuronDuplicates,
   restoreCable,
   restoreDevice,
+  saveDmxAddress,
+  saveIpAddress,
   saveNeuronId,
   setFound,
   setNotes,
@@ -324,8 +329,10 @@ export function DeviceCard(props: DeviceCardProps) {
           </Section>
         ) : null}
 
-        {/* A type without Neuron IDs (racks, NSPS by default — T68, D185) hides the section unless one was captured anyway. */}
+        {/* Addresses follow the wires (T146, D245): a section shows when the device needs that address or has one anyway. */}
         {card.device.needsNeuronId || card.device.neuronId ? <NeuronSection card={card} store={store} readOnly={readOnly} run={run} /> : null}
+        {card.device.needsIpAddress || card.device.ipAddress ? <AddressSection kind="ip" card={card} store={store} readOnly={readOnly} run={run} /> : null}
+        {card.device.needsDmxAddress || card.device.dmxAddress ? <AddressSection kind="dmx" card={card} store={store} readOnly={readOnly} run={run} /> : null}
 
         <Section title={`Photos (${card.photos.length})`} marks={card.photosWaiting ? `📷 ${card.photosWaiting} waiting` : ''}>
           <PhotoStrip photos={card.photos} resolveBlobUri={props.resolveBlobUri} onOpen={props.onOpenPhoto} />
@@ -630,6 +637,70 @@ function NeuronSection({ card, store, readOnly, run }: { card: Card; store: Stor
           {check && typing ? (
             <Text style={check.error ? styles.error : styles.muted}>{check.error ?? `${check.value} ✓`}</Text>
           ) : null}
+          {dupes.length ? <Text style={styles.finding}>⚠ Already on {dupes.map((x) => x.label).join(', ')} in this project.</Text> : null}
+        </View>
+      )}
+    </Section>
+  );
+}
+
+/**
+ * IP address or DMX address (T146, D246): typed entry with the format check (`checkIpAddress`,
+ * `checkDmxAddress`), the duplicate warning for IP, one `Field survey` op; Clear empties it.
+ */
+function AddressSection({ kind, card, store, readOnly, run }: { kind: 'ip' | 'dmx'; card: Card; store: Store; readOnly: boolean; run: Run }) {
+  const d = card.device;
+  const value = kind === 'ip' ? d.ipAddress : d.dmxAddress;
+  const field = kind === 'ip' ? 'ip_address' : 'dmx_address';
+  const title = kind === 'ip' ? 'IP address' : 'DMX address';
+  const [typing, setTyping] = useState<string | null>(null);
+  const [dupes, setDupes] = useState<{ id: string; label: string }[]>([]);
+  const check = typing === null || !typing.trim() ? null : kind === 'ip' ? checkIpAddress(typing) : checkDmxAddress(typing);
+
+  useEffect(() => {
+    if (kind !== 'ip' || !check || check.error) return setDupes([]);
+    let active = true;
+    ipDuplicates(store, d.projectId, check.value, d.id).then((r) => active && setDupes(r), () => {});
+    return () => {
+      active = false;
+    };
+  }, [kind, store, d.projectId, d.id, check?.value, check?.error]);
+
+  const save = () => run((e) => (kind === 'ip' ? saveIpAddress(e, d.id, typing ?? '') : saveDmxAddress(e, d.id, typing ?? ''))).then((ok) => ok && setTyping(null));
+  const clear = () => run((e) => (kind === 'ip' ? saveIpAddress(e, d.id, '') : saveDmxAddress(e, d.id, ''))).then((ok) => ok && setTyping(null));
+
+  return (
+    <Section title={title} marks={marks(card, field)}>
+      <View style={styles.rowWrap}>
+        <Text style={[styles.neuron, !value && styles.muted]}>{value ?? '— not captured'}</Text>
+      </View>
+      {typing === null ? (
+        readOnly ? null : (
+          <View style={styles.rowWrap}>
+            <SmallButton label="Type…" onPress={() => setTyping(value ?? '')} />
+            {value ? <SmallButton label="Clear" onPress={() => void clear()} /> : null}
+          </View>
+        )
+      ) : (
+        <View>
+          <View style={styles.neuronRow}>
+            <TextInput
+              style={[styles.input, styles.mono, styles.flex]}
+              value={typing}
+              onChangeText={setTyping}
+              placeholder={kind === 'ip' ? 'IPv4, e.g. 10.101.4.23' : 'universe/address, e.g. 1/001'}
+              placeholderTextColor="#888"
+              keyboardType={kind === 'ip' ? 'decimal-pad' : 'numbers-and-punctuation'}
+              autoCorrect={false}
+              autoFocus
+              maxLength={20}
+              returnKeyType="done"
+              onSubmitEditing={() => check && !check.error && void save()}
+            />
+            <SmallButton label={dupes.length ? 'Save anyway' : 'Save'} disabled={!check || !!check.error} onPress={() => void save()} />
+            <SmallButton label="Cancel" onPress={() => setTyping(null)} />
+          </View>
+          {check && typing ? <Text style={check.error ? styles.error : styles.muted}>{check.error ?? `${check.value} ✓`}</Text> : null}
           {dupes.length ? <Text style={styles.finding}>⚠ Already on {dupes.map((x) => x.label).join(', ')} in this project.</Text> : null}
         </View>
       )}

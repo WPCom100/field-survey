@@ -24,7 +24,7 @@ type Row = Record<string, unknown>;
 async function project() {
   const store = await Store.open(new BetterSqliteDriver(), { installId: uuidv7(), search: 'like' });
   const editor = new Editor(store, { projectId: PROJECT, userId: ME, now: tsNext });
-  const ids = { l06: uuidv7(), l06m: uuidv7(), group: uuidv7(), panel: uuidv7(), rack: uuidv7(), station: uuidv7(), bus: uuidv7(), fixtures: uuidv7() };
+  const ids = { l06: uuidv7(), l06m: uuidv7(), group: uuidv7(), panel: uuidv7(), rack: uuidv7(), station: uuidv7(), sensor: uuidv7(), bus: uuidv7(), fixtures: uuidv7() };
   await editor.group({ change_type: 'Master edit', reason: 'seed' }, async (g) => {
     await g.create('project', { id: PROJECT, name: 'Tower' });
     await g.create('level', { id: ids.l06, project_id: PROJECT, level: '06', floor_order: 7, numbering_group_id: ids.group, in_scope: true, surveyed: '2026-10-13' });
@@ -32,6 +32,7 @@ async function project() {
     await g.create('device', { id: ids.panel, level_id: ids.l06m, display_id: '06M-01', category: 'Relay panel', device: 'CT06LCPA', panel_name: 'CT06LCPA', status: 'Installed, untested', room_location: 'XX06M-1E05 Elec Rm' });
     await g.create('device', { id: ids.rack, level_id: ids.l06, display_id: '06-01', category: 'Equipment rack', device: 'Equipment rack' });
     await g.create('device', { id: ids.station, level_id: ids.l06m, display_id: '06M-S1', category: 'Station', device: 'PI1002', room_location: 'Corridor XX06M-C006' });
+    await g.create('device', { id: ids.sensor, level_id: ids.l06m, display_id: '06M-D1', category: 'Sensor', device: 'UHCI-WM' });
     await g.create('placeholder', { id: ids.bus, project_id: PROJECT, label: 'Stations & Sensors', kind: 'station_bus' });
     await g.create('placeholder', { id: ids.fixtures, project_id: PROJECT, label: 'Fixtures', kind: 'fixtures' });
   });
@@ -58,15 +59,19 @@ describe('RULES over a store', () => {
     const { store, editor, engine, ids } = await project();
     await engine.run();
     const neuron = (await open(store)).find((p) => p.rule_id === 'R3c')!;
-    expect(neuron.payload).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', notes: '06M-01, 06M-S1', sort_last: true, device_text: 'All devices' });
+    // the station and the sensor ride the Unison bus (D245); the relay panel has no Unison wire, the rack hosts it
+    expect(neuron.payload).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', notes: '06M-D1, 06M-S1', sort_last: true, device_text: 'All devices' });
     const res = await engine.decide(neuron.id, { kind: 'accept' });
     const itemId = res.recordIds[0]!;
-    expect(await store.get<Row>('punch_item', itemId)).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', type: 'Information', owner: 'EC', tracking_status: 'Open', sort_last: true, rule_id: 'R3c', proposal_id: neuron.id, notes: '06M-01, 06M-S1' });
+    expect(await store.get<Row>('punch_item', itemId)).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', type: 'Information', owner: 'EC', tracking_status: 'Open', sort_last: true, rule_id: 'R3c', proposal_id: neuron.id, notes: '06M-D1, 06M-S1' });
     // the lint "no Missing all Device Neuron IDs item" (T36) resolves: one op, then nothing
     expect((await engine.run()).ops).toBe(1);
     expect((await engine.run()).ops).toBe(0);
-    // a capture → Notes rewritten by the engine, one op, naming the rule, carrying the proposal
+    // a Neuron ID on the panel changes nothing: it needs none (no Unison wire, D246)
     await editor.setField('device', ids.panel, 'neuron_id', '00A1B2C3D4E5', CTX);
+    expect((await engine.run()).ops).toBe(0);
+    // a capture → Notes rewritten by the engine, one op, naming the rule, carrying the proposal
+    await editor.setField('device', ids.sensor, 'neuron_id', '00A1B2C3D4E6', CTX);
     const r = await engine.run();
     expect(r).toMatchObject({ upkeep: 1, ops: 1 });
     const item = (await store.get<Row>('punch_item', itemId))!;
@@ -96,7 +101,29 @@ describe('RULES over a store', () => {
     await editor.create('library_type', { project_id: PROJECT, model: 'Equipment rack', category: 'Equipment rack', needs_neuron_id: true, state: 'accepted' }, CTX);
     await engine.run();
     const neuron = (await open(store)).find((p) => p.rule_id === 'R3c')!;
-    expect(neuron.payload).toMatchObject({ notes: '06-01, 06M-01, 06M-S1' });
+    expect(neuron.payload).toMatchObject({ notes: '06-01, 06M-D1, 06M-S1' });
+  });
+
+  it('R3c reads the wires from the store (T146, D245): a network run on the panel makes the IP item, a DMX run the DMX one', async () => {
+    const { store, editor, engine, ids } = await project();
+    await editor.group(CTX, async (g) => {
+      const n = await g.create('cable', { project_id: PROJECT, cable: 'N', qty: 1 });
+      await g.create('cable_end', { cable_id: n.id, side: 'A', level_id: ids.l06m, device_id: ids.panel, status: 'Not installed' });
+      const x = await g.create('cable', { project_id: PROJECT, cable: 'X', qty: 1 });
+      await g.create('cable_end', { cable_id: x.id, side: 'A', level_id: ids.l06m, device_id: ids.panel });
+      await g.create('cable_end', { cable_id: x.id, side: 'B', level_id: ids.l06, device_id: ids.rack });
+    });
+    await engine.run();
+    const r3c = (await open(store)).filter((p) => p.rule_id === 'R3c');
+    expect(r3c.map((p) => [p.discriminator, p.payload!.item, p.payload!.owner, p.payload!.notes])).toEqual([
+      [null, 'Missing all Device Neuron IDs', 'EC', '06M-D1, 06M-S1'],
+      ['dmx', 'Missing all Device DMX addresses', 'EC', '06-01, 06M-01'],
+      ['ip', 'Missing all Device IP addresses', 'ETC', '06M-01'],
+    ]);
+    // an address typed on the card: the next run shortens the draft
+    await editor.setField('device', ids.panel, 'ip_address', '10.101.4.23', CTX);
+    await engine.run();
+    expect((await open(store)).filter((p) => p.rule_id === 'R3c').map((p) => p.discriminator)).toEqual([null, 'dmx']);
   });
 
   it('accepting a library draft (R2c) makes the cable with both ends; the device then has the code and the draft stays accepted', async () => {

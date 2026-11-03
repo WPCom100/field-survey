@@ -119,10 +119,38 @@ export const PARAMS: readonly ParamSpec[] = [
     default: { '*': 'Waiting on <signal> Termination Kits', X: 'Waiting on DMX Termination Kits', F: 'Waiting on Fiber Termination Kits', N: 'Waiting on Network Termination Kits', NG: 'Waiting on Network Termination Kits' },
     placeholders: ['<signal>'],
   },
-  // --- R3c: the Neuron ID item
-  { rule: 'R3c', key: 'item', kind: 'text', label: 'Item text', changes: 'The last item of every numbering group.', default: 'Missing all Device Neuron IDs' },
-  { rule: 'R3c', key: 'owner', kind: 'owner', label: 'Owner', changes: 'The Owner of the Neuron ID item.', default: 'EC' },
-  { rule: 'R3c', key: 'device_text', kind: 'text', label: 'Device text', changes: 'The Punch List Device cell of the Neuron ID item.', default: 'All devices' },
+  // --- R3c: the address items (T146, D245, D246): Neuron ID, IP address, DMX address
+  { rule: 'R3c', key: 'item', kind: 'text', label: 'Neuron ID item text', changes: 'The Neuron ID item that ends every numbering group.', default: 'Missing all Device Neuron IDs' },
+  { rule: 'R3c', key: 'owner', kind: 'owner', label: 'Neuron ID item owner', changes: 'The Owner of the Neuron ID item (EC or ETC, depending on the job — D246).', default: 'EC' },
+  { rule: 'R3c', key: 'ip.item', kind: 'text', label: 'IP address item text', changes: 'The IP address item that ends every numbering group.', default: 'Missing all Device IP addresses' },
+  { rule: 'R3c', key: 'ip.owner', kind: 'owner', label: 'IP address item owner', changes: 'The Owner of the IP address item (ETC owns IP addresses — D246).', default: 'ETC' },
+  { rule: 'R3c', key: 'dmx.item', kind: 'text', label: 'DMX address item text', changes: 'The DMX address item that ends every numbering group.', default: 'Missing all Device DMX addresses' },
+  { rule: 'R3c', key: 'dmx.owner', kind: 'owner', label: 'DMX address item owner', changes: 'The Owner of the DMX address item (EC or ETC, depending on the job — D246).', default: 'EC' },
+  { rule: 'R3c', key: 'device_text', kind: 'text', label: 'Device text', changes: 'The Punch List Device cell of the three address items.', default: 'All devices' },
+  {
+    rule: 'R3c',
+    key: 'neuron_codes',
+    kind: 'bool_by_code',
+    label: 'Cable codes that need a Neuron ID',
+    changes: 'A device that gets a wire of a code that is on needs a Neuron ID (stations and sensors ride the Unison bus and always count; an NSPS or rack hosts the bus and never does unless its type says Needed). The Neuron ID setting on a type overrides it.',
+    default: { '*': false, U: true },
+  },
+  {
+    rule: 'R3c',
+    key: 'ip_codes',
+    kind: 'bool_by_code',
+    label: 'Cable codes that need an IP address',
+    changes: 'A device that gets a wire of a code that is on needs an IP address. The IP address setting on a type overrides it.',
+    default: { '*': false, N: true, NG: true },
+  },
+  {
+    rule: 'R3c',
+    key: 'dmx_codes',
+    kind: 'bool_by_code',
+    label: 'Cable codes that need a DMX address',
+    changes: 'A device that gets a wire of a code that is on needs a DMX address. The DMX address setting on a type overrides it.',
+    default: { '*': false, X: true },
+  },
   // --- R4: parts
   { rule: 'R4a', key: 'owner', kind: 'owner', label: 'Owner of missing parts', changes: 'The Owner every rule-made part gets (R4b); a part with another owner is flagged.', default: 'EC' },
   {

@@ -21,6 +21,7 @@ import {
   LintEndStatus,
   LintFarEnd,
   LintIdDup,
+  LintIpDup,
   LintLockedDrafts,
   LintNeuronDup,
   LintNeuronItem,
@@ -65,19 +66,30 @@ describe('punch item lints', () => {
     expect(found(b, [LintOwner])).toEqual([['lint.item_owner', p.id, 'Punch #1 "Replace wire nuts": no Owner']]);
   });
 
-  it('flags a numbering group missing its Neuron ID item, and an item not sorted last', () => {
+  it('flags a numbering group missing its Neuron ID, IP address or DMX address item, and an item not sorted last (T146)', () => {
     const b = new Build();
     const l06 = b.level('06', { numbering_group_id: 'g6' });
     const l06m = b.level('06M', { numbering_group_id: 'g6' });
-    b.device(l06m, 'Station', { display_id: '06M-S1' });
+    b.device(l06m, 'Station', { display_id: '06M-S1' }); // rides the Unison bus: Neuron ID
+    const gw = b.device(l06m, 'Equipment', { display_id: '06M-03', device: 'RSN-DMX8-R' });
+    b.cable('N', { device: gw }, null);
+    b.cable('X', { device: gw }, null);
     const l03 = b.level('03');
     b.device(l03, 'Station', { display_id: '03-S1', neuron_id: '00A1' }); // every ID captured: no item needed
-    b.device(l03, 'NSPS', { display_id: '03-02' }); // needs none (T68, D185)
-    expect(found(b, [LintNeuronItem])).toEqual([['lint.neuron_item', 'g6', 'Levels 06/06M: no "Missing all Device Neuron IDs" item']]);
+    const nsps = b.device(l03, 'NSPS', { display_id: '03-02' }); // hosts the bus, needs none (D185)
+    b.cable('U', { device: nsps }, null);
+    expect(found(b, [LintNeuronItem])).toEqual([
+      ['lint.neuron_item', 'g6', 'Levels 06/06M: no "Missing all Device Neuron IDs" item'],
+      ['lint.ip_item', 'g6', 'Levels 06/06M: no "Missing all Device IP addresses" item'],
+      ['lint.dmx_item', 'g6', 'Levels 06/06M: no "Missing all Device DMX addresses" item'],
+    ]);
     const item = b.punch(l06, { item: 'Missing all Device Neuron IDs', type: 'Information', sort_last: false });
+    b.punch(l06, { item: 'Missing all Device IP addresses', type: 'Information', sort_last: true });
+    b.punch(l06, { item: 'Missing all Device DMX addresses', type: 'Information', sort_last: true });
     expect(found(b, [LintNeuronItem])).toEqual([['lint.neuron_item', item.id, 'Levels 06/06M: "Missing all Device Neuron IDs" is not sorted last']]);
     item.sort_last = true;
     expect(found(b, [LintNeuronItem])).toEqual([]);
+    expect(LintNeuronItem.lints).toEqual(['lint.neuron_item', 'lint.ip_item', 'lint.dmx_item']);
   });
 });
 
@@ -148,6 +160,20 @@ describe('duplicates, links, pins, locks', () => {
       ['lint.id_dup', y.id, '02-S2: ID also used by 1 other device'],
       ['lint.id_dup', z.id, '02-S2: ID also used by 1 other device'],
     ]);
+  });
+
+  it('flags an IP address on two live devices, on each; a DMX address may repeat (T146, D247)', () => {
+    const b = new Build();
+    const l = b.level('02');
+    const x = b.device(l, 'Touchscreen', { display_id: '02-04', ip_address: '10.101.4.23', dmx_address: '1/001' });
+    const y = b.device(l, 'Equipment', { display_id: '02-05', ip_address: '10.101.4.23', dmx_address: '1/001' });
+    b.device(l, 'Equipment', { display_id: '02-06', ip_address: '10.101.4.23', deleted_at: '2026-10-01' }); // deleted: ignored
+    b.device(l, 'Equipment', { display_id: '02-07', ip_address: '10.101.4.24' });
+    expect(found(b, [LintIpDup])).toEqual([
+      ['lint.ip_dup', x.id, '02-04: IP address 10.101.4.23 is also on 02-05'],
+      ['lint.ip_dup', y.id, '02-05: IP address 10.101.4.23 is also on 02-04'],
+    ]);
+    expect(LINT_RULES.map((r) => r.id)).toContain('lint.ip_dup');
   });
 
   it('flags a punch item, part, end or photo still linked to a deleted device', () => {

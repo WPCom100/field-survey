@@ -179,6 +179,10 @@ class Device(Id, Synced, Base):
         fk("photo.id", use_alter=True)
     )
     neuron_method: Mapped[str | None]
+    # T146 (D245, D246): an IPv4 dotted quad, no subnet (`10.101.4.23`), and `<universe>/<address>`
+    # (`1/001`); needed by the wires the device gets (N / NG, X) as the Neuron ID is by its U run.
+    ip_address: Mapped[str | None] = mapped_column(String(15), index=True)
+    dmx_address: Mapped[str | None] = mapped_column(String(12), index=True)
     origin: Mapped[str | None]
     found_on_site: Mapped[bool | None]
     baseline_ref_id: Mapped[uuid.UUID | None] = mapped_column(fk("draft_device.id"))
@@ -582,8 +586,11 @@ class LibraryType(Id, Synced, Base):
     default_cables: Mapped[list[Any] | None]
     optional_cables: Mapped[list[Any] | None]
     optional_accessories: Mapped[list[Any] | None]
-    # Whether its devices carry a Neuron ID; null = the category's default (T68, D185).
+    # Whether its devices carry a Neuron ID / IP address / DMX address; null = by the wires its
+    # devices get (T68 / D185, T146 / D245: `addressNeeds` in packages/rules).
     needs_neuron_id: Mapped[bool | None]
+    needs_ip_address: Mapped[bool | None]
+    needs_dmx_address: Mapped[bool | None]
     state: Mapped[str] = mapped_column(default="draft", server_default="draft")
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(fk("app_user.id"))
     # Provenance across op streams (a project type promoted to the app library, D184): a plain

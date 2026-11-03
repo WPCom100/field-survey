@@ -14,6 +14,8 @@ export const SIGNAL: Readonly<Record<string, string>> = DEFAULT_PARAMS.get('R3',
 
 /** The parameters' defaults under the names T34 gave them (tests and docs). */
 export const NEURON_ITEM = textParam(DEFAULT_PARAMS, 'R3c', 'item');
+export const IP_ITEM = textParam(DEFAULT_PARAMS, 'R3c', 'ip.item');
+export const DMX_ITEM = textParam(DEFAULT_PARAMS, 'R3c', 'dmx.item');
 export const DMX_KITS_NOTE = textParam(DEFAULT_PARAMS, 'R3b', 'notes', 'X');
 export const BUS_LABEL = 'Stations & Sensors';
 

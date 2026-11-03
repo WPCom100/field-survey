@@ -28,7 +28,7 @@ export type VocabListKey = (typeof VOCAB_LISTS)[number]['list'];
 export const SEED_VOCAB: Readonly<Record<VocabListKey, readonly string[]>> = {
   device_note: STANDARD_PHRASES,
   connection_note: CONNECTION_PHRASES,
-  punch_item: ['Missing all Device Neuron IDs'],
+  punch_item: ['Missing all Device Neuron IDs', 'Missing all Device IP addresses', 'Missing all Device DMX addresses'],
   punch_note: ['Waiting on DMX Termination Kits', 'Need to be ordered', 'Confirm whether on site'],
   part_note: ['Need to be ordered', 'Confirm whether on site', 'Confirm whether on site (provided in box)'],
   photo_caption: STANDARD_PHRASES,

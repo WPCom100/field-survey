@@ -77,6 +77,8 @@ def sample(table, column):
         return {"k": [1, "Run, not terminated; no term kit", None], "nested": {"x": 1.5}}
     if isinstance(t, String) and t.length == 64:
         return "ab" * 32
+    if isinstance(t, String) and t.length == 15:
+        return "10.101.4.23"  # device.ip_address (T146)
     if isinstance(t, String) and t.length == 12:
         return "0123456789AB"
     py = t.python_type

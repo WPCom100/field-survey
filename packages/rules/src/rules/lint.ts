@@ -15,10 +15,9 @@ import { canonicalCategory, MASTER_CATEGORY_RENAME, ROLE_LABEL } from '@field-su
 import { DEVICE_CATEGORIES } from '../lints';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow, PunchItemRow } from '../snapshot';
-import { deviceNeedsNeuronId, deviceRole, governingCables, parseLibraryAccessories, typeOfDevice, type LibraryAccessory } from './library';
-import { isNeuronItem } from './r3';
+import { ADDRESS_KINDS, ADDRESS_LABEL, deviceRole, governingCables, parseLibraryAccessories, typeOfDevice, type AddressKind, type LibraryAccessory } from './library';
+import { addressItemText, addressItems, missingAddresses } from './r3';
 import { cableOf, compareIds, compareLevels, deviceLabel, endLabel, signal, str, subjectOfDevice, subjectOfEnd } from './shared';
-import { textParam } from '../params';
 
 function hasCode(ctx: RuleContext, d: DeviceRow, code: string): boolean {
   return (ctx.index.endsByDevice.get(d.id) ?? []).some((e) => cableOf(ctx, e)?.cable === code);
@@ -76,24 +75,30 @@ export const LintOwner: Rule = {
   },
 };
 
+/** The lint id per address kind (T146): `lint.neuron_item` is T36's. */
+export const ADDRESS_ITEM_LINT: Readonly<Record<AddressKind, string>> = { neuron: 'lint.neuron_item', ip: 'lint.ip_item', dmx: 'lint.dmx_item' };
+
 export const LintNeuronItem: Rule = {
   id: 'lint.neuron_item',
-  title: 'Neuron ID item missing or not last',
-  text: 'A numbering group with a device still missing its Neuron ID has a "Missing all Device Neuron IDs" item sorted last (R3c, D49); a group without one, or an item not sorted last, is flagged.',
+  title: 'Address item missing or not last',
+  text: 'A numbering group with a device still missing its Neuron ID, IP address or DMX address has that kind\'s "Missing all Device …" item sorted last (R3c, D49, D245); a group without one, or an item not sorted last, is flagged (`lint.neuron_item`, `lint.ip_item`, `lint.dmx_item`).',
+  lints: ADDRESS_KINDS.map((k) => ADDRESS_ITEM_LINT[k]),
   run(ctx) {
     for (const [groupId, group] of ctx.index.levelsByGroup) {
       const levels = group.slice().sort(compareLevels);
       const first = levels[0];
       if (!first) continue;
-      const neuron = textParam(ctx.params, 'R3c', 'item');
-      const items = levels.flatMap((l) => ctx.index.punchByLevel.get(l.id) ?? []).filter((p) => isNeuronItem(p, neuron));
-      for (const p of items) {
-        if (!p.sort_last) ctx.find({ subject: { entity_kind: 'punch_item', entity_id: p.id, level_id: p.level_id }, message: `${levelNames(levels)}: "${neuron}" is not sorted last` });
-      }
-      if (items.length) continue;
-      const missing = levels.some((l) => (ctx.index.devicesByLevel.get(l.id) ?? []).some((d) => !str(d.neuron_id) && deviceNeedsNeuronId(ctx, d)));
-      if (missing) {
-        ctx.find({ subject: { entity_kind: 'numbering_group', entity_id: groupId, level_id: first.id }, message: `${levelNames(levels)}: no "${neuron}" item` });
+      for (const kind of ADDRESS_KINDS) {
+        const lint_id = ADDRESS_ITEM_LINT[kind];
+        const text = addressItemText(ctx, kind);
+        const items = addressItems(ctx, kind, levels);
+        for (const p of items) {
+          if (!p.sort_last) ctx.find({ lint_id, subject: { entity_kind: 'punch_item', entity_id: p.id, level_id: p.level_id }, message: `${levelNames(levels)}: "${text}" is not sorted last` });
+        }
+        if (items.length) continue;
+        if (missingAddresses(ctx, kind, levels).length) {
+          ctx.find({ lint_id, subject: { entity_kind: 'numbering_group', entity_id: groupId, level_id: first.id }, message: `${levelNames(levels)}: no "${text}" item` });
+        }
       }
     }
   },
@@ -301,6 +306,18 @@ export const LintNeuronDup: Rule = {
   },
 };
 
+/** A duplicate IP address is a lint like a duplicate Neuron ID (T146, D247); a duplicate DMX address is not — two devices may share one. */
+export const LintIpDup: Rule = {
+  id: 'lint.ip_dup',
+  title: 'Duplicate IP address',
+  text: 'An IP address belongs to one device; the same address on several devices of the project is flagged on each. DMX addresses may repeat.',
+  run(ctx) {
+    for (const list of duplicates(ctx, (d) => str(d.ip_address)).values()) {
+      for (const d of list) ctx.find({ subject: subjectOfDevice(d), message: `${deviceLabel(ctx, d)}: ${ADDRESS_LABEL.ip} ${str(d.ip_address)} is also on ${others(ctx, list, d)}` });
+    }
+  },
+};
+
 export const LintIdDup: Rule = {
   id: 'lint.id_dup',
   title: 'Duplicate device ID',
@@ -479,6 +496,7 @@ export const LINT_RULES: readonly Rule[] = [
   LintFarEnd,
   LintEndStatus,
   LintNeuronDup,
+  LintIpDup,
   LintIdDup,
   LintDeletedLink,
   LintPin,

@@ -213,13 +213,17 @@ export const ENTITIES = {
       neuron_id: t(),
       neuron_evidence_photo_id: t(),
       neuron_method: enumCol(v.NEURON_METHOD),
+      // T146 (D245, D246): an IPv4 dotted quad (no subnet) and `<universe>/<address>`; needed
+      // by the wires the device gets (N / NG, X) like the Neuron ID by its U run.
+      ip_address: t(),
+      dmx_address: t(),
       origin: enumCol(v.ORIGIN),
       found_on_site: b(),
       baseline_ref_id: t(),
       panel_name: t(),
       library_type_id: t(),
     },
-    [['level_id'], ['neuron_id'], ['display_id']],
+    [['level_id'], ['neuron_id'], ['display_id'], ['ip_address'], ['dmx_address']],
   ),
 
   accessory: record(
@@ -554,8 +558,11 @@ export const ENTITIES = {
       default_cables: j(),
       optional_cables: j(),
       optional_accessories: j(),
-      // T68 (D185): null = the category's default (`neuronIdDefault` in packages/rules).
+      // T68 (D185), T146 (D245): null = by the wires its devices get (`addressNeeds` in
+      // packages/rules); true / false is the type's own answer.
       needs_neuron_id: b(),
+      needs_ip_address: b(),
+      needs_dmx_address: b(),
       state: enumCol(v.LIBRARY_STATE, { notNull: true, default: 'draft' }),
       created_by_id: t(),
       promoted_from_id: t(),

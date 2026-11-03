@@ -55,6 +55,9 @@ export interface DeviceRow extends Deletable {
   notes: string | null;
   pin: { sheet: string; x: number; y: number } | null;
   neuron_id: string | null;
+  /** T146 (D245, D246): IPv4 dotted quad, no subnet; `<universe>/<address>`. */
+  ip_address: string | null;
+  dmx_address: string | null;
   origin: string | null;
   found_on_site: boolean | null;
   panel_name: string | null;
@@ -164,8 +167,10 @@ export interface LibraryTypeRow extends Deletable {
   default_cables: unknown;
   optional_cables: unknown;
   optional_accessories: unknown;
-  /** Null = the role's default (`neuronIdDefaultForRole`, T68, D185). */
+  /** Null = by the wires its devices get (`addressNeeds`, T68 / D185, T146 / D245). */
   needs_neuron_id: boolean | null;
+  needs_ip_address: boolean | null;
+  needs_dmx_address: boolean | null;
   /** What its devices are (T112, D201); null = the category's role (`roleOfCategory` in core). */
   role: string | null;
   state: 'draft' | 'accepted' | 'rejected';
@@ -352,6 +357,8 @@ export interface SnapshotIndex {
   sourcesByPart: Map<string, PartSourceRow[]>;
   libraryType: Map<string, LibraryTypeRow>;
   sheet: Map<string, SheetRow>;
+  /** Live proposals by id (T146: an R3c item's kind is its proposal's discriminator). */
+  proposal: Map<string, ProposalRow>;
   /** The project's rule parameters over the defaults (T102). */
   params: RuleParams;
   /** Live punch items and parts by the proposal they were accepted from. */
@@ -400,6 +407,7 @@ export function indexSnapshot(s: Snapshot): SnapshotIndex {
     sourcesByPart: groupBy(live(s.partSources), (ps) => ps.missing_part_id),
     libraryType: byId(live(s.libraryTypes)),
     sheet: byId(live(s.sheets ?? [])),
+    proposal: byId(live(s.proposals)),
     params: new RuleParams((s.ruleParams ?? []).filter((r) => r.project_id === s.projectId)),
     recordsByProposal,
     otherEnd(end) {

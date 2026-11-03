@@ -183,7 +183,16 @@ def test_copy_from(client, session):
     sid = source["id"]
     lvl = source["levels"][0]["id"]
 
-    def lt(project_id, model, state="accepted", category=None, needs_neuron_id=None, role=None):
+    def lt(
+        project_id,
+        model,
+        state="accepted",
+        category=None,
+        needs_neuron_id=None,
+        role=None,
+        needs_ip_address=None,
+        needs_dmx_address=None,
+    ):
         return LibraryType(
             id=uuid7(),
             project_id=project_id,
@@ -191,6 +200,8 @@ def test_copy_from(client, session):
             category=category,
             state=state,
             needs_neuron_id=needs_neuron_id,
+            needs_ip_address=needs_ip_address,
+            needs_dmx_address=needs_dmx_address,
             role=role,
         )
 
@@ -220,7 +231,15 @@ def test_copy_from(client, session):
             gone,
             lt(None, "P-NSPS-D", category="NSPS"),
             lt(None, "X-DRAFT", state="draft"),
-            lt(sid, "PI1002", category="Station", needs_neuron_id=False, role="station"),
+            lt(
+                sid,
+                "PI1002",
+                category="Station",
+                needs_neuron_id=False,
+                role="station",
+                needs_ip_address=True,
+                needs_dmx_address=False,
+            ),
             lt(sid, "p-nsps-d", category="NSPS"),
             lt(sid, "ERP-XYZ", state="draft"),
             standing,
@@ -257,8 +276,13 @@ def test_copy_from(client, session):
     types = session.scalars(select(LibraryType).where(LibraryType.project_id == pid)).all()
     assert sorted(t.model for t in types) == ["P-NSPS-D", "PI1002"]
     assert all(t.state == "accepted" and t.promoted_from_id is None for t in types)
-    # The Neuron ID flag comes along; null stays null (the category's default, T68 / D185).
+    # The Neuron ID flag comes along; null stays null (by the wires, T68 / D185, T146 / D245).
     assert {t.model: t.needs_neuron_id for t in types} == {"P-NSPS-D": None, "PI1002": False}
+    # T146: the IP / DMX flags too
+    assert {t.model: (t.needs_ip_address, t.needs_dmx_address) for t in types} == {
+        "P-NSPS-D": (None, None),
+        "PI1002": (True, False),
+    }
     assert {t.model: t.role for t in types} == {"P-NSPS-D": None, "PI1002": "station"}  # T112
     rulings = session.scalars(select(Ruling).where(Ruling.project_id == pid)).all()
     assert [r.text for r in rulings] == ["Wagos everywhere"]

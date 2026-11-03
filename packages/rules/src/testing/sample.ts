@@ -29,6 +29,8 @@ export function device(partial: Partial<DeviceRow> & Pick<DeviceRow, 'id'>): Dev
     notes: null,
     pin: null,
     neuron_id: null,
+    ip_address: null,
+    dmx_address: null,
     origin: 'baseline',
     found_on_site: null,
     panel_name: null,

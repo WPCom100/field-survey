@@ -9,7 +9,7 @@
  */
 
 import { DEVICE_CATEGORIES, LIBRARY_STREAM, OpError, ROLE, ROLE_LABEL, canonicalCategory, isRole, roleOf, roleOfCategory, type EditContext, type Editor, type Role, type Store } from '@field-survey/core';
-import { CABLE_CODES, RuleParams, cableCodes, loadRuleParamRows, neuronIdDefault, neuronIdDefaultForRole, parseLibraryAccessories, parseLibraryCables, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
+import { CABLE_CODES, RuleParams, addressNeeds, cableCodes, loadRuleParamRows, parseLibraryAccessories, parseLibraryCables, type AddressNeeds, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
 
 import { copyTypeChips, offersPartChips } from '../suggestions/model';
 
@@ -22,7 +22,7 @@ export const CATEGORIES = DEVICE_CATEGORIES;
 export const ROLES = ROLE;
 export const ROLE_LABELS = ROLE_LABEL;
 
-export { CABLE_CODES, neuronIdDefault, neuronIdDefaultForRole, roleOf, roleOfCategory, type LibraryAccessory, type LibraryCable, type Role };
+export { CABLE_CODES, addressNeeds, roleOf, roleOfCategory, type AddressNeeds, type LibraryAccessory, type LibraryCable, type Role };
 
 /** D52: an NSPS kit carries its power supply, expected 1. Offered on types whose role is `nsps`. */
 export const NSPS_POWER_SUPPLY: LibraryAccessory = { model: 'P-NSPS-D Power Supply', expected_qty: 1 };
@@ -55,10 +55,14 @@ export interface LibraryType {
   defaultCables: LibraryCable[];
   optionalCables: LibraryCable[];
   optionalAccessories: LibraryAccessory[];
-  /** Stored flag; null = the category's default (T68, D185). */
+  /** Stored flags; null = by the wires its devices get (T68 / D185, T146 / D245). */
   needsNeuronId: boolean | null;
-  /** What applies: the flag, else the role's default (off for racks and NSPS). */
+  needsIpAddress: boolean | null;
+  needsDmxAddress: boolean | null;
+  /** What the type alone implies (`addressNeeds` over its role and default cables): the flag, else by the wires. */
   neuronId: boolean;
+  ipAddress: boolean;
+  dmxAddress: boolean;
   state: LibraryState;
   createdById: string | null;
   /** When the type's first op was made (the "added … 10/09" line). */
@@ -114,7 +118,7 @@ export function clean(text: string | null | undefined): string | null {
  * change pulled from another iPad still refreshes the form.
  */
 export function editorStamp(t: LibraryType): string {
-  return JSON.stringify([t.id, t.model, t.category, t.role, t.aliases, t.idScheme, t.needsNeuronId, t.defaultCables, t.optionalCables, t.optionalAccessories, t.state, t.promotedAs]);
+  return JSON.stringify([t.id, t.model, t.category, t.role, t.aliases, t.idScheme, t.needsNeuronId, t.needsIpAddress, t.needsDmxAddress, t.defaultCables, t.optionalCables, t.optionalAccessories, t.state, t.promotedAs]);
 }
 
 /** "A, B ,a" → ["A", "B"]: comma-separated aliases, deduplicated ignoring case and spaces. */
@@ -148,7 +152,15 @@ function scopeWhere(scope: string | null): { where: string; params: string[] } {
   return scope ? { where: 'project_id = ?', params: [scope] } : { where: 'project_id IS NULL', params: [] };
 }
 
-function toType(r: Row, codes: readonly string[]): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | 'promotedAs'> {
+function toType(r: Row, codes: readonly string[], params: RuleParams): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | 'promotedAs'> {
+  const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
+  // what the type alone implies for a device of it with no cable record (T146): its flags, else its default cables and role
+  const needs = addressNeeds(
+    { needs_neuron_id: flag(r.needs_neuron_id), needs_ip_address: flag(r.needs_ip_address), needs_dmx_address: flag(r.needs_dmx_address), category: str(r.category), role: r.role, state: 'accepted', default_cables: r.default_cables },
+    { category: str(r.category) },
+    null,
+    params,
+  );
   return {
     id: String(r.id),
     projectId: str(r.project_id),
@@ -161,8 +173,12 @@ function toType(r: Row, codes: readonly string[]): Omit<LibraryType, 'devices' |
     defaultCables: parseLibraryCables(r.default_cables, codes),
     optionalCables: parseLibraryCables(r.optional_cables, codes),
     optionalAccessories: parseLibraryAccessories(r.optional_accessories),
-    needsNeuronId: typeof r.needs_neuron_id === 'boolean' ? r.needs_neuron_id : null,
-    neuronId: typeof r.needs_neuron_id === 'boolean' ? r.needs_neuron_id : neuronIdDefaultForRole(roleOf({ role: r.role, category: str(r.category) }, null)),
+    needsNeuronId: flag(r.needs_neuron_id),
+    needsIpAddress: flag(r.needs_ip_address),
+    needsDmxAddress: flag(r.needs_dmx_address),
+    neuronId: needs.neuron,
+    ipAddress: needs.ip,
+    dmxAddress: needs.dmx,
     state: r.state === 'accepted' || r.state === 'rejected' ? r.state : 'draft',
     createdById: str(r.created_by_id),
     promotedFromId: str(r.promoted_from_id),
@@ -215,7 +231,7 @@ export async function loadLibrary(store: Store, scope: string | null): Promise<L
   }
   const types: LibraryType[] = [];
   for (const r of rows) {
-    const t = toType(r, codes);
+    const t = toType(r, codes, ruleParams);
     const keys = new Set([t.model, ...t.aliases].map(modelKey));
     const count = devices.filter((d) => (d.library_type_id ? d.library_type_id === t.id : !!d.device && keys.has(modelKey(d.device)))).length;
     const first = (await store.opsFor(t.id))[0];
@@ -272,8 +288,10 @@ export interface TypePatch {
   defaultCables?: LibraryCable[];
   optionalCables?: LibraryCable[];
   optionalAccessories?: LibraryAccessory[];
-  /** null = back to the category's default. */
+  /** null = back to "by the wires" (T146, D245). */
   needsNeuronId?: boolean | null;
+  needsIpAddress?: boolean | null;
+  needsDmxAddress?: boolean | null;
 }
 
 function checkCables(list: readonly LibraryCable[], what: string, codes: readonly string[]): LibraryCable[] | null {
@@ -308,6 +326,8 @@ export async function updateType(editor: Editor, store: Store, id: string, patch
   if (patch.defaultCables !== undefined) values.default_cables = checkCables(patch.defaultCables, 'Default cables', codes);
   if (patch.optionalCables !== undefined) values.optional_cables = checkCables(patch.optionalCables, 'Optional cables', codes);
   if (patch.needsNeuronId !== undefined) values.needs_neuron_id = patch.needsNeuronId;
+  if (patch.needsIpAddress !== undefined) values.needs_ip_address = patch.needsIpAddress;
+  if (patch.needsDmxAddress !== undefined) values.needs_dmx_address = patch.needsDmxAddress;
   if (patch.optionalAccessories !== undefined) {
     // A catalogue slot's max quantity and group (D197 (4)) ride along: `lint.accessory_group` reads them (T113).
     const list = patch.optionalAccessories.map((a): LibraryAccessory => ({
@@ -393,6 +413,9 @@ export async function copyTypes(editor: Editor, store: Store, scope: string | nu
         optional_accessories: r.optional_accessories ?? null,
         // only when set: a server without migration 0010 refuses the column (T68)
         ...(r.needs_neuron_id != null ? { needs_neuron_id: r.needs_neuron_id } : {}),
+        // and the T146 flags (migration 0019 / Alembic 0020)
+        ...(r.needs_ip_address != null ? { needs_ip_address: r.needs_ip_address } : {}),
+        ...(r.needs_dmx_address != null ? { needs_dmx_address: r.needs_dmx_address } : {}),
         // likewise the T111 columns (Alembic 0011); `source_ref` travels with the copy
         ...(r.description != null ? { description: r.description } : {}),
         ...(r.datasheet_url != null ? { datasheet_url: r.datasheet_url } : {}),

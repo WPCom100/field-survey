@@ -11,7 +11,7 @@ import { Build } from '../testing/build';
 import { Acc, E5 } from './e5';
 import { R1 } from './r1';
 import { RuleParams, type RuleParamRow } from '../params';
-import { CABLE_CODES, R2g, cableCodes, needsNeuronId, neuronIdDefault, parseLibraryCables } from './library';
+import { CABLE_CODES, R2g, addressNeeds, cableCodes, needsNeuronId, parseLibraryCables } from './library';
 import { R2a, R2b, R2c, R2d, R2e, R2f } from './r2';
 import { LintPower, LintRelay } from './lint';
 import { R3a, R3b, R3c, R3d, R3f } from './r3';
@@ -433,87 +433,173 @@ describe('R3b termination kit item', () => {
   });
 });
 
-describe('R3c Missing all Device Neuron IDs (D49, D170)', () => {
+describe('R3c Missing all Device Neuron IDs / IP addresses / DMX addresses (D49, D170, D245, D246)', () => {
+  /**
+   * One numbering group (06 + 06M): an NSPS hosting the Unison pair (U end, no Neuron chip), two
+   * stations riding the bus (Neuron) and one with its ID captured, a gateway with a network run and
+   * a DMX run (IP and DMX), a relay panel on the DMX run (DMX) that carries a Neuron ID it does not
+   * need, and a rack with only its 120V feed (nothing).
+   */
   function group() {
     const b = new Build();
     const l06 = b.level('06', { numbering_group_id: 'g6', floor_order: 7 });
     const l06m = b.level('06M', { numbering_group_id: 'g6', floor_order: 8 });
-    const a = b.device(l06, 'Relay panel', { display_id: '06-02' });
+    const bus = b.placeholder('Stations & Sensors', 'station_bus');
+    const nsps = b.device(l06, 'NSPS', { display_id: '06-02', device: 'P-NSPS-D' });
+    b.cable('U', { device: nsps, status: 'Not installed' }, { placeholder: bus });
     const s10 = b.device(l06m, 'Station', { display_id: '06M-S10' });
     const s2 = b.device(l06m, 'Station', { display_id: '06M-S2' });
-    const done = b.device(l06, 'Relay panel', { display_id: '06-01', neuron_id: '00A1B2C3D4E5' });
-    return { b, l06, l06m, a, s10, s2, done };
+    b.device(l06m, 'Station', { display_id: '06M-S1', neuron_id: '00A1B2C3D4E6' });
+    const gw = b.device(l06m, 'Equipment', { display_id: '06M-03', device: 'RSN-DMX8-R' });
+    b.cable('N', { device: gw, status: 'Not installed' }, null);
+    const panel = b.device(l06, 'Relay panel', { display_id: '06-01', neuron_id: '00A1B2C3D4E5' });
+    b.cable('X', { device: panel }, { device: gw });
+    const rack = b.device(l06, 'Equipment rack', { display_id: '06-04' });
+    b.cable('120V', { device: rack }, null, { single_row: true });
+    return { b, l06, l06m, nsps, s10, s2, gw, panel, rack };
   }
 
-  it('proposes one sort_last Information item per numbering group on its first level, Notes listing the IDs in order', () => {
+  it('proposes one sort_last Information item per kind on the group\'s first level, Notes listing the IDs in order, owners per D246', () => {
     const { b, l06 } = group();
     b.level('01', { numbering_group_id: 'g1' }); // a group with no devices: nothing
     const out = run(b, [R3c]);
-    expect(out.proposals).toHaveLength(1);
-    expect(out.proposals[0]).toMatchObject({
-      kind: 'punch',
-      subject: { entity_kind: 'numbering_group', entity_id: 'g6', level_id: l06.id },
-      payload: { level_id: l06.id, item: 'Missing all Device Neuron IDs', type: 'Information', owner: 'EC', tracking_status: 'Open', sort_last: true, device_text: 'All devices', notes: '06-02, 06M-S2, 06M-S10' },
-      why: '3 devices on Levels 06/06M have no Neuron ID.',
-    });
+    expect(out.proposals.map((p) => [p.discriminator, p.payload.item, p.payload.owner, p.payload.notes, p.why])).toEqual([
+      [null, 'Missing all Device Neuron IDs', 'EC', '06M-S2, 06M-S10', '2 devices on Levels 06/06M have no Neuron ID.'],
+      ['ip', 'Missing all Device IP addresses', 'ETC', '06M-03', '1 device on Levels 06/06M has no IP address.'],
+      ['dmx', 'Missing all Device DMX addresses', 'EC', '06-01, 06M-03', '2 devices on Levels 06/06M have no DMX address.'],
+    ]);
+    for (const p of out.proposals) {
+      expect(p).toMatchObject({ kind: 'punch', subject: { entity_kind: 'numbering_group', entity_id: 'g6', level_id: l06.id } });
+      expect(p.payload).toMatchObject({ level_id: l06.id, type: 'Information', tracking_status: 'Open', sort_last: true, device_text: 'All devices' });
+    }
     expect(out.upkeep).toEqual([]);
-    // the same output on every run (deterministic id)
-    expect(run(b, [R3c]).proposals[0]!.id).toBe(out.proposals[0]!.id);
+    // the same output on every run (deterministic ids); the Neuron item keeps T34's key (no discriminator)
+    expect(run(b, [R3c]).proposals.map((p) => p.id)).toEqual(out.proposals.map((p) => p.id));
   });
 
-  it('maintains the existing item instead: Notes rewritten, Closed when empty, reopened on a new device', () => {
-    const { b, l06, a, s10, s2 } = group();
-    const item = b.punch(l06, { item: 'Missing all Device Neuron IDs', type: 'Information', sort_last: true, notes: null, proposal_id: 'prop-1' });
+  it('maintains an existing item of each kind instead: Notes rewritten, Closed when empty, reopened on a new device (D170)', () => {
+    const { b, l06, l06m, s10, s2, gw, panel } = group();
+    const neuron = b.punch(l06, { item: 'Missing all Device Neuron IDs', type: 'Information', sort_last: true, notes: null, proposal_id: 'prop-1' });
+    const ip = b.punch(l06, { item: 'Missing all Device IP addresses', type: 'Information', sort_last: true, notes: null });
     let out = run(b, [R3c]);
-    expect(out.proposals).toEqual([]);
-    expect(out.upkeep).toEqual([{ rule_id: 'R3c', entity: 'punch_item', id: item.id, fields: { notes: '06-02, 06M-S2, 06M-S10' }, proposal_id: 'prop-1', why: '3 devices still without a Neuron ID' }]);
-    a.neuron_id = '000000000001';
+    expect(out.proposals.map((p) => p.discriminator)).toEqual(['dmx']); // the DMX item is still to be made
+    expect(out.upkeep).toEqual([
+      { rule_id: 'R3c', entity: 'punch_item', id: neuron.id, fields: { notes: '06M-S2, 06M-S10' }, proposal_id: 'prop-1', why: '2 devices still without a Neuron ID' },
+      { rule_id: 'R3c', entity: 'punch_item', id: ip.id, fields: { notes: '06M-03' }, proposal_id: null, why: '1 device still without an IP address' },
+    ]);
     s10.neuron_id = '000000000002';
     s2.neuron_id = '000000000003';
+    gw.ip_address = '10.101.4.23';
     out = run(b, [R3c]);
-    expect(out.upkeep[0]!.fields).toEqual({ notes: null, tracking_status: 'Closed', date_closed: '2026-10-15' });
-    item.tracking_status = 'Closed';
-    item.date_closed = '2026-10-15';
-    item.notes = null;
-    expect(run(b, [R3c]).upkeep[0]!.fields).toEqual({ notes: null }); // nothing to change (the engine skips unchanged values)
-    b.device(l06, 'Sensor', { display_id: '06-D1' });
-    expect(run(b, [R3c]).upkeep[0]!.fields).toEqual({ notes: '06-D1', tracking_status: 'Open', date_closed: null });
+    expect(out.upkeep.map((u) => u.fields)).toEqual([
+      { notes: null, tracking_status: 'Closed', date_closed: '2026-10-15' },
+      { notes: null, tracking_status: 'Closed', date_closed: '2026-10-15' },
+    ]);
+    for (const item of [neuron, ip]) Object.assign(item, { tracking_status: 'Closed', date_closed: '2026-10-15', notes: null });
+    expect(run(b, [R3c]).upkeep.map((u) => u.fields)).toEqual([{ notes: null }, { notes: null }]); // nothing to change (the engine skips unchanged values)
+    // a new sensor reopens the Neuron item; the IP item stays closed; a DMX address on the panel shortens the DMX draft
+    b.device(l06m, 'Sensor', { display_id: '06M-D1' });
+    panel.dmx_address = '1/001';
+    out = run(b, [R3c]);
+    expect(out.upkeep.map((u) => u.fields)).toEqual([{ notes: '06M-D1', tracking_status: 'Open', date_closed: null }, { notes: null }]);
+    expect(out.proposals[0]!.payload.notes).toBe('06M-03');
   });
 
-  it('lists only devices that need a Neuron ID: racks and NSPS are out by category, a type\'s flag overrides (T68, D185)', () => {
-    const { b, l06, l06m } = group();
-    b.device(l06, 'Equipment rack', { display_id: '06-03' });
-    b.device(l06m, 'NSPS', { display_id: '06M-04', device: 'P-NSPS-D' });
-    expect(run(b, [R3c]).proposals[0]!.payload.notes).toBe('06-02, 06M-S2, 06M-S10');
-    // a type that says yes brings its rack back, by link or by Device text; a station type that says no drops its devices
-    const rackType = b.libraryType('Rack 42U', 'Equipment rack', { needs_neuron_id: true });
-    b.device(l06, 'Equipment rack', { display_id: '06-05', library_type_id: rackType.id });
-    b.libraryType('P-NSPS-D', 'NSPS', { needs_neuron_id: true, state: 'draft' });
-    b.libraryType('PI1002', 'Station', { needs_neuron_id: false });
-    b.device(l06m, 'Station', { display_id: '06M-S7', device: 'PI1002' });
-    expect(run(b, [R3c]).proposals[0]!.payload.notes).toBe('06-02, 06-05, 06M-04, 06M-S2, 06M-S10');
+  it('an R3c item is told from the others by its proposal\'s discriminator, else by its text (the project\'s wording or the default)', () => {
+    const { b, l06 } = group();
+    b.snap.ruleParams = [{ id: 'rp', project_id: b.snap.projectId, rule_id: 'R3c', key: 'ip.item', value: 'Missing all IP addresses', state: 'accepted', deleted_at: null }];
+    // an accepted IP item under the project's wording, and a rule-made item whose proposal says "dmx" though its text was edited
+    const ip = b.punch(l06, { item: 'Missing all IP addresses', type: 'Information', sort_last: true });
+    b.snap.proposals.push({ id: 'prop-dmx', project_id: b.snap.projectId, rule_id: 'R3c', subject: { entity_kind: 'numbering_group', entity_id: 'g6' }, discriminator: 'dmx', kind: 'punch', payload: null, inputs_hash: null, state: 'accepted', decided_by_id: null, decided_at: null, deleted_at: null });
+    const dmx = b.punch(l06, { item: 'DMX addresses still to capture', type: 'Information', sort_last: true, rule_id: 'R3c', proposal_id: 'prop-dmx' });
+    const out = run(b, [R3c]);
+    expect(out.proposals.map((p) => p.discriminator)).toEqual([null]); // only the Neuron item is still to be made
+    expect(out.upkeep.map((u) => [u.id, u.fields.notes])).toEqual([[ip.id, '06M-03'], [dmx.id, '06-01, 06M-03']]);
   });
 
-  it('proposes nothing for a group whose only devices need no Neuron ID', () => {
+  it('a type\'s flag overrides the wires both ways; the rules\' code maps are parameters (D245 (1), D247)', () => {
+    const { b, l06, l06m, nsps, panel } = group();
+    // the NSPS type says Needed: the host is listed; a station type says Not needed: its devices drop
+    b.libraryType('P-NSPS-D', 'NSPS', { needs_neuron_id: true });
+    const station = b.libraryType('PI1002', 'Station', { needs_neuron_id: false, needs_ip_address: true });
+    b.device(l06m, 'Station', { display_id: '06M-S7', library_type_id: station.id });
+    // the panel's type says no DMX address though a DMX run lands on it
+    const erp = b.libraryType('ERP24-FT', 'Relay panel', { needs_dmx_address: false });
+    panel.library_type_id = erp.id;
+    let out = run(b, [R3c]);
+    expect(out.proposals.map((p) => [p.discriminator, p.payload.notes])).toEqual([
+      [null, '06-02, 06M-S2, 06M-S10'],
+      ['ip', '06M-03, 06M-S7'],
+      ['dmx', '06M-03'],
+    ]);
+    expect(nsps.display_id).toBe('06-02');
+    // the project says a DALI run (D) needs a DMX address too, and its IP item belongs to EC/ETC
+    b.snap.ruleParams = [
+      { id: 'rp-1', project_id: b.snap.projectId, rule_id: 'R3c', key: 'dmx_codes', value: { D: true }, state: 'accepted', deleted_at: null },
+      { id: 'rp-2', project_id: b.snap.projectId, rule_id: 'R3c', key: 'ip.owner', value: 'EC/ETC', state: 'accepted', deleted_at: null },
+    ];
+    const dali = b.device(l06, 'Equipment', { display_id: '06-05', device: 'DALI gateway' });
+    b.cable('D', { device: dali }, null);
+    out = run(b, [R3c]);
+    expect(out.proposals.find((p) => p.discriminator === 'dmx')!.payload.notes).toBe('06-05, 06M-03');
+    expect(out.proposals.find((p) => p.discriminator === 'ip')!.payload.owner).toBe('EC/ETC');
+  });
+
+  it('proposes nothing for a group whose devices need no address', () => {
     const b = new Build();
     const l = b.level('07', { numbering_group_id: 'g7' });
-    b.device(l, 'Equipment rack', { display_id: '07-01' });
-    b.device(l, 'NSPS', { display_id: '07-02' });
+    const rack = b.device(l, 'Equipment rack', { display_id: '07-01' });
+    b.cable('120V', { device: rack }, null, { single_row: true });
+    const nsps = b.device(l, 'NSPS', { display_id: '07-02' });
+    b.cable('U', { device: nsps }, { placeholder: b.placeholder('Stations & Sensors', 'station_bus') });
+    b.device(l, 'Relay panel', { display_id: '07-03' }); // no cable record, no type: nothing is known of its wires
     expect(run(b, [R3c]).proposals).toEqual([]);
   });
 });
 
-describe('needsNeuronId (T68, D185)', () => {
-  it('reads the type flag, else the type category default, else the device category', () => {
-    expect(neuronIdDefault('Equipment rack')).toBe(false);
-    expect(neuronIdDefault('NSPS')).toBe(false);
-    expect(neuronIdDefault('Station')).toBe(true);
-    expect(neuronIdDefault(null)).toBe(true);
-    expect(needsNeuronId(null, { category: 'NSPS' })).toBe(false);
-    expect(needsNeuronId({ needs_neuron_id: null, category: 'Station' }, { category: 'NSPS' })).toBe(true);
-    expect(needsNeuronId({ needs_neuron_id: null, category: null }, { category: 'Equipment rack' })).toBe(false);
-    expect(needsNeuronId({ needs_neuron_id: true, category: 'NSPS' }, { category: 'NSPS' })).toBe(true);
-    expect(needsNeuronId({ needs_neuron_id: false, category: 'Station' }, { category: 'Station' })).toBe(false);
+describe('addressNeeds (T146, D245): what a device needs is read off the wires it gets', () => {
+  const station = { category: 'Station' };
+  const any = { category: 'Equipment' };
+  it('U → Neuron ID, N / NG → IP address, X → DMX address; other codes nothing', () => {
+    expect(addressNeeds(null, any, ['U'])).toEqual({ neuron: true, ip: false, dmx: false });
+    expect(addressNeeds(null, any, ['N'])).toEqual({ neuron: false, ip: true, dmx: false });
+    expect(addressNeeds(null, any, ['NG'])).toEqual({ neuron: false, ip: true, dmx: false });
+    expect(addressNeeds(null, any, ['X'])).toEqual({ neuron: false, ip: false, dmx: true });
+    expect(addressNeeds(null, any, ['X', 'N', 'U'])).toEqual({ neuron: true, ip: true, dmx: true });
+    expect(addressNeeds(null, any, ['P', '0-10V', '120V', 'F', 'UV', 'D'])).toEqual({ neuron: false, ip: false, dmx: false });
+    expect(addressNeeds(null, { category: 'Relay panel' }, [])).toEqual({ neuron: false, ip: false, dmx: false });
+    expect(needsNeuronId(null, { category: 'Power Distribution' }, ['U'])).toBe(true);
+  });
+  it('a device with no cable record reads its accepted type\'s default cables; a draft type\'s count for nothing', () => {
+    const type = { category: 'Touchscreen', state: 'accepted', default_cables: [{ code: 'N' }, { code: 'X' }] };
+    expect(addressNeeds(type, any, [])).toEqual({ neuron: false, ip: true, dmx: true });
+    expect(addressNeeds(type, any, null)).toEqual({ neuron: false, ip: true, dmx: true });
+    expect(addressNeeds({ ...type, state: 'draft' }, any, [])).toEqual({ neuron: false, ip: false, dmx: false });
+    // the device's own ends win over the type's templates
+    expect(addressNeeds(type, any, ['U'])).toEqual({ neuron: true, ip: false, dmx: false });
+  });
+  it('a station or sensor rides the Stations & Sensors bus: Neuron ID with no ends of its own (D50, R2e)', () => {
+    expect(addressNeeds(null, station, [])).toEqual({ neuron: true, ip: false, dmx: false });
+    expect(addressNeeds(null, { category: 'Sensor' }, null)).toEqual({ neuron: true, ip: false, dmx: false });
+    expect(addressNeeds({ category: 'Equipment', role: 'station' }, any, ['N'])).toEqual({ neuron: true, ip: true, dmx: false });
+  });
+  it('an NSPS or rack hosting the Unison pair needs no Neuron ID (D185), but an IP or DMX address when such a run lands on it', () => {
+    expect(addressNeeds(null, { category: 'NSPS' }, ['U', '120V'])).toEqual({ neuron: false, ip: false, dmx: false });
+    expect(addressNeeds(null, { category: 'Equipment Panels' }, ['U', 'N', 'X'])).toEqual({ neuron: false, ip: true, dmx: true });
+    expect(addressNeeds({ category: 'Equipment', role: 'nsps' }, any, ['U'])).toEqual({ neuron: false, ip: false, dmx: false });
+  });
+  it('the type\'s explicit flag overrides both ways; null is by the wires', () => {
+    expect(addressNeeds({ needs_neuron_id: true, category: 'NSPS' }, any, ['U'])).toEqual({ neuron: true, ip: false, dmx: false });
+    expect(addressNeeds({ needs_neuron_id: false, category: 'Station' }, station, [])).toEqual({ neuron: false, ip: false, dmx: false });
+    expect(addressNeeds({ needs_ip_address: true, needs_dmx_address: true }, any, [])).toEqual({ neuron: false, ip: true, dmx: true });
+    expect(addressNeeds({ needs_ip_address: false, needs_dmx_address: false }, any, ['N', 'X', 'U'])).toEqual({ neuron: true, ip: false, dmx: false });
+    expect(addressNeeds({ needs_neuron_id: null, needs_ip_address: null, needs_dmx_address: null }, any, ['N'])).toEqual({ neuron: false, ip: true, dmx: false });
+  });
+  it('reads the code maps from the project\'s parameters', () => {
+    const params = new RuleParams([{ id: 'rp', project_id: 'p', rule_id: 'R3c', key: 'ip_codes', value: { N: false, F: true }, state: 'accepted', deleted_at: null }]);
+    expect(addressNeeds(null, any, ['N'], params)).toEqual({ neuron: false, ip: false, dmx: false });
+    expect(addressNeeds(null, any, ['F'], params)).toEqual({ neuron: false, ip: true, dmx: false });
+    expect(addressNeeds(null, any, ['NG'], params).ip).toBe(true);
   });
 });
 
@@ -693,21 +779,22 @@ describe('the registry', () => {
         'R3a Run Unison to Stations & Sensors',
         'R3b Terminate DMX to 06M-09',
         'R3c Missing all Device Neuron IDs',
+        'R3c Missing all Device DMX addresses',
       ].sort(),
     );
-    // the T36 lints name what the drafts would add: the rack's 120V, the panel's P, the Neuron item
-    expect(a.findings.map((f) => f.lint_id).sort()).toEqual(['Acc', 'R1.no_item', 'lint.neuron_item', 'lint.power_120v', 'lint.relay_cables'].sort());
+    // the T36 lints name what the drafts would add: the rack's 120V, the panel's P, the Neuron and DMX items
+    expect(a.findings.map((f) => f.lint_id).sort()).toEqual(['Acc', 'R1.no_item', 'lint.neuron_item', 'lint.dmx_item', 'lint.power_120v', 'lint.relay_cables'].sort());
     expect(RULES.map((r) => r.id)).toEqual([
       'R1', 'R2a', 'R2b', 'R2c', 'R2d', 'R2e', 'R2f', 'R2g', 'R3a', 'R3b', 'R3c', 'R3d', 'R3f', 'R4a', 'R4b', 'R4d', 'E5', 'Acc',
       'lint.power_120v', 'lint.relay_cables', 'lint.item_owner', 'lint.neuron_item', 'lint.vocab', 'lint.type_category', 'lint.far_end', 'lint.end_status',
-      'lint.neuron_dup', 'lint.id_dup', 'lint.deleted_link', 'lint.pin_sheet', 'lint.locked_drafts', 'lint.accessory_group', 'ruling',
+      'lint.neuron_dup', 'lint.ip_dup', 'lint.id_dup', 'lint.deleted_link', 'lint.pin_sheet', 'lint.locked_drafts', 'lint.accessory_group', 'ruling',
     ]);
     const empty = run(new Build(), RULES);
     expect(empty).toMatchObject({ proposals: [], findings: [], upkeep: [], problems: [] });
   });
 });
 
-describe('roles (T112, D201): R2c / R2d / R2e and the Neuron ID default read the device role, not the category string', () => {
+describe('roles (T112, D201): R2c / R2d / R2e and the Neuron ID exception read the device role, not the category string', () => {
   it("a type's role governs; the D196 categories with no type imply a role only where one is named", () => {
     const b = new Build();
     const { level, power } = floor(b);
@@ -753,14 +840,14 @@ describe('roles (T112, D201): R2c / R2d / R2e and the Neuron ID default read the
     expect(erp.category).toBe('Power Distribution');
   });
 
-  it('needsNeuronId: the type flag, else the role of the type (its role, else its category), else the device category', () => {
-    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: 'nsps' }, { category: 'Equipment' })).toBe(false);
-    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: 'other' }, { category: 'NSPS' })).toBe(true);
-    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: null }, { category: 'NSPS' })).toBe(true); // Equipment names no role
-    expect(needsNeuronId({ needs_neuron_id: true, category: null, role: 'equipment_rack' }, { category: 'Equipment Panels' })).toBe(true);
-    expect(needsNeuronId(null, { category: 'Equipment Panels' })).toBe(false);
-    expect(needsNeuronId(null, { category: 'Power Distribution' })).toBe(true);
-    expect(neuronIdDefault('Equipment Rack')).toBe(false);
-    expect(neuronIdDefault('Equipment')).toBe(true);
+  it('addressNeeds: the Neuron exception reads the role of the type (its role, else its category), else the device category', () => {
+    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: 'nsps' }, { category: 'Equipment' }, ['U'])).toBe(false);
+    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: 'other' }, { category: 'NSPS' }, ['U'])).toBe(true);
+    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: null }, { category: 'NSPS' }, ['U'])).toBe(true); // Equipment names no role
+    expect(needsNeuronId({ needs_neuron_id: true, category: null, role: 'equipment_rack' }, { category: 'Equipment Panels' }, [])).toBe(true);
+    expect(needsNeuronId(null, { category: 'Equipment Panels' }, ['U'])).toBe(false);
+    expect(needsNeuronId(null, { category: 'Power Distribution' }, ['U'])).toBe(true);
+    // a station type of a category naming no role still rides the bus by its role
+    expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: 'station' }, { category: 'Equipment' }, [])).toBe(true);
   });
 });

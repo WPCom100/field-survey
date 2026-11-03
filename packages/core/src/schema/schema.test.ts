@@ -63,7 +63,7 @@ describe('migrations', () => {
 
   it('uses the D76 column names on the master-column entities', () => {
     expect(Object.keys(ENTITIES.device.columns)).toEqual(
-      expect.arrayContaining(['display_id', 'room_location', 'drawing_position', 'neuron_id']),
+      expect.arrayContaining(['display_id', 'room_location', 'drawing_position', 'neuron_id', 'ip_address', 'dmx_address']),
     );
     expect(Object.keys(ENTITIES.cable_end.columns)).toEqual(
       expect.arrayContaining(['from_text', 'to_text', 'display_id']),

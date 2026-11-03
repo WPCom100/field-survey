@@ -37,7 +37,7 @@ export class Build {
   device(level: LevelRow, category: string, p: Partial<DeviceRow> = {}): DeviceRow {
     const row: DeviceRow = {
       id: this.id('device'), level_id: level.id, display_id: null, category, device: null, type: null, room_location: null, drawing_position: null,
-      status: null, notes: null, pin: null, neuron_id: null, origin: 'baseline', found_on_site: null, panel_name: null, library_type_id: null, deleted_at: null,
+      status: null, notes: null, pin: null, neuron_id: null, ip_address: null, dmx_address: null, origin: 'baseline', found_on_site: null, panel_name: null, library_type_id: null, deleted_at: null,
       ...p,
     };
     this.snap.devices.push(row);
@@ -108,7 +108,7 @@ export class Build {
   libraryType(model: string, category: string, p: Partial<LibraryTypeRow> = {}): LibraryTypeRow {
     const row: LibraryTypeRow = {
       id: this.id('type'), project_id: this.snap.projectId, model, aliases: null, category, id_scheme: null, default_cables: null,
-      optional_cables: null, optional_accessories: null, needs_neuron_id: null, role: null, state: 'accepted', deleted_at: null, ...p,
+      optional_cables: null, optional_accessories: null, needs_neuron_id: null, needs_ip_address: null, needs_dmx_address: null, role: null, state: 'accepted', deleted_at: null, ...p,
     };
     this.snap.libraryTypes.push(row);
     return row;

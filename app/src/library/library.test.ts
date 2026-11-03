@@ -163,7 +163,7 @@ describe('device-type library editor (T48)', () => {
     expect((await loadLibrary(store, (await project('Other')).id)).codes).not.toContain('DX');
   });
 
-  it('Neuron ID per type (T68, D185): category default, the flag in the editor, the card, the dashboard and Copy from', async () => {
+  it('Neuron ID per type (T68, D185; by the wires since T146, D245): the flag in the editor, the card, the dashboard and Copy from', async () => {
     const { store, project } = await setup();
     const p = await project('Tower');
     const nspsType = await createType(p.editor, store, p.id, { model: 'P-NSPS-D-KIT', category: 'NSPS' });
@@ -177,8 +177,8 @@ describe('device-type library editor (T48)', () => {
     const rack = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-06', category: 'Equipment rack', device: 'Rack' }, CTX);
     const station = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-S1', category: 'Station', library_type_id: stationType }, CTX);
     expect((await loadDeviceCard(store, nsps.id))!.device.needsNeuronId).toBe(false);
-    expect((await loadDeviceCard(store, rack.id))!.device.needsNeuronId).toBe(false); // no type: the category decides
-    expect((await loadDeviceCard(store, station.id))!.device.needsNeuronId).toBe(true);
+    expect((await loadDeviceCard(store, rack.id))!.device.needsNeuronId).toBe(false); // no type: the category's role hosts the bus
+    expect((await loadDeviceCard(store, station.id))!.device.needsNeuronId).toBe(true); // rides the bus (D50)
     let dash = await loadDashboard(store, p.id);
     expect(asFound(dash)).toMatchObject({ neuronCaptured: 0, neuronDevices: 1, devices: 3 });
     expect(drillRows(dash, { table: 'asFound', key: 'neuronMissing', status: null }).map((r) => r.label)).toEqual(['06M-S1']);
@@ -195,14 +195,27 @@ describe('device-type library editor (T48)', () => {
     expect((await loadDeviceCard(store, station.id))!.device.needsNeuronId).toBe(false);
     dash = await loadDashboard(store, p.id);
     expect(drillRows(dash, { table: 'asFound', key: 'neuronMissing', status: null }).map((r) => r.label)).toEqual(['06M-05']);
-    // back to the category default
+    // back to "by the wires"
     await updateType(p.editor, store, nspsType, { needsNeuronId: null });
     expect((await loadDeviceCard(store, nsps.id))!.device.needsNeuronId).toBe(false);
-    // Copy from carries the flag
+    // T146: the IP / DMX flags the same way — the station type says its devices carry an IP address
+    await updateType(p.editor, store, stationType, { needsIpAddress: true, needsDmxAddress: false });
+    expect((await store.opsFor(stationType)).slice(-2).map((o) => [o.field, o.now])).toEqual([['needs_ip_address', true], ['needs_dmx_address', false]]);
+    expect((await loadLibrary(store, p.id)).types.find((t) => t.id === stationType)).toMatchObject({ needsIpAddress: true, needsDmxAddress: false, ipAddress: true, dmxAddress: false });
+    let card = (await loadDeviceCard(store, station.id))!;
+    expect([card.device.needsNeuronId, card.device.needsIpAddress, card.device.needsDmxAddress]).toEqual([false, true, false]);
+    // by the wires: a DMX run landing on the rack gives it a DMX address need; the NSPS with no wires needs nothing
+    const x = await p.editor.create('cable', { project_id: p.id, cable: 'X', qty: 1 }, CTX);
+    await p.editor.create('cable_end', { cable_id: x.id, side: 'A', level_id: p.levelId, device_id: rack.id }, CTX);
+    card = (await loadDeviceCard(store, rack.id))!;
+    expect([card.device.needsNeuronId, card.device.needsIpAddress, card.device.needsDmxAddress]).toEqual([false, false, true]);
+    card = (await loadDeviceCard(store, nsps.id))!;
+    expect([card.device.needsNeuronId, card.device.needsIpAddress, card.device.needsDmxAddress]).toEqual([false, false, false]);
+    // Copy from carries the flags
     await acceptType(p.editor, stationType);
     const q = await project('Other');
     await copyTypes(q.editor, store, q.id, [stationType]);
-    expect((await loadLibrary(store, q.id)).types[0]).toMatchObject({ model: 'PI1002', needsNeuronId: false, neuronId: false });
+    expect((await loadLibrary(store, q.id)).types[0]).toMatchObject({ model: 'PI1002', needsNeuronId: false, neuronId: false, needsIpAddress: true, ipAddress: true, needsDmxAddress: false });
   });
 
   it('accepting a type with default cables raises R2g drafts for the devices already there (and R2d stands aside)', async () => {
@@ -348,7 +361,7 @@ describe('library roles (T112, D201)', () => {
     // an NSPS in the D196 `Equipment` category: the category names no role
     const nspsType = await createType(p.editor, store, p.id, { model: 'P-NSPS-D-KIT', category: 'Equipment' });
     let t = (await loadLibrary(store, p.id)).types.find((x) => x.id === nspsType)!;
-    expect([t.role, t.effectiveRole, t.neuronId, t.rules]).toEqual([null, 'other', true, []]);
+    expect([t.role, t.effectiveRole, t.neuronId, t.rules]).toEqual([null, 'other', false, []]); // no role, no default cables: nothing known of its wires (T146)
     await expect(updateType(p.editor, store, nspsType, { role: 'power supply' as never })).rejects.toThrow(/not a role/);
     await updateType(p.editor, store, nspsType, { role: 'nsps' });
     t = (await loadLibrary(store, p.id)).types.find((x) => x.id === nspsType)!;
@@ -359,7 +372,7 @@ describe('library roles (T112, D201)', () => {
     const gateway = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-07', category: 'Equipment', device: 'RSN-DMX8-R' }, CTX);
     expect((await loadDeviceCard(store, linked.id))!.device.needsNeuronId).toBe(false);
     expect((await loadDeviceCard(store, byText.id))!.device.needsNeuronId).toBe(false);
-    expect((await loadDeviceCard(store, gateway.id))!.device.needsNeuronId).toBe(true);
+    expect((await loadDeviceCard(store, gateway.id))!.device.needsNeuronId).toBe(false); // no type, no wires (T146)
     // a station type of a category that names no role: the role gives the tag scheme
     const stationType = await createType(p.editor, store, p.id, { model: 'UH10002', category: 'Equipment' });
     await updateType(p.editor, store, stationType, { role: 'station' });

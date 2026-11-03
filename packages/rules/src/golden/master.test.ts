@@ -13,7 +13,11 @@
  *    Neuron ID items (D175 (4)); a second run writes nothing;
  * 3. with the master's copied ends unsurveyed (D171) the differences marked `copied` go away;
  * 4. R3c: with the master's Neuron ID items removed the engine proposes one per numbering group
- *    with the master's Device text and the IDs still missing;
+ *    with the master's Device text and the IDs still missing — by the wires each device gets
+ *    (T146, D245): the master has no IP / DMX address items, so the engine proposes those on
+ *    every group with a network or DMX run and flags the groups until they are accepted
+ *    (`expectedAddressDrafts`), and the devices the wire rule takes off the Neuron list are pinned in
+ *    `NEURON_LEFT_BY_WIRES` (D246: the relay panels; and what else — a diff for Landry);
  * 5. R3b / R4b: with the master's DMX-kit items and their kits removed the engine re-proposes
  *    the item per "no term kit" end and, once each is accepted, its kit sourced to it;
  * 6. E5: an ERP-FT-LVD short of the BOM count offers the 0-10V end Issue "Not landed" and the
@@ -37,7 +41,9 @@ import { describe, expect, it } from 'vitest';
 import { RuleEngine } from '../engine';
 import { RULES } from '../rules/index';
 
-import { compareIds, compareLevels, DMX_KITS_NOTE, NEURON_ITEM } from '../rules/shared';
+import { addressKindOf } from '../rules/r3';
+import { compareIds, compareLevels, DMX_ITEM, DMX_KITS_NOTE, IP_ITEM, NEURON_ITEM } from '../rules/shared';
+import type { AddressKind } from '../rules/library';
 import type { CableEndRow, MissingPartRow, ProposalRow, PunchItemRow, Snapshot } from '../snapshot';
 
 const FILE = fileURLToPath(new URL('../../../../fixtures/master-ops.json', import.meta.url));
@@ -128,6 +134,26 @@ const KNOWN_KITS: readonly { where: string; device: string; part: string; run: M
 ];
 
 const kitKey = (k: { where: string; part: string }) => `R4b ${k.where}: ${k.part}`;
+
+/**
+ * T146 (D245): the master has no "Missing all Device IP addresses" / "… DMX addresses" rows, so
+ * over the master as imported R3c proposes one per numbering group whose devices get a network
+ * (N / NG) or DMX (X) run and still lack the address, and `lint.ip_item` / `lint.dmx_item` flag
+ * those groups until the drafts are accepted — as the Neuron item and its lint did on a fresh
+ * project before the master's rows existed. Both are derived here from the snapshot's cable ends
+ * (`expectedAddressNotes`), not from the rule.
+ */
+const ADDRESS_ITEM_TEXT: Readonly<Record<AddressKind, string>> = { neuron: NEURON_ITEM, ip: IP_ITEM, dmx: DMX_ITEM };
+
+/**
+ * The devices the wire rule (D245) takes off the Neuron list that D185's role default had on it,
+ * by the master's category: the relay panels (D246: 0-10V, P and 120V wires only — a known
+ * difference), and — a diff Landry has not ruled on yet (T146 open question, D247) — the Foundry
+ * panels (DMX runs or no cable record at all), the EBDKs (the panic wire only) and the one
+ * touchscreen (a network run: it gets an IP address need instead). Any change here is a diff to
+ * show Landry first.
+ */
+const NEURON_LEFT_BY_WIRES: Readonly<Record<string, number>> = { 'Relay panel': 11, 'Foundry panel': 12, EBDK: 11, Touchscreen: 1 };
 
 /** The ends whose status the master copied from the other end (note "(per …)"): Unsurveyed under D171. */
 const COPIED_ENDS = ['01/C-20', '01/C-21', '02/C-12', '03/C-14', '06M/C-15', '06M/C-17', '06M/C-18', '06M/C-19'];
@@ -388,7 +414,42 @@ async function ruleFindings(m: Master, labels?: Labels) {
   const far = all.filter((f) => f.lint_id === 'lint.far_end');
   if (labels) expect(far.map((f) => `${labels.endById.get(f.subject!.entity_id) ?? '(unnumbered)'} ${f.message}`).sort()).toEqual([...FAR_END_FINDINGS].sort());
   else expect(far).toHaveLength(FAR_END_FINDINGS.length);
-  return all.filter((f) => !f.lint_id.startsWith('import.') && f.lint_id !== 'lint.far_end');
+  // T146: the IP / DMX item lints stand on every group that needs the item the master never had
+  const address = all.filter((f) => f.lint_id === 'lint.ip_item' || f.lint_id === 'lint.dmx_item');
+  expect(address.map((f) => `${f.lint_id} ${f.message}`).sort()).toEqual(expectedAddressFindings(await m.engine.loadSnapshot()).sort());
+  return all.filter((f) => !f.lint_id.startsWith('import.') && f.lint_id !== 'lint.far_end' && f.lint_id !== 'lint.ip_item' && f.lint_id !== 'lint.dmx_item');
+}
+
+/** One `R3c` draft per (group, kind) the master lacks: the group's first level and the Notes it should carry. */
+function expectedAddressDrafts(snap: Snapshot): { groupId: string; kind: 'ip' | 'dmx'; first: Snapshot['levels'][number]; notes: string }[] {
+  const out: { groupId: string; kind: 'ip' | 'dmx'; first: Snapshot['levels'][number]; notes: string }[] = [];
+  for (const groupId of new Set(snap.levels.filter((l) => !l.deleted_at).map((l) => l.numbering_group_id))) {
+    const first = snap.levels.filter((l) => l.numbering_group_id === groupId && !l.deleted_at).sort(compareLevels)[0]!;
+    for (const kind of ['ip', 'dmx'] as const) {
+      const notes = expectedAddressNotes(snap, first.id, kind);
+      if (notes) out.push({ groupId, kind, first, notes });
+    }
+  }
+  return out;
+}
+
+function expectedAddressFindings(snap: Snapshot): string[] {
+  return expectedAddressDrafts(snap).map(({ groupId, kind }) => {
+    const levels = snap.levels.filter((l) => l.numbering_group_id === groupId && !l.deleted_at).sort(compareLevels);
+    const names = levels.length === 1 ? `Level ${levels[0]!.level}` : `Levels ${levels.map((l) => l.level).join('/')}`;
+    return `lint.${kind}_item ${names}: no "${ADDRESS_ITEM_TEXT[kind]}" item`;
+  });
+}
+
+/** The engine's R3c IP / DMX drafts against `expectedAddressDrafts`, by (group, kind), with their payloads. */
+function checkAddressDrafts(snap: Snapshot, drafts: readonly { subject: ProposalRow['subject']; discriminator: string | null; payload: Record<string, unknown> | null }[]): void {
+  const expected = expectedAddressDrafts(snap);
+  const got = drafts.map((p) => `${p.subject!.entity_id}|${p.discriminator}`);
+  expect(sorted(got)).toEqual(sorted(expected.map((e) => `${e.groupId}|${e.kind}`)));
+  for (const e of expected) {
+    const p = drafts.find((x) => x.subject!.entity_id === e.groupId && x.discriminator === e.kind)!;
+    expect(p.payload, `${e.first.level} ${e.kind}`).toMatchObject({ level_id: e.first.id, item: ADDRESS_ITEM_TEXT[e.kind], type: 'Information', owner: e.kind === 'ip' ? 'ETC' : 'EC', tracking_status: 'Open', notes: e.notes, sort_last: true, device_text: 'All devices' });
+  }
 }
 
 // ------------------------------------------------------------------- tests
@@ -419,8 +480,13 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
     for (const k of KNOWN_KITS) expect(labels.punch(k.run).cable_end_id, k.where).not.toBeNull();
     const r1 = await m.engine.run();
     expect(r1.problems).toBe(0);
-    expect(r1.findings).toBe(FAR_END_FINDINGS.length);
-    const rows = await openProposals(m);
+    const snap0 = await m.engine.loadSnapshot();
+    expect(r1.findings).toBe(FAR_END_FINDINGS.length + expectedAddressFindings(snap0).length);
+    const all = await openProposals(m);
+    // T146: the IP / DMX address items the master never had, one per group with such a run (13 on the Tower)
+    checkAddressDrafts(snap0, all.filter((p) => p.rule_id === 'R3c'));
+    expect(all.filter((p) => p.rule_id === 'R3c')).toHaveLength(13);
+    const rows = all.filter((p) => p.rule_id !== 'R3c');
     const got = rows.map((p) => labels.keyOf(p));
     expect(sorted(got)).toEqual(sorted([...KNOWN_DIFFERENCES.map(key), ...KNOWN_KITS.map(kitKey)]));
     for (const l of LINKED_BY_IMPORT) expect(got, l.where).not.toContain(key({ rule: l.rule, where: l.where, item: l.was }));
@@ -447,10 +513,12 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
     for (const ref of NEURON_ITEMS) {
       const item = after.punch(ref);
       expect(item).toMatchObject({ type: 'Information', owner: 'EC', tracking_status: 'Open', sort_last: true, device_text: 'All devices' });
-      expect(item.notes).toBe(expectedNeuronNotes(snap, item.level_id));
+      expect(item.notes).toBe(expectedAddressNotes(snap, item.level_id, 'neuron'));
       const ops = await m.store.opsFor(item.id);
       expect(ops.filter((o) => o.reason === 'Rule engine R3c').map((o) => o.field)).toEqual(['notes']);
     }
+    // T146 / D246: who the wire rule took off the Neuron list, by the master's category — exactly these
+    expect(neuronLeftByWires(snap)).toEqual(NEURON_LEFT_BY_WIRES);
     // a second run writes nothing
     expect((await m.engine.run()).ops).toBe(0);
   });
@@ -462,9 +530,10 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
     for (const l of COPIED_ENDS) expect(labels.end(l).note, l).toMatch(/\(per /);
     expect(snap.cableEnds.filter((e) => /\(per /.test(e.note ?? '')).map((e) => labels.endById.get(e.id)).sort()).toEqual([...COPIED_ENDS].sort());
     const { out } = await m.engine.plan(d171View(snap, labels));
-    const got = out.proposals.map((p) => labels.keyOf(p));
+    const got = out.proposals.filter((p) => p.rule_id !== 'R3c').map((p) => labels.keyOf(p));
     expect(sorted(got)).toEqual(sorted([...KNOWN_DIFFERENCES.filter((d) => !d.copied).map(key), ...KNOWN_KITS.map(kitKey)]));
-    expect(out.findings.filter((f) => f.lint_id !== 'lint.far_end')).toEqual([]);
+    checkAddressDrafts(snap, out.proposals.filter((p) => p.rule_id === 'R3c'));
+    expect(out.findings.filter((f) => f.lint_id !== 'lint.far_end' && f.lint_id !== 'lint.ip_item' && f.lint_id !== 'lint.dmx_item')).toEqual([]);
     expect(out.findings.filter((f) => f.lint_id === 'lint.far_end')).toHaveLength(FAR_END_FINDINGS.length);
   });
 
@@ -475,14 +544,15 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
     const neuron = new Set(NEURON_ITEMS.map((ref) => labels.punch(ref).id));
     const { out } = await m.engine.plan({ ...snap, punchItems: snap.punchItems.filter((p) => !neuron.has(p.id)) });
     expect(out.upkeep).toEqual([]);
-    const drafts = out.proposals.filter((p) => p.rule_id === 'R3c');
+    checkAddressDrafts(snap, out.proposals.filter((p) => p.rule_id === 'R3c' && addressKindOf(p.discriminator) !== 'neuron'));
+    const drafts = out.proposals.filter((p) => p.rule_id === 'R3c' && addressKindOf(p.discriminator) === 'neuron');
     expect(drafts).toHaveLength(7);
     expect(new Set(drafts.map((p) => p.subject.entity_id)).size).toBe(7);
     for (const p of drafts) {
       const levels = snap.levels.filter((l) => l.numbering_group_id === p.subject.entity_id).sort(compareLevels);
       const first = levels[0]!;
       expect(p.subject).toMatchObject({ entity_kind: 'numbering_group', level_id: first.id });
-      expect(p.payload).toEqual({ level_id: first.id, item: NEURON_ITEM, type: 'Information', owner: 'EC', tracking_status: 'Open', notes: expectedNeuronNotes(snap, first.id), sort_last: true, device_text: 'All devices', why: expect.any(String) });
+      expect(p.payload).toEqual({ level_id: first.id, item: NEURON_ITEM, type: 'Information', owner: 'EC', tracking_status: 'Open', notes: expectedAddressNotes(snap, first.id, 'neuron'), sort_last: true, device_text: 'All devices', why: expect.any(String) });
     }
     // the master's rows are exactly what the drafts would make
     for (const ref of NEURON_ITEMS) {
@@ -592,7 +662,7 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
     expect((await ruleFindings(m)).map((f) => [f.lint_id, labels.deviceById.get(f.subject!.entity_id), f.message]).sort()).toEqual(
       panels.map((p) => ['Acc', p.device, `ERP-FT-LVD: found ${p.found} of ${p.expected}`]).sort(),
     );
-    expect(r1.findings).toBe(3 + FAR_END_FINDINGS.length);
+    expect(r1.findings).toBe(3 + FAR_END_FINDINGS.length + expectedAddressFindings(await m.engine.loadSnapshot()).length);
     // before the survey found them: the Land items gone and the 0-10V ends not yet Issue → E5 proposes both
     await m.editor.group(CTX, async (g) => {
       for (const p of panels) {
@@ -685,18 +755,48 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
 });
 
 /**
- * The IDs with no Neuron ID in the numbering group of `levelId`: level order, then natural ID order
- * (D175 (4)); racks and NSPS need none (T68, D185 — the master import has no library types).
+ * What each master device needs, read off its wires independently of the rule (T146, D245): the
+ * codes of its live cable ends; a Station / Sensor rides the Unison bus (U); an Equipment rack or
+ * NSPS carries no Neuron ID (D185). The master import has no library types, so no type flag applies.
  */
-function expectedNeuronNotes(snap: Snapshot, levelId: string): string | null {
+function needsByWires(snap: Snapshot, d: Snapshot['devices'][number]): Record<AddressKind, boolean> {
+  const live = new Set(snap.cables.filter((c) => !c.deleted_at).map((c) => c.id));
+  const codes = snap.cableEnds.filter((e) => !e.deleted_at && e.device_id === d.id && live.has(e.cable_id)).map((e) => snap.cables.find((c) => c.id === e.cable_id)!.cable);
+  const cat = d.category ?? '';
+  if (['Station', 'Sensor'].includes(cat)) codes.push('U');
+  return {
+    neuron: !['Equipment rack', 'NSPS'].includes(cat) && codes.includes('U'),
+    ip: codes.includes('N') || codes.includes('NG'),
+    dmx: codes.includes('X'),
+  };
+}
+
+/**
+ * The IDs with no address of `kind` in the numbering group of `levelId`, among the devices that
+ * need one by their wires: level order, then natural ID order (D175 (4)).
+ */
+function expectedAddressNotes(snap: Snapshot, levelId: string, kind: AddressKind): string | null {
   expect(snap.libraryTypes.filter((t) => !t.deleted_at)).toEqual([]);
+  const field = { neuron: 'neuron_id', ip: 'ip_address', dmx: 'dmx_address' }[kind] as 'neuron_id' | 'ip_address' | 'dmx_address';
   const level = snap.levels.find((l) => l.id === levelId)!;
   const levels = snap.levels.filter((l) => l.numbering_group_id === level.numbering_group_id && !l.deleted_at).sort(compareLevels);
   const ids = levels.flatMap((l) =>
     snap.devices
-      .filter((d) => d.level_id === l.id && !d.deleted_at && !(d.neuron_id ?? '').trim() && !['Equipment rack', 'NSPS'].includes(d.category ?? ''))
+      .filter((d) => d.level_id === l.id && !d.deleted_at && !(d[field] ?? '').trim() && needsByWires(snap, d)[kind])
       .map((d) => d.display_id ?? `${l.level}-?`)
       .sort(compareIds),
   );
   return ids.length ? ids.join(', ') : null;
+}
+
+/** Devices D185's role default listed for a Neuron ID that the wire rule does not, counted by category. */
+function neuronLeftByWires(snap: Snapshot): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const d of snap.devices) {
+    if (d.deleted_at) continue;
+    const cat = d.category ?? '(none)';
+    if (['Equipment rack', 'NSPS'].includes(cat) || needsByWires(snap, d).neuron) continue;
+    out[cat] = (out[cat] ?? 0) + 1;
+  }
+  return out;
 }

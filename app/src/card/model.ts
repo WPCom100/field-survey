@@ -8,7 +8,7 @@ import { defaultDeviceText, displayNumber, isNew, reviewFields, type StoredOp, t
 import { CABLE_CODES, cableCodes, cableTitle, editableKeys, loadRuleParams, parseLibraryAccessories, parseLibraryCables, type LibraryCable } from '@field-survey/rules';
 
 import { loadDraftEndLabels, waitsForDraft } from '../cables/draftEnds';
-import { deviceNeedsNeuron, loadNeuronTypes, typeOf } from '../library/neuron';
+import { codesOfDevice, deviceAddressNeeds, loadDeviceTypes, typeOf } from '../library/neuron';
 import { photoStrip } from '../photo/links';
 import { baselineEvents, type BaselineEvent } from '../setup/lock';
 import { chipsFor, loadChipRows } from '../suggestions/model';
@@ -47,6 +47,8 @@ export const FIELD_LABEL: Readonly<Record<string, string>> = {
   neuron_id: 'Neuron ID',
   neuron_method: 'Neuron ID method',
   neuron_evidence_photo_id: 'Neuron ID evidence',
+  ip_address: 'IP address',
+  dmx_address: 'DMX address',
   origin: 'Origin',
   found_on_site: 'Found on site',
   panel_name: 'Panel name',
@@ -72,8 +74,16 @@ export type CardDevice = {
   pin: { sheet: string; x: number; y: number } | null;
   neuronId: string | null;
   neuronMethod: string | null;
-  /** Its type (or category) carries a Neuron ID (T68, D185); the card hides the section otherwise. */
+  /** T146 (D245, D246): an IPv4 dotted quad, no subnet; `<universe>/<address>`. */
+  ipAddress: string | null;
+  dmxAddress: string | null;
+  /**
+   * Which addresses the device needs, by its type's flags, else by the wires it gets (T68 / D185,
+   * T146 / D245); the card hides a section whose address is neither needed nor captured.
+   */
   needsNeuronId: boolean;
+  needsIpAddress: boolean;
+  needsDmxAddress: boolean;
   fieldAddition: boolean;
   /** Placed from a draft (T46): Put back in the unplaced list deletes it (T139). */
   placedFromDraft: boolean;
@@ -474,8 +484,10 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
   const levelCode = String(level.level);
   const projectId = String(level.project_id);
   const pinRow = d.pin && typeof d.pin === 'object' ? (d.pin as Row) : null;
-  const types = await loadNeuronTypes(store, projectId);
+  const types = await loadDeviceTypes(store, projectId);
   const type = d.deleted_at ? null : typeOf(types, d);
+  const ruleParams = await loadRuleParams(store, projectId);
+  const needs = deviceAddressNeeds(types, d, await codesOfDevice(store, deviceId), ruleParams);
 
   const device: CardDevice = {
     id: deviceId,
@@ -497,7 +509,11 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
         : null,
     neuronId: str(d.neuron_id),
     neuronMethod: str(d.neuron_method),
-    needsNeuronId: deviceNeedsNeuron(types, d),
+    ipAddress: str(d.ip_address),
+    dmxAddress: str(d.dmx_address),
+    needsNeuronId: needs.neuron,
+    needsIpAddress: needs.ip,
+    needsDmxAddress: needs.dmx,
     fieldAddition: d.origin === 'field_addition',
     placedFromDraft: !!str(d.baseline_ref_id),
     deleted: !!d.deleted_at,
@@ -599,7 +615,6 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     (a, b) => Number(a.label === 'NEW') - Number(b.label === 'NEW') || a.label.localeCompare(b.label, 'en', { numeric: true }) || a.id.localeCompare(b.id),
   );
 
-  const ruleParams = await loadRuleParams(store, projectId);
   const cableOffers = optionalCableOffers(type, connections.map((c) => c.cable), cableCodes(ruleParams));
   const accessoryOffers = optionalAccessoryOffers(type, accessories.map((a) => a.model));
   const accessoryOfferGroups = accessoryOfferBlocks(type, accessoryOffers, accessories);

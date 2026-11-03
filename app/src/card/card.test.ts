@@ -12,15 +12,20 @@ import {
   addOptionalAccessory,
   addOptionalCable,
   appendPhrase,
+  checkDmxAddress,
+  checkIpAddress,
   checkNeuronId,
   correction,
   deleteCable,
   deleteDevice,
+  ipDuplicates,
   movePin,
   neuronDuplicates,
   normalizeNeuronId,
   restoreCable,
   restoreDevice,
+  saveDmxAddress,
+  saveIpAddress,
   saveNeuronId,
   setFound,
   setNotes,
@@ -252,6 +257,42 @@ describe('device card edits', () => {
     await setFound(editor, acc, 2);
     expect((await loadDeviceCard(store, dev.id))!.accessories[0]!.short).toBe(false);
     expect(() => setFound(editor, acc, -1)).toThrow(OpError);
+  });
+
+  it('IP and DMX addresses (T146, D246): format checks, one Field survey op each, Clear, duplicate IPs reported; the card needs them by the wires', async () => {
+    expect(checkIpAddress(' 10.101.004.23 ')).toEqual({ value: '10.101.4.23', error: null });
+    expect(checkIpAddress('10.101.4.23/24').error).toMatch(/No subnet/);
+    expect(checkIpAddress('10.101.4').error).toMatch(/four numbers/);
+    expect(checkIpAddress('10.101.4.256').error).toMatch(/0–255/);
+    expect(checkIpAddress('').error).toMatch(/Type the IP address/);
+    expect(checkDmxAddress('1/1')).toEqual({ value: '1/001', error: null });
+    expect(checkDmxAddress(' 12 / 512 ')).toEqual({ value: '12/512', error: null });
+    expect(checkDmxAddress('1/513').error).toMatch(/1–512/);
+    expect(checkDmxAddress('0/1').error).toMatch(/universe is 1 or more/);
+    expect(checkDmxAddress('1-001').error).toMatch(/<universe>\/<address>/);
+
+    const { store, pid, editor, byLabel } = await setup();
+    await ensureDemoCardExtras(store); // the panel's X, 0-10V and U runs
+    const panel = byLabel('06M-01'); // X, 0-10V and U runs: Neuron ID and DMX address, no IP
+    const far = byLabel('06M-03'); // the DMX run's far end
+    let card = (await loadDeviceCard(store, panel.id))!;
+    expect([card.device.needsNeuronId, card.device.needsIpAddress, card.device.needsDmxAddress]).toEqual([true, false, true]);
+    expect([card.device.ipAddress, card.device.dmxAddress]).toEqual([null, null]);
+    card = (await loadDeviceCard(store, far.id))!;
+    expect([card.device.needsNeuronId, card.device.needsIpAddress, card.device.needsDmxAddress]).toEqual([false, false, true]);
+
+    expect(() => saveIpAddress(editor, panel.id, '10.1.2')).toThrow(OpError);
+    expect(() => saveDmxAddress(editor, panel.id, '1/999')).toThrow(OpError);
+    expect(await saveDmxAddress(editor, panel.id, '1/1')).toMatchObject({ entity_kind: 'device', field: 'dmx_address', now: '1/001', change_type: 'Field survey', reason: 'Field survey' });
+    expect(await saveIpAddress(editor, panel.id, '10.101.4.23')).toMatchObject({ field: 'ip_address', now: '10.101.4.23' });
+    card = (await loadDeviceCard(store, panel.id))!;
+    expect([card.device.ipAddress, card.device.dmxAddress]).toEqual(['10.101.4.23', '1/001']);
+    await saveIpAddress(editor, far.id, '10.101.4.23');
+    expect(await ipDuplicates(store, pid, '10.101.4.23', far.id)).toEqual([{ id: panel.id, label: '06M-01' }]);
+    expect(await ipDuplicates(store, pid, '10.101.4.24', far.id)).toEqual([]);
+    // Clear
+    expect(await saveIpAddress(editor, panel.id, '  ')).toMatchObject({ field: 'ip_address', now: null });
+    expect((await loadDeviceCard(store, panel.id))!.device.ipAddress).toBeNull();
   });
 
   it('Neuron ID: normalised, 12 hex digits, duplicates reported, saved as one group', async () => {

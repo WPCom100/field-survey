@@ -46,6 +46,15 @@ describe('the catalogue', () => {
       '<signal> termination kit - <far end> run',
     ]);
     expect([d.get('R3c', 'item'), d.get('R3c', 'owner'), d.get('R3c', 'device_text')]).toEqual(['Missing all Device Neuron IDs', 'EC', 'All devices']);
+    // T146 (D245, D246): the IP and DMX items, and the code → address maps
+    expect([d.get('R3c', 'ip.item'), d.get('R3c', 'ip.owner'), d.get('R3c', 'dmx.item'), d.get('R3c', 'dmx.owner')]).toEqual(['Missing all Device IP addresses', 'ETC', 'Missing all Device DMX addresses', 'EC']);
+    expect(['U', 'N', 'NG', 'X', 'F'].map((c) => [d.flagCode('R3c', 'neuron_codes', c), d.flagCode('R3c', 'ip_codes', c), d.flagCode('R3c', 'dmx_codes', c)])).toEqual([
+      [true, false, false],
+      [false, true, false],
+      [false, true, false],
+      [false, false, true],
+      [false, false, false],
+    ]);
     expect([d.get('R2f', 'status'), d.get('R5', 'enabled'), d.get('R2c', 'panic.status')]).toEqual(['Not started', true, 'Installed, untested']);
   });
 
@@ -217,8 +226,13 @@ describe('rule parameters over a store', () => {
     await editor.setField('device', ids.station, 'neuron_id', null, CTX);
     await setRuleParam(editor, 'R3c', 'owner', 'ETC');
     await engine.run();
-    const r3c = await store.list<ProposalRow>('proposal', { where: `rule_id = 'R3c'` });
-    expect(r3c[0]!.payload).toMatchObject({ item: 'Missing all Device Neuron IDs', owner: 'ETC', notes: '07-S1' });
+    const r3c = await store.list<ProposalRow>('proposal', { where: `rule_id = 'R3c'`, orderBy: 'discriminator' });
+    // T146: one item per address kind; the two panels' network and DMX runs give them IP and DMX address needs
+    expect(r3c.map((p) => [p.discriminator, p.payload!.item, p.payload!.owner, p.payload!.notes])).toEqual([
+      [null, 'Missing all Device Neuron IDs', 'ETC', '07-S1'],
+      ['dmx', 'Missing all Device DMX addresses', 'EC', '06-01, 06-02'],
+      ['ip', 'Missing all Device IP addresses', 'ETC', '06-01, 06-02'],
+    ]);
   });
 
   it('app-level defaults are drafts until accepted and never move a project (copied at creation instead)', async () => {

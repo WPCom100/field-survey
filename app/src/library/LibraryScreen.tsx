@@ -21,7 +21,6 @@ import {
   editorStamp,
   libraryGroups,
   loadLibrary,
-  neuronIdDefaultForRole,
   parseAliases,
   rejectType,
   reopenType,
@@ -394,6 +393,8 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
   const [aliases, setAliases] = useState(t.aliases.join(', '));
   const [scheme, setScheme] = useState<IdScheme | null>(t.idScheme);
   const [neuron, setNeuron] = useState<boolean | null>(t.needsNeuronId);
+  const [ip, setIp] = useState<boolean | null>(t.needsIpAddress);
+  const [dmx, setDmx] = useState<boolean | null>(t.needsDmxAddress);
   const [defaults, setDefaults] = useState<LibraryCable[]>(t.defaultCables);
   const [optional, setOptional] = useState<LibraryCable[]>(t.optionalCables);
   const [accessories, setAccessories] = useState<LibraryAccessory[]>(t.optionalAccessories);
@@ -404,12 +405,14 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
     aliases !== t.aliases.join(', ') ||
     scheme !== t.idScheme ||
     neuron !== t.needsNeuronId ||
+    ip !== t.needsIpAddress ||
+    dmx !== t.needsDmxAddress ||
     JSON.stringify(defaults) !== JSON.stringify(t.defaultCables) ||
     JSON.stringify(optional) !== JSON.stringify(t.optionalCables) ||
     JSON.stringify(accessories) !== JSON.stringify(t.optionalAccessories);
   const save = () =>
     props.run(
-      (e, s) => updateType(e, s, t.id, { model, category, role, aliases: parseAliases(aliases), idScheme: scheme, needsNeuronId: neuron, defaultCables: defaults, optionalCables: optional, optionalAccessories: accessories }),
+      (e, s) => updateType(e, s, t.id, { model, category, role, aliases: parseAliases(aliases), idScheme: scheme, needsNeuronId: neuron, needsIpAddress: ip, needsDmxAddress: dmx, defaultCables: defaults, optionalCables: optional, optionalAccessories: accessories }),
       'Saved.',
     );
   const ro = !props.canEdit;
@@ -465,17 +468,24 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
               ))}
             </View>
           </Field>
-          <Field label="Neuron ID" hint="Whether devices of this type carry one. A type that does not hides it on the card and is left out of “Missing all Device Neuron IDs” and the dashboard count.">
-            <View style={styles.wrap}>
-              {([null, true, false] as const).map((v) => (
-                <Pressable key={String(v)} disabled={ro} onPress={() => setNeuron(v)} style={[styles.chip, neuron === v && styles.chipOn]}>
-                  <Text style={neuron === v ? styles.chipTextOn : styles.chipText}>
-                    {v === null ? `Role default (${neuronIdDefaultForRole(roleOf({ role, category }, null)) ? 'needed' : 'not needed'})` : v ? 'Needed' : 'Not needed'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </Field>
+          {/* T146 (D245): what the type's devices need; null = by the wires they get (U → Neuron ID, N / NG → IP address, X → DMX address). */}
+          {(
+            [
+              ['Neuron ID', neuron, setNeuron, 'A Unison (U) run needs one; stations and sensors ride the bus; an NSPS or rack hosts it and needs none. Needed / Not needed overrides the wires: the card hides the section and the device leaves “Missing all Device Neuron IDs” and the dashboard count.'],
+              ['IP address', ip, setIp, 'A network (N, NG) run needs one. Needed / Not needed overrides the wires; the device leaves “Missing all Device IP addresses” when not needed.'],
+              ['DMX address', dmx, setDmx, 'A DMX (X) run needs one. Needed / Not needed overrides the wires; the device leaves “Missing all Device DMX addresses” when not needed.'],
+            ] as const
+          ).map(([label, value, set, hint]) => (
+            <Field key={label} label={label} hint={hint}>
+              <View style={styles.wrap}>
+                {([null, true, false] as const).map((v) => (
+                  <Pressable key={String(v)} disabled={ro} onPress={() => set(v)} style={[styles.chip, value === v && styles.chipOn]}>
+                    <Text style={value === v ? styles.chipTextOn : styles.chipText}>{v === null ? 'By the wires' : v ? 'Needed' : 'Not needed'}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </Field>
+          ))}
           <Field
             label="Default cables (always generated)"
             hint="Once the type is accepted, the rules offer each run as a draft to every device of this type that lacks it, instead of the category's (R2c / R2d). Unison (U) stays one bus per level (R2e).">
