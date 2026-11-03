@@ -70,7 +70,8 @@ export type DeviceDraftRow = {
 export type AccessoryOf = { model: string; parentId: string | null; parentLabel: string | null };
 
 export type EndpointKind = 'device' | 'draft_device' | 'placeholder';
-export type Endpoint = { kind: EndpointKind; id: string; label: string; levelId: string | null; confidence?: number | null };
+/** `riser`: the text the riser printed for a candidate, kept when the label (`endpointLabel`, T137) reads otherwise. */
+export type Endpoint = { kind: EndpointKind; id: string; label: string; levelId: string | null; confidence?: number | null; riser?: string | null };
 export type Side = 'from' | 'to';
 
 export type CableDraftRow = {
@@ -286,11 +287,11 @@ export function cableEnds(raw: unknown): Pick<CableDraftRow, 'candidates' | 'end
   let confirmed = true;
   for (const side of ['from', 'to'] as const) {
     const mine = list.filter((e) => e.side === side);
-    candidates[side] = mine.filter((e) => !e.manual).map((e) => ({ kind: e.kind, id: e.id, label: e.label, levelId: e.levelId, confidence: e.confidence }));
+    candidates[side] = mine.filter((e) => !e.manual).map((e) => ({ kind: e.kind, id: e.id, label: e.label, levelId: e.levelId, confidence: e.confidence, riser: e.label }));
     const pick = mine.find((e) => e.chosen);
     const only = mine.length === 1 ? mine[0] : undefined;
     const e = pick ?? only ?? null;
-    ends[side] = e ? { kind: e.kind, id: e.id, label: e.label, levelId: e.levelId, confidence: e.confidence } : null;
+    ends[side] = e ? { kind: e.kind, id: e.id, label: e.label, levelId: e.levelId, confidence: e.confidence, riser: e.manual ? null : e.label } : null;
     chosen[side] = !!pick;
     // a To set by a code change (T128, `follows_code`) is not the reviewer's pick
     handPicked[side] = !!pick && !pick.follows && (pick.manual || mine.length > 1);
@@ -563,7 +564,7 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
   for (const d of devices) bump(levelKeyOf(d.levelId, d.sourceRef), d.levelCode, 'devices', d.state === 'proposed');
   for (const c of cables) bump(levelKeyOf(c.levelId, c.sourceRef), c.levelCode, 'cables', c.state === 'proposed');
 
-  return {
+  const data: DraftReviewData = {
     levels: levelRows,
     devices,
     cables,
@@ -581,6 +582,15 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
       label: [str(d.display_id) ?? `${levelCode(String(d.level_id)) ?? '?'}-?`, str(d.panel_name) ?? str(d.device) ?? str(d.category)].filter(Boolean).join(' '),
     })),
   };
+  // every endpoint reads as what it is now, the riser's text a note (T137)
+  for (const c of cables) {
+    for (const side of ['from', 'to'] as const) {
+      c.candidates[side] = c.candidates[side].map((e) => endpointLabel(data, e));
+      const end = c.ends[side];
+      if (end) c.ends[side] = endpointLabel(data, end);
+    }
+  }
+  return data;
 }
 
 // ------------------------------------------------------------------ accessory drafts (T126)
@@ -771,10 +781,34 @@ export function draftRole(d: { role?: Role | null; category: string | null }): R
   return d.role ?? roleOfCategory(d.category);
 }
 
+/** A draft device as an endpoint reads (T137): its model and name, and its level — `P-NSPS-D (draft, 03)`. */
+export function draftDeviceLabel(d: Pick<DeviceDraftRow, 'model' | 'name' | 'category' | 'levelCode'>): string {
+  const what = [...new Set([d.model, d.name].filter((x): x is string => !!x))].join(' ') || d.category || '?';
+  return `${what} (draft${d.levelCode ? `, ${d.levelCode}` : ''})`;
+}
+
+/**
+ * An endpoint labelled from what it is now (T137): a draft device by its model, name and level, a
+ * device by its ID and text, a placeholder by its label. A candidate's riser text stays as `riser`
+ * when the label does not already say it (`PARADIGM P-NSPS-DIN` on a `P-NSPS-D`); the stored
+ * candidates are not rewritten. An endpoint this iPad has no record for keeps its stored label.
+ */
+export function endpointLabel(data: Pick<DraftReviewData, 'devices' | 'devicesLive' | 'placeholders'>, e: Endpoint): Endpoint {
+  let label: string | undefined;
+  if (e.kind === 'draft_device') {
+    const d = data.devices.find((x) => x.id === e.id);
+    label = d ? draftDeviceLabel(d) : undefined;
+  } else if (e.kind === 'device') label = data.devicesLive.find((x) => x.id === e.id)?.label;
+  else label = data.placeholders.find((x) => x.id === e.id)?.label;
+  const now = label ?? e.label;
+  const riser = e.riser?.trim() && !now.toUpperCase().includes(e.riser.trim().toUpperCase()) ? e.riser.trim() : null;
+  return { ...e, label: now, riser };
+}
+
 /**
  * What a side can be set to, best first: the side's candidates (a draft device shown as the
  * device it has become when there is one), then devices and draft devices on the side's level,
- * then placeholders. `query` filters by text.
+ * then placeholders, each labelled by `endpointLabel`. `query` filters by the label or the riser's text.
  */
 export function endpointOptions(data: DraftReviewData, c: CableDraftRow, side: Side, query = ''): Endpoint[] {
   const q = query.trim().toUpperCase();
@@ -784,7 +818,7 @@ export function endpointOptions(data: DraftReviewData, c: CableDraftRow, side: S
   const add = (e: Endpoint) => {
     const k = `${e.kind}:${e.id}`;
     if (seen.has(k)) return;
-    if (q && !e.label.toUpperCase().includes(q)) return;
+    if (q && !e.label.toUpperCase().includes(q) && !e.riser?.toUpperCase().includes(q)) return;
     seen.add(k);
     out.push(e);
   };
@@ -803,7 +837,7 @@ export function endpointOptions(data: DraftReviewData, c: CableDraftRow, side: S
   for (const d of data.devicesLive) if (scope(d.levelId)) add({ kind: 'device', id: d.id, label: d.label, levelId: d.levelId });
   for (const d of data.devices) {
     if (d.state === 'rejected' || !scope(d.levelId)) continue;
-    add({ kind: 'draft_device', id: d.id, label: `${d.name ?? d.model ?? '?'} (draft${d.levelCode ? `, ${d.levelCode}` : ''})`, levelId: d.levelId });
+    add({ kind: 'draft_device', id: d.id, label: draftDeviceLabel(d), levelId: d.levelId });
   }
   for (const p of data.placeholders) add({ kind: 'placeholder', id: p.id, label: p.label, levelId: p.levelId });
   return out;

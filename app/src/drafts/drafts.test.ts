@@ -268,6 +268,35 @@ describe('draft review read model (T44)', () => {
     expect(cableEnds(picked).candidates.to.map((e) => e.id)).toEqual(['p1', 'p2']);
     expect(cableEnds(withChosen(picked, 'to', null)).ends.to).toBeNull();
   });
+
+  it('labels an endpoint by what it is now, the riser’s text a note (T137)', async () => {
+    const { store, editor, ids } = await setup();
+    const MASTER = { change_type: 'Master edit', reason: 'test' } as const;
+    const nsps = (await editor.create('draft_device', { project_id: PROJECT, import_batch_id: ids.riser, level_id: ids.l02, model: 'P-NSPS-D', category: 'Equipment', role: 'nsps', qty: 1, confidence: 0.9, level_basis: 'riser_band', state: 'proposed' }, MASTER)).id;
+    const n = (await editor.create('draft_cable', {
+      project_id: PROJECT, import_batch_id: ids.riser, level_id: ids.l02, code: 'N', qty: 1, origin: 'riser', state: 'proposed', from_label: 'UFMP4', to_label: 'PARADIGM P-NSPS-DIN',
+      candidates: [{ side: 'from', kind: 'draft_device', id: ids.dE, label: 'UFMP4', confidence: 0.9 }, { side: 'to', kind: 'draft_device', id: nsps, label: 'PARADIGM P-NSPS-DIN', confidence: 0.8 }],
+    }, MASTER)).id;
+    let data = await loadDraftReview(store, PROJECT);
+    const c = row(data.cables, n);
+    // the draft by its model and level, the riser's text a note; one that says it already has none
+    expect(c.ends.to).toMatchObject({ id: nsps, label: 'P-NSPS-D (draft, 02)', riser: 'PARADIGM P-NSPS-DIN' });
+    expect(c.ends.from).toMatchObject({ label: 'UFMP4 (draft, 02)', riser: null });
+    // a placed device by its ID and text, a placeholder by its label
+    expect(row(data.cables, ids.c1).ends.from).toMatchObject({ label: 'ERP48-FT-481P CT06LCPA (draft, 06M)' });
+    expect(endpointOptions(data, row(data.cables, ids.c1), 'from')[0]).toMatchObject({ label: '06M-04 CT06LCPA (in the baseline)' });
+    expect(row(data.cables, ids.c2).ends.to).toMatchObject({ label: 'B3A Canyon', riser: null });
+    // searching the model finds the candidate once, as the draft reads, and so does the riser's text
+    for (const q of ['P-NSPS-D', 'NSPS-DIN']) expect(endpointOptions(data, c, 'to', q).filter((o) => o.id === nsps)).toEqual([expect.objectContaining({ kind: 'draft_device', label: 'P-NSPS-D (draft, 02)' })]);
+    // picking it and confirming says the draft's label; the stored candidate keeps the riser's text
+    const pick = endpointOptions(data, c, 'to', 'P-NSPS-D').find((o) => o.id === nsps)!;
+    await setEndpoint(editor, store, n, 'to', pick);
+    data = await loadDraftReview(store, PROJECT);
+    const res = await acceptCable(editor, store, data, row(data.cables, n), { confirm: true });
+    expect(res.ops.at(-1)).toMatchObject({ reason: 'Draft review: endpoint confirmed N UFMP4 (draft, 02) → P-NSPS-D (draft, 02)' });
+    const stored = (await store.get<Record<string, unknown>>('draft_cable', n))!.candidates as Record<string, unknown>[];
+    expect(stored.filter((v) => v.side === 'to')).toEqual([expect.objectContaining({ id: nsps, label: 'PARADIGM P-NSPS-DIN', chosen: true, confirmed: true })]);
+  });
 });
 
 describe('draft review edits (T44)', () => {

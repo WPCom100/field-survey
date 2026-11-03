@@ -547,7 +547,8 @@ function CablePanel({
     const e = c.ends[side];
     if (!e) return '— not set';
     const real = realEnd(data, e);
-    return `${e.label}${e.kind === 'draft_device' ? (real ? `  → ${real.text} (in the baseline)` : '  (draft, not placed yet)') : e.kind === 'placeholder' ? '  (placeholder)' : ''}`;
+    const what = e.kind === 'draft_device' ? (real ? `  → ${real.text} (in the baseline)` : '  (not placed yet)') : e.kind === 'placeholder' ? '  (placeholder)' : '';
+    return `${e.label}${what}${e.riser ? `  · riser: ${e.riser}` : ''}`;
   };
   return (
     <>
@@ -642,6 +643,7 @@ function EndpointPicker({ c, side, data, onPick }: { c: CableDraftRow; side: Sid
           <Text style={styles.optionText}>
             {e.kind === 'device' ? '▣' : e.kind === 'draft_device' ? '◌' : '⌂'} {e.label}
             {e.confidence != null ? `  · ${pct(e.confidence)}` : ''}
+            {e.riser ? `  · riser: ${e.riser}` : ''}
           </Text>
         </Pressable>
       ))}

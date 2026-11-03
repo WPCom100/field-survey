@@ -618,6 +618,14 @@ Decision D237 (Proposed): the waiting end is a device end with no device and `dr
 - [ ] **Reopen asks again.** Reopen one of the SR / LR sensor drafts: its "SR or LR? … — pick one" line comes back; Accept it with a pick: the line goes. → saw:
 - [ ] **The N line answers itself.** On a level with an open NSPS draft showing "No network (N) run drawn to P-NSPS-D on the riser", + Add a cable draft of code `N` and set one end (Change…) to that NSPS draft: the line goes at once, without accepting the NSPS draft. Reject that N draft: the line comes back. (Skip if no level has an open one.) → saw:
 
+## T137 — Endpoints read as the device, the riser's text a note  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01 (C-35) "it calls the device a P-NSPS-DIN, while everything else calls it a P-NSPS-D. When I searched for the 3rd floor P-NSPS-D and selected it, it auto input the P-NSPS-DIN." An end the riser read is now labelled by what it is — a draft by its model, name and level, a placed device by its ID and text, a placeholder by its label — with the riser's printed text after it as `· riser: …`. Use `pipeline test`, level 03, a cable draft whose To is the P-NSPS-D.
+
+- [ ] **The end line.** Setup → 4 Review drafts → 03 → that cable draft: To reads `P-NSPS-D (draft, 03)  (not placed yet)  · riser: PARADIGM P-NSPS-DIN` (or the device's ID and text if it is placed); the table's To column reads `P-NSPS-D (draft, 03)`. The line above, "The riser reads: …", still shows the riser's own text. → saw:
+- [ ] **Search and pick.** Change… on To, type `P-NSPS-D`: the 03 draft is listed once, as `◌ P-NSPS-D (draft, 03) … · riser: PARADIGM P-NSPS-DIN`; typing `DIN` finds it too. Pick it: the end line still reads `P-NSPS-D (draft, 03)`. → saw:
+- [ ] **Confirm.** Confirm endpoint ✓, then open the draft's history (or the Change Log): the reason reads `… → P-NSPS-D (draft, 03)`, not `PARADIGM P-NSPS-DIN`. → saw:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".
