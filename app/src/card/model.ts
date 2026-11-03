@@ -129,6 +129,8 @@ export type JumpTarget = { deviceId: string; levelId: string; label: string; sam
 export type CardConnection = {
   /** The cable end on this device. */
   id: string;
+  /** Its cable, which ⋯ → Delete… removes with both ends (T138). */
+  cableId: string;
   /** `C-07` or `NEW`. */
   label: string;
   cable: string | null;
@@ -216,6 +218,11 @@ export type HistoryEntry = {
   reason: string | null;
   pending: boolean;
   inReview: boolean;
+  /**
+   * A connection's delete / restore line (T138): its cable, and whether this line offers
+   * Restore… (the cable's latest delete while it is still deleted).
+   */
+  cable?: { id: string; restorable: boolean };
 };
 
 export type DeviceCard = {
@@ -337,8 +344,34 @@ export function withBaselineEvents(history: HistoryEntry[], events: BaselineEven
       pending: e.pending,
       inReview: false,
     };
-    const i = out.findIndex((h) => h.at < e.at);
-    out.splice(i < 0 ? out.length : i, 0, line);
+    insertByTime(out, line);
+  }
+  return out;
+}
+
+/** Puts a line before the first older entry of a newest-first history. */
+function insertByTime(out: HistoryEntry[], line: HistoryEntry): void {
+  const i = out.findIndex((h) => h.at < line.at);
+  out.splice(i < 0 ? out.length : i, 0, line);
+}
+
+/**
+ * The delete / restore ops of the device's cables as History lines (T138): `Connection deleted`
+ * with what it was (`X C-03 → 06M-02`); the latest delete of a cable still deleted offers Restore….
+ */
+export function withCableEvents(history: HistoryEntry[], cables: readonly { id: string; title: string; deleted: boolean; ops: readonly StoredOp[] }[]): HistoryEntry[] {
+  const out = [...history];
+  for (const c of cables) {
+    const events = c.ops.filter((o) => o.kind === 'delete' || o.kind === 'restore');
+    const last = events.at(-1);
+    for (const op of events) {
+      insertByTime(out, {
+        ...historyEntry(op),
+        what: op.kind === 'delete' ? 'Connection deleted' : 'Connection restored',
+        now: c.title,
+        cable: { id: c.id, restorable: c.deleted && op === last && op.kind === 'delete' },
+      });
+    }
   }
   return out;
 }
@@ -524,20 +557,30 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
   const draftLabels = await loadDraftEndLabels(store, [...others.values()]);
 
   const connections: CardConnection[] = [];
+  /** Every cable with an end here, deleted ones too, for the History's delete / restore lines (T138). */
+  const cableLines: { id: string; title: string; deleted: boolean; ops: StoredOp[] }[] = [];
   for (const e of ends) {
     const cable = cables.get(String(e.cable_id));
-    if (!cable || cable.deleted_at) continue;
+    if (!cable) continue;
     const other = others.get(String(e.cable_id) + '|' + (e.side === 'A' ? 'B' : 'A')) ?? null;
     const far = other && str(other.device_id) ? (farDevices.get(String(other.device_id)) ?? null) : null;
     const farLabel = far ? displayNumber('device', far, farCodes.get(String(far.level_id)) ?? null) : null;
     const farDraft = waitsForDraft(other) ? (draftLabels.get(String(other!.draft_device_id)) ?? null) : null;
     const farPlaceholder = other && str(other.placeholder_id) ? (placeholders.get(String(other.placeholder_id)) ?? null) : null;
     const farText = farLabel ?? farPlaceholder ?? farDraft;
+    const label = displayNumber('cable_end', e);
+    const to = str(e.to_text) ?? farText ?? '(far end not set)';
+    const cableOps = await store.opsFor(String(cable.id));
+    if (cableOps.some((o) => o.kind === 'delete' || o.kind === 'restore')) {
+      cableLines.push({ id: String(cable.id), title: `${str(cable.cable) ?? '?'} ${label} → ${to}`, deleted: !!cable.deleted_at, ops: cableOps });
+    }
+    if (cable.deleted_at) continue;
     connections.push({
       id: String(e.id),
-      label: displayNumber('cable_end', e),
+      cableId: String(cable.id),
+      label,
       cable: str(cable.cable),
-      to: str(e.to_text) ?? farText ?? '(far end not set)',
+      to,
       status: str(e.status),
       note: str(e.note),
       statusSource: str(e.status_source),
@@ -630,7 +673,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
 
   // --- history (newest first), review and unsynced marks per field
   const ops = await store.opsFor(deviceId);
-  const history = withBaselineEvents(ops.map(historyEntry).reverse(), await baselineEvents(store, device.levelId), levelCode);
+  const history = withCableEvents(withBaselineEvents(ops.map(historyEntry).reverse(), await baselineEvents(store, device.levelId), levelCode), cableLines);
   const pending = new Set(ops.filter((o) => o.state === 'pending' && o.field).map((o) => o.field!));
   const inReview = new Set(Object.keys(await reviewFields(store, deviceId)));
 

@@ -288,11 +288,32 @@ export const LintIdDup: Rule = {
 
 // ------------------------------------------------------------------ links, pins, locks
 
+/** Punch items and parts (by their sources) still on an end of a deleted cable (its ends are not in the index). */
+function deletedCableLinks(ctx: RuleContext): void {
+  const goneCables = new Map(ctx.snap.cables.filter((c) => c.deleted_at != null).map((c) => [c.id, c] as const));
+  if (!goneCables.size) return;
+  const goneEnds = new Map<string, string>();
+  for (const e of ctx.snap.cableEnds) {
+    const c = goneCables.get(e.cable_id);
+    if (c) goneEnds.set(e.id, `${e.display_id ?? 'NEW'}${c.cable ? ` (${c.cable})` : ''}`);
+  }
+  const gone = (id: string | null) => (id ? goneEnds.get(id) : undefined);
+  for (const p of ctx.index.punchItem.values()) {
+    const end = gone(p.cable_end_id);
+    if (end) ctx.find({ subject: { entity_kind: 'punch_item', entity_id: p.id, level_id: p.level_id }, message: `${punchLabel(p)}: linked to deleted connection ${end}` });
+  }
+  for (const m of ctx.index.missingPart.values()) {
+    const end = (ctx.index.sourcesByPart.get(m.id) ?? []).map((src) => (src.target_kind === 'cable_end' ? gone(src.target_id) : undefined)).find(Boolean);
+    if (end) ctx.find({ subject: { entity_kind: 'missing_part', entity_id: m.id, level_id: m.level_id }, message: `Part #${m.number ?? 'NEW'}${m.part ? ` "${m.part}"` : ''}: linked to deleted connection ${end}` });
+  }
+}
+
 export const LintDeletedLink: Rule = {
   id: 'lint.deleted_link',
-  title: 'Linked to a deleted device',
-  text: 'A punch item, missing part, connection end or photo that still points at a deleted device is flagged: relink it or delete it.',
+  title: 'Linked to a deleted device or connection',
+  text: 'A punch item, missing part, connection end or photo that still points at a deleted device, and a punch item or missing part on an end of a deleted connection (T138), is flagged: relink it or delete it.',
   run(ctx) {
+    deletedCableLinks(ctx);
     const deleted = new Map(ctx.snap.devices.filter((d) => d.deleted_at != null).map((d) => [d.id, d] as const));
     if (!deleted.size) return;
     const gone = (id: string | null) => (id ? deleted.get(id) : undefined);

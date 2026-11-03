@@ -4,14 +4,16 @@
  * From / To text (D32) and who surveyed it; the riser label check; "Jump to" the far end's device
  * (on this level: select it; on another: open that level's plan with the pin lit). Every tap is
  * one op (D45), `Field survey` (D96). Each end shows the photos linked to it (D128, T65); its
- * 📷 Photo preselects that end in the caption sheet. Render with `key={endId}`.
+ * 📷 Photo preselects that end in the caption sheet. ⋯ → Delete… removes the cable with both ends
+ * (T138, a `Correction` with the typed reason); a deleted cable shows why and offers Restore….
+ * Render with `key={endId}`.
  */
 
 import { OpError, vocab, type Editor, type Store } from '@field-survey/core';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { appendPhrase } from '../card/actions';
+import { appendPhrase, deleteCable, restoreCable } from '../card/actions';
 import type { JumpTarget } from '../card/model';
 import { PhotoStrip } from '../photo/PhotoStrip';
 import { chipStyles } from '../plan/chips';
@@ -49,6 +51,9 @@ export function EndEditor(props: EndEditorProps) {
   const { store, editor, endId, reloadKey, onEdited } = props;
   const [view, setView] = useState<CableView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [menu, setMenu] = useState(false);
+  /** The reason being typed for ⋯ → Delete… / Restore… (T138). */
+  const [pending, setPending] = useState<{ kind: 'delete' | 'restore'; reason: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -84,6 +89,12 @@ export function EndEditor(props: EndEditorProps) {
   const [mine, other] = view.ends;
   const readOnly = !editor || view.deleted;
   const name = view.code ? CABLE_NAME[view.code] : null;
+  const title = `${view.code ?? '?'} ${mine.label}`;
+  const confirmPending = () => {
+    if (!pending) return;
+    const { kind, reason } = pending;
+    void run((e) => (kind === 'delete' ? deleteCable(e, view.id, reason) : restoreCable(e, view.id, reason))).then((ok) => ok && setPending(null));
+  };
 
   return (
     <View style={styles.root}>
@@ -100,9 +111,60 @@ export function EndEditor(props: EndEditorProps) {
           {view.qty != null ? <Text style={styles.muted}>Qty {view.qty}</Text> : null}
           {view.singleRow ? <Text style={chipStyles.badgePlain}>1 row</Text> : null}
           {view.deleted ? <Text style={[chipStyles.badge, chipStyles.badgeDeleted]}>DELETED</Text> : null}
+          <View style={styles.flex} />
+          {editor ? (
+            <Pressable onPress={() => setMenu((m) => !m)} hitSlop={8} style={styles.headBtn} accessibilityLabel="Connection menu">
+              <Text style={styles.headBtnText}>⋯</Text>
+            </Pressable>
+          ) : null}
         </View>
         {view.vertical ? <Text style={styles.muted}>Vertical {view.vertical}</Text> : null}
       </View>
+      {menu ? (
+        <View style={styles.menu}>
+          <Pressable style={styles.menuItem} onPress={() => (setMenu(false), setPending({ kind: view.deleted ? 'restore' : 'delete', reason: '' }))}>
+            <Text style={[styles.menuText, !view.deleted && styles.danger]}>{view.deleted ? 'Restore connection…' : 'Delete connection…'}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {pending ? (
+        <View style={styles.reasonBox}>
+          <Text style={styles.label}>
+            {pending.kind === 'delete' ? `Delete ${title} with both ends: why?` : `Restore ${title}: why?`}
+          </Text>
+          <TextInput
+            style={styles.input}
+            value={pending.reason}
+            onChangeText={(t) => setPending({ ...pending, reason: t })}
+            placeholder="Reason (kept in the history)"
+            placeholderTextColor="#888"
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={confirmPending}
+          />
+          <View style={styles.rowWrap}>
+            <Pressable
+              disabled={!pending.reason.trim()}
+              onPress={confirmPending}
+              style={[styles.btn, pending.kind === 'delete' && styles.btnDanger, !pending.reason.trim() && styles.off]}>
+              <Text style={[styles.btnText, pending.kind === 'delete' && styles.danger]}>{pending.kind === 'delete' ? 'Delete' : 'Restore'}</Text>
+            </Pressable>
+            <Pressable onPress={() => setPending(null)} style={styles.btn}>
+              <Text style={styles.btnText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+      {view.deleted ? (
+        <View style={styles.deleted}>
+          <Text style={styles.deletedText}>Deleted{view.deleteReason ? `: ${view.deleteReason}` : ''}</Text>
+          {editor && !pending ? (
+            <Pressable onPress={() => setPending({ kind: 'restore', reason: '' })} style={styles.btn}>
+              <Text style={styles.btnText}>Restore…</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <ScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <EndSection
@@ -454,4 +516,15 @@ const styles = StyleSheet.create({
   phraseMore: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
   btn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0', backgroundColor: '#fff' },
   btnText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
+  btnDanger: { borderColor: '#b71c1c' },
+  danger: { color: '#b71c1c' },
+  off: { opacity: 0.4 },
+  headBtn: { paddingHorizontal: 8, paddingVertical: 2 },
+  headBtnText: { fontSize: 22, color: '#1565c0', fontWeight: '600' },
+  menu: { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1', backgroundColor: '#f8f9fb' },
+  menuItem: { paddingHorizontal: 14, paddingVertical: 10 },
+  menuText: { fontSize: 15, color: '#1565c0' },
+  reasonBox: { padding: 12, gap: 6, backgroundColor: '#fff8e1', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
+  deleted: { margin: 8, padding: 10, borderRadius: 6, backgroundColor: '#ffebee', gap: 6, alignItems: 'flex-start' },
+  deletedText: { color: '#b71c1c', fontWeight: '600' },
 });

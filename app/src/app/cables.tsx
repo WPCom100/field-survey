@@ -29,7 +29,7 @@ const STATUSES: readonly string[] = [...vocab.CONNECTION_STATUS, UNSURVEYED];
  * vertical, level or code, filtered by code, end status and checks; the project's consistency
  * check counts along the bottom (tap one to filter). Selecting a cable opens the connection end
  * editor (T22) in the side panel with the cable's checks, Confirm endpoint (D6, D180), its Needs
- * review item and the riser crop below it. Select → Apply as ruling… hands the chosen cables' ends
+ * review item and the riser crop below it; the editor's ⋯ deletes the cable (T138). Select → Apply as ruling… hands the chosen cables' ends
  * to the ruling editor (T37). `?project=` names the project.
  */
 export default function CablesScreen() {
@@ -248,7 +248,8 @@ export default function CablesScreen() {
               <CableChecks row={row} names={data?.names} canEdit={!!editor} onConfirm={() => confirm(row)} projectId={projectId} />
             </ScrollView>
           ) : (
-            <Text style={styles.empty}>Select a cable.</Text>
+            // a selected cable that left the list was deleted (T138): its devices' History restores it
+            <Text style={styles.empty}>{selected && data ? 'This cable is deleted. Restore it from the History of a device at either end.' : 'Select a cable.'}</Text>
           )}
           {note ? <Text style={styles.note}>{note}</Text> : null}
         </View>

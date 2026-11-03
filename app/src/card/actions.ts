@@ -141,6 +141,18 @@ export function restoreDevice(editor: Editor, deviceId: string, reason: string):
   return editor.restore('device', deviceId, correction(reason));
 }
 
+/**
+ * A connection added in error (T138): one `delete` op on the cable, its ends going with it; the
+ * device's History offers Restore. Punch items and parts on its ends stay (the lint flags them).
+ */
+export function deleteCable(editor: Editor, cableId: string, reason: string): Promise<Op> {
+  return editor.delete('cable', cableId, correction(reason));
+}
+
+export function restoreCable(editor: Editor, cableId: string, reason: string): Promise<Op> {
+  return editor.restore('cable', cableId, correction(reason));
+}
+
 /** New pin position in sheet coordinates (D92), rounded to 0.1 pt. */
 export function movePin(
   editor: Editor,

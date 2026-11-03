@@ -14,10 +14,12 @@ import {
   appendPhrase,
   checkNeuronId,
   correction,
+  deleteCable,
   deleteDevice,
   movePin,
   neuronDuplicates,
   normalizeNeuronId,
+  restoreCable,
   restoreDevice,
   saveNeuronId,
   setFound,
@@ -299,6 +301,41 @@ describe('device card edits', () => {
     expect(card.device.pin).toEqual({ sheet, x: 100, y: 200.1 });
     expect(card.history[0]).toMatchObject({ what: 'Pin', now: '(100, 200)' });
     expect(card.history.map((h) => h.what)).toEqual(['Pin', 'Restored', 'Deleted', '(row added)']);
+  });
+
+  it("a connection row's ⋯ → Delete… (T138): one Correction on the cable, gone from both devices, History offers Restore", async () => {
+    const { store, pid, editor, byLabel } = await setup();
+    const a = byLabel('06M-01');
+    const b = byLabel('06M-02');
+    const cable = uuidv7(), endA = uuidv7(), endB = uuidv7();
+    await store.applyRemoteMany([
+      pulled('cable', cable, pid, { project_id: pid, cable: 'X', qty: 1, end_a_id: endA, end_b_id: endB }),
+      pulled('cable_end', endA, pid, { cable_id: cable, side: 'A', endpoint_kind: 'device', device_id: a.id, level_id: DEMO_LEVEL_ID, display_id: 'C-30', status: 'Issue' }),
+      pulled('cable_end', endB, pid, { cable_id: cable, side: 'B', endpoint_kind: 'device', device_id: b.id, level_id: DEMO_LEVEL_ID, display_id: 'C-31' }),
+    ]);
+    const before = (await loadDeviceCard(store, a.id))!;
+    const row = before.connections.find((c) => c.label === 'C-30')!;
+    expect(row.cableId).toBe(cable);
+    expect(before.history.some((h) => h.cable)).toBe(false);
+
+    expect(() => deleteCable(editor, row.cableId, '')).toThrow(OpError);
+    const del = await deleteCable(editor, row.cableId, 'Added from the punch list in error');
+    expect(del).toMatchObject({ entity_kind: 'cable', kind: 'delete', change_type: 'Correction', reason: 'Added from the punch list in error' });
+    for (const dev of [a, b]) {
+      const card = (await loadDeviceCard(store, dev.id))!;
+      expect(card.connections.some((c) => c.cableId === cable)).toBe(false);
+      expect(card.history.find((h) => h.cable)).toMatchObject({ what: 'Connection deleted', reason: 'Added from the punch list in error', changeType: 'Correction', pending: true, cable: { id: cable, restorable: true } });
+    }
+    expect((await loadDeviceCard(store, a.id))!.history.find((h) => h.cable)!.now).toBe('X C-30 → 06M-02');
+    expect((await loadDeviceCard(store, b.id))!.history.find((h) => h.cable)!.now).toBe('X C-31 → 06M-01');
+
+    await restoreCable(editor, cable, 'Was right');
+    const after = (await loadDeviceCard(store, a.id))!;
+    expect(after.connections.find((c) => c.cableId === cable)).toMatchObject({ label: 'C-30', status: 'Issue' });
+    expect(after.history.filter((h) => h.cable).map((h) => [h.what, h.cable!.restorable])).toEqual([
+      ['Connection restored', false],
+      ['Connection deleted', false],
+    ]);
   });
 
   it('formats history values', () => {

@@ -122,6 +122,9 @@ export function reconcileProposals(input: ReconcileInput): Change[] {
         break;
       case 'accepted':
       case 'edited':
+        // A cable cites no proposal: once accepted, a cable deleted later (T138) or recoded
+        // leaves the decision standing, with no new draft by itself.
+        if (row.kind === 'cable') break;
         // Accepted, but no live record cites it (deleted, or an older app wrote none): propose again.
         changes.push({
           kind: 'set',

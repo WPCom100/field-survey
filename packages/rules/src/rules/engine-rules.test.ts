@@ -117,6 +117,41 @@ describe('RULES over a store', () => {
     expect((await open(store)).filter((x) => x.subject?.entity_id === res.recordIds[1])).toEqual([]);
   });
 
+  it('a deleted cable (T138) is absent: its open drafts are superseded, the library draft it was accepted from stays accepted and is not offered again', async () => {
+    const { store, editor, engine, ids } = await project();
+    await engine.run();
+    const lib = (await open(store)).find((x) => x.rule_id === 'R2c' && x.discriminator === '0-10V')!;
+    const made = (await engine.decide(lib.id, { kind: 'accept' })).recordIds[0]!;
+    const l09 = uuidv7();
+    const net = uuidv7();
+    const endA = uuidv7();
+    await editor.group({ change_type: 'Master edit', reason: 'seed' }, async (g) => {
+      await g.create('level', { id: l09, project_id: PROJECT, level: '09', floor_order: 9, numbering_group_id: uuidv7(), in_scope: false });
+      const far = uuidv7();
+      const endB = uuidv7();
+      await g.create('device', { id: far, level_id: l09, display_id: '09-01', category: 'Equipment rack' });
+      await g.create('cable', { id: net, project_id: PROJECT, cable: 'N', end_a_id: endA, end_b_id: endB });
+      await g.create('cable_end', { id: endA, cable_id: net, side: 'A', endpoint_kind: 'device', device_id: ids.panel, level_id: ids.l06m, to_text: 'Network to Level 09', status: 'Issue', note: 'Run, not terminated', status_source: 'surveyed', surveyed_at: tsNext() });
+      await g.create('cable_end', { id: endB, cable_id: net, side: 'B', endpoint_kind: 'device', device_id: far, level_id: l09 });
+    });
+    await engine.run();
+    const onNet = async () => (await open(store)).filter((p) => p.subject?.entity_id === endA).map((p) => p.payload?.item ?? p.rule_id);
+    expect(await onNet()).toContain('Terminate network to Level 09');
+
+    const fix: EditContext = { change_type: 'Correction', reason: 'Added in error' };
+    await editor.delete('cable', net, fix);
+    await editor.delete('cable', made, fix);
+    await engine.run();
+    expect(await onNet()).toEqual([]);
+    expect(await store.get<ProposalRow>('proposal', lib.id)).toMatchObject({ state: 'accepted' });
+    expect((await open(store)).some((x) => x.rule_id === 'R2c' && x.discriminator === '0-10V')).toBe(false);
+    expect((await engine.run()).ops).toBe(0);
+    // restored, it is read again
+    await editor.restore('cable', net, { change_type: 'Correction', reason: 'Was right after all' });
+    await engine.run();
+    expect(await onNet()).toContain('Terminate network to Level 09');
+  });
+
   it('a status draft (R2f) accepted sets the end derived, never copying the other end', async () => {
     const { store, editor, engine, ids } = await project();
     const l09 = uuidv7();

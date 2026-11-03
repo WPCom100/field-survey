@@ -327,7 +327,8 @@ function groupBy<T>(rows: readonly T[], key: (r: T) => string | null | undefined
 
 /**
  * Lookups the rules share, built once per evaluation over the **live** rows (deleted ones stay
- * reachable through the snapshot arrays). Every map is keyed by id.
+ * reachable through the snapshot arrays; the ends of a deleted cable count as deleted). Every map
+ * is keyed by id.
  */
 export interface SnapshotIndex {
   level: Map<string, LevelRow>;
@@ -363,7 +364,9 @@ export function indexSnapshot(s: Snapshot): SnapshotIndex {
   const levels = live(s.levels);
   const devices = live(s.devices);
   const cables = live(s.cables);
-  const ends = live(s.cableEnds);
+  // a deleted cable takes its ends with it (T138): they stay in `s.cableEnds` for the lints
+  const liveCables = new Set(cables.map((c) => c.id));
+  const ends = live(s.cableEnds).filter((e) => liveCables.has(e.cable_id));
   const punch = live(s.punchItems);
   const parts = live(s.missingParts);
   const byId = <T extends { id: string }>(rows: readonly T[]) => new Map(rows.map((r) => [r.id, r] as const));

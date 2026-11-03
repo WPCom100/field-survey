@@ -2,7 +2,8 @@
  * Device card (T20, Phase 3 §4.3): the side panel beside the plan when a device is selected.
  * Sections scroll and collapse; every tap commits one op (D45, no Save button) through
  * `actions.ts`. Plain taps are `Field survey` (D96); `[⋯]` delete / restore / move pin ask for
- * a reason (`Correction`). Camera / Library and a thumbnail tap hand over to the photo flow
+ * a reason (`Correction`), as does a connection row's `⋯` → Delete… (T138), whose History line
+ * offers Restore…. Camera / Library and a thumbnail tap hand over to the photo flow
  * (T21); a connection row opens the end editor (T22); rule drafts are decided through the
  * `ProposalDecider` (T33); the quick actions E6 / E7 / E9 run through `runQuickAction` of the
  * rules package (T34). Neuron ID scan (T54) is shown with its button disabled until it lands.
@@ -24,8 +25,10 @@ import {
   addOptionalCable,
   appendPhrase,
   checkNeuronId,
+  deleteCable,
   deleteDevice,
   neuronDuplicates,
+  restoreCable,
   restoreDevice,
   saveNeuronId,
   setFound,
@@ -69,7 +72,11 @@ export type DeviceCardProps = {
   onOpenEnd?: (endId: string) => void;
 };
 
-type Pending = { kind: 'delete' | 'restore' | 'move'; reason: string } | null;
+type Pending =
+  | { kind: 'delete' | 'restore' | 'move'; reason: string }
+  /** A connection's cable (T138): `title` is what the reason box names (`N C-01 → switch`). */
+  | { kind: 'deleteCable' | 'restoreCable'; cableId: string; title: string; reason: string }
+  | null;
 
 export function DeviceCard(props: DeviceCardProps) {
   const { store, editor, deviceId, reloadKey, onEdited } = props;
@@ -122,8 +129,35 @@ export function DeviceCard(props: DeviceCardProps) {
       props.onStartMove(reason.trim());
       return;
     }
-    void run((e) => (pending.kind === 'delete' ? deleteDevice(e, d.id, reason) : restoreDevice(e, d.id, reason))).then((ok) => ok && setPending(null));
+    const p = pending;
+    void run((e) => {
+      switch (p.kind) {
+        case 'deleteCable':
+          return deleteCable(e, p.cableId, reason);
+        case 'restoreCable':
+          return restoreCable(e, p.cableId, reason);
+        case 'delete':
+          return deleteDevice(e, d.id, reason);
+        default:
+          return restoreDevice(e, d.id, reason);
+      }
+    }).then((ok) => ok && setPending(null));
   };
+  const pendingQuestion = (p: NonNullable<Pending>): string => {
+    switch (p.kind) {
+      case 'delete':
+        return `Delete ${d.label}: why?`;
+      case 'restore':
+        return `Restore ${d.label}: why?`;
+      case 'move':
+        return `Move the pin of ${d.label}: why?`;
+      case 'deleteCable':
+        return `Delete the connection ${p.title} with both ends: why?`;
+      case 'restoreCable':
+        return `Restore the connection ${p.title}: why?`;
+    }
+  };
+  const danger = pending?.kind === 'delete' || pending?.kind === 'deleteCable';
 
   return (
     <View style={styles.root}>
@@ -167,9 +201,7 @@ export function DeviceCard(props: DeviceCardProps) {
 
       {pending ? (
         <View style={styles.reasonBox}>
-          <Text style={styles.label}>
-            {pending.kind === 'delete' ? `Delete ${d.label}: why?` : pending.kind === 'restore' ? `Restore ${d.label}: why?` : `Move the pin of ${d.label}: why?`}
-          </Text>
+          <Text style={styles.label}>{pendingQuestion(pending)}</Text>
           <TextInput
             style={styles.input}
             value={pending.reason}
@@ -182,8 +214,8 @@ export function DeviceCard(props: DeviceCardProps) {
           />
           <View style={styles.rowWrap}>
             <SmallButton
-              label={pending.kind === 'delete' ? 'Delete' : pending.kind === 'restore' ? 'Restore' : 'Tap the new position ▸'}
-              danger={pending.kind === 'delete'}
+              label={danger ? 'Delete' : pending.kind === 'move' ? 'Tap the new position ▸' : 'Restore'}
+              danger={danger}
               disabled={!pending.reason.trim()}
               onPress={confirmPending}
             />
@@ -316,6 +348,15 @@ export function DeviceCard(props: DeviceCardProps) {
                     → {c.farDraft}
                   </Text>
                 ) : null}
+                {readOnly ? null : (
+                  <Pressable
+                    onPress={() => setPending({ kind: 'deleteCable', cableId: c.cableId, title: `${c.cable ?? '?'} ${c.label} → ${c.to}`, reason: '' })}
+                    hitSlop={6}
+                    style={styles.jump}
+                    accessibilityLabel={`Delete connection ${c.label}`}>
+                    <Text style={styles.rowMenu}>⋯</Text>
+                  </Pressable>
+                )}
                 {props.onOpenEnd ? <Text style={styles.chev}>›</Text> : null}
               </View>
             </Pressable>
@@ -370,7 +411,14 @@ export function DeviceCard(props: DeviceCardProps) {
 
         <Section title={`History (${card.history.length})`} marks="" collapsed>
           {card.history.map((h) => (
-            <HistoryLine key={h.opId} h={h} names={props.names} />
+            <HistoryLine
+              key={h.opId}
+              h={h}
+              names={props.names}
+              onRestore={
+                h.cable?.restorable && !readOnly ? () => setPending({ kind: 'restoreCable', cableId: h.cable!.id, title: h.now ?? 'connection', reason: '' }) : undefined
+              }
+            />
           ))}
         </Section>
       </ScrollView>
@@ -759,7 +807,7 @@ function pad(n: number) {
   return String(n).padStart(2, '0');
 }
 
-function HistoryLine({ h, names }: { h: HistoryEntry; names: ReadonlyMap<string, string> }) {
+function HistoryLine({ h, names, onRestore }: { h: HistoryEntry; names: ReadonlyMap<string, string>; onRestore?: () => void }) {
   const t = new Date(h.at);
   const when = Number.isNaN(t.getTime()) ? h.at : `${pad(t.getMonth() + 1)}/${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
   const who = names.get(h.userId) ?? `user …${h.userId.slice(-4)}`;
@@ -770,7 +818,11 @@ function HistoryLine({ h, names }: { h: HistoryEntry; names: ReadonlyMap<string,
         {h.pending ? ' ↑' : ''}
         {h.inReview ? ' · in review' : ''}
       </Text>
-      {h.was !== null || h.now !== null ? (
+      {h.cable ? (
+        <Text style={styles.histBody} numberOfLines={3}>
+          {h.now}
+        </Text>
+      ) : h.was !== null || h.now !== null ? (
         <Text style={styles.histBody} numberOfLines={3}>
           {h.was ?? ''} → {h.now ?? ''}
         </Text>
@@ -779,6 +831,11 @@ function HistoryLine({ h, names }: { h: HistoryEntry; names: ReadonlyMap<string,
         {h.changeType}
         {h.reason && h.reason !== h.changeType ? ` · "${h.reason}"` : ''}
       </Text>
+      {onRestore ? (
+        <View style={styles.rowWrap}>
+          <SmallButton label="Restore…" onPress={onRestore} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -894,6 +951,7 @@ const styles = StyleSheet.create({
   jump: { paddingHorizontal: 6, paddingVertical: 2 },
   jumpText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
   chev: { fontSize: 20, color: '#999', paddingLeft: 4 },
+  rowMenu: { fontSize: 18, color: '#1565c0', fontWeight: '600' },
   btn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0', backgroundColor: '#fff' },
   btnText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
   btnDanger: { borderColor: '#b71c1c' },

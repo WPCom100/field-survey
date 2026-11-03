@@ -34,7 +34,7 @@ export const LINT_CHECKS: readonly LintCheck[] = [
   { id: 'riser', title: 'To does not match the riser', lints: ['R2b'], hint: 'The riser governs To: correct To, or keep the guess in the note.' },
   { id: 'neuron_dup', title: 'Duplicate Neuron ID', lints: ['lint.neuron_dup'], hint: 'One of the devices has the wrong Neuron ID: scan it again.' },
   { id: 'id_dup', title: 'Duplicate device ID', lints: ['lint.id_dup'], hint: 'Two live devices share an ID: delete the duplicate or correct the ID.' },
-  { id: 'deleted_link', title: 'Linked to a deleted device', lints: ['lint.deleted_link'], hint: 'Link the record to the right device, or delete it.' },
+  { id: 'deleted_link', title: 'Linked to a deleted device or connection', lints: ['lint.deleted_link'], hint: 'Link the record to the right device or connection, or delete it.' },
   { id: 'pin_sheet', title: 'Pin outside the sheet', lints: ['lint.pin_sheet'], hint: 'Open the plan and move the pin onto the sheet.' },
   { id: 'locked_drafts', title: 'Level locked with unreviewed drafts', lints: ['lint.locked_drafts'], hint: 'Review the drafts in Setup, or unlock the level to do so.' },
   { id: 'accessory', title: 'Accessory found < expected', lints: ['Acc'], hint: 'Check the device; order the accessory as a missing part if it is not there.' },

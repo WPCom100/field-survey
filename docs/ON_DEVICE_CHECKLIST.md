@@ -626,6 +626,19 @@ Decision D237 (Proposed): the waiting end is a device end with no device and `dr
 - [ ] **Search and pick.** Change… on To, type `P-NSPS-D`: the 03 draft is listed once, as `◌ P-NSPS-D (draft, 03) … · riser: PARADIGM P-NSPS-DIN`; typing `DIN` finds it too. Pick it: the end line still reads `P-NSPS-D (draft, 03)`. → saw:
 - [ ] **Confirm.** Confirm endpoint ✓, then open the draft's history (or the Change Log): the reason reads `… → P-NSPS-D (draft, 03)`, not `PARADIGM P-NSPS-DIN`. → saw:
 
+## T138 — Delete a connection added in error  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01 Landry added a connection from the punch list by mistake and had no way to remove it. Now ⋯ deletes a cable with both its ends (a `Correction` with your reason), and the device's History restores it. Use any project with a cable you can spare, or add one first with **+ add …** on a device card.
+
+- [ ] **From the card.** Tap a device → Connections: each row has a **⋯** before the ›. Tap it: the box at the top asks "Delete the connection `<code> C-nn → …` with both ends: why?", Delete stays grey until you type a reason. Type one → **Delete**: the row leaves the Connections list, and the plan's **Conns** tab no longer lists either end. → saw:
+- [ ] **History restores it.** Same card → History: the newest lines include `Connection deleted` with `<code> C-nn → …`, Correction and your reason, and a **Restore…** button. Restore… asks why; give a reason: the row is back in Connections with its status and note as they were; History now shows `Connection restored` and the delete line has no button. → saw:
+- [ ] **The far device too.** Delete it again and open the device at the other end: the connection is gone from its card as well, and its History has the same `Connection deleted` line with Restore…. → saw:
+- [ ] **From the Cable / riser view.** Cables → select a row → the end editor's header has **⋯** → **Delete connection…** → reason → Delete: the row leaves the list (and the counts along the bottom), the side panel says "This cable is deleted. Restore it from the History of a device at either end." Opened from a card instead, the end editor shows DELETED, "Deleted: <reason>" and Restore…. → saw:
+- [ ] **Nothing comes back by itself.** Delete a connection the rules proposed and you accepted (e.g. a relay panel's 0-10V → Fixtures, or + add …): after the rules run (a few seconds, or Sync), no new draft for it appears on the card and its Run / Terminate drafts are gone. If an accepted punch item or kit part was on that connection, **Lint** lists it under "Linked to a deleted device or connection": close or delete it yourself. → saw:
+- [ ] **Export.** Sync, then export the workbook: the deleted connection's rows are not on the Connections tab (and not in the floor PDF's Connections table). → saw:
+
+Decision D238 (Proposed): a connection is deleted as one `delete` op on its cable (the ends stay as they are and go with it); Restore lives in the History of the device at either end and in the end editor; punch items and parts on it are left for the lint, not deleted with it; an accepted cable draft is never re-offered by itself once its cable is gone. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

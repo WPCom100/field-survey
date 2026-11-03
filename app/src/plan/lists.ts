@@ -164,7 +164,8 @@ export async function loadLevelLists(
     (endsOf.get(String(e.cable_id)) ?? [])
       .filter((o) => String(o.id) !== String(e.id) && o.side !== e.side)
       .sort((a, b) => Number(!!a.deleted_at) - Number(!!b.deleted_at))[0];
-  const connections = ends.map((e): ListRow => {
+  // a deleted cable takes its ends with it (T138): shown only where deleted rows are
+  const connections = ends.filter((e) => includeDeleted || !cables.get(String(e.cable_id))?.deleted_at).map((e): ListRow => {
     const id = String(e.id);
     const cable = cables.get(String(e.cable_id));
     const { deviceLabel: _deviceLabel, ...inherited } = inherit(str(e.device_id));

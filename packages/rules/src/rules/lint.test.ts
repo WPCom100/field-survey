@@ -166,6 +166,22 @@ describe('duplicates, links, pins, locks', () => {
     ]);
   });
 
+  it('flags a punch item or part still on an end of a deleted connection (T138); the ends themselves are absent', () => {
+    const b = new Build();
+    const l = b.level('01');
+    const panel = b.device(l, 'Relay panel', { display_id: '01-01' });
+    const rack = b.device(l, 'Equipment rack', { display_id: '01-02' });
+    const { a: end } = b.cable('X', { device: panel, display_id: 'C-01' }, { device: rack, display_id: 'C-02' }, { deleted_at: '2026-11-02' });
+    const p = b.punch(l, { device_id: panel.id, cable_end_id: end.id, item: 'Run DMX to 01-02' });
+    const m = b.part(l, { device_id: panel.id, part: 'DMX termination kit' }, [{ target_kind: 'cable_end', target_id: end.id }]);
+    expect(found(b, [LintDeletedLink])).toEqual([
+      ['lint.deleted_link', p.id, 'Punch #1 "Run DMX to 01-02": linked to deleted connection C-01 (X)'],
+      ['lint.deleted_link', m.id, 'Part #1 "DMX termination kit": linked to deleted connection C-01 (X)'],
+    ]);
+    // nothing reads the ends of the deleted cable: no far-end or end-status lint on them
+    expect(found(b, LINT_RULES).filter(([, id]) => id === end.id)).toEqual([]);
+  });
+
   it('flags a pin outside its sheet or on a deleted sheet', () => {
     const b = new Build();
     const l = b.level('06M');

@@ -67,7 +67,7 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | To ≠ riser | `R2b` | the A end |
 | Duplicate Neuron ID | `lint.neuron_dup` | each device (case-insensitive) |
 | — (T13: duplicate device ID, D88) | `lint.id_dup` | each live device |
-| Link to deleted device | `lint.deleted_link` | the punch item, part, end or photo |
+| Link to deleted device or connection | `lint.deleted_link` | the punch item, part, end or photo (deleted device); the punch item or part (by its sources) on an end of a deleted cable (T138) |
 | Pin outside sheet | `lint.pin_sheet` | the device (outside `width_pt` × `height_pt`, or on a deleted sheet) |
 | Level locked with unreviewed drafts | `lint.locked_drafts` | the level |
 | Accessory found < expected | `Acc` | the device (discriminator = accessory) |
@@ -125,7 +125,7 @@ upkeep (D170, R3c only so far).
 - **Findings** (`ctx.find`): `lint_id` defaults to the rule id; a rule that raises several lints
   names each (`R1.untested`) and lists them in `lints`, so its findings resolve when it goes
   quiet. Findings of other producers (the import's `import.*`) are never touched.
-- `ctx.index` maps are over live rows; deleted rows are in `ctx.snap.*` with `deleted_at`.
+- `ctx.index` maps are over live rows; deleted rows are in `ctx.snap.*` with `deleted_at`. The ends of a deleted cable count as deleted (T138): a cable delete is one op on the cable, its `cable_end` rows keep `deleted_at` null.
 
 ## Payloads per `kind` (what Accept does — `decide.ts`)
 
@@ -148,7 +148,7 @@ upkeep (D170, R3c only so far).
 | `proposed` | same hash → nothing; else new payload + hash | → `superseded` |
 | `superseded` | → `proposed` | nothing |
 | `rejected` | same hash → stays; else → `proposed` | nothing |
-| `accepted` / `edited` | cited by a live record → nothing; else → `proposed` | nothing |
+| `accepted` / `edited` | cited by a live record → nothing; a `cable` proposal (no record cites one) → nothing, so a cable deleted later is not re-offered (T138); else → `proposed` | nothing |
 
 A live record citing the proposal (`proposal_id`) makes the row `accepted` (`edited` when the
 record's fields differ from the payload) on every iPad, from the record alone.

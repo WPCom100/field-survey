@@ -7,11 +7,14 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { Editor, Store, uuidv7, type EditContext, type Op } from '@field-survey/core';
+import { Editor, OpError, Store, uuidv7, type EditContext, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { RULES, RuleEngine, setRuleParam } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
 
+import { deleteCable, restoreCable } from '../card/actions';
+import { loadCableEnds } from '../ends/model';
+import { loadLevelLists } from '../plan/lists';
 import { confirmEndpoint } from './actions';
 import { cableChecks, codeTitle, groupCables, loadCables, parseRiserRef, riserBlobOf, riserSignal, statusCell, verticalOf } from './model';
 
@@ -174,6 +177,31 @@ describe('cable / riser view (T39)', () => {
     const data = await loadCables(store, PROJECT);
     expect(data.rows.find((r) => r.id === cables.bad)!.checks.map((c) => c.id)).not.toContain('unconfirmed');
     expect(data.totals.unconfirmed).toBe(0);
+  });
+
+  it("a deleted cable (T138) leaves the view, the counts and the plan's Conns; its end editor says why; restore brings it back", async () => {
+    const { store, editor, id, cables, ends } = await setup();
+    const conns = async (includeDeleted = false) => (await loadLevelLists(store, PROJECT, id.l06m, '06M', [], { includeDeleted })).connections.map((r) => r.label).sort();
+    expect(await conns()).toContain('C-04');
+    expect(() => deleteCable(editor, cables.bad!, ' ')).toThrow(OpError);
+    const op = await deleteCable(editor, cables.bad!, 'Added in error');
+    expect(op).toMatchObject({ entity_kind: 'cable', entity_id: cables.bad, kind: 'delete', change_type: 'Correction', reason: 'Added in error' });
+    expect(await store.outboxCount()).toBe(1); // one op: the ends go with the cable
+
+    const data = await loadCables(store, PROJECT);
+    expect(data.rows).toHaveLength(6);
+    expect(data.rows.some((r) => r.id === cables.bad)).toBe(false);
+    expect(data.totals.unconfirmed).toBe(0); // 'bad' was the one unconfirmed cable
+    expect(await conns()).not.toContain('C-04');
+    expect(await conns(true)).toContain('C-04'); // shown where deleted rows are
+    expect(await loadCableEnds(store, ends.badA!)).toMatchObject({ deleted: true, deleteReason: 'Added in error' });
+    // the end rows themselves are untouched: the cable carries the delete
+    expect(await store.get<Record<string, unknown>>('cable_end', ends.badA!)).toMatchObject({ deleted_at: null });
+
+    await restoreCable(editor, cables.bad!, 'It is there after all');
+    expect((await loadCables(store, PROJECT)).rows).toHaveLength(7);
+    expect(await loadCableEnds(store, ends.badA!)).toMatchObject({ deleted: false, deleteReason: null });
+    expect(await conns()).toContain('C-04');
   });
 
   it('reads the riser label signal and the riser_ref crop', () => {

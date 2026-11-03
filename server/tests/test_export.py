@@ -313,6 +313,84 @@ def test_far_end_waiting_for_its_draft_exports_unsurveyed_with_its_to(
     ]
 
 
+def test_deleted_cable_is_taken_by_the_server_and_left_out_of_the_export(
+    session, store, factory, client
+):
+    """T138: ⋯ → Delete… on a connection is one `delete` op on the cable (a Correction with the
+    reason); the server applies it, and the export leaves both of its rows out; Restore brings
+    them back."""
+    project_id = new_project(session, "Delete a connection")
+    landry = upsert_user(session, "Landry")
+    group = NumberingGroup(id=uuid7(), project_id=project_id, label="06")
+    l06 = Level(id=uuid7(), project_id=project_id, level="06", floor_order=1)
+    l06.numbering_group_id = group.id
+    panel = Device(id=uuid7(), level_id=l06.id, display_id="06-04", category="Power Distribution")
+    rack = Device(id=uuid7(), level_id=l06.id, display_id="06-01", category="Equipment Rack")
+    keep = Cable(id=uuid7(), project_id=project_id, cable="X", qty=1)
+    gone = Cable(id=uuid7(), project_id=project_id, cable="N", qty=1)
+    session.add_all([group, l06])
+    session.flush()
+    session.add_all([panel, rack, keep, gone])
+    session.flush()
+    for cable, (a, b) in ((keep, ("C-01", "C-02")), (gone, ("C-03", "C-04"))):
+        for side, dev, num in (("A", panel, a), ("B", rack, b)):
+            session.add(
+                CableEnd(
+                    id=uuid7(),
+                    cable_id=cable.id,
+                    side=side,
+                    endpoint_kind="device",
+                    device_id=dev.id,
+                    level_id=l06.id,
+                    display_id=num,
+                    to_text=f"{cable.cable} to {'06-01' if dev is panel else '06-04'}",
+                )
+            )
+    session.commit()
+
+    def push(kind, reason):
+        op = {
+            "op_id": str(uuid7()),
+            "project_id": str(project_id),
+            "user_id": str(landry.id),
+            "install_id": str(uuid.uuid5(uuid.NAMESPACE_URL, "ipad:Landry")),
+            "client_ts": datetime.now(UTC).isoformat(),
+            "entity_kind": "cable",
+            "entity_id": str(gone.id),
+            "kind": kind,
+            "change_type": "Correction",
+            "reason": reason,
+        }
+        r = client.post(
+            "/ops", json={"project_id": str(project_id), "since": None, "ops": [op]}, headers=HDR
+        )
+        assert r.status_code == 200, r.text
+        assert [x["outcome"] for x in r.json()["results"]] == ["applied"]
+
+    def exported_ids():
+        got = run_export_via_api(client, factory, store, project_id)
+        wb = openpyxl.load_workbook(io.BytesIO(store.read(object_key(got["blob"]))))
+        return sorted(r[1].value for r in wb["Connections"].iter_rows(min_row=4) if r[1].value)
+
+    push("delete", "Added from the punch list in error")
+    session.expire_all()
+    row = session.get(Cable, gone.id)
+    assert row.deleted_at is not None
+    assert (row.deleted_by_id, row.delete_reason) == (
+        landry.id,
+        "Added from the punch list in error",
+    )
+    # the ends are not touched: the cable carries the delete
+    ends = session.scalars(select(CableEnd).where(CableEnd.cable_id == gone.id)).all()
+    assert [e.deleted_at for e in ends] == [None, None]
+    assert exported_ids() == ["C-01", "C-02"]
+
+    push("restore", "It is there after all")
+    session.expire_all()
+    assert session.get(Cable, gone.id).deleted_at is None
+    assert exported_ids() == ["C-01", "C-02", "C-03", "C-04"]
+
+
 # ------------------------------------------------------------- empty project
 
 

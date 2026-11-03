@@ -81,6 +81,8 @@ export type CableView = {
   riserToLabel: string | null;
   vertical: string | null;
   deleted: boolean;
+  /** Why it was deleted (T138: ⋯ → Delete… asks). */
+  deleteReason: string | null;
   /**
    * Termination kits (T103, D213): this cable's own setting (null = its code's), what its code
    * says (the project's `R4b.kit`), and the result.
@@ -190,6 +192,7 @@ export async function loadCableEnds(store: Store, endId: string): Promise<CableV
     riserToLabel: str(cable.riser_to_label),
     vertical: str(cable.vertical),
     deleted: !!cable.deleted_at,
+    deleteReason: str(cable.delete_reason),
     termKit: { own: ownKits, code: codeKits, takes: ownKits ?? codeKits },
     ends: [mine, other],
     // The riser governs the cable's To (R2): the A end's To text, else whichever end has one.
