@@ -10,7 +10,7 @@
  * finding reopens when its message changes (D178).
  */
 
-import { MASTER_CATEGORY_RENAME, ROLE_LABEL } from '@field-survey/core';
+import { canonicalCategory, MASTER_CATEGORY_RENAME, ROLE_LABEL } from '@field-survey/core';
 
 import { DEVICE_CATEGORIES } from '../lints';
 import type { Rule, RuleContext } from '../rule';
@@ -191,6 +191,32 @@ export const LintVocab: Rule = {
         discriminator: `cable=${code ?? ''}`,
         ...(code ? { fix: { field: 'cable', from: code, to: null } } : {}),
         message: code ? `${where}Cable code "${code}" is not in the vocabulary` : `${where}Cable has no code`,
+      });
+    }
+  },
+};
+
+/**
+ * A device whose category is not its type's (T144, D232): set from the type when it was placed,
+ * then the type was regrouped (the ERn enclosures moved from Equipment to Equipment Panels), or
+ * the device's was changed by hand. Old master spellings compare as their canonical value
+ * (`lint.vocab` flags those). Fix all via ruling renames the device's to the type's.
+ */
+export const LintTypeCategory: Rule = {
+  id: 'lint.type_category',
+  title: 'Category differs from its type',
+  text: 'A device\'s category is its library type\'s (D232): a device whose category differs from its type\'s (old master spellings read as their canonical value) is flagged with the type\'s as the fix.',
+  run(ctx) {
+    for (const d of ctx.index.device.values()) {
+      const own = str(d.category);
+      const type = typeOfDevice(ctx, d);
+      const theirs = str(type?.category);
+      if (!own || !theirs || canonicalCategory(own) === canonicalCategory(theirs)) continue;
+      ctx.find({
+        subject: subjectOfDevice(d),
+        discriminator: `category=${own}`,
+        fix: { field: 'category', from: own, to: theirs },
+        message: `${deviceLabel(ctx, d)}: type ${type!.model} says ${theirs}, device says ${own}`,
       });
     }
   },
@@ -449,6 +475,7 @@ export const LINT_RULES: readonly Rule[] = [
   LintOwner,
   LintNeuronItem,
   LintVocab,
+  LintTypeCategory,
   LintFarEnd,
   LintEndStatus,
   LintNeuronDup,

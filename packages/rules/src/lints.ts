@@ -29,6 +29,7 @@ export const LINT_CHECKS: readonly LintCheck[] = [
   { id: 'item_owner', title: 'Punch item without Owner', lints: ['lint.item_owner'], hint: 'Give the item an Owner: EC, ETC or EC/ETC.' },
   { id: 'neuron_item', title: 'Neuron ID item missing or not last', lints: ['lint.neuron_item'], hint: 'Accept the R3c "Missing all Device Neuron IDs" draft; it is kept sorted last.' },
   { id: 'vocab', title: 'Value outside vocabulary', lints: ['lint.vocab', 'R3f'], hint: 'Change the value to the vocabulary\'s, or fix all of them with one ruling.', ruling: true },
+  { id: 'type_category', title: 'Category differs from its type', lints: ['lint.type_category'], hint: 'The type was regrouped after the device was placed: fix all of them to the type\'s category with one ruling, or change the type.', ruling: true },
   { id: 'far_end', title: 'Cable with missing far end', lints: ['lint.far_end'], hint: 'Open the end and pick the far end (a device or a placeholder).' },
   { id: 'end_status', title: 'Cable ends with incompatible statuses', lints: ['lint.end_status'], hint: 'A wire is run or not: survey both ends again and correct one.' },
   { id: 'riser', title: 'To does not match the riser', lints: ['R2b'], hint: 'The riser governs To: correct To, or keep the guess in the note.' },

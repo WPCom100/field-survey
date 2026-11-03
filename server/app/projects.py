@@ -46,6 +46,8 @@ DEFAULT_EXPORT_TITLE = "ETC Lighting Controls Survey"
 PARTY_KEYS = ("ec", "etc", "gc")
 SETTING_KEYS = ("export_title", "disclaimer")
 CHANGE_TYPE = "Master edit"
+# The reason on every op of a new project (its copied library types too, which T144 reads).
+CREATED_REASON = "Project created by"
 
 
 class ProjectError(Exception):
@@ -264,7 +266,7 @@ def create_project(session: Session, body: ProjectIn, user: User) -> CreatedOut:
     session.add(project)
     session.flush()
 
-    reason = f"Project created by {user.name}" + (f", copied from {source.name}" if source else "")
+    reason = f"{CREATED_REASON} {user.name}" + (f", copied from {source.name}" if source else "")
     ops = _Ops(project.id, user.id, reason)
     ops.create(
         "project",

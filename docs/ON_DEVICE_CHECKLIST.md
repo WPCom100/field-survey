@@ -697,6 +697,17 @@ Decision D242 (Proposed): a display sheet over 400,000 page objects is stored as
 
 Decision D243 (Proposed): Move to… on a flagged draft sets its level (or the pool) and unflags it in one edit, also after some units were placed (those keep their level); a draft put in the pool by hand is in the pool whatever level its extraction read. → Approve / change:
 
+## T144 — ERn enclosures are Equipment Panels  ·  Needs: no new build (JS update; server deploy first, then **one DaVinci upload with the new `DaVinci_categories.xlsx`**)
+
+**Why it matters:** on 2026-11-01 (A-2) the ERn read as `Equipment`; you ruled them `Equipment Panels` (D232). The mapping workbook in the repo (`fixtures/DaVinci_categories.xlsx`) now files the 22 ERn enclosures under Equipment Panels on its Types tab. The server keeps using the workbook you last uploaded, so upload the new one once: copy it and DaVinci's `library.json` (`%LOCALAPPDATA%\ETC\DaVinci\`) to the iPad first.
+
+- [ ] **The upload corrects them.** Setup → 3 Sources → DaVinci library → Choose files…, pick `library.json` **and** the new `DaVinci_categories.xlsx`. When the card reads Done, the line includes "n categories corrected" (about 22, plus one per project copy of an accepted ERn type). → saw:
+- [ ] **The library shows them as Equipment Panels, still racks.** Library (app, then this project's): ERn2 Mk2, ERn4 Mk2 and the other ERn enclosures are listed under Equipment Panels with role Equipment rack, Neuron ID not needed. ERn-Net, ERn-BM, ERn-RPS Mk2 and the ERn upgrade kits are still under Accessories (not placeable). → saw:
+- [ ] **A category you set yourself stays.** If you had changed an ERn type's category by hand before the upload, it still reads what you set. (Skip if you never did.) → saw:
+- [ ] **Placed ERn devices are flagged.** Lint → check "Category differs from its type": each ERn device placed before the upload reads "<ID>: type ERn2-W-120 Mk2 says Equipment Panels, device says Equipment". Tap **Fix all via ruling**: the ruling editor opens with `Rename "Equipment" to "Equipment Panels"` over those devices; apply it and the findings close. Their pins are still hexagons. → saw:
+
+Decision D244 (Proposed): the ERn upgrade kits (`ERn2-W-UPG` and the rest) stay accessories, not Equipment Panels (an override would make them placeable devices); project copies count as set by the import while nobody has edited their category; the new lint flags any device whose category differs from its type's, not only the ERn. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

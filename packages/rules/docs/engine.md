@@ -62,6 +62,7 @@ D24 (client only), D169 (deterministic proposal ids), D170–D173 and D175 (T34'
 | Item without Owner | `lint.item_owner` | the punch item |
 | Neuron ID item missing / not last | `lint.neuron_item` | the numbering group (no item while a device lacks an ID) or the item (`sort_last` false) |
 | Value outside vocabulary | `lint.vocab`, `R3f` | the record: an old spelling (`vocab.canonical_of`; `fix` = field, from, canonical), a category outside CLAUDE.md §3 + `vocab(category)`, a cable code outside the master's; R3f for item text |
+| — (T144: category differs from its type, D232) | `lint.type_category` | the device (discriminator `category=<value>`): its category ≠ its type's (old master spellings compared as their canonical value); `fix` = category → the type's, so the check offers Fix all via ruling |
 | Cable with missing far end | `lint.far_end` | the end that has an endpoint (one end only, or the far end names no device/placeholder); an end naming a draft device not placed yet (`draft_device_id`, D235) is not missing |
 | Ends with different code / incompatible statuses | `lint.end_status` | the `Not installed` end when the other is `Complete` / `Installed, untested`; a code mismatch cannot happen (one cable, one code) |
 | To ≠ riser | `R2b` | the A end |

@@ -215,6 +215,7 @@ Pure TypeScript over an in-memory project snapshot (no DB, no React; the same pa
 | E5 | Accessory ERP-FT-LVD found < expected | 0-10V end Issue "Not landed"; punch "Land 0-10V control wiring" |
 | Acc | Any accessory found < expected | Finding (D52, proposal) |
 | lint.accessory_group | An accepted type's accessory group found < min or > max, or one model found > its `max_quantity` (counted rows only) | Finding (D197 (4), D202) |
+| lint.type_category | A device's category ≠ its library type's (old master spellings as their canonical value), e.g. a type regrouped after placing (the ERn enclosures → `Equipment Panels`) | Finding with the type's category as the fix; Fix all via ruling (D232, T144) |
 | E6/E7/E9 | Quick actions | Closed Information "Reterminated - all good"; Not installed + Information "Confirm …"; append "; moved from <room>" |
 | E12 | MSS import (M7) | Disagreement → `Missed Survey` "check" item |
 

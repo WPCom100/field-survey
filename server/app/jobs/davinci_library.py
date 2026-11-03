@@ -34,8 +34,10 @@ the NSPS -KIT power-supply expectation (D52) are not written: the reviewer adds 
 
 Re-running on a newer file updates **draft** rows by DaVinci `typeId` (field by field, as `set`
 ops with history) and never touches an accepted or rejected type — except a Neuron flag `true`
-the import itself wrote on an NSPS or rack type, which it clears in a `Correction` op (D222); a
-flag a person set (any later op) stays. With `retire_hand_made` the
+the import itself wrote on an NSPS or rack type, which it clears in a `Correction` op (D222),
+and a category it set that the mapping now files elsewhere (D232), which it corrects on the app
+type and on the project copies of it nobody edited, in `Correction` ops; a flag or category a
+person set (any later op) stays, on a draft too. With `retire_hand_made` the
 run first soft-deletes every app-library type that has no `source_ref` (hand-made, any state) —
 Landry's ruling once the catalogue covers them (D199); the project copies of those types stay.
 The same pair of files is not imported twice (`skipped`). Everything is one transaction through
@@ -65,6 +67,7 @@ from app.auth import system_user, upsert_user
 from app.ids import uuid7
 from app.jobs import runner
 from app.models import FieldHead, ImportBatch, LibraryType, Op, Project, User, Vocab
+from app.projects import CREATED_REASON
 from app.roles import NO_NEURON_ROLES, role_of, role_of_category
 from app.storage import ObjectStore
 from app.sync import LIBRARY_STREAM, SERVER_INSTALL_ID, OpIn, Push, jsonable
@@ -75,7 +78,7 @@ DAVINCI_KIND = "davinci"
 JSON_MIME = "application/json"
 XLSX_MIME = runner.XLSX_MIME
 CHANGE_TYPE = "Master edit"
-CORRECTION = "Correction"  # the D222 Neuron flag fix on an accepted or rejected type
+CORRECTION = "Correction"  # the D222 / D232 fixes on an accepted or rejected type
 REASON = "DaVinci library import"
 IMPORT_USER_NAME = "davinci"
 RETIRE_REASON = "Replaced by the DaVinci library import"
@@ -650,25 +653,25 @@ def role_of_davinci(t: DType, category: str | None) -> str | None:
     DaVinci family / category / name: `Power Distribution` is a relay panel unless DaVinci files
     it under Foundry; `Equipment` is an NSPS (P-NSPS-D…) or an ERn enclosure (`equipment_rack`)
     by name, else `other`; `Emergency Equipment` is an EBDK only for the Emergency Bypass
-    Detection Kit; `Equipment Panels` is a rack only for DaVinci's Equipment Racks (a simple
-    network box is `other`); `Equipment Rack` (DIN rail enclosures), `Touchscreen`, `Station`
-    and `Sensor` name their role. None for an accessory or an ignored type."""
+    Detection Kit; `Equipment Panels` is a rack for DaVinci's Equipment Racks and the ERn
+    enclosures (D232; a simple network box is `other`); `Equipment Rack` (DIN rail enclosures),
+    `Touchscreen`, `Station` and `Sensor` name their role. None for an accessory or an ignored
+    type."""
     if not category or category == IGNORE:
         return None
     name = f"{t.model_pattern} {t.display_name}".upper()
+    ern = name.startswith("ERN") or " ERN" in name
     match category:
         case "Power Distribution":
             return "foundry_panel" if t.category.startswith("Foundry") else "relay_panel"
         case "Equipment":
             if "NSPS" in name:
                 return "nsps"
-            if name.startswith("ERN") or " ERN" in name:
-                return "equipment_rack"
-            return "other"
+            return "equipment_rack" if ern else "other"
         case "Emergency Equipment":
             return "ebdk" if t.category == "Emergency Bypass Detection Kit" else "other"
         case "Equipment Panels":
-            return "equipment_rack" if t.category == "Equipment Racks" else "other"
+            return "equipment_rack" if t.category == "Equipment Racks" or ern else "other"
         case "Equipment Rack":
             return "equipment_rack"
         case "Touchscreen":
@@ -1027,6 +1030,16 @@ def _set_by_import(session: Session, head: uuid.UUID | None) -> bool:
     return head is None or session.scalar(select(Op.reason).where(Op.op_id == head)) == REASON
 
 
+def _copied_or_imported(session: Session, head: uuid.UUID | None) -> bool:
+    """A project type's field still holds what the import set (D232): its head op is the create
+    that copied the type into a new project (`projects._copy`) or an earlier import correction."""
+    op = session.get(Op, head) if head else None
+    if op is None:
+        return False
+    reason = op.reason or ""
+    return reason == REASON or (op.kind == "create" and reason.startswith(CREATED_REASON))
+
+
 def _same(a: Any, b: Any) -> bool:
     return json.dumps(jsonable(a), sort_keys=True) == json.dumps(jsonable(b), sort_keys=True)
 
@@ -1116,6 +1129,17 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
 
     plan = build_plan(lib, mapping, reserved=reserved, filename=lib_name)
 
+    # Project copies of app types (made at project creation, D65) by model: the category fix
+    # reaches the ones nobody edited (D232).
+    copies: dict[str, list[LibraryType]] = {}
+    for c in session.scalars(
+        select(LibraryType).where(
+            LibraryType.project_id.is_not(None), LibraryType.deleted_at.is_(None)
+        )
+    ):
+        copies.setdefault(model_key(c.model), []).append(c)
+    copy_ops: dict[uuid.UUID, _Ops] = {}
+
     counts: Counter[str] = Counter()
     for tp in plan.types:
         row = by_type_id.get(tp.type_id)
@@ -1141,17 +1165,46 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
         by_import = _set_by_import(session, neuron_head)
         if row.needs_neuron_id is True and role in NO_NEURON_ROLES and by_import:
             counts["neuron_flags_corrected"] += 1
+        # The category the mapping files the type under replaces the one the import set, in any
+        # state and on the project copies nobody edited; a person's category stands (D232).
+        category = tp.payload.get("category")
+        category_head = _head(session, row.id, "category")
+        category_by_import = _set_by_import(session, category_head)
+        if category_by_import:
+            if not _same(row.category, category):
+                counts["categories_corrected"] += 1
+            for c in copies.get(model_key(row.model), []):
+                c_head = _head(session, c.id, "category")
+                if _same(c.category, category) or not _copied_or_imported(session, c_head):
+                    continue
+                c_ops = copy_ops.setdefault(c.project_id, _Ops(c.project_id, actor.id))
+                c_ops.set(
+                    "library_type", c.id, "category", c.category, category, c_head, CORRECTION
+                )
+                counts["categories_corrected"] += 1
         if row.state != "draft":
             counts["kept_" + row.state] += 1
             if row.needs_neuron_id is True and role in NO_NEURON_ROLES and by_import:
                 ops.set(
                     "library_type", row.id, "needs_neuron_id", True, None, neuron_head, CORRECTION
                 )
+            if category_by_import and not _same(row.category, category):
+                ops.set(
+                    "library_type",
+                    row.id,
+                    "category",
+                    row.category,
+                    category,
+                    category_head,
+                    CORRECTION,
+                )
             continue
         changed = 0
         for f in UPDATED_FIELDS:
             was = getattr(row, f)
             now = tp.payload.get(f)
+            if f == "category" and not category_by_import:
+                continue
             if f == "needs_neuron_id":
                 if not by_import:
                     continue
@@ -1163,6 +1216,8 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
         counts["updated" if changed else "unchanged"] += 1
         counts["fields_set"] += changed
     push = _push(session, LIBRARY_STREAM, ops.ops, library=True) if ops.ops else None
+    for pid, c_ops in copy_ops.items():
+        _push(session, pid, c_ops.ops, library=False)
 
     # Unmapped port protocols: `vocab(cable_code)` drafts in the uploading project (D197).
     have = {
@@ -1198,9 +1253,10 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
         "kept_accepted": counts["kept_accepted"],
         "kept_rejected": counts["kept_rejected"],
         "neuron_flags_corrected": counts["neuron_flags_corrected"],
+        "categories_corrected": counts["categories_corrected"],
         "retired": retired,
         "vocab_drafts": len(vocab_ops.ops),
-        "ops": len(ops.ops) + len(vocab_ops.ops),
+        "ops": len(ops.ops) + len(vocab_ops.ops) + sum(len(o.ops) for o in copy_ops.values()),
         "last_library_seq": push.seq if push else None,
         "last_server_seq": vpush.seq if vpush else None,
     }

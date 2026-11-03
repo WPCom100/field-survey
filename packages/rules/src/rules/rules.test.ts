@@ -699,7 +699,7 @@ describe('the registry', () => {
     expect(a.findings.map((f) => f.lint_id).sort()).toEqual(['Acc', 'R1.no_item', 'lint.neuron_item', 'lint.power_120v', 'lint.relay_cables'].sort());
     expect(RULES.map((r) => r.id)).toEqual([
       'R1', 'R2a', 'R2b', 'R2c', 'R2d', 'R2e', 'R2f', 'R2g', 'R3a', 'R3b', 'R3c', 'R3d', 'R3f', 'R4a', 'R4b', 'R4d', 'E5', 'Acc',
-      'lint.power_120v', 'lint.relay_cables', 'lint.item_owner', 'lint.neuron_item', 'lint.vocab', 'lint.far_end', 'lint.end_status',
+      'lint.power_120v', 'lint.relay_cables', 'lint.item_owner', 'lint.neuron_item', 'lint.vocab', 'lint.type_category', 'lint.far_end', 'lint.end_status',
       'lint.neuron_dup', 'lint.id_dup', 'lint.deleted_link', 'lint.pin_sheet', 'lint.locked_drafts', 'lint.accessory_group', 'ruling',
     ]);
     const empty = run(new Build(), RULES);

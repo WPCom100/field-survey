@@ -110,7 +110,12 @@ def mapping_xlsx(rows: list[tuple[str, str, str]], overrides=()) -> bytes:
 @needs_categories
 def test_the_mapping_sheet_parses_with_every_row_assigned(categories):
     m = dl.read_categories(categories)
-    assert len(m.rows) == 155 and m.unassigned == [] and m.overrides == {}
+    assert len(m.rows) == 155 and m.unassigned == []
+    # D232: the 22 ERn enclosures are Equipment Panels; their upgrade kits and modules stay out
+    assert set(m.overrides.values()) == {"Equipment Panels"} and len(m.overrides) == 22
+    assert all(k[:2] == ("Paradigm", "Controllers") for k in m.overrides)
+    assert ("Paradigm", "Controllers", "ERn2 Mk2") in m.overrides
+    assert not any("UPG" in k[2] or "Upgrade" in k[2] for k in m.overrides)
     assert m.categories == ELEVEN  # D196's eleven, spelled as the sheet spells them
     assert sum(1 for v in m.rows.values() if v == dl.IGNORE) == 103
     assert m.rows[("Paradigm", "Controllers")] == "Equipment"
@@ -182,7 +187,8 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     assert plan.stats["placeable"] == 8 and plan.stats["accessory_only"] == 29
     assert plan.stats["by_category"] == {
         "Emergency Equipment": 1,
-        "Equipment": 3,
+        "Equipment": 2,
+        "Equipment Panels": 1,
         "Power Distribution": 1,
         "Sensor": 1,
         "Station": 1,
@@ -244,6 +250,12 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     assert "power_supply" not in erp["source_ref"]
     # the ERn2 enclosure has no mapped port, but carries power-supply modules → a 120V feed
     ern = p[ERN2]
+    # an ERn enclosure is an Equipment Panel (D232), still a rack: no Neuron ID
+    assert ern["category"] == "Equipment Panels" and ern["needs_neuron_id"] is None
+    assert next(t for t in plan.types if t.type_id == ERN2).role == "equipment_rack"
+    modules = [t for t in plan.types if t.payload["model"] in ("ERn-Net", "ERn-BM", "ERn2-W-UPG")]
+    assert len(modules) == 3
+    assert all(t.payload["accessory_only"] and t.payload["category"] is None for t in modules)
     assert codes(ern) == [("120V", 1, True)]
     assert ern["source_ref"]["power_supply"] == {
         "self": False,
@@ -536,6 +548,103 @@ def test_rerun_corrects_neuron_flags_the_import_wrote_on_nsps_and_racks(
     # the same files again: nothing left to correct, so the D222 batch now skips them
     third = _run(session, store, factory, pid, sample, categories)
     assert third.job_state == "skipped" and third.stats["earlier_batch"] == str(second.id)
+
+
+def _old_category_of(self, t):
+    """The mapping before D232 (no ERn overrides), with the UH10002 and the touchscreen filed
+    elsewhere, so a re-run has a draft to move and a hand-set category to leave."""
+    if t.type_id == UH10002:
+        return "Wall Plates"
+    if t.type_id == TS7:
+        return "Station"
+    return self.rows.get((t.family, t.category)) or dl.IGNORE
+
+
+@needs_sample
+@needs_categories
+def test_rerun_corrects_categories_the_import_set_on_app_types_and_project_copies(
+    session, store, factory, sample, categories, monkeypatch
+):
+    """D232: the ERn enclosure the import filed under Equipment, accepted and copied into two
+    projects, moves to Equipment Panels on the next import — a Correction op on the app type and
+    on the copy nobody edited; the copy Ann regrouped and the draft whose category Ann set keep
+    theirs; a draft the import filed elsewhere follows the mapping."""
+    landry = upsert_user(session, "Landry")
+    pid = _project(session)
+    with monkeypatch.context() as m:  # the mapping as it was
+        m.setattr(dl.Mapping, "category_of", _old_category_of)
+        first = _run(session, store, factory, pid, sample, categories)
+    assert first.job_state == "done", first.stats
+    types = _app_types(session)
+    assert types[ERN2].category == "Equipment" and types[ERN2].role == "equipment_rack"
+    types[ERN2].state = "accepted"
+    session.commit()
+    # two projects created since copy the accepted enclosure (D65)
+    copies = {}
+    for name in ("Annex", "Garage"):
+        out = projects.create_project(
+            session, projects.ProjectIn(name=name, levels=[projects.LevelIn(level="01")]), landry
+        )
+        copies[name] = session.scalars(
+            select(LibraryType).where(
+                LibraryType.project_id == uuid.UUID(out.id),
+                LibraryType.model == types[ERN2].model,
+            )
+        ).one()
+    assert {c.category for c in copies.values()} == {"Equipment"}
+    # Ann regroups the Garage's copy and sets the touchscreen draft's category by hand
+    ann = upsert_user(session, "Ann")
+    garage = copies["Garage"]
+    for stream, entity, now in (
+        (garage.project_id, garage.id, "Equipment Rack"),
+        (dl.LIBRARY_STREAM, types[TS7].id, "Wall Plates"),
+    ):
+        hand = dl._Ops(stream, ann.id)
+        head = dl._head(session, entity, "category")
+        hand.set("library_type", entity, "category", None, now, head)
+        for op in hand.ops:
+            op.change_type, op.reason = "Field survey", None
+        dl._push(session, stream, hand.ops, library=stream == dl.LIBRARY_STREAM)
+    session.commit()
+
+    # Landry uploads the regrouped mapping with the next library
+    doc = json.loads(sample)
+    doc["timestamp"] = "2026-11-02T00:00:00.000Z"
+    second = _run(
+        session, store, factory, pid, json.dumps(doc).encode(), categories, name="library2.json"
+    )
+    assert second.job_state == "done", second.stats
+    s = second.stats
+    assert s["categories_corrected"] == 3  # the app ERn2, the Annex copy, the UH10002 draft
+    assert s["kept_accepted"] == 1 and s["neuron_flags_corrected"] == 0
+    session.expire_all()
+    types = _app_types(session)
+    ern = types[ERN2]
+    assert ern.category == "Equipment Panels" and ern.state == "accepted"
+    assert ern.role == "equipment_rack" and ern.needs_neuron_id is None  # the role is unchanged
+    assert session.get(LibraryType, copies["Annex"].id).category == "Equipment Panels"
+    assert session.get(LibraryType, garage.id).category == "Equipment Rack"  # Ann's stands
+    assert types[TS7].category == "Wall Plates"  # Ann's, on a draft too
+    assert types[UH10002].category == "Station"
+    fixes = session.scalars(
+        select(Op).where(
+            Op.entity_kind == "library_type",
+            Op.field == "category",
+            Op.reason == "DaVinci library import",
+        )
+    ).all()
+    by_entity = {o.entity_id: o for o in fixes}
+    assert set(by_entity) == {ern.id, copies["Annex"].id, types[UH10002].id}
+    for eid, project_id in ((ern.id, None), (copies["Annex"].id, copies["Annex"].project_id)):
+        o = by_entity[eid]
+        assert o.change_type == "Correction" and o.project_id == project_id
+        assert (o.was, o.now) == ("Equipment", "Equipment Panels") and o.base_op_id
+    assert by_entity[types[UH10002].id].change_type == "Master edit"  # the ordinary draft update
+    # the same files again: nothing left to correct
+    third = _run(
+        session, store, factory, pid, json.dumps(doc).encode(), categories, name="library2.json"
+    )
+    assert third.job_state == "skipped"
 
 
 @needs_sample

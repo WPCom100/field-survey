@@ -15,7 +15,7 @@ Decisions: D43, D48, D65, D183, D184, D196, D197.
 | `alembic/versions/0011_davinci_library.py` | `library_type.description / datasheet_url / source_ref / accessory_only`; `vocab.list` gains `cable_code`; `import_batch.kind` gains `davinci`. Client side: core migration 0010. |
 | `tests/test_davinci_library.py` | The golden sample end to end: the mapping, the plan, the job, re-runs, clashes, the route. |
 | `tests/make_davinci_sample.py` | Regenerates `fixtures/davinci-library-sample.json` from a real `library.json`. |
-| `fixtures/DaVinci_categories.xlsx` | Landry's mapping (D196): Categories tab "Our category" per DaVinci family / category (155 rows, 52 kept), Types tab "Override" per type (none yet). |
+| `fixtures/DaVinci_categories.xlsx` | Landry's mapping (D196): Categories tab "Our category" per DaVinci family / category (155 rows, 52 kept), Types tab "Override" per type: the 22 ERn enclosures (`Paradigm / Controllers`, display name `ERn…`) → `Equipment Panels` (D232, T144). |
 
 ## Running one
 
@@ -117,6 +117,17 @@ op each in the library log. A later run (a newer `library.json`, or a regrouped 
   `equipment_rack` is cleared in one `Correction` op, in any state (`stats.neuron_flags_corrected`,
   "n Neuron flags corrected" on the Sources card). A flag a person set after the import is never
   touched, on a draft either;
+- a **category** the import set (the field head's `reason` is "DaVinci library import") that the
+  mapping now files elsewhere is corrected in any state (D232, T144): an accepted or rejected type
+  in one `Correction` op, a draft by the ordinary `set`. So are the **project copies** of that type
+  (matched by model) whose category nobody edited — the head is still the create op that copied
+  it into a new project (reason "Project created by …") or an earlier import correction — in one
+  `Correction` op each in that project's own op stream. A category a person set (any later op, in
+  the app library or the project) stands, and so does every copy of a type whose app category a
+  person set. The role is not touched (an ERn stays `equipment_rack`). `stats.categories_corrected`
+  counts the app types and copies, "n categories corrected" on the Sources card. A device placed
+  under the old category gets the `lint.type_category` finding (type says one, device the other)
+  with Fix all via ruling;
 - a new `typeId` → created; a type ETC removed → its row stays (nothing is deleted);
 - the `cable_code` drafts already in the uploading project are not written again;
 - the same pair of files is `skipped` only against a batch run since D222 (its stats carry
@@ -124,7 +135,7 @@ op each in the library log. A later run (a newer `library.json`, or a regrouped 
 
 `stats`: `types_in_file`, `placeable`, `accessory_only`, `by_category`, `power_supplies`,
 `load_outputs`, `created`, `updated`, `unchanged`, `fields_set`, `kept_accepted`,
-`kept_rejected`, `neuron_flags_corrected`, `retired[]`, `clashes[]`, `renamed[]`, `not_surveyed_protocols{}`,
+`kept_rejected`, `neuron_flags_corrected`, `categories_corrected`, `retired[]`, `clashes[]`, `renamed[]`, `not_surveyed_protocols{}`,
 `aliases_dropped`, `rows_not_in_mapping[]`, `rows_unassigned[]`, `unmapped_protocols{}`,
 `vocab_drafts`, `library_timestamp`, `categories_file`, `categories_reused_from`, `ops`,
 `last_library_seq`.
@@ -145,7 +156,9 @@ A created type also gets a **role** (`library_type.role`: `relay_panel`, `foundr
 category and DaVinci's family / name (`role_of_davinci`): `Power Distribution` is a relay panel
 unless DaVinci files it under Foundry; `Equipment` is an NSPS (P-NSPS-D…) or an ERn enclosure
 (`equipment_rack`) by name, else `other`; `Emergency Equipment` is an EBDK only for the
-Emergency Bypass Detection Kit; `Equipment Panels` is a rack only for DaVinci's Equipment Racks;
+Emergency Bypass Detection Kit; `Equipment Panels` is a rack for DaVinci's Equipment Racks and the ERn enclosures
+(D232: the mapping files those under `Equipment Panels`; their modules and upgrade kits stay
+accessories);
 `Equipment Rack`, `Touchscreen`, `Station` and `Sensor` name their role; accessories get none.
 The rules, the ID letters, the Punch List Device text and the pin shapes read the role, never
 the category string (`app/roles.py`, `packages/core/src/roles.ts`). **A re-run never writes

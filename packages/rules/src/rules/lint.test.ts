@@ -28,6 +28,7 @@ import {
   LintPin,
   LintPower,
   LintRelay,
+  LintTypeCategory,
   LintVocab,
   LINT_RULES,
 } from './lint';
@@ -389,5 +390,30 @@ describe('library cable lints by role (T112, D201)', () => {
       '06M-03: Category "Dimmer rack" is not in the vocabulary',
     ]);
     expect(evaluate(b.snap, [LintVocab], undefined, { now: NOW }).findings.find((f) => f.subject.entity_id === d.id)?.subject.fix).toEqual({ field: 'category', from: 'Relay panel', to: 'Power Distribution' });
+  });
+
+  it('flags a device whose category is not its type\'s (T144: the ERn moved to Equipment Panels) and seeds a rename ruling', () => {
+    const b = new Build();
+    const l = b.level('06M');
+    const ern = b.libraryType('ERn2-W-120 Mk2', 'Equipment Panels', { role: 'equipment_rack' });
+    const nsps = b.libraryType('P-NSPS-D', 'Equipment', { role: 'nsps' });
+    const old = b.device(l, 'Equipment', { display_id: '06M-05', library_type_id: ern.id });
+    const old2 = b.device(l, 'Equipment', { display_id: '06M-07', library_type_id: ern.id });
+    b.device(l, 'Equipment Panels', { display_id: '06M-06', library_type_id: ern.id }); // placed after
+    b.device(l, 'Equipment rack', { display_id: '06M-08', library_type_id: ern.id }); // the master's spelling: lint.vocab's
+    b.device(l, 'Equipment', { display_id: '06M-04', library_type_id: nsps.id });
+    b.device(l, 'Equipment'); // no type
+    expect(found(b, [LintTypeCategory])).toEqual([
+      ['lint.type_category', old.id, '06M-05: type ERn2-W-120 Mk2 says Equipment Panels, device says Equipment'],
+      ['lint.type_category', old2.id, '06M-07: type ERn2-W-120 Mk2 says Equipment Panels, device says Equipment'],
+    ]);
+    const findings = evaluate(b.snap, [LintTypeCategory], undefined, { now: NOW }).findings;
+    expect(checkOf('lint.type_category')).toMatchObject({ id: 'type_category', ruling: true });
+    const seeds = rulingSeeds(
+      findings.map((f, i) => ({ findingId: `f${i}`, lintId: f.lint_id, entityKind: f.subject.entity_kind, entityId: f.subject.entity_id, levelId: f.subject.level_id ?? null, fix: f.subject.fix ?? null })),
+    );
+    expect(seeds).toEqual([
+      expect.objectContaining({ entity: 'device', field: 'category', action: 'rename', from: 'Equipment', to: 'Equipment Panels', recordIds: [old.id, old2.id], text: 'Rename "Equipment" to "Equipment Panels"' }),
+    ]);
   });
 });
