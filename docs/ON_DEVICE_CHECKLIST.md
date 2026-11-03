@@ -724,6 +724,16 @@ Decision D244 (Proposed): the ERn upgrade kits (`ERn2-W-UPG` and the rest) stay 
 
 Decision D247 (Proposed): "gets a wire" = the device's live cable ends (any status), else its accepted type's default cables, stations and sensors always on the Unison bus; the NSPS / rack Neuron exception stays unless the type says Needed; "Missing all Device IP addresses" / "… DMX addresses" as the item texts; neither address is exported; a duplicate IP is a lint and a Save-anyway warning, a duplicate DMX is not. **And the Tower consequence:** besides the 11 relay panels you ruled on (D246), the wire rule takes the **12 Foundry panels (UFMP4)**, the **11 EBDKs** and the **touchscreen 01-06** off the Neuron items (they have DMX, panic or network wires, no Unison), and gives the racks, the NSPS with network runs, 01-06 and the panels IP / DMX address needs. Right? If a Foundry panel, an EBDK or a touchscreen does carry a Neuron ID, say which: it becomes "Needed" on its type (or a code in the R3c Neuron map), not a code change. → Approve / change:
 
+## T147 — Dashboard: IP and DMX addresses captured  ·  Needs: no new build (JS update only; T146's server deploy first if it has not happened yet)
+
+**Why it matters:** T146 gave devices an IP address and a DMX address by the wires they get; the dashboard only counted Neuron IDs. The as-found line now shows all three, each counted over the devices that need one, with a list of the devices still missing it. Use the Tower project.
+
+- [ ] **The line.** Dashboard → the as-found line reads `field additions n · never found n · Neuron IDs captured n/169 · IP addresses captured n/9 · DMX addresses captured n/16` (Tower, before anyone types an address). On a narrow window the line wraps; nothing is cut off. → saw:
+- [ ] **IP drill-down.** Tap "IP addresses captured": the side panel is titled "Devices without an IP address" and lists B2-03, 01-05, 01-06, 02-03, 03-01, 03-05, 04-03, 04-05, 06M-01 (racks, NSPS with a network run, the touchscreen, two relay panels). Tap a row: its card opens on the plan. → saw:
+- [ ] **DMX drill-down.** Tap "DMX addresses captured": "Devices without a DMX address" lists the 12 relay panels (`CT…LCP…`), the Foundry panels 02-06 and 04-06, and the racks 01-05 and 06M-01. → saw:
+- [ ] **Counts follow a capture.** Type an IP address on 01-06 and a DMX address on 01-01 (card → Type…), then back to the Dashboard: IP reads 1/9 and DMX 1/16; neither device is in its list any more. Clear both afterwards if this is the real project. → saw:
+- [ ] **Levels filter.** Pick Level 01 in the Levels chips: the three counts cover level 01 only (IP n/2, DMX n/3), and each list holds only 01 devices. → saw:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

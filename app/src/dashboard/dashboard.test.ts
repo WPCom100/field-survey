@@ -11,7 +11,7 @@ import { Editor, Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
-import { asFound, chartData, drillRows, loadDashboard, readinessLine, searchProject, summaryTables, type SummaryTable } from './model';
+import { asFound, chartData, drillRows, drillTitle, loadDashboard, readinessLine, searchProject, summaryTables, type SummaryTable } from './model';
 
 const PROJECT = uuidv7();
 const ME = uuidv7();
@@ -101,9 +101,37 @@ describe('dashboard (T38)', () => {
     const { store } = await setup();
     const data = await loadDashboard(store, PROJECT);
     // T146 (D245): the two stations ride the Unison bus; the relay panel (a DMX run) and the NSPS need none — the panel's captured ID is not counted
-    expect(asFound(data)).toEqual({ fieldAdditions: 1, neverFound: 1, neuronCaptured: 0, neuronDevices: 2, devices: 4 });
+    // the DMX run (X) lands on the relay panel and the NSPS: both need a DMX address; nothing has a network run yet
+    expect(asFound(data)).toEqual({ fieldAdditions: 1, neverFound: 1, neuronCaptured: 0, neuronDevices: 2, ipCaptured: 0, ipDevices: 0, dmxCaptured: 0, dmxDevices: 2, devices: 4 });
     expect(drillRows(data, { table: 'asFound', key: 'neverFound', status: null }).map((r) => r.label)).toEqual(['01-? NEW']);
     expect(drillRows(data, { table: 'asFound', key: 'neuronMissing', status: null }).map((r) => r.label)).toEqual(['01-S2', '01-? NEW']);
+    expect(drillRows(data, { table: 'asFound', key: 'dmxMissing', status: null }).map((r) => r.label)).toEqual(['01-01', '06M-04']);
+    expect(drillRows(data, { table: 'asFound', key: 'ipMissing', status: null })).toEqual([]);
+  });
+
+  it('counts IP and DMX addresses over the devices whose wires need one, and drills to the ones still missing (T147)', async () => {
+    const { store, id, editor } = await setup();
+    // a network run (N) from the NSPS to the relay panel, unpulled: both now need an IP address (D247 (1): any end status)
+    const { id: net } = await editor.create('cable', { project_id: PROJECT, cable: 'N', qty: 1 }, { change_type: 'Master edit', reason: 't' });
+    await editor.create('cable_end', { cable_id: net, side: 'A', level_id: id.l06m, device_id: id.d4, status: 'Not installed' }, { change_type: 'Master edit', reason: 't' });
+    await editor.create('cable_end', { cable_id: net, side: 'B', level_id: id.l01, device_id: id.d1, status: 'Not installed' }, { change_type: 'Master edit', reason: 't' });
+    await editor.setField('device', id.d4, 'ip_address', '10.101.6.4', { change_type: 'Master edit', reason: 't' });
+    await editor.setField('device', id.d1, 'dmx_address', '1/001', { change_type: 'Master edit', reason: 't' });
+    const data = await loadDashboard(store, PROJECT);
+    expect(asFound(data)).toMatchObject({ ipCaptured: 1, ipDevices: 2, dmxCaptured: 1, dmxDevices: 2, neuronCaptured: 0, neuronDevices: 2 });
+    expect(drillRows(data, { table: 'asFound', key: 'ipMissing', status: null }).map((r) => r.label)).toEqual(['01-01']);
+    expect(drillRows(data, { table: 'asFound', key: 'dmxMissing', status: null }).map((r) => r.label)).toEqual(['06M-04']);
+    expect(drillTitle({ table: 'asFound', key: 'ipMissing', status: null })).toBe('Devices without an IP address');
+    expect(drillTitle({ table: 'asFound', key: 'dmxMissing', status: null })).toBe('Devices without a DMX address');
+    // the Levels filter counts and drills within the level
+    expect(asFound(data, { levelId: id.l06m })).toMatchObject({ ipCaptured: 1, ipDevices: 1, dmxCaptured: 0, dmxDevices: 1 });
+    expect(drillRows(data, { table: 'asFound', key: 'ipMissing', status: null }, { levelId: id.l06m })).toEqual([]);
+    // a type's explicit flag overrides the wires (D247 (2)): an NSPS type that says "no DMX address"
+    const { id: nsps } = await editor.create('library_type', { project_id: PROJECT, category: 'NSPS', role: 'nsps', model: 'P-NSPS-D', state: 'accepted', needs_dmx_address: false }, { change_type: 'Master edit', reason: 't' });
+    await editor.setField('device', id.d4, 'library_type_id', nsps, { change_type: 'Master edit', reason: 't' });
+    const typed = await loadDashboard(store, PROJECT);
+    expect(asFound(typed)).toMatchObject({ dmxCaptured: 1, dmxDevices: 1 });
+    expect(drillRows(typed, { table: 'asFound', key: 'dmxMissing', status: null })).toEqual([]);
   });
 
   it('derives readiness: setup with review count, ready once locked, surveying after an edit past the lock', async () => {
@@ -201,11 +229,50 @@ describe.skipIf(missing)(`dashboard over the seeded master${missing ? ' — SKIP
     expect(asFound(data)).toMatchInlineSnapshot(`
       {
         "devices": 210,
+        "dmxCaptured": 0,
+        "dmxDevices": 16,
         "fieldAdditions": 0,
+        "ipCaptured": 0,
+        "ipDevices": 9,
         "neuronCaptured": 0,
         "neuronDevices": 169,
         "neverFound": 0,
       }
+    `);
+    // T147: the devices whose wires need an IP / DMX address (T146's addressNeeds; D247 (6) lists the Tower's)
+    const missing = (key: 'ipMissing' | 'dmxMissing') => drillRows(data, { table: 'asFound', key, status: null }).map((r) => `${r.label} ${r.text}`);
+    expect(missing('ipMissing')).toMatchInlineSnapshot(`
+      [
+        "B2-03 P-NSPS-D-KIT · Elec XXB2-2E02",
+        "01-05 Equipment Rack 18U · Elec WT01-1E02",
+        "01-06 P-TS7-E · Info Desk WT01-1046",
+        "02-03 P-NSPS-D-KIT · Elec XX02-1E01",
+        "03-01 CT03LCPA · Elec XX03-1E01",
+        "03-05 P-NSPS-D-KIT · Elec XX03-1E04",
+        "04-03 CT04LCPB · Elec XX04-1E01",
+        "04-05 P-NSPS-D-KIT · Elec XX04-1E01",
+        "06M-01 Equipment Rack 18U · Stair A Vestibule XX06M-2SV01 area",
+      ]
+    `);
+    expect(missing('dmxMissing')).toMatchInlineSnapshot(`
+      [
+        "B2-01 CTB2LCPB · Elec XXB2-2E02",
+        "B1-01 CTB1LCPB · Elec WTB1-1E01; moved from Elec XXB1-2E02",
+        "01-01 CT01LCPB · Elec XX01-1E02",
+        "01-03 CT01LCPA · Elec XX01-1E01",
+        "01-05 Equipment Rack 18U · Elec WT01-1E02",
+        "02-01 CT02LCPA · Elec XX02-1E01",
+        "02-04 CT02LCPB · Elec XX02-1E02",
+        "02-06 UFMP4 · Elec XX02-1E02",
+        "03-01 CT03LCPA · Elec XX03-1E01",
+        "03-03 CT03LCPB · Elec XX03-1E04",
+        "04-01 CT04LCPA · Elec XX04-1E04",
+        "04-03 CT04LCPB · Elec XX04-1E01",
+        "04-06 UFMP8 · Conf XX04-3108A/B",
+        "06M-01 Equipment Rack 18U · Stair A Vestibule XX06M-2SV01 area",
+        "06M-02 CT06LCPB · Stair A Vestibule XX06M-2SV01 area, right of rack",
+        "06M-04 CT06LCPA · Near Elevator Machine Room XX06M-1EM02",
+      ]
     `);
     expect(readinessLine(data.readiness)).toMatchInlineSnapshot(`"B2 setup (1 review) · B1 setup (2 review) · 01 setup (4 review) · 02 setup (4 review) · 03 setup (9 review) · 04 setup (6 review) · 06 setup · 06M setup (5 review)"`);
   }, 60_000);

@@ -14,7 +14,7 @@ import { vocab, type Store } from '@field-survey/core';
 
 import { loadRuleParams } from '@field-survey/rules';
 
-import { deviceNeedsNeuron, loadDeviceCodes, loadDeviceTypes } from '../library/neuron';
+import { deviceAddressNeeds, loadDeviceCodes, loadDeviceTypes } from '../library/neuron';
 import { connectionMatches, projectCableCodes } from '../plan/lists';
 
 export const UNSURVEYED = 'Unsurveyed';
@@ -63,14 +63,34 @@ export type AsFound = {
   neuronCaptured: number;
   /** Devices that need a Neuron ID (T68 / D185, T146 / D245: by their type's flag, else the wires they get). */
   neuronDevices: number;
+  /** Captured / needed IP addresses and DMX addresses (T147), counted the same way (T146's `addressNeeds`). */
+  ipCaptured: number;
+  ipDevices: number;
+  dmxCaptured: number;
+  dmxDevices: number;
   devices: number;
 };
+
+/** One fact per address kind on a device: whether it needs one, whether one was captured. */
+export type DeviceFacts = {
+  fieldAddition: boolean;
+  neverFound: boolean;
+  neuron: boolean;
+  needsNeuron: boolean;
+  ip: boolean;
+  needsIp: boolean;
+  dmx: boolean;
+  needsDmx: boolean;
+};
+
+/** The as-found drill-downs: field additions, never found, and the devices still missing each address kind. */
+export type AsFoundKey = 'fieldAdditions' | 'neverFound' | 'neuronMissing' | 'ipMissing' | 'dmxMissing';
 
 export type DashboardData = {
   levels: DashLevel[];
   rows: DashRow[];
   /** Device facts the as-found line counts, by device id. */
-  deviceFacts: Map<string, { fieldAddition: boolean; neverFound: boolean; neuron: boolean; needsNeuron: boolean }>;
+  deviceFacts: Map<string, DeviceFacts>;
   readiness: Readiness[];
 };
 
@@ -94,7 +114,7 @@ export type SummaryTable = {
 };
 
 /** A tapped count: one table, one key (null = the Total row), one status (null = the Total column). */
-export type Drill = { table: TableId; key: string | null; status: string | null } | { table: 'asFound'; key: 'fieldAdditions' | 'neverFound' | 'neuronMissing'; status: null };
+export type Drill = { table: TableId; key: string | null; status: string | null } | { table: 'asFound'; key: AsFoundKey; status: null };
 
 type Row = Record<string, unknown>;
 
@@ -129,7 +149,17 @@ export async function loadDashboard(store: Store, projectId: string): Promise<Da
     const label = str(d.display_id) ?? `${code.get(levelId)}-? NEW`;
     deviceLabel.set(String(d.id), label);
     rows.push({ entity: 'device', id: String(d.id), levelId, levelCode: code.get(levelId)!, status: str(d.status) ?? UNSURVEYED, owner: null, label, text: join(d.device ?? d.type ?? d.category, d.room_location), deviceId: String(d.id) });
-    deviceFacts.set(String(d.id), { fieldAddition: d.origin === 'field_addition', neverFound: d.found_on_site === 0 || d.found_on_site === false, neuron: !!str(d.neuron_id), needsNeuron: deviceNeedsNeuron(types, d, codes.get(String(d.id)), ruleParams) });
+    const needs = deviceAddressNeeds(types, d, codes.get(String(d.id)), ruleParams);
+    deviceFacts.set(String(d.id), {
+      fieldAddition: d.origin === 'field_addition',
+      neverFound: d.found_on_site === 0 || d.found_on_site === false,
+      neuron: !!str(d.neuron_id),
+      needsNeuron: needs.neuron,
+      ip: !!str(d.ip_address),
+      needsIp: needs.ip,
+      dmx: !!str(d.dmx_address),
+      needsDmx: needs.dmx,
+    });
   }
   const punches = await store.db.query<Row>(`SELECT * FROM punch_item WHERE deleted_at IS NULL AND ${inLevels}`, [projectId]);
   for (const p of punches) {
@@ -256,10 +286,8 @@ export function summaryTables(data: DashboardData, f: DashFilter = {}): SummaryT
 /** The records behind a tapped count, in the export's order. */
 export function drillRows(data: DashboardData, d: Drill, f: DashFilter = {}): DashRow[] {
   if (d.table === 'asFound') {
-    return scoped(data, 'device', f).filter((r) => {
-      const x = data.deviceFacts.get(r.id)!;
-      return d.key === 'fieldAdditions' ? x.fieldAddition : d.key === 'neverFound' ? x.neverFound : x.needsNeuron && !x.neuron;
-    });
+    const key = d.key;
+    return scoped(data, 'device', f).filter((r) => asFoundMatch(data.deviceFacts.get(r.id)!, key));
   }
   const t = TABLES.find((x) => x.id === d.table)!;
   return scoped(data, t.entity, f).filter(
@@ -270,12 +298,35 @@ export function drillRows(data: DashboardData, d: Drill, f: DashFilter = {}): Da
 }
 
 export function drillTitle(d: Drill): string {
-  if (d.table === 'asFound') return d.key === 'fieldAdditions' ? 'Field additions' : d.key === 'neverFound' ? 'Never found' : 'Devices without a Neuron ID';
+  if (d.table === 'asFound') return AS_FOUND_TITLE[d.key];
   return [TABLE_TITLE[d.table], d.key ?? 'All', d.status ?? 'Total'].join(' · ');
 }
 
+function asFoundMatch(x: DeviceFacts, key: AsFoundKey): boolean {
+  switch (key) {
+    case 'fieldAdditions':
+      return x.fieldAddition;
+    case 'neverFound':
+      return x.neverFound;
+    case 'neuronMissing':
+      return x.needsNeuron && !x.neuron;
+    case 'ipMissing':
+      return x.needsIp && !x.ip;
+    case 'dmxMissing':
+      return x.needsDmx && !x.dmx;
+  }
+}
+
+const AS_FOUND_TITLE: Readonly<Record<AsFoundKey, string>> = {
+  fieldAdditions: 'Field additions',
+  neverFound: 'Never found',
+  neuronMissing: 'Devices without a Neuron ID',
+  ipMissing: 'Devices without an IP address',
+  dmxMissing: 'Devices without a DMX address',
+};
+
 export function asFound(data: DashboardData, f: DashFilter = {}): AsFound {
-  const out: AsFound = { fieldAdditions: 0, neverFound: 0, neuronCaptured: 0, neuronDevices: 0, devices: 0 };
+  const out: AsFound = { fieldAdditions: 0, neverFound: 0, neuronCaptured: 0, neuronDevices: 0, ipCaptured: 0, ipDevices: 0, dmxCaptured: 0, dmxDevices: 0, devices: 0 };
   for (const r of scoped(data, 'device', f)) {
     const x = data.deviceFacts.get(r.id)!;
     out.devices++;
@@ -284,6 +335,14 @@ export function asFound(data: DashboardData, f: DashFilter = {}): AsFound {
     if (x.needsNeuron) {
       out.neuronDevices++;
       if (x.neuron) out.neuronCaptured++;
+    }
+    if (x.needsIp) {
+      out.ipDevices++;
+      if (x.ip) out.ipCaptured++;
+    }
+    if (x.needsDmx) {
+      out.dmxDevices++;
+      if (x.dmx) out.dmxCaptured++;
     }
   }
   return out;
