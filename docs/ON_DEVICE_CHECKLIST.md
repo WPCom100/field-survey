@@ -639,6 +639,18 @@ Decision D237 (Proposed): the waiting end is a device end with no device and `dr
 
 Decision D238 (Proposed): a connection is deleted as one `delete` op on its cable (the ends stay as they are and go with it); Restore lives in the History of the device at either end and in the end editor; punch items and parts on it are left for the lint, not deleted with it; an accepted cable draft is never re-offered by itself once its cable is gone. → Approve / change:
 
+## T139 — Undo a placement; put a device back in the list  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01 Landry placed a device by mistake and had no way to put it back in the unplaced list. Use a project with drafts left to place (e.g. `pipeline test`) and a level with an accepted cable waiting on a draft if you have one.
+
+- [ ] **Undo in the panel.** Plan → Place devices → pick a draft row → tap the plan → Place ✓. A green row at the top reads "Placed `<level>-? <model>`." with **↶ Undo**. Tap ↶ Undo: the pin leaves the plan, the note says "… back in the unplaced list.", and the row is back in the list with its count as before. → saw:
+- [ ] **A master device.** Place a device marked "in the baseline", then ↶ Undo: its pin is gone and it is back in the list; its card keeps its ID, Drawing Position and Room. → saw:
+- [ ] **Only the latest, until the panel closes.** Place two items: only the second shows ↶ Undo. Tap ◀ Done placing and open Place devices again: no Undo row. → saw:
+- [ ] **From the card.** Tap a device you placed from a draft → ⋯ → **Put back in the unplaced list…**: the box asks "Put `<level>-?` back in the unplaced list (the device is deleted, its draft's unit is left to place): why?" with "Placed by mistake" filled in → **Put back**: the card shows Deleted: Placed by mistake, the pin is gone, and Place devices lists the unit again. On a master device the box says "(its pin is cleared)" instead. → saw:
+- [ ] **Its connection waits, then follows.** Place a draft that has a waiting connection (Metro: `… 1 waiting cable(s) made`), set that end's status on the card, then ↶ Undo: the far device's card still lists the connection with "→ … (draft on <level>, not placed yet)". Place the draft again: the connection is on the new device's card with the status you set, and Cables shows it once, not twice. → saw:
+
+Decision D239 (Proposed): Undo / Put back deletes a device placed from a draft (its cable ends go back to waiting for the draft, so placing it again re-links them) and only clears the pin of any other device; the card offers it for every device with a pin, not only those placed from drafts; the reason starts as "Placed by mistake". → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

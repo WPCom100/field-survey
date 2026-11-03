@@ -11,6 +11,9 @@
  *   role (as a field addition, D55) — no `display_id` (the server numbers it, D93 / D118), and the
  *   draft's accessories per unit. Then the accepted cable drafts waiting on it become cables
  *   (`commitWaitingCables`, D193 (3)).
+ *
+ * Undo / Put back in the unplaced list (T139, D239) takes a placement back: a device placed from a
+ * draft is deleted and its cable ends wait for the draft again; a master device loses its pin.
  */
 
 import { OpError, type EditContext, type Editor, type Op, type Store } from '@field-survey/core';
@@ -125,4 +128,39 @@ async function placeDraft(editor: Editor, store: Store, item: UnplacedDraft, inp
 /** Flag (or unflag) a draft as not on this sheet: it leaves the list for the Flagged section. */
 export async function flagNotOnSheet(editor: Editor, item: UnplacedDraft, flag: boolean): Promise<Op | null> {
   return editor.setField('draft_device', item.draftId, 'not_on_sheet', flag, ctx(`${flag ? 'not on this sheet' : 'back on the list'}: ${item.title}`));
+}
+
+/** The reason Undo writes (T139); the card's Put back… box starts with it. */
+export const UNPLACE_REASON = 'Placed by mistake';
+
+export type UnplaceResult = { deleted: boolean; endsBack: number; ops: Op[] };
+
+/**
+ * Put a placed device back in the unplaced list (T139, D239), one `Correction` group:
+ *
+ * - placed from a draft (`baseline_ref_id`): the device is deleted, so the draft's unit is left to
+ *   place again by itself; each live cable end on it goes back to waiting for the draft
+ *   (`device_id` → none, `draft_device_id` → the draft, D235), so placing it again links the
+ *   same ends and their surveyed fields instead of leaving a cable on a deleted device;
+ * - a device of the master: its pin is cleared and nothing else changes.
+ */
+export async function unplaceDevice(editor: Editor, store: Store, deviceId: string, reason: string = UNPLACE_REASON): Promise<UnplaceResult> {
+  if (!reason.trim()) throw new OpError('Say why (the reason is kept in the history).');
+  const row = await store.get<Record<string, unknown>>('device', deviceId);
+  if (!row || row.deleted_at) throw new OpError('That device is no longer on this iPad.');
+  const draftId = str(row.baseline_ref_id as string | null);
+  if (!draftId && row.pin == null) throw new OpError('That device has no pin to take back.');
+  const ends = draftId
+    ? await store.db.query<{ id: string }>(
+        `SELECT e.id FROM cable_end e JOIN cable c ON c.id = e.cable_id
+         WHERE e.device_id = ? AND e.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY e.id`,
+        [deviceId],
+      )
+    : [];
+  const ops = await editor.group({ change_type: 'Correction', reason: reason.trim() }, async (g) => {
+    if (!draftId) return g.setField('device', deviceId, 'pin', null);
+    for (const e of ends) await g.setFields('cable_end', e.id, { device_id: null, draft_device_id: draftId });
+    await g.delete('device', deviceId);
+  });
+  return { deleted: !!draftId, endsBack: ends.length, ops };
 }

@@ -75,6 +75,8 @@ export type CardDevice = {
   /** Its type (or category) carries a Neuron ID (T68, D185); the card hides the section otherwise. */
   needsNeuronId: boolean;
   fieldAddition: boolean;
+  /** Placed from a draft (T46): Put back in the unplaced list deletes it (T139). */
+  placedFromDraft: boolean;
   deleted: boolean;
   deleteReason: string | null;
 };
@@ -497,6 +499,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     neuronMethod: str(d.neuron_method),
     needsNeuronId: deviceNeedsNeuron(types, d),
     fieldAddition: d.origin === 'field_addition',
+    placedFromDraft: !!str(d.baseline_ref_id),
     deleted: !!d.deleted_at,
     deleteReason: str(d.delete_reason),
   };

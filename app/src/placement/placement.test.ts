@@ -10,7 +10,8 @@ import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
 import { loadLockTable, lockQuestion, lockWarnings } from '../setup/lock';
-import { flagNotOnSheet, perUnit, placeItem } from './actions';
+import { loadDeviceCard } from '../card/model';
+import { UNPLACE_REASON, flagNotOnSheet, perUnit, placeItem, unplaceDevice } from './actions';
 import { itemLine, itemsIn, loadPlacementProgress, loadUnplaced, rolesIn, tagProposals, tagRoles, typeNameOf, type UnplacedDevice, type UnplacedDraft, type UnplacedItem } from './model';
 
 const PROJECT = uuidv7();
@@ -173,6 +174,48 @@ describe('unplaced list (T46)', () => {
     // a level's draft goes on its own level's plan only
     const sensor = draftOf((await loadUnplaced(store, PROJECT, ids.l06m))!.items, ids.dSensor);
     await expect(placeItem(editor, store, sensor, { levelId: ids.l02, sheetId: ids.s02, at: { x: 1, y: 1 } })).rejects.toThrow(/another level/);
+  });
+
+  it('undo a draft unit (T139): the device deleted, the unit back in the list, its cable end waiting for the draft again', async () => {
+    const { store, editor, ids } = await setup();
+    const ufmp = draftOf((await loadUnplaced(store, PROJECT, ids.l02))!.items, ids.dUfmp);
+    const r = await placeItem(editor, store, ufmp, { levelId: ids.l02, sheetId: ids.s02, at: { x: 40, y: 50 } });
+    expect(r.cablesMade).toBe(1);
+    expect((await loadDeviceCard(store, r.deviceId))!.device.placedFromDraft).toBe(true);
+    const end = (await store.list<Record<string, unknown>>('cable_end', { where: 'device_id = ?', params: [r.deviceId] }))[0]!;
+    // the end gets surveyed before the mistake is seen
+    await editor.setField('cable_end', String(end.id), 'status', 'Not installed', { change_type: 'Field survey', reason: 'Field survey' });
+
+    const u = await unplaceDevice(editor, store, r.deviceId);
+    expect(u).toMatchObject({ deleted: true, endsBack: 1 });
+    expect(u.ops.every((o) => o.change_type === 'Correction' && o.reason === UNPLACE_REASON && o.group_id === u.ops[0]!.group_id)).toBe(true);
+    expect(await store.get('device', r.deviceId)).toMatchObject({ delete_reason: UNPLACE_REASON });
+    expect(await store.get('cable_end', String(end.id))).toMatchObject({ device_id: null, draft_device_id: ids.dUfmp, status: 'Not installed', deleted_at: null });
+    const back = draftOf((await loadUnplaced(store, PROJECT, ids.l02))!.items, ids.dUfmp);
+    expect(back.remaining).toBe(1);
+
+    // placed again: the same cable end is linked, no second cable
+    const again = await placeItem(editor, store, back, { levelId: ids.l02, sheetId: ids.s02, at: { x: 60, y: 70 } });
+    expect(again.cablesMade).toBe(1);
+    expect(await store.get('cable_end', String(end.id))).toMatchObject({ device_id: again.deviceId, status: 'Not installed' });
+    expect(await store.list('cable', { where: 'project_id = ?', params: [PROJECT] })).toHaveLength(1);
+    // a deleted device or a blank reason is refused before anything is written
+    await expect(unplaceDevice(editor, store, r.deviceId)).rejects.toThrow(OpError);
+    await expect(unplaceDevice(editor, store, again.deviceId, ' ')).rejects.toThrow(OpError);
+  });
+
+  it('undo a master device (T139): only its pin is cleared and it is back in the list', async () => {
+    const { store, editor, ids } = await setup();
+    const panel = (await loadUnplaced(store, PROJECT, ids.l06m))!.items.find((i) => i.key === `device:${ids.panel}`)!;
+    await placeItem(editor, store, panel, { levelId: ids.l06m, sheetId: ids.s06m, at: { x: 5, y: 5 }, room: 'Elec Rm' });
+    expect((await loadDeviceCard(store, ids.panel))!.device.placedFromDraft).toBe(false);
+    const u = await unplaceDevice(editor, store, ids.panel, 'Wrong panel');
+    expect(u).toMatchObject({ deleted: false, endsBack: 0 });
+    expect(u.ops.map((o) => [o.field, o.change_type, o.reason])).toEqual([['pin', 'Correction', 'Wrong panel']]);
+    expect(await store.get('device', ids.panel)).toMatchObject({ pin: null, deleted_at: null, room_location: 'Elec Rm' });
+    expect((await loadUnplaced(store, PROJECT, ids.l06m))!.items.some((i) => i.key === panel.key)).toBe(true);
+    // nothing to take back now
+    await expect(unplaceDevice(editor, store, ids.panel)).rejects.toThrow(/no pin/);
   });
 
   it('a pooled unit takes the level of the sheet and counts the pool down on every level', async () => {

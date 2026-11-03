@@ -4,7 +4,8 @@
  * Flag: not on this sheet, and — once a spot is chosen — the confirm form: ID (the device's, or
  * `<level>-? NEW` for the server to number, D93 / D118), panel tag, Drawing Position and Room
  * (defaults from the grid and the nearest room at the spot, T45) → Place ✓. Dashed pins on the
- * plan are proposals from the sheet's text tags; tapping one selects it with its spot.
+ * plan are proposals from the sheet's text tags; tapping one selects it with its spot. The row
+ * just placed stays at the top with ↶ Undo until the panel closes (T139).
  * The logic is in `model.ts` / `actions.ts`; this is the view.
  */
 
@@ -13,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { chipStyles } from '../plan/chips';
-import { flagNotOnSheet, placeItem, type PlaceResult } from './actions';
+import { flagNotOnSheet, placeItem, unplaceDevice, type PlaceResult } from './actions';
 import { TAGGED_ROLES, itemLine, itemsIn, rolesIn, type LevelUnplaced, type PlaceScope, type UnplacedItem } from './model';
 
 export type PlacePanelProps = {
@@ -44,6 +45,8 @@ export function PlacePanel(props: PlacePanelProps) {
   const [role, setRole] = useState<Role | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The last placement, with ↶ Undo until the panel closes (T139). */
+  const [last, setLast] = useState<{ deviceId: string; what: string; text: string } | null>(null);
 
   const all = useMemo(() => (data ? [...data.items, ...data.flagged] : []), [data]);
   const selected = selectedKey ? (all.find((i) => i.key === selectedKey) ?? null) : null;
@@ -105,6 +108,27 @@ export function PlacePanel(props: PlacePanelProps) {
         {props.proposals > 0 ? <Text style={styles.note}>{props.proposals} dashed pin{props.proposals === 1 ? '' : 's'} proposed from the sheet's tags: tap one to confirm it.</Text> : null}
         {!editor ? <Text style={styles.warn}>Pick who you are to place devices.</Text> : null}
         {note ? <Text style={styles.note}>{note}</Text> : null}
+        {last ? (
+          <View style={[styles.row, styles.lastRow]}>
+            <Text style={[styles.rowText, styles.lastText]} numberOfLines={2}>
+              {last.text}
+            </Text>
+            <Btn
+              label="↶ Undo"
+              disabled={busy || !editor}
+              onPress={() =>
+                void run(async () => {
+                  if (!editor) return null;
+                  const r = await unplaceDevice(editor, props.store, last.deviceId);
+                  console.log(`[plan] unplaced ${last.deviceId}: ${r.deleted ? 'deleted' : 'pin cleared'}${r.endsBack ? `, ${r.endsBack} end(s) wait for the draft again` : ''}`);
+                  setLast(null);
+                  props.onEdited();
+                  return `${last.what}: back in the unplaced list.`;
+                })
+              }
+            />
+          </View>
+        ) : null}
       </View>
 
       {selected ? (
@@ -134,7 +158,8 @@ export function PlacePanel(props: PlacePanelProps) {
               console.log(`[plan] placed ${selected.key} → ${r.deviceId}${r.cablesMade ? `, ${r.cablesMade} waiting cable(s) made` : ''}`);
               props.onPlaced(r, selected);
               const what = selected.kind === 'device' ? selected.label : `${props.levelCode}-? ${selected.title}`;
-              return `Placed ${what}.${r.cablesMade ? ` ${r.cablesMade} waiting cable${r.cablesMade === 1 ? '' : 's'} made.` : ''}`;
+              setLast({ deviceId: r.deviceId, what, text: `Placed ${what}.${r.cablesMade ? ` ${r.cablesMade} waiting cable${r.cablesMade === 1 ? '' : 's'} made.` : ''}` });
+              return null;
             })
           }
         />
@@ -316,6 +341,8 @@ const styles = StyleSheet.create({
   list: { padding: 8, gap: 4, paddingBottom: 40 },
   row: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: '#d6d9de', gap: 3 },
   rowOn: { backgroundColor: '#dce8fb', borderColor: '#1565c0' },
+  lastText: { flex: 1 },
+  lastRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#eef7ee', borderColor: '#9ccc9c' },
   rowText: { fontSize: 14, fontWeight: '600', color: '#222' },
   rowSub: { fontSize: 12, color: '#666' },
 });

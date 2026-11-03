@@ -3,7 +3,7 @@
  * Sections scroll and collapse; every tap commits one op (D45, no Save button) through
  * `actions.ts`. Plain taps are `Field survey` (D96); `[⋯]` delete / restore / move pin ask for
  * a reason (`Correction`), as does a connection row's `⋯` → Delete… (T138), whose History line
- * offers Restore…. Camera / Library and a thumbnail tap hand over to the photo flow
+ * offers Restore…; Put back in the unplaced list… (T139) takes a placement back. Camera / Library and a thumbnail tap hand over to the photo flow
  * (T21); a connection row opens the end editor (T22); rule drafts are decided through the
  * `ProposalDecider` (T33); the quick actions E6 / E7 / E9 run through `runQuickAction` of the
  * rules package (T34). Neuron ID scan (T54) is shown with its button disabled until it lands.
@@ -20,6 +20,7 @@ import { BadgeStrip, Swatch, chipStyles } from '../plan/chips';
 import { UNSURVEYED } from '../plan/filters';
 import type { Badges } from '../plan/lists';
 import { pinStyleFor } from '../plan/pins';
+import { UNPLACE_REASON, unplaceDevice } from '../placement/actions';
 import {
   addOptionalAccessory,
   addOptionalCable,
@@ -74,6 +75,8 @@ export type DeviceCardProps = {
 
 type Pending =
   | { kind: 'delete' | 'restore' | 'move'; reason: string }
+  /** Put back in the unplaced list (T139): starts with "Placed by mistake". */
+  | { kind: 'unplace'; reason: string }
   /** A connection's cable (T138): `title` is what the reason box names (`N C-01 → switch`). */
   | { kind: 'deleteCable' | 'restoreCable'; cableId: string; title: string; reason: string }
   | null;
@@ -138,6 +141,8 @@ export function DeviceCard(props: DeviceCardProps) {
           return restoreCable(e, p.cableId, reason);
         case 'delete':
           return deleteDevice(e, d.id, reason);
+        case 'unplace':
+          return unplaceDevice(e, store, d.id, reason);
         default:
           return restoreDevice(e, d.id, reason);
       }
@@ -151,6 +156,10 @@ export function DeviceCard(props: DeviceCardProps) {
         return `Restore ${d.label}: why?`;
       case 'move':
         return `Move the pin of ${d.label}: why?`;
+      case 'unplace':
+        return d.placedFromDraft
+          ? `Put ${d.label} back in the unplaced list (the device is deleted, its draft's unit is left to place): why?`
+          : `Put ${d.label} back in the unplaced list (its pin is cleared): why?`;
       case 'deleteCable':
         return `Delete the connection ${p.title} with both ends: why?`;
       case 'restoreCable':
@@ -191,6 +200,9 @@ export function DeviceCard(props: DeviceCardProps) {
           {props.canMovePin && !d.deleted ? (
             <MenuButton label={props.unplaced ? 'Place pin…' : 'Move pin…'} onPress={() => (setMenu(false), setPending({ kind: 'move', reason: '' }))} />
           ) : null}
+          {!d.deleted && (d.placedFromDraft || d.pin) ? (
+            <MenuButton label="Put back in the unplaced list…" onPress={() => (setMenu(false), setPending({ kind: 'unplace', reason: UNPLACE_REASON }))} />
+          ) : null}
           {d.deleted ? (
             <MenuButton label="Restore…" onPress={() => (setMenu(false), setPending({ kind: 'restore', reason: '' }))} />
           ) : (
@@ -214,7 +226,7 @@ export function DeviceCard(props: DeviceCardProps) {
           />
           <View style={styles.rowWrap}>
             <SmallButton
-              label={danger ? 'Delete' : pending.kind === 'move' ? 'Tap the new position ▸' : 'Restore'}
+              label={danger ? 'Delete' : pending.kind === 'move' ? 'Tap the new position ▸' : pending.kind === 'unplace' ? 'Put back' : 'Restore'}
               danger={danger}
               disabled={!pending.reason.trim()}
               onPress={confirmPending}
