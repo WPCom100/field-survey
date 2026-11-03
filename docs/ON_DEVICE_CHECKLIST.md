@@ -610,6 +610,14 @@ Decision D236: an enlarged source crop zooms with the native iOS scroll view (pi
 
 Decision D237 (Proposed): the waiting end is a device end with no device and `draft_device_id` (kept after placement as provenance); a draft to a placeholder is made too; the waiting end is read-only in the end editor until its device is placed; placement links by the device placed from the draft (or the one device on its level that plainly is it); lines accepted before this are made by the next placement or "Make n waiting cables". → Approve / change:
 
+## T133 — The mismatch list forgets what you settled  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01, after every review item on 03 was settled, the level's mismatch list still showed "No network (N) run drawn to P-NSPS-D on the riser" and "SR or LR? P-DOC-C-SR / P-DOC-C-LR — pick one" twice: an accepted draft kept asking. Now a device's warning shows only while its draft is open (not yet accepted, edited or rejected), and the N warning also goes once an N cable draft runs to that device. Use `pipeline test`, level 03.
+
+- [ ] **Settled warnings are gone.** Setup → 4 Review drafts → 03: the mismatch list no longer shows the two SR / LR lines or the P-NSPS-D N line (those drafts are accepted). → saw:
+- [ ] **Reopen asks again.** Reopen one of the SR / LR sensor drafts: its "SR or LR? … — pick one" line comes back; Accept it with a pick: the line goes. → saw:
+- [ ] **The N line answers itself.** On a level with an open NSPS draft showing "No network (N) run drawn to P-NSPS-D on the riser", + Add a cable draft of code `N` and set one end (Change…) to that NSPS draft: the line goes at once, without accepting the NSPS draft. Reject that N draft: the line comes back. (Skip if no level has an open one.) → saw:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

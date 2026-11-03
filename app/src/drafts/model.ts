@@ -338,25 +338,31 @@ export function withChosen(raw: unknown, side: Side, pick: Endpoint | null, conf
 
 // ------------------------------------------------------------------ mismatch list
 
-/** One sentence per conflict worth a reader's eye, for the level's mismatch list (Phase 3 §3.3). */
-export function deviceMismatches(d: DeviceDraftRow, levelCode: (id: string | null) => string | null): string[] {
+/**
+ * One sentence per conflict worth a reader's eye, for the level's mismatch list (Phase 3 §3.3).
+ * Only while the draft is `proposed`: Accept, Edit or Reject settles them (T133) — the accessory
+ * line excepted, which stands until the draft is folded or rejected (T126). `nRun`: an N cable
+ * draft not rejected has this draft as an end, which answers `network:no_N_run` (T133, T108).
+ */
+export function deviceMismatches(d: DeviceDraftRow, levelCode: (id: string | null) => string | null, nRun = false): string[] {
   const model = d.name ? `${d.model ?? '?'} ${d.name}` : (d.model ?? '?');
   const out: string[] = [];
-  for (const c of d.conflicts) {
+  const open = d.state === 'proposed';
+  for (const c of open ? d.conflicts : []) {
     if (c === 'qty:bom≠riser') out.push(d.needs.qty ? `BOM qty ${d.needs.qty.bom ?? '?'} ≠ riser ${d.needs.qty.riser ?? '?'} (${model})` : `BOM and riser quantities differ (${model})`);
     else if (c === 'model:SR/LR') out.push(`SR or LR? ${d.candidates.join(' / ')} — pick one`);
     else if (c === 'level:06/06M') out.push(`${model}: on 06 or 06M? — pick the level`);
     else if (c === 'source:riser_only') out.push(`Riser device not in the BOM: ${model}`);
     else if (c === 'cards:bom≠riser') out.push(`Option cards differ between the BOM and the riser (${model})`);
     else if (c === 'pairing:ebdk≠erp') out.push(`EBDK and relay panels do not pair one to one (${model})`);
-    else if (c === 'network:no_N_run') out.push(`No network (N) run drawn to ${model} on the riser`);
+    else if (c === 'network:no_N_run' && !nRun) out.push(`No network (N) run drawn to ${model} on the riser`);
   }
   if (d.accessoryOf && d.state !== 'rejected') {
     out.push(d.accessoryOf.parentLabel ? `${model} is an accessory of ${d.accessoryOf.parentLabel} — fold it in` : `${model} is an accessory and no draft here lists it — reject it`);
   }
   const venue = str(d.sourceRef?.venue);
   const code = levelCode(d.levelId);
-  if (venue && code && d.levelBasis === 'venue' && firstNumber(venue) !== firstNumber(code)) out.push(`BOM venue "${venue}" → ${code} (level alias)`);
+  if (open && venue && code && d.levelBasis === 'venue' && firstNumber(venue) !== firstNumber(code)) out.push(`BOM venue "${venue}" → ${code} (level alias)`);
   return out;
 }
 
@@ -714,9 +720,14 @@ export function bulkCables(data: DraftReviewData, key: LevelKey, min = BULK_MIN)
 export function mismatchList(data: DraftReviewData, key: LevelKey): Mismatch[] {
   const code = (id: string | null) => data.levels.find((l) => l.levelId === id)?.code ?? null;
   const out: Mismatch[] = [];
+  const nRun = new Set<string>();
+  for (const c of data.cables) {
+    if (c.code !== 'N' || c.state === 'rejected') continue;
+    for (const e of [c.ends.from, c.ends.to]) if (e?.kind === 'draft_device') nRun.add(e.id);
+  }
   for (const d of data.devices) {
     if (levelKeyOf(d.levelId, d.sourceRef) !== key || d.state === 'rejected') continue;
-    for (const text of deviceMismatches(d, code)) out.push({ draftId: d.id, kind: 'device', text });
+    for (const text of deviceMismatches(d, code, nRun.has(d.id))) out.push({ draftId: d.id, kind: 'device', text });
   }
   for (const c of data.cables) {
     if (levelKeyOf(c.levelId, c.sourceRef) !== key || c.state !== 'proposed') continue;

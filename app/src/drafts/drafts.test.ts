@@ -196,6 +196,40 @@ describe('draft review read model (T44)', () => {
     expect(mismatchList(data, ids.l06m).map((m) => m.text)).toEqual(['N from CT06LCPA: far end not found — pick it']);
   });
 
+  it('drops a device mismatch once the draft is settled, and the N line once an N cable draft reaches it (T133)', async () => {
+    const { store, editor, ids } = await setup();
+    const MASTER = { change_type: 'Master edit', reason: 'test' } as const;
+    const texts = async (key: string) => mismatchList(await loadDraftReview(store, PROJECT), key).map((m) => m.text);
+    // accepted with its SR/LR pick, edited with its quantity: neither asks again
+    const data = await loadDraftReview(store, PROJECT);
+    await acceptDevice(editor, row(data.devices, ids.dB), { model: 'P-DOC-C-LR' });
+    await editDevice(editor, row(data.devices, ids.dC), { qty: 2 });
+    expect(await texts(ids.l01)).toEqual([]);
+    expect(row((await loadDraftReview(store, PROJECT)).devices, ids.dB).conflicts).toEqual(['model:SR/LR']); // kept on the draft
+    // reopened, it asks again
+    await reopenDraft(editor, 'device', row((await loadDraftReview(store, PROJECT)).devices, ids.dB));
+    expect(await texts(ids.l01)).toEqual(['SR or LR? P-DOC-C-SR / P-DOC-C-LR — pick one']);
+
+    // an NSPS the riser draws no network run to
+    const nsps = (await editor.create('draft_device', { project_id: PROJECT, import_batch_id: ids.riser, level_id: ids.l02, model: 'P-NSPS-D', category: 'Equipment', qty: 1, confidence: 0.9, conflicts: ['network:no_N_run'], level_basis: 'riser_band', state: 'proposed' }, MASTER)).id;
+    expect(await texts(ids.l02)).toEqual(['No network (N) run drawn to P-NSPS-D on the riser']);
+    // an X cable to it does not answer it
+    const toNsps = (code: string, state = 'proposed') =>
+      editor.create('draft_cable', { project_id: PROJECT, level_id: ids.l02, code, qty: 1, origin: 'manual', state, candidates: [{ side: 'from', kind: 'draft_device', id: ids.dE, label: 'UFMP4' }, { side: 'to', kind: 'draft_device', id: nsps, label: 'P-NSPS-D' }] }, MASTER);
+    await toNsps('X');
+    expect(await texts(ids.l02)).toEqual(['No network (N) run drawn to P-NSPS-D on the riser']);
+    // a rejected N cable does not either; one proposed (or accepted) does
+    await toNsps('N', 'rejected');
+    expect(await texts(ids.l02)).toEqual(['No network (N) run drawn to P-NSPS-D on the riser']);
+    const n = (await toNsps('N')).id;
+    expect(await texts(ids.l02)).toEqual([]);
+    await editor.setField('draft_cable', n, 'state', 'accepted', MASTER);
+    expect(await texts(ids.l02)).toEqual([]);
+    // and comes back when that N line is rejected
+    await editor.setField('draft_cable', n, 'state', 'rejected', MASTER);
+    expect(await texts(ids.l02)).toEqual(['No network (N) run drawn to P-NSPS-D on the riser']);
+  });
+
   it('filters and sorts rows, and picks what Accept all takes', async () => {
     const { store, ids } = await setup();
     const data = await loadDraftReview(store, PROJECT);
