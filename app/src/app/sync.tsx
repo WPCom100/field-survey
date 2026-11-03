@@ -100,6 +100,7 @@ export default function SyncScreen() {
         {sync.nextAttemptAt && !online ? <Text style={styles.sub}>Next try {time(sync.nextAttemptAt)}</Text> : null}
         <Btn
           label="Sync now"
+          testID="sync.now"
           onPress={run(async () => {
             await (await getSyncEngine()).requestSync();
           })}
@@ -299,9 +300,9 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Btn({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+function Btn({ label, onPress, disabled, testID }: { label: string; onPress: () => void; disabled?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled && { opacity: 0.4 }]} accessibilityRole="button">
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled && { opacity: 0.4 }]} accessibilityRole="button" testID={testID}>
       <Text style={styles.btnText}>{label}</Text>
     </Pressable>
   );

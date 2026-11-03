@@ -11,6 +11,7 @@ export function Field({
   placeholder,
   multiline,
   width,
+  testID,
 }: {
   label: string;
   value: string;
@@ -20,6 +21,8 @@ export function Field({
   placeholder?: string;
   multiline?: boolean;
   width?: number;
+  /** `<screen>.<element>`: what a Maestro flow taps (T149). */
+  testID?: string;
 }) {
   return (
     <View style={[styles.field, width ? { width } : styles.fieldGrow]}>
@@ -34,6 +37,7 @@ export function Field({
         autoCapitalize="none"
         autoCorrect={false}
         multiline={multiline}
+        testID={testID}
       />
     </View>
   );
@@ -45,17 +49,21 @@ export function Btn({
   primary,
   disabled,
   small,
+  testID,
 }: {
   title: string;
   onPress: () => void;
   primary?: boolean;
   disabled?: boolean;
   small?: boolean;
+  /** `<screen>.<element>`: what a Maestro flow taps (T149). */
+  testID?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      testID={testID}
       style={[styles.btn, primary && styles.btnPrimary, small && styles.btnSmall, disabled && styles.btnDisabled]}
     >
       <Text style={[styles.btnText, primary && styles.btnTextPrimary, small && styles.btnTextSmall]}>{title}</Text>

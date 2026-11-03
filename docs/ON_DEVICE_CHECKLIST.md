@@ -708,6 +708,20 @@ Decision D243 (Proposed): Move to… on a flagged draft sets its level (or the p
 
 Decision D244 (Proposed): the ERn upgrade kits (`ERn2-W-UPG` and the rest) stay accessories, not Equipment Panels (an override would make them placeable devices); project copies count as set by the import while nobody has edited their category; the new lint flags any device whose category differs from its type's, not only the ERn. → Approve / change:
 
+## T149 — Mac test rig  ·  Needs: a Mac (Apple silicon, on the office Wi-Fi), not an iPad
+
+**Why it matters:** from here on the functional half of each task's checks is a Maestro flow Claude runs on the Simulator (D248); this section proves the rig once. Do it at the Mac, or let Claude do it over SSH (`docs/ops.md` §6 says how). Nothing here touches the Droplet.
+
+- [ ] **Setup.** In the repo on the Mac: `bash scripts/mac/rig.sh setup`. It ends with `rig: ready` after checking Xcode's command-line tools, installing Maestro and CocoaPods if missing, and creating and booting the simulator **Field Survey iPad** (Simulator.app opens with an iPad). → saw:
+- [ ] **Local server.** `bash scripts/mac/rig.sh server`: Docker starts postgres, s3 and the API; the script migrates, makes the bucket and ends with `health: ok` from `http://127.0.0.1:8010/health`. → saw:
+- [ ] **Local build.** `bash scripts/mac/rig.sh build` (10–20 min the first time: prebuild, `pod install`, the Xcode build): it ends with the app installed and open on the simulator, showing the dev client's launcher or the Connect screen. No `eas.json` change, no EAS build. → saw:
+- [ ] **Metro.** In a second terminal `bash scripts/mac/rig.sh metro`; then `bash scripts/mac/rig.sh open` loads the app from Metro: the Connect screen appears. → saw:
+- [ ] **The smoke flow passes.** `bash scripts/mac/rig.sh flows`: Maestro connects to `127.0.0.1:8010` as Ann, creates a project with level 06M, opens the level (the "No plan sheet yet" line), syncs (`Synced …`), and reports `smoke.yaml` passed. The project appears in the local server, not on the Droplet. → saw:
+- [ ] **A failing selector reads clearly.** Change `USER: Ann` to `USER: Zed` in `app/maestro/smoke.yaml` and run again: the run fails at `tapOn: Zed` with a screenshot under `~/.maestro/tests/`; put Ann back. → saw:
+- [ ] **Second simulator.** `bash scripts/mac/rig.sh second`: a second iPad simulator boots with the same build; `rig.sh flows --device B` runs the smoke flow there and both projects are on the local server. → saw:
+
+Decision D249 (Proposed): `eas.json` is not edited for the rig; the `simulator` profile waits for the next build cycle (T150) because any `eas.json` edit changes the runtime fingerprint and would cut the iPads off from updates. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

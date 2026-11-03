@@ -86,7 +86,7 @@ export default function ProjectsScreen() {
         <Btn title="Device-type library" onPress={() => router.push({ pathname: '/library', params: { scope: 'app' } })} />
         <Btn title="Rule defaults" onPress={() => router.push('/rule-defaults')} />
         <Btn title={busy ? 'Refreshing…' : 'Refresh from server'} onPress={() => void refresh()} disabled={busy} />
-        <Btn title="+ New project" primary onPress={() => router.push('/new-project')} />
+        <Btn title="+ New project" primary onPress={() => router.push('/new-project')} testID="projects.new" />
       </View>
       <Notice text={error} error />
       <Notice text={notice} />
@@ -106,7 +106,11 @@ export default function ProjectsScreen() {
             <Pressable onPress={() => router.push({ pathname: '/setup/[projectId]', params: { projectId: p.id } })} style={styles.action}>
               <Text style={styles.actionText}>Setup ▸</Text>
             </Pressable>
-            <Pressable onPress={() => router.push({ pathname: '/', params: { project: p.id } })} style={[styles.action, styles.actionPrimary]}>
+            <Pressable
+              onPress={() => router.push({ pathname: '/', params: { project: p.id } })}
+              style={[styles.action, styles.actionPrimary]}
+              testID={`projects.open.${p.name}`}
+            >
               <Text style={[styles.actionText, styles.actionTextPrimary]}>Open</Text>
             </Pressable>
           </View>

@@ -1,0 +1,35 @@
+# Projects → + New project → name, one level (06M) → Create → the home opens on it → open the
+# level (no sheet yet) → back. The name carries the time so every run makes its own project.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.projects
+- assertVisible: Projects
+- tapOn:
+    id: projects.new
+- assertVisible: New project
+- evalScript: ${output.project = 'Maestro ' + new Date().toISOString().slice(5, 16).replace('T', ' ')}
+- tapOn:
+    id: newProject.name
+- inputText: ${output.project}
+- tapOn:
+    id: newProject.levelCode
+- inputText: 06M
+- tapOn:
+    id: newProject.addLevel
+- assertVisible: 06M
+- tapOn:
+    id: newProject.create
+- extendedWaitUntil:
+    visible: ${output.project}
+    timeout: 20000
+- assertVisible:
+    id: level.06M
+- tapOn:
+    id: level.06M
+- extendedWaitUntil:
+    visible: No plan sheet yet.*
+    timeout: 15000
+- tapOn:
+    id: plan.back
+- assertVisible: ${output.project}

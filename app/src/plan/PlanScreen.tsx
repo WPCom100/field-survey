@@ -1014,7 +1014,7 @@ export function PlanScreen(props: PlanScreenProps) {
     <View style={styles.root}>
       {/* top bar */}
       <View style={[styles.bar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={onBack} style={styles.back} hitSlop={8}>
+        <Pressable onPress={onBack} style={styles.back} hitSlop={8} testID="plan.back">
           <Text style={styles.backText}>◀ {plan?.level.code ?? '…'}</Text>
         </Pressable>
         <BarButton label="Category" count={prefs.filter.categories.length} open={menu === 'category'} onPress={() => setMenu(menu === 'category' ? null : 'category')} />
