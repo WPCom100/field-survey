@@ -67,17 +67,20 @@ Two different letters (`OF`, `TO`, `IN`) are words in notes, never bubbles."""
 MIN_LABELS = 3
 """An axis needs this many labels printed on two sheet edges before it counts as a grid."""
 
-ROOM_CODE_RE = re.compile(r"^[A-Z]{2}\d{2}[A-Z]?-[A-Z0-9]{2,6}$")
-"""Room codes as this project's drawings print them (`XX06M-1E05`)."""
+DEFAULT_ROOM_CODE_PATTERNS = (r"[A-Z]{2}\d{2}[A-Z]?-[A-Z0-9]{2,6}",)
+"""Room codes as the Tower's drawings print them (`XX06M-1E05`). A project's own
+`vocab(room_code_pattern)` rows replace these (T79, D240); `app/src/vocab/seed.ts` seeds the
+same strings."""
 
-TAG_RES = (
-    re.compile(r"^CT[0-9A-Z]{1,3}LCP[AB]$"),  # relay panels
-    re.compile(r"^EBDK$"),
-    re.compile(r"^UFMP\d*$"),  # Foundry panels
-    re.compile(r"^ERP\d*$"),
-    re.compile(r"^NSPS$"),
-    re.compile(r"^P-[A-Z]{2,5}(?:-[A-Z]{1,2})?$"),  # rack components (P-ACP, P-SPM-E, P-REP)
+DEFAULT_TAG_PATTERNS = (
+    r"CT[0-9A-Z]{1,3}LCP[AB]",  # relay panels
+    r"EBDK",
+    r"UFMP\d*",  # Foundry panels
+    r"ERP\d*",
+    r"NSPS",
+    r"P-[A-Z]{2,5}(?:-[A-Z]{1,2})?",  # rack components (P-ACP, P-SPM-E, P-REP)
 )
+"""Device tags as the Tower's drawings print them; `vocab(tag_pattern)` replaces them (D240)."""
 
 MAX_CHARS = 500_000
 """Characters one page may draw before the job gives up (T124): the 14 MB Level 02 composite
@@ -615,22 +618,59 @@ def _set_json(col: Axis, row: Axis) -> dict[str, Any]:
 # ------------------------------------------------------------ rooms and tags
 
 
+@dataclass(frozen=True)
+class Patterns:
+    """What the text pass reads as a room code and as a device tag: each pattern must match a
+    whole word (`re.fullmatch`, so `^` / `$` are optional)."""
+
+    rooms: tuple[re.Pattern[str], ...]
+    tags: tuple[re.Pattern[str], ...]
+
+
+def compile_patterns(
+    rooms: list[str] | tuple[str, ...] = DEFAULT_ROOM_CODE_PATTERNS,
+    tags: list[str] | tuple[str, ...] = DEFAULT_TAG_PATTERNS,
+) -> tuple[Patterns, list[dict[str, str]]]:
+    """Compile the patterns; one that does not compile is left out and returned as
+    `{list, pattern, error}` for the batch to report (T79, D240) — never raised."""
+    bad: list[dict[str, str]] = []
+
+    def build(values: list[str] | tuple[str, ...], list_name: str) -> tuple[re.Pattern[str], ...]:
+        out = []
+        for v in values:
+            try:
+                out.append(re.compile(v))
+            except re.error as e:
+                bad.append({"list": list_name, "pattern": v, "error": str(e)})
+        return tuple(out)
+
+    return Patterns(build(rooms, "room_code_pattern"), build(tags, "tag_pattern")), bad
+
+
+DEFAULT_PATTERNS = compile_patterns()[0]
+
+
+def _any_match(patterns: tuple[re.Pattern[str], ...], text: str) -> bool:
+    return any(rx.fullmatch(text) for rx in patterns)
+
+
 def _title(s: str) -> str:
     """`ELEVATOR MACHINE ROOM` → `Elevator Machine Room`; short tokens, codes and bracketed
     abbreviations (`IDF`, `C16`, `(FSAE)`) stay as printed."""
     return " ".join(w.capitalize() if len(w) >= 4 and w.isalpha() else w for w in s.split())
 
 
-def find_rooms(words: list[Word]) -> list[dict[str, Any]]:
+def find_rooms(words: list[Word], patterns: Patterns = DEFAULT_PATTERNS) -> list[dict[str, Any]]:
     """Room codes with the name printed above them (one or two lines of the same font). The
     composite overlays source sheets, so a name's words can be printed twice a few points apart;
     a repeated word within 12 pt is one word."""
     out = []
-    codes = [w for w in words if ROOM_CODE_RE.match(w.text)]
+    is_code = {id(w) for w in words if _any_match(patterns.rooms, w.text)}
+    codes = [w for w in words if id(w) in is_code]
     for code in codes:
         lines: dict[int, list[Word]] = defaultdict(list)
         for w in words:
-            if w is code or ROOM_CODE_RE.match(w.text) or abs(w.size - code.size) > 1:
+            if id(w) in is_code or abs(w.size - code.size) > 1:
                 continue
             if abs(w.x - code.x) > 70:
                 continue
@@ -667,12 +707,12 @@ def find_rooms(words: list[Word]) -> list[dict[str, Any]]:
 MIN_TAG_SIZE = 4.0
 
 
-def find_tags(words: list[Word]) -> list[dict[str, Any]]:
+def find_tags(words: list[Word], patterns: Patterns = DEFAULT_PATTERNS) -> list[dict[str, Any]]:
     """Device tags printed on the sheet (panel names, EBDK, Foundry panels, rack components);
     the hairline text of rack elevations is skipped."""
     out = []
     for w in words:
-        if w.size >= MIN_TAG_SIZE and any(rx.match(w.text) for rx in TAG_RES):
+        if w.size >= MIN_TAG_SIZE and _any_match(patterns.tags, w.text):
             out.append(
                 {"text": w.text, "x": round(w.x, 1), "y": round(w.y, 1), "size": round(w.size, 1)}
             )
@@ -932,8 +972,15 @@ def page_count(data: bytes) -> int:
     return len(PdfReader(io.BytesIO(data)).pages)
 
 
-def analyse_sheet(data: bytes, page_index: int = 0, *, boundaries: bool = True) -> SheetAnalysis:
-    """The whole text pass over one page. `boundaries=False` skips the OCG work (source sheets)."""
+def analyse_sheet(
+    data: bytes,
+    page_index: int = 0,
+    *,
+    boundaries: bool = True,
+    patterns: Patterns = DEFAULT_PATTERNS,
+) -> SheetAnalysis:
+    """The whole text pass over one page. `boundaries=False` skips the OCG work (source sheets);
+    `patterns` are the project's room-code and tag patterns (D240)."""
     reader = PdfReader(io.BytesIO(data))
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         page = pdf.pages[page_index]
@@ -948,8 +995,8 @@ def analyse_sheet(data: bytes, page_index: int = 0, *, boundaries: bool = True) 
         for b in bubbles
         if id(b) not in taken and rings.around(b.x, b.y)
     ]
-    rooms = find_rooms(words)
-    tags = find_tags(words)
+    rooms = find_rooms(words, patterns)
+    tags = find_tags(words, patterns)
     lines, labels, found = extract_boundaries(reader, page_index) if boundaries else ([], [], False)
     display = write_display_pdf(reader) if boundaries and found else None
     features = {

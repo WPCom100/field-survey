@@ -67,4 +67,13 @@ describe('sheetJobLine', () => {
     expect(sheetJobLine(b('done', { grid_sets: 3, auto_sets: 3, sheets: [{}] }))).toBe('Done: 1 sheet, 3 grid sets (3 auto) — arrives with the next sync');
     expect(sheetJobLine(b('done', { grid_sets: 0, auto_sets: 0, sheets: [{}, {}, {}] }))).toBe('Done: 3 sheets, 0 grid sets — arrives with the next sync');
   });
+
+  it('names the patterns the job skipped (T79, D240)', () => {
+    const done = (bad_patterns: unknown[]) => sheetJobLine({ id: 'x', job_state: 'done', stats: { grid_sets: 1, auto_sets: 1, sheets: [{}], bad_patterns } });
+    expect(done([])).toBe('Done: 1 sheet, 1 grid set (1 auto) — arrives with the next sync');
+    expect(done([{ list: 'tag_pattern', pattern: 'P-[A-Z', error: 'unterminated character set' }])).toBe(
+      'Done: 1 sheet, 1 grid set (1 auto) — arrives with the next sync; skipped a bad pattern (P-[A-Z) — fix in Vocabulary',
+    );
+    expect(done([{ pattern: '(' }, { pattern: '[' }])).toMatch(/skipped 2 bad patterns \(\(, \[\)/);
+  });
 });

@@ -13,7 +13,10 @@ level's `display_sheet_id` is set to the new sheet (the previous display sheet, 
 soft-deleted — pins placed on it keep its id and show as "elsewhere" until moved, see TASKS), and
 the boundaries are kept in `sheet.features`. A **source** PDF gives one `sheet` per page, all on
 the same blob, text pass only. The same file (SHA-256) for the same level and kind is not
-imported twice (`skipped`). Everything is one transaction through the ordinary apply loop
+imported twice (`skipped`). Room codes and tags are read with the project's
+`vocab(room_code_pattern)` / `vocab(tag_pattern)` rows (T79, D240; none = the Tower's built-in
+patterns); a pattern that does not compile is skipped and listed in the batch's `bad_patterns`.
+Everything is one transaction through the ordinary apply loop
 (`Push`, trusted, the requesting user); a failure leaves the project as it was.
 """
 
@@ -38,7 +41,7 @@ from app.auth import system_user, upsert_user
 from app.blobs import object_key
 from app.ids import uuid7
 from app.jobs import plan_analysis, runner
-from app.models import Blob, FieldHead, ImportBatch, Level, Project, Sheet, User
+from app.models import Blob, FieldHead, ImportBatch, Level, Project, Sheet, User, Vocab
 from app.storage import ObjectStore
 from app.sync import SERVER_INSTALL_ID, OpIn, Push, jsonable
 
@@ -191,6 +194,37 @@ def _store_blob(session: Session, store: ObjectStore, data: bytes) -> tuple[str,
     return sha, True
 
 
+PATTERN_LISTS = ("room_code_pattern", "tag_pattern")
+
+
+def project_patterns(
+    session: Session, project_id: uuid.UUID
+) -> tuple[plan_analysis.Patterns, dict[str, str], list[dict[str, str]]]:
+    """The project's room-code and tag patterns (T79, D240): its live `vocab` rows of each list,
+    drafts included (usable at once, D43), rejected ones not. A list with no rows reads as the
+    Tower's built-in patterns. Returns the patterns, where each list came from (`project` /
+    `default`) and the patterns that did not compile."""
+    rows = session.scalars(
+        select(Vocab)
+        .where(
+            Vocab.project_id == project_id,
+            Vocab.list.in_(PATTERN_LISTS),
+            Vocab.deleted_at.is_(None),
+            Vocab.state != "rejected",
+        )
+        .order_by(Vocab.id)
+    )
+    values: dict[str, list[str]] = {k: [] for k in PATTERN_LISTS}
+    for v in rows:
+        if v.value.strip():
+            values[v.list].append(v.value.strip())
+    rooms = values["room_code_pattern"] or plan_analysis.DEFAULT_ROOM_CODE_PATTERNS
+    tags = values["tag_pattern"] or plan_analysis.DEFAULT_TAG_PATTERNS
+    patterns, bad = plan_analysis.compile_patterns(rooms, tags)
+    source = {k: "project" if values[k] else "default" for k in PATTERN_LISTS}
+    return patterns, source, bad
+
+
 def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> dict[str, Any]:
     """Apply one queued plans batch inside the caller's transaction; returns its stats."""
     if batch.kind != PLANS_KIND:
@@ -235,6 +269,7 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
     requester = session.get(User, batch.created_by_id) if batch.created_by_id else None
     user_id = (requester or system_user(session, "import")).id
     ops = _Ops(project.id, user_id)
+    patterns, pattern_source, bad_patterns = project_patterns(session, project.id)
     title = Path(str(entry.get("name") or "sheet.pdf")).stem
     pages = range(1) if sheet_kind == "display" else range(plan_analysis.page_count(data))
     sheets: list[dict[str, Any]] = []
@@ -242,7 +277,9 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
     source_sha: str | None = None
     for i in pages:
         try:
-            a = plan_analysis.analyse_sheet(data, i, boundaries=sheet_kind == "display")
+            a = plan_analysis.analyse_sheet(
+                data, i, boundaries=sheet_kind == "display", patterns=patterns
+            )
         except plan_analysis.SheetTooLarge as e:
             raise runner.ImportError_(str(e)) from e
         if sheet_kind == "display":
@@ -313,6 +350,8 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
         "grid_sets": sum(s["grid_sets"] for s in sheets),
         "auto_sets": sum(s["auto_sets"] for s in sheets),
         "blobs_stored": blobs_stored,
+        "patterns": pattern_source,
+        "bad_patterns": bad_patterns,
         "ops": len(ops.ops),
         "last_server_seq": push.seq,
     }
@@ -324,6 +363,7 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
         kind=sheet_kind,
         sheets=len(sheets),
         auto_sets=stats["auto_sets"],
+        bad_patterns=len(bad_patterns),
     )
     return stats
 

@@ -88,6 +88,10 @@ VOCAB_LIST = (
     "type",
     # T111 (D197): the cable codes; a DaVinci port protocol with no code lands here as a draft
     "cable_code",
+    # T79 (D240): the plans job's text pass — one regular expression per row, matched against a
+    # whole word on the sheet; a list with no rows reads as the Tower's built-in patterns
+    "room_code_pattern",
+    "tag_pattern",
 )
 # T99 (D174, D212): library suggestion chips — what a row hangs off and where it is offered.
 SUGGESTION_SCOPE = ("type", "category", "code")

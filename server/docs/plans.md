@@ -75,9 +75,16 @@ label's line; `auto` below `AUTO_RESIDUAL_PT` = 2, else `none` until the iPad ca
 hand (`manual`). On the 06M composite: `A–H / 13.5–5` (Centennial, 0.18 pt), `A.–F. / 15.–5.`
 (Walter Tower, 0.00 pt) and `R.–K. / 16.–13. (+22°)` (a wing rotated 22°, 0.03 pt).
 
-**Rooms**: words matching `ROOM_CODE_RE` (`XX06M-1E05`) with the name printed above them in the
-same font (one or two lines), title-cased (`Elevator Machine Room`; `IDF`, `C16`, `(FSAE)` stay).
-**Tags**: words matching a `TAG_RES` pattern (`CT06LCPA`, `EBDK`, `UFMP8`, `ERP`, `NSPS`,
+**Patterns** (T79, D240): what counts as a room code or a tag is the project's vocabulary —
+`vocab(room_code_pattern)` and `vocab(tag_pattern)`, one regular expression per row (Python `re`),
+each matched against a whole word (`re.fullmatch`). Drafts count, rejected rows do not; a list with
+no rows reads as the Tower's built-in patterns (`DEFAULT_ROOM_CODE_PATTERNS`,
+`DEFAULT_TAG_PATTERNS`, which "Load standard" on the iPad seeds as the same strings). A pattern
+that does not compile is skipped and listed in the batch's stats (`bad_patterns`, beside
+`patterns: {list: project | default}`); the iPad's job line names it.
+**Rooms**: words matching a room-code pattern (`XX06M-1E05`) with the name printed above them in
+the same font (one or two lines), title-cased (`Elevator Machine Room`; `IDF`, `C16`, `(FSAE)`
+stay). **Tags**: words matching a tag pattern (`CT06LCPA`, `EBDK`, `UFMP8`, `ERP`, `NSPS`,
 `P-ACP`…) at font size ≥ 4 pt (rack elevations print hairline text) — T46's pre-placement
 proposals read these. **Bubbles**: ringed labels no set claimed (detail callouts) — what the
 manual calibration snaps a tap to.

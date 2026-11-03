@@ -414,7 +414,7 @@ export const TAG_TAKEN_PT = 30;
 
 export type Proposal = { key: string; itemKey: string; at: Point; tag: string };
 
-/** The roles a sheet tag can stand for (`TAG_RES` in `plan_analysis.py`): `CT06LCPA` is a relay or a Foundry panel. Rack parts (`P-ACP`) name no unit to place. */
+/** The roles a sheet tag can stand for (the Tower's tag patterns, `DEFAULT_TAG_PATTERNS` in `plan_analysis.py`): `CT06LCPA` is a relay or a Foundry panel. Rack parts (`P-ACP`) name no unit to place. */
 const TAG_ROLES: readonly (readonly [RegExp, readonly Role[]])[] = [
   [/^CT[0-9A-Z]{1,3}LCP[AB]$/, ['relay_panel', 'foundry_panel']],
   [/^EBDK$/, ['ebdk']],

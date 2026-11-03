@@ -22,6 +22,7 @@ import { statements as m0014 } from './migrations/0014_suggestion';
 import { statements as m0015 } from './migrations/0015_cable_term_kit';
 import { statements as m0016 } from './migrations/0016_vocab_app_level';
 import { statements as m0017 } from './migrations/0017_cable_end_draft_device';
+import { statements as m0018 } from './migrations/0018_vocab_patterns';
 
 export interface Migration {
   version: number;
@@ -47,6 +48,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 15, name: 'cable_term_kit', statements: m0015 },
   { version: 16, name: 'vocab_app_level', statements: m0016 },
   { version: 17, name: 'cable_end_draft_device', statements: m0017 },
+  { version: 18, name: 'vocab_patterns', statements: m0018 },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

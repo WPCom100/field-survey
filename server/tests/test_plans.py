@@ -6,6 +6,7 @@ import io
 import json
 import math
 import uuid
+from datetime import UTC, datetime
 
 import pypdfium2 as pdfium
 import pytest
@@ -15,9 +16,10 @@ from sqlalchemy import select
 
 from app import projects
 from app.auth import upsert_user
+from app.ids import uuid7
 from app.jobs import plan_analysis as pa
 from app.jobs import plans, runner
-from app.models import Blob, ImportBatch, Level, Op, Sheet
+from app.models import Blob, ImportBatch, Level, Op, Sheet, Vocab
 
 FIXTURE = SERVER_DIR.parent / "fixtures" / "Level_06M_-_Lighting_Composite_vector.pdf"
 needs_fixture = pytest.mark.skipif(
@@ -508,6 +510,94 @@ def test_source_pdf_gives_one_sheet_per_page(session, store, factory):
     assert len({s.blob for s in sheets}) == 1 and all(s.kind == "source" for s in sheets)
     assert session.get(Level, level.id).display_sheet_id is None
     assert batch.stats["blobs_stored"] == 1
+
+
+def _word(text, x=100.0, y=100.0, size=8.0):
+    return pa.Word(text, x, y, x - 10, y - size / 2, x + 10, y + size / 2, size, True)
+
+
+def test_patterns_match_whole_words_and_bad_ones_are_reported():
+    """T79 (D240): a pattern matches a whole word (anchors optional); one that does not compile
+    is left out and returned, never raised."""
+    patterns, bad = pa.compile_patterns(
+        rooms=[r"RM-\d{3}", "(unclosed"], tags=["EBDK", r"^LCP\d$", "[A-Z"]
+    )
+    assert [b["list"] for b in bad] == ["room_code_pattern", "tag_pattern"]
+    assert bad[0]["pattern"] == "(unclosed" and bad[0]["error"]
+    assert len(patterns.rooms) == 1 and len(patterns.tags) == 2
+    words = [_word("EBDK"), _word("EBDK2"), _word("LCP4", x=300), _word("CT06LCPA", x=500)]
+    assert [t["text"] for t in pa.find_tags(words, patterns)] == ["EBDK", "LCP4"]
+    # the built-in Tower patterns are the default
+    assert [t["text"] for t in pa.find_tags(words)] == ["CT06LCPA", "EBDK"]
+    rooms = pa.find_rooms([_word("RM-101"), _word("XX06M-1E05", x=400)], patterns)
+    assert [r["code"] for r in rooms] == ["RM-101"]
+    assert [r["code"] for r in pa.find_rooms([_word("XX06M-1E05")])] == ["XX06M-1E05"]
+
+
+def test_the_ipad_seed_spells_the_built_in_patterns():
+    """`app/src/vocab/seed.ts` seeds the same strings the job falls back to (D240)."""
+    seed = (SERVER_DIR.parent / "app" / "src" / "vocab" / "seed.ts").read_text(encoding="utf-8")
+    for p in pa.DEFAULT_ROOM_CODE_PATTERNS + pa.DEFAULT_TAG_PATTERNS:
+        assert f"`{p}`" in seed or f"'{p}'" in seed, p
+
+
+def test_the_job_reads_the_projects_patterns(session, store, factory, monkeypatch):
+    """T79 (D240): the plans job reads the project's `room_code_pattern` / `tag_pattern` rows
+    (drafts too, rejected and deleted rows not), falls back to the Tower's patterns for a list
+    with no rows, and reports a bad pattern on the batch; the lists copy with the project."""
+    project_id, level, user = _project_with_level(session)
+    seen = []
+    real = pa.analyse_sheet
+
+    def spy(data, page_index=0, **kw):
+        seen.append(kw["patterns"])
+        return real(data, page_index, **kw)
+
+    monkeypatch.setattr(pa, "analyse_sheet", spy)
+    first = _run(session, store, factory, project_id, level, _small_pdf(), name="a.pdf")
+    assert first.job_state == "done", first.stats
+    assert first.stats["patterns"] == {"room_code_pattern": "default", "tag_pattern": "default"}
+    assert first.stats["bad_patterns"] == []
+    assert seen[-1] == pa.DEFAULT_PATTERNS
+
+    def row(lst, value, **kw):
+        return Vocab(id=uuid7(), project_id=project_id, list=lst, value=value, **kw)
+
+    session.add_all(
+        [
+            row("tag_pattern", "EBDK"),
+            row("tag_pattern", r"UFMP\d", state="draft"),
+            row("tag_pattern", "NSPS", state="rejected"),
+            row("tag_pattern", "ERP", deleted_at=datetime.now(UTC)),
+            row("tag_pattern", "P-[A-Z"),
+        ]
+    )
+    session.commit()
+    second = _run(
+        session, store, factory, project_id, level, _small_pdf() + b"\n%rev2\n", name="b.pdf"
+    )
+    assert second.job_state == "done", second.stats
+    assert second.stats["patterns"] == {"room_code_pattern": "default", "tag_pattern": "project"}
+    [bad] = second.stats["bad_patterns"]
+    assert bad["list"] == "tag_pattern" and bad["pattern"] == "P-[A-Z" and bad["error"]
+    assert [rx.pattern for rx in seen[-1].tags] == ["EBDK", r"UFMP\d"]
+    assert seen[-1].rooms == pa.DEFAULT_PATTERNS.rooms
+
+    out = projects.create_project(
+        session,
+        projects.ProjectIn(
+            name="Next",
+            copy_from=projects.CopyFrom(project_id=project_id),
+            levels=[projects.LevelIn(level="02")],
+        ),
+        user,
+    )
+    copied = session.scalars(
+        select(Vocab.value).where(
+            Vocab.project_id == uuid.UUID(out.id), Vocab.list == "tag_pattern"
+        )
+    ).all()
+    assert {"EBDK", r"UFMP\d", "P-[A-Z"} <= set(copied) and "ERP" not in copied
 
 
 def test_bad_uploads_are_refused(session, store):

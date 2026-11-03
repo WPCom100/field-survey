@@ -27,6 +27,9 @@ describe('vocabulary editor (T40)', () => {
     expect(v.device_note.map((e) => e.value)).toContain('Empty box on wall.');
     expect(v.device_note.every((e) => !e.draft)).toBe(true);
     expect(v.cable_code.map((e) => e.value)).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D']); // T111 / D199: the codes, as a list
+    // T79 (D240): the Tower's plan-text patterns, as the server's built-in defaults spell them
+    expect(v.room_code_pattern.map((e) => e.value)).toEqual(['[A-Z]{2}\\d{2}[A-Z]?-[A-Z0-9]{2,6}']);
+    expect(v.tag_pattern.map((e) => e.value)).toEqual(['CT[0-9A-Z]{1,3}LCP[AB]', 'EBDK', 'UFMP\\d*', 'ERP\\d*', 'NSPS', 'P-[A-Z]{2,5}(?:-[A-Z]{1,2})?']);
     expect(await loadStandard(editor, store)).toEqual({ values: 0, placeholders: 0 });
     // T112 (D201): the master's renamed categories are recorded as old spellings of the D196 value
     const rows = await store.list<{ id: string; value: string; canonical_of_id: string | null }>('vocab', { where: 'project_id = ? AND list = ?', params: [projectId, 'category'] });

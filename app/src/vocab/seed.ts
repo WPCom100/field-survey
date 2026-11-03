@@ -19,6 +19,8 @@ export const VOCAB_LISTS = [
   { list: 'type', title: 'Device types', hint: "Chips under a device's Type on the card (the master's Type column, e.g. \"Echo relay panel\"). Free typing stays." },
   { list: 'category', title: 'Device categories', hint: "Device Category picker (the D196 eleven). A pin shape follows the device's role, which its library type carries (D64, T112)." },
   { list: 'cable_code', title: 'Cable codes', hint: 'The codes a cable can carry (CLAUDE.md §3). A DaVinci port protocol with no code arrives here as a draft (T111); accepting it records a decision, it does not make a code yet.' },
+  { list: 'room_code_pattern', title: 'Room-code patterns', hint: 'What the plan upload reads as a room code (T79): one regular expression per row (Python syntax, matched against a whole word). An empty list uses the Tower\'s pattern. A pattern that does not compile is skipped and named on the upload\'s job line.' },
+  { list: 'tag_pattern', title: 'Tag patterns', hint: 'What the plan upload reads as a device tag for dashed proposals (T79): one regular expression per row, matched against a whole word. An empty list uses the Tower\'s patterns. Takes effect on the next sheet upload.' },
 ] as const satisfies readonly { list: (typeof vocab.VOCAB_LIST)[number]; title: string; hint: string }[];
 
 export type VocabListKey = (typeof VOCAB_LISTS)[number]['list'];
@@ -33,6 +35,10 @@ export const SEED_VOCAB: Readonly<Record<VocabListKey, readonly string[]>> = {
   type: [],
   category: DEVICE_CATEGORIES,
   cable_code: ['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D'],
+  // the Tower's drawing conventions; the same strings as `DEFAULT_*_PATTERNS` in
+  // server/app/jobs/plan_analysis.py (D240)
+  room_code_pattern: [String.raw`[A-Z]{2}\d{2}[A-Z]?-[A-Z0-9]{2,6}`],
+  tag_pattern: [String.raw`CT[0-9A-Z]{1,3}LCP[AB]`, 'EBDK', String.raw`UFMP\d*`, String.raw`ERP\d*`, 'NSPS', String.raw`P-[A-Z]{2,5}(?:-[A-Z]{1,2})?`],
 };
 
 /**

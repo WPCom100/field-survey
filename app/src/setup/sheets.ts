@@ -79,7 +79,9 @@ export function sheetJobLine(b: ImportBatch): string {
       const n = typeof b.stats?.grid_sets === 'number' ? b.stats.grid_sets : 0;
       const auto = typeof b.stats?.auto_sets === 'number' ? b.stats.auto_sets : 0;
       const sheets = Array.isArray(b.stats?.sheets) ? (b.stats.sheets as unknown[]).length : 1;
-      return `Done: ${sheets} sheet${sheets === 1 ? '' : 's'}, ${n} grid set${n === 1 ? '' : 's'}${n ? ` (${auto} auto)` : ''} — arrives with the next sync`;
+      const bad = Array.isArray(b.stats?.bad_patterns) ? (b.stats.bad_patterns as { pattern?: unknown }[]) : [];
+      const skipped = bad.length ? `; skipped ${bad.length === 1 ? 'a bad pattern' : `${bad.length} bad patterns`} (${bad.map((p) => String(p.pattern)).join(', ')}) — fix in Vocabulary` : '';
+      return `Done: ${sheets} sheet${sheets === 1 ? '' : 's'}, ${n} grid set${n === 1 ? '' : 's'}${n ? ` (${auto} auto)` : ''} — arrives with the next sync${skipped}`;
     }
   }
 }

@@ -107,6 +107,9 @@ export const VOCAB_LIST = [
   'type',
   // T111 (D197): the cable codes; a DaVinci port protocol with no code lands here as a draft
   'cable_code',
+  // T79 (D240): the plans job's text pass (read on the server) — one regular expression per row
+  'room_code_pattern',
+  'tag_pattern',
 ] as const;
 // T99 (D174, D212): library suggestion chips — the scope a row hangs off (a type id, a category, a
 // cable code) and where it is offered (device Notes, end Note, a punch item's Item, a part's Part).
