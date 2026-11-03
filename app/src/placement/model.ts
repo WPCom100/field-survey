@@ -22,7 +22,7 @@ import { canonicalCategory, isRole, type Role, type SheetFeatures, type Store } 
 
 export type Point = { x: number; y: number };
 
-import { accessoryTypeOf, loadDeviceTypes, roleOfDevice, typeForDraft, typeOf, type DeviceType, type DeviceTypes } from '../library/neuron';
+import { accessoryTypeOf, loadDeviceTypes, roleOfDevice, typeForDraft, typeOf, typeOfPrinted, type DeviceType, type DeviceTypes } from '../library/neuron';
 
 // ------------------------------------------------------------------ shapes
 
@@ -40,6 +40,8 @@ type ItemBase = {
   panelName: string | null;
   /** What the library type is called (`Echo Relay Panel 24`, T127), when it says more than the model. */
   typeName: string | null;
+  /** The library type: a device's (`library_type_id`, else its Device text), the one a draft will get (`typeForDraft`, T115). */
+  libraryTypeId: string | null;
 };
 
 export type UnplacedDevice = ItemBase & {
@@ -66,8 +68,6 @@ export type UnplacedDraft = ItemBase & {
   covered: number;
   remaining: number;
   notOnSheet: boolean;
-  /** The library type it will get (`typeForDraft`, T115), if the library has one. */
-  libraryTypeId: string | null;
   /** The type's category, else the draft's (canonical). */
   deviceCategory: string | null;
   accessories: DraftAccessory[];
@@ -106,6 +106,8 @@ export type LevelUnplaced = {
   /** Drafts flagged not on this sheet (level and pool), with units left. */
   flagged: UnplacedDraft[];
   progress: LevelPlacement;
+  /** The project's and the app library's types, for what the sheet prints (`tagProposals`, T140). */
+  types: DeviceTypes;
 };
 
 // ------------------------------------------------------------------ small parsers
@@ -175,6 +177,7 @@ type DeviceRec = {
   baselineRef: string | null;
   role: Role;
   typeName: string | null;
+  typeId: string | null;
 };
 
 type DraftRec = {
@@ -191,6 +194,7 @@ type DraftRec = {
 };
 
 type Computed = {
+  types: DeviceTypes;
   levels: LevelRow[];
   devices: DeviceRec[];
   drafts: (DraftRec & { placed: number; covered: number; remaining: number; typeId: string | null; typeRole: Role; deviceCategory: string | null; typeName: string | null })[];
@@ -218,6 +222,7 @@ async function compute(store: Store, projectId: string): Promise<Computed> {
     baselineRef: str(d.baseline_ref_id),
     role: roleOfDevice(types, d),
     typeName: typeNameOf(typeOf(types, d), str(d.device)),
+    typeId: typeOf(types, d)?.id ?? null,
   }));
 
   const rawDrafts = await store.list<Row>('draft_device', {
@@ -287,7 +292,7 @@ async function compute(store: Store, projectId: string): Promise<Computed> {
       typeName: typeNameOf(type, rec.model),
     });
   }
-  return { levels, devices, drafts };
+  return { types, levels, devices, drafts };
 }
 
 const inScope = (l: LevelRow) => l.in_scope !== 0 && l.in_scope !== false;
@@ -341,6 +346,7 @@ export async function loadUnplaced(store: Store, projectId: string, levelId: str
       role: d.role,
       panelName: d.panelName,
       typeName: d.typeName,
+      libraryTypeId: d.typeId,
       room: d.room,
       drawingPosition: d.drawingPosition,
     }))
@@ -375,6 +381,7 @@ export async function loadUnplaced(store: Store, projectId: string, levelId: str
     items: [...devices, ...drafts.filter((d) => !d.notOnSheet)],
     flagged: drafts.filter((d) => d.notOnSheet),
     progress: progressOf(c, level),
+    types: c.types,
   };
 }
 
@@ -405,76 +412,108 @@ export function itemLine(i: UnplacedItem): string {
 
 // ------------------------------------------------------------------ proposals from text tags
 
-/** Roles a sheet tag names (`CT06LCPA`, `EBDK`, `UFMP8`, `ERP48`, `NSPS`, rack parts — D147 (2)); stations and sensors are always placed by hand. */
+/** The panel roles: their units carry a panel tag (`CT06LCPA`, `EBDK`, `UFMP8`, `NSPS`, rack parts — D147 (2)), and their `-` model parts are printed too. */
 export const TAGGED_ROLES: ReadonlySet<Role> = new Set<Role>(['relay_panel', 'foundry_panel', 'ebdk', 'equipment_rack', 'nsps']);
 /** Two tags of one text this close (pt) are one: the composite overlays its source sheets. */
 export const TAG_SAME_PT = 24;
 /** A tag this close (pt) to a pin already on the sheet is taken. */
 export const TAG_TAKEN_PT = 30;
+/** Words this close (pt) are printed beside one another: `CT03LCPA` over `ERP24-FT241P`, `CT06LCPA` over `UFMP8` (T140). */
+export const TAG_BESIDE_PT = 20;
 
-export type Proposal = { key: string; itemKey: string; at: Point; tag: string };
+/** `guess`: by role alone (D234 (3)), drawn fainter and labelled so. */
+export type Proposal = { key: string; itemKey: string; at: Point; tag: string; guess: boolean };
 
-/** The roles a sheet tag can stand for (the Tower's tag patterns, `DEFAULT_TAG_PATTERNS` in `plan_analysis.py`): `CT06LCPA` is a relay or a Foundry panel. Rack parts (`P-ACP`) name no unit to place. */
-const TAG_ROLES: readonly (readonly [RegExp, readonly Role[]])[] = [
-  [/^CT[0-9A-Z]{1,3}LCP[AB]$/, ['relay_panel', 'foundry_panel']],
-  [/^EBDK$/, ['ebdk']],
-  [/^UFMP\d*$/, ['foundry_panel']],
-  [/^ERP\d*$/, ['relay_panel']],
-  [/^NSPS$/, ['nsps']],
-];
+/** The roles a panel tag alone may stand for, for a guess (D234 (3)): `CT06LCPA` is a relay or a Foundry panel. A printed model (`UFMP8`, `EBDK`) is matched by its text and type, never by role. */
+const TAG_ROLES: readonly (readonly [RegExp, readonly Role[]])[] = [[/^CT[0-9A-Z]{1,3}LCP[AB]$/, ['relay_panel', 'foundry_panel']]];
 
 export function tagRoles(text: string): readonly Role[] {
   const key = tagKey(text);
   return TAG_ROLES.find(([rx]) => rx.test(key))?.[1] ?? [];
 }
 
+/** Model text compared as printed: spaces, case and dashes ignored (`ERP24-FT241P` is `ERP24-FT-241P`). */
+const looseKey = (s: string | null | undefined): string => tagKey(s).replace(/-/g, '');
+
+/** Two texts of one type do not name different variants of it (`P-DOC-C-LR` is not `P-DOC-C-SR-X`; plain `P-DOC-C` is either). */
+function sameVariant(a: string, b: string, model: string): boolean {
+  const m = `${tagKey(model)}-`;
+  const va = a.startsWith(m) ? a.slice(m.length) : '';
+  const vb = b.startsWith(m) ? b.slice(m.length) : '';
+  return !va || !vb || va === vb || va.startsWith(`${vb}-`) || vb.startsWith(`${va}-`);
+}
+
 /**
- * Dashed pins proposed at the sheet's text tags (Phase 2 "Pre-placement", Phase 3 §3.4), never
- * next to a pin already on the sheet, in three passes:
- * 1. a tag that is an unplaced item's panel tag or model — also a master panel whose category
- *    names no role (`Power Distribution` after the rename ruling, D201 (2)) but whose tag is printed;
- * 2. one `-` part of the model of 4+ characters (`ERP48` in `ERP48-FT-481P`, `NSPS` in `P-NSPS-D`);
- * 3. a tag still left that stands for the item's role (`UFMP8` or `CT06LCPA` for a `UFMP4` draft,
- *    a relay-panel draft with no tag yet — T127), one to each item of the level still without one.
- * Every tag goes to one item, every item gets as many tags as it has units. Nothing is written
- * until a person confirms one.
+ * Dashed pins proposed at what the sheet prints (Phase 2 "Pre-placement", Phase 3 §3.4; T140,
+ * D234): the text pass's tags — panel tags and every library model or alias beside a device —
+ * never next to a pin already on the sheet. For every role, stations and sensors included:
+ * 1. **the printed model**, exact text (`PI1104`, `ERP24-FT241P` for `ERP24-FT-241P`);
+ * 2. **its type**: a printed alias or variant of the item's library type (`P-DOC-C-LR` for a
+ *    `P-DOC-C-LR-X` draft), never another variant of it;
+ * 3. **the panel tag** (`CT06LCPA`) — also a master panel whose category names no role (D201 (2));
+ * 4. one `-` part of the model of 4+ characters, panel roles (`ERP48` in `ERP48-FT-481P`);
+ * 5. **a guess**: a panel tag still left (`CT…LCPA/B`) to a relay or Foundry item of the level with
+ *    none yet and no tag of its own, one each — only when the model printed beside the tag, if
+ *    any, is the item's (a `UFMP4` never on the `CT06LCPA` over `UFMP8`), and never a tag another
+ *    item is named by or one beside a proposal already made.
+ * An item whose own panel tag is printed takes a model only beside that tag (passes 1, 2, 4). Every
+ * word goes to one item, every item gets as many as it has units: a ×n draft one proposal per
+ * matching word. Nothing is written until a person confirms one.
  */
-export function tagProposals(features: Pick<SheetFeatures, 'tags'>, items: readonly UnplacedItem[], pins: readonly Point[]): Proposal[] {
-  const tags: { text: string; key: string; at: Point }[] = [];
+export function tagProposals(features: Pick<SheetFeatures, 'tags'>, items: readonly UnplacedItem[], pins: readonly Point[], types: DeviceTypes = new Map()): Proposal[] {
+  type Tag = { text: string; key: string; at: Point; type: DeviceType | null };
+  const tags: Tag[] = [];
   for (const t of features.tags) {
     const key = tagKey(t.text);
     if (!key) continue;
     if (tags.some((o) => o.key === key && Math.hypot(o.at.x - t.x, o.at.y - t.y) <= TAG_SAME_PT)) continue;
     if (pins.some((p) => Math.hypot(p.x - t.x, p.y - t.y) <= TAG_TAKEN_PT)) continue;
-    tags.push({ text: t.text, key, at: { x: t.x, y: t.y } });
+    tags.push({ text: t.text, key, at: { x: t.x, y: t.y }, type: typeOfPrinted(types, t.text) });
   }
+  const near = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y) <= TAG_BESIDE_PT;
   const open = items.filter((i) => unitsOf(i) > 0);
-  const tagged = open.filter((i) => TAGGED_ROLES.has(i.role));
   const left = new Map(open.map((i) => [i.key, unitsOf(i)]));
+  // where an item's own panel tag is printed, its model is the word beside it
+  const ownTags = new Map(open.map((i) => [i.key, tags.filter((t) => i.panelName && t.key === tagKey(i.panelName))]));
+  const atOwn = (i: UnplacedItem, t: Tag) => {
+    const own = ownTags.get(i.key) ?? [];
+    return !own.length || own.some((o) => near(o.at, t.at));
+  };
   const used = new Set<number>();
   const out: Proposal[] = [];
-  const give = (i: UnplacedItem, t: (typeof tags)[number], n: number) => {
+  const give = (i: UnplacedItem, t: Tag, n: number, guess = false) => {
     used.add(n);
     left.set(i.key, (left.get(i.key) ?? 0) - 1);
-    out.push({ key: `${i.key}@${n}`, itemKey: i.key, at: t.at, tag: t.text });
+    out.push({ key: `${i.key}@${n}`, itemKey: i.key, at: t.at, tag: t.text, guess });
   };
-  const pass = (among: readonly UnplacedItem[], keysOf: (i: UnplacedItem) => string[]) => {
+  const pass = (among: readonly UnplacedItem[], fits: (i: UnplacedItem, t: Tag) => boolean) => {
     for (const i of among) {
-      const keys = new Set(keysOf(i).filter(Boolean));
-      if (!keys.size) continue;
       tags.forEach((t, n) => {
-        if ((left.get(i.key) ?? 0) <= 0 || used.has(n) || !keys.has(t.key)) return;
+        if ((left.get(i.key) ?? 0) <= 0 || used.has(n) || !fits(i, t)) return;
         give(i, t, n);
       });
     }
   };
-  pass(open.filter((i) => TAGGED_ROLES.has(i.role) || i.role === 'other'), (i) => [tagKey(i.panelName), tagKey(i.model)]);
-  pass(tagged, (i) => (i.model ?? '').split('-').map(tagKey).filter((k) => k.length >= 4));
-  for (const i of tagged) {
-    if (i.kind === 'draft' && i.pool) continue;
-    if ((left.get(i.key) ?? 0) <= 0 || out.some((p) => p.itemKey === i.key)) continue;
-    const n = tags.findIndex((t, m) => !used.has(m) && tagRoles(t.text).includes(i.role));
-    if (n >= 0) give(i, tags[n]!, n);
+  const isModel = (i: UnplacedItem, t: Tag) => !!i.model && looseKey(t.text) === looseKey(i.model);
+  const isType = (i: UnplacedItem, t: Tag) => !!t.type && t.type.id === i.libraryTypeId && sameVariant(t.key, tagKey(i.model), t.type.model);
+  pass(open, (i, t) => isModel(i, t) && atOwn(i, t));
+  pass(open, (i, t) => isType(i, t) && atOwn(i, t));
+  pass(open, (i, t) => !!i.panelName && t.key === tagKey(i.panelName));
+  pass(
+    open.filter((i) => TAGGED_ROLES.has(i.role)),
+    (i, t) => atOwn(i, t) && (i.model ?? '').split('-').map(tagKey).filter((k) => k.length >= 4).includes(t.key),
+  );
+  // 5. guesses: a panel tag by role, within the family of what is printed beside it
+  const named = new Set(open.map((i) => tagKey(i.panelName)).filter(Boolean));
+  for (const i of open) {
+    if ((i.kind === 'draft' && i.pool) || i.panelName || (left.get(i.key) ?? 0) <= 0 || out.some((p) => p.itemKey === i.key)) continue;
+    const n = tags.findIndex((t, m) => {
+      if (used.has(m) || !tagRoles(t.text).includes(i.role) || named.has(t.key)) return false;
+      if (out.some((p) => near(p.at, t.at))) return false;
+      const beside = tags.filter((o, k) => k !== m && o.type && near(o.at, t.at));
+      return !beside.length || beside.some((o) => isModel(i, o) || isType(i, o));
+    });
+    if (n >= 0) give(i, tags[n]!, n, true);
   }
   return out;
 }

@@ -29,6 +29,16 @@ the same level and kind is `skipped`. Everything is one transaction; a failure r
 on the batch and leaves the project untouched. CLI: `python -m app.jobs.plans <project> <level>
 <pdf> [--kind display|source] [--user NAME]`.
 
+**Re-reading the tags** (T140): `python -m app.jobs.plans retag <project> [--user NAME]` runs the
+tag pass again over every live sheet of the project from its stored PDF, with the project's
+patterns and library as they are now — after the tag pass or the library changes, since the same
+file is never uploaded twice and a replaced display sheet leaves its pins behind (until T77). A
+sheet whose tags changed gets one `set` of `features` (change type Master edit, reason "Plan sheet
+tags re-read") with only `tags` replaced; the rest of `features`, the grid sets and the pins stay.
+It prints what changed per sheet (`before` / `after` tag counts); a second run changes nothing.
+On the Droplet: `docker compose exec -T worker python -m app.jobs.plans retag <project_id>`
+(minutes per composite: the pass reads every word of the page).
+
 ## The text pass (`plan_analysis.analyse_sheet`)
 
 Vector sheets only (A11): pdfplumber words with font size and position, pdfplumber curves /
@@ -84,9 +94,23 @@ that does not compile is skipped and listed in the batch's stats (`bad_patterns`
 `patterns: {list: project | default}`); the iPad's job line names it.
 **Rooms**: words matching a room-code pattern (`XX06M-1E05`) with the name printed above them in
 the same font (one or two lines), title-cased (`Elevator Machine Room`; `IDF`, `C16`, `(FSAE)`
-stay). **Tags**: words matching a tag pattern (`CT06LCPA`, `EBDK`, `UFMP8`, `ERP`, `NSPS`,
-`P-ACP`…) at font size ≥ 4 pt (rack elevations print hairline text) — T46's pre-placement
-proposals read these. **Bubbles**: ringed labels no set claimed (detail callouts) — what the
+stay). **Tags** — what T46's pre-placement proposals read (`app/src/placement/model.ts`
+`tagProposals`): words matching a tag pattern (`CT06LCPA`, `EBDK`, `UFMP8`, `ERP`, `NSPS`,
+`P-ACP`…) and, since T140 (D234, D241), every word that is a **model or alias of a library type**
+— the project's live types and the app library's, rejected ones not (`plans.library_names` →
+`plan_analysis.name_keys`): `PI1104`, `P-LS`, `UFMP4`, `ERP24-FT241P`. A variant alias cut short
+counts too: the catalogue has `P-DOC-C-LR-X` as an alias of `P-DOC-C`, the drawings print
+`P-DOC-C-LR`. Names under 4 characters (`NET`, `UPS`, `TBD`) are ordinary words on a sheet and are
+not kept. Then:
+- **joined**: fragments of one word that touch (the 03 composite draws `P-DOC` as `P` `-D` `O`
+  `C`), and a type printed over two lines when the two, run together with or without a `-`, are a
+  library name (`P-DOC` / `C-LR` → `P-DOC-C-LR`, `ERP24-FT` / `241P` → `ERP24-FT241P`);
+- **left out**: text under 4 pt (legend symbols at 1–2.3 pt, rack elevations' hairline text — the
+  labels beside devices are 5.5 pt on the 06M, 02 and 03 composites), a word in a sentence of a
+  note (a plain word of the same size on its line within 0.8 em: `… SYSTEM EBDK LOCATION IN …`)
+  and a **legend table's device column** (3+ words of one size centred on one x, rows ≤ 4.5 em
+  apart, two kept words in it — or any column under a `Description` header). The composites repeat
+  each source sheet's legend; a legend word is never a device on the plan. **Bubbles**: ringed labels no set claimed (detail callouts) — what the
 manual calibration snaps a tap to.
 
 **Boundaries** (D100): the page's optional-content groups whose name contains "boundar" (or the
@@ -119,7 +143,8 @@ display sheet and Skia draws the lines instead (`app/src/plan/drawLayers.ts`).
 ```json
 {
   "rooms": [{"code": "XX06M-2SV01", "name": "Stair A Vestibule", "x": 1299.6, "y": 790.8}],
-  "tags": [{"text": "CT06LCPA", "x": 2360.1, "y": 1354.9, "size": 12.0}],
+  "tags": [{"text": "CT06LCPA", "x": 1650.0, "y": 1459.2, "size": 6.0},
+           {"text": "P-DOC-C-LR", "x": 3045.9, "y": 1306.6, "size": 5.5}],
   "bubbles": [{"text": "22", "x": 1671.6, "y": 1931.3}],
   "boundaries": [{"points": [[1596, 186], [2732, 186], …]}],
   "boundary_labels": [{"text": "Ef.106.5.A", "x": 1090.8, "y": 1108.3}]
@@ -143,3 +168,7 @@ three auto sets under 2 pt with their labels and frames, the wording cases above
 loose bubbles, boundaries + the OCG-off display PDF (pdfium renders no magenta pixels), the job
 (display sheet → blob + sheet create + level set, idempotent by file, replacement soft-deletes the
 old sheet, a source PDF → one sheet per page), refused uploads, the `/imports` route.
+`tests/test_plan_tags.py` (T140): `name_keys`, the joins and what is left out on made-up words;
+the 06M, Level 02 and Level 03 composites with the catalogue's rows for what they print (each
+skipped when its fixture is missing; the 02 and 03 composites are ~15 MB each and read for about
+three minutes together); the job passing the project's and the app library's names; `retag`.

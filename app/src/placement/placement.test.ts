@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { loadLockTable, lockQuestion, lockWarnings } from '../setup/lock';
 import { loadDeviceCard } from '../card/model';
 import { UNPLACE_REASON, flagNotOnSheet, perUnit, placeItem, unplaceDevice } from './actions';
+import { typeOfPrinted, type DeviceType, type DeviceTypes } from '../library/neuron';
 import { itemLine, itemsIn, loadPlacementProgress, loadUnplaced, rolesIn, tagProposals, tagRoles, typeNameOf, type UnplacedDevice, type UnplacedDraft, type UnplacedItem } from './model';
 
 const PROJECT = uuidv7();
@@ -287,7 +288,7 @@ describe('proposals from the sheet text tags (T46)', () => {
   const item = (key: string, f: Partial<UnplacedDraft>): UnplacedItem =>
     ({ kind: 'draft', key, draftId: key, levelId: 'L', pool: false, title: key, model: null, name: null, category: null, role: 'relay_panel', panelName: null, typeName: null, qty: 1, placed: 0, covered: 0, remaining: 1, notOnSheet: false, libraryTypeId: null, deviceCategory: null, accessories: [], ...f }) as UnplacedDraft;
 
-  it('proposes a panel at its tag, merges repeated tags, skips taken tags and stations', () => {
+  it('proposes a panel at its tag, a station at its printed model, merges repeated tags, skips taken tags', () => {
     const items = [
       item('a', { panelName: 'CT06LCPA', model: 'ERP48-FT-481P' }),
       item('b', { model: 'EBDK', role: 'ebdk', remaining: 2 }),
@@ -306,12 +307,15 @@ describe('proposals from the sheet text tags (T46)', () => {
       { text: 'PI1002', x: 10, y: 10 },
     ];
     const p = tagProposals({ tags }, items, [{ x: 710, y: 705 }]);
+    // the printed model first (stations too, T140), then the panel tag, then a model part
     expect(p.map((x) => [x.itemKey, x.tag, x.at.x])).toEqual([
-      ['a', 'CT06LCPA', 100],
       ['b', 'EBDK', 300],
       ['b', 'EBDK', 900],
+      ['s', 'PI1002', 10],
+      ['a', 'CT06LCPA', 100],
       ['c', 'NSPS', 50],
     ]);
+    expect(p.some((x) => x.guess)).toBe(false);
     // the exact tag goes before a model part: ERP48 is a part of a's model, but a is already proposed
     const q = tagProposals({ tags: [{ text: 'ERP48', x: 5, y: 5 }] }, [item('a', { model: 'ERP48-FT-481P' })], []);
     expect(q.map((x) => x.itemKey)).toEqual(['a']);
@@ -334,15 +338,16 @@ describe('proposals from the sheet text tags (T46)', () => {
     ]);
   });
 
-  it('a tag left over goes to an item of its role on the level with none yet, one each (T127)', () => {
+  it('a panel tag left over is a guess for an item of its role on the level with none yet, one each (T127, D234)', () => {
     expect(tagRoles('CT06LCPA')).toEqual(['relay_panel', 'foundry_panel']);
-    expect(tagRoles('ufmp8')).toEqual(['foundry_panel']);
+    // a printed model is matched by its text and type, never by role (D234 (3))
+    expect(tagRoles('ufmp8')).toEqual([]);
     expect(tagRoles('P-ACP')).toEqual([]);
     const items = [
       // a BOM relay panel with no tag yet, two of them; a Foundry panel of another model
       item('r', { model: 'ERP24-FT-241P', remaining: 2 }),
       item('f', { model: 'UFMP4', role: 'foundry_panel' }),
-      // already proposed by its own tag: no second one by role
+      // named: its own tag, not a UFMP8 printed away from it
       item('a', { panelName: 'CT06LCPA', model: 'UFMP8', role: 'foundry_panel' }),
       // the pool is not the level's
       item('p', { model: 'UFMP4', role: 'foundry_panel', pool: true, levelId: null }),
@@ -355,10 +360,87 @@ describe('proposals from the sheet text tags (T46)', () => {
       { text: 'UFMP8', x: 700, y: 700 },
       { text: 'UFMP8', x: 900, y: 900 },
     ];
-    expect(tagProposals({ tags }, items, []).map((x) => [x.itemKey, x.tag, x.at.x])).toEqual([
-      ['a', 'CT06LCPA', 100],
-      ['r', 'CT06LCPB', 400],
-      ['f', 'UFMP8', 700],
+    // UFMP4 never on a UFMP8 (T140); CT06LCPC is no tag pattern
+    expect(tagProposals({ tags }, items, []).map((x) => [x.itemKey, x.tag, x.at.x, x.guess])).toEqual([
+      ['a', 'CT06LCPA', 100, false],
+      ['r', 'CT06LCPB', 400, true],
+    ]);
+  });
+
+  // the app library's rows for what the 03 composite prints (T111 import, trimmed)
+  const type = (id: string, model: string, role: string, aliases: string[] = []): DeviceType => ({ id, project_id: null, model, aliases, state: 'accepted', category: null, needs_neuron_id: null, role });
+  const TYPES: DeviceTypes = new Map(
+    [
+      type('t-pi', 'PI1104', 'station', ['Inspire Station - 4 Btn Fader', 'PI1104-X']),
+      type('t-doc', 'P-DOC-C', 'sensor', ['7184A1416-5', 'P-DOC-C-SR-5', 'P-DOC-C-LR-5', 'P-DOC-C-LR-X', 'P-DOC-C-SR-X']),
+      type('t-erp', 'ERP Feedthrough 24', 'relay_panel', ['7123A1123', 'ERP24-FT241P']),
+      type('t-u4', 'UFMP4', 'foundry_panel', ['UFMP4-F']),
+      type('t-u8', 'UFMP8', 'foundry_panel', ['UFMP8-F']),
+    ].map((t) => [t.id, t] as const),
+  );
+
+  it('reads a printed type by its model, an alias or a variant cut short (T140)', () => {
+    expect(typeOfPrinted(TYPES, 'P-DOC-C-LR')?.id).toBe('t-doc');
+    expect(typeOfPrinted(TYPES, 'p-doc-c')?.id).toBe('t-doc');
+    expect(typeOfPrinted(TYPES, 'ERP24-FT241P')?.id).toBe('t-erp');
+    expect(typeOfPrinted(TYPES, 'P-DOC')).toBeNull();
+    expect(typeOfPrinted(TYPES, 'UFMP4-F-X')).toBeNull();
+  });
+
+  it('stations and sensors go to the type printed beside them, one word each, never another variant (T140, D234)', () => {
+    const dev = (key: string, model: string, libraryTypeId: string | null): UnplacedItem =>
+      ({ kind: 'device', key, deviceId: key, levelId: 'L', label: key, isNew: false, title: key, model, category: 'Station', role: 'station', panelName: null, typeName: null, libraryTypeId, room: null, drawingPosition: null }) as UnplacedDevice;
+    const items = [
+      dev('03-S1', 'PI1104', 't-pi'),
+      item('st', { model: 'PI1104', role: 'station', libraryTypeId: 't-pi', remaining: 3 }),
+      item('lr', { model: 'P-DOC-C-LR-X', role: 'sensor', libraryTypeId: 't-doc', remaining: 3 }),
+      item('sr', { model: 'P-DOC-C-SR-X', role: 'sensor', libraryTypeId: 't-doc' }),
+      // a BOM model the library spells without the dash
+      item('erp', { model: 'ERP24-FT-241P', remaining: 1 }),
+    ];
+    const tags = [
+      { text: 'PI1104', x: 100, y: 0 },
+      { text: 'PI1104', x: 300, y: 0 },
+      { text: 'P-DOC-C-LR', x: 700, y: 0 },
+      { text: 'P-DOC-C-LR', x: 900, y: 0 },
+      { text: 'P-DOC-C-SR', x: 1100, y: 0 },
+      { text: 'P-DOC-C', x: 1300, y: 0 },
+      { text: 'ERP24-FT241P', x: 1500, y: 0 },
+    ];
+    const p = tagProposals({ tags }, items, [], TYPES);
+    expect(p.map((x) => [x.itemKey, x.tag, x.at.x])).toEqual([
+      ['03-S1', 'PI1104', 100],
+      ['st', 'PI1104', 300],
+      ['erp', 'ERP24-FT241P', 1500],
+      ['lr', 'P-DOC-C-LR', 700],
+      ['lr', 'P-DOC-C-LR', 900],
+      ['lr', 'P-DOC-C', 1300],
+      ['sr', 'P-DOC-C-SR', 1100],
+    ]);
+    // never two items on one word, and a ×3 draft has only the words there are
+    expect(new Set(p.map((x) => x.at.x)).size).toBe(p.length);
+    expect(p.filter((x) => x.itemKey === 'st')).toHaveLength(1);
+  });
+
+  it('a guess stays within the family printed beside the tag and never doubles a panel (T140, D234 (3))', () => {
+    const items = [
+      item('r1', { model: 'ERP24-FT-241P' }),
+      item('r2', { model: 'ERP24-FT-241P' }),
+      item('f', { model: 'UFMP4', role: 'foundry_panel', libraryTypeId: 't-u4' }),
+    ];
+    const tags = [
+      // CT03LCPA over UFMP8: a Foundry panel of another model, so neither a UFMP4 nor a relay panel
+      { text: 'CT03LCPA', x: 100, y: 100 },
+      { text: 'UFMP8', x: 100, y: 110 },
+      // CT03LCPB over the relay panel's model: r1 takes the model, so nobody guesses the tag
+      { text: 'CT03LCPB', x: 400, y: 100 },
+      { text: 'ERP24-FT241P', x: 400, y: 111 },
+      // with nothing printed beside it, a guess
+      { text: 'CT04LCPA', x: 800, y: 100 },
+    ];
+    expect(tagProposals({ tags }, items, [], TYPES).map((x) => [x.itemKey, x.tag, x.at.x, x.guess])).toEqual([
+      ['r1', 'ERP24-FT241P', 400, false],
+      ['r2', 'CT04LCPA', 800, true],
     ]);
   });
 });

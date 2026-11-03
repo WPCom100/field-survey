@@ -4,7 +4,8 @@
  * Flag: not on this sheet, and — once a spot is chosen — the confirm form: ID (the device's, or
  * `<level>-? NEW` for the server to number, D93 / D118), panel tag, Drawing Position and Room
  * (defaults from the grid and the nearest room at the spot, T45) → Place ✓. Dashed pins on the
- * plan are proposals from the sheet's text tags; tapping one selects it with its spot. The row
+ * plan are proposals from what the sheet prints (types and panel tags, T140), a guess fainter and
+ * named so in the form; tapping one selects it with its spot. The row
  * just placed stays at the top with ↶ Undo until the panel closes (T139).
  * The logic is in `model.ts` / `actions.ts`; this is the view.
  */
@@ -25,6 +26,10 @@ export type PlacePanelProps = {
   sheetId: string;
   data: LevelUnplaced | null;
   proposals: number;
+  /** …of which guessed by role alone (T140, D234 (3)): drawn fainter. */
+  guesses: number;
+  /** The printed tag behind the chosen spot when that spot is a guess. */
+  spotGuess: string | null;
   selectedKey: string | null;
   /** The spot on the sheet (a tap, a drop or a proposal), null until chosen. */
   spot: { x: number; y: number } | null;
@@ -105,7 +110,13 @@ export function PlacePanel(props: PlacePanelProps) {
             ))}
           </View>
         ) : null}
-        {props.proposals > 0 ? <Text style={styles.note}>{props.proposals} dashed pin{props.proposals === 1 ? '' : 's'} proposed from the sheet's tags: tap one to confirm it.</Text> : null}
+        {props.proposals > 0 ? (
+          <Text style={styles.note}>
+            {props.proposals} dashed pin{props.proposals === 1 ? '' : 's'} where the sheet prints the type or tag: tap one to confirm it.
+            {props.guesses > 0 ? ` ${props.guesses} faint one${props.guesses === 1 ? ' is a guess' : 's are guesses'} by type alone: check the plan first.` : ''}
+          </Text>
+        ) : null}
+        {spot && props.spotGuess ? <Text style={styles.warn}>Guess: the sheet prints {props.spotGuess} here, not this model. Check it is this unit before placing.</Text> : null}
         {!editor ? <Text style={styles.warn}>Pick who you are to place devices.</Text> : null}
         {note ? <Text style={styles.note}>{note}</Text> : null}
         {last ? (

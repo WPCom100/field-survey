@@ -71,6 +71,40 @@ export function typeOfModel(types: DeviceTypes, model: string | null): DeviceTyp
   return findDeviceType(types, { device: text(model), library_type_id: null });
 }
 
+/** Variants cut short, per types map (T140): `P-DOC-C-LR` → the type whose alias `P-DOC-C-LR-X` extends its model `P-DOC-C`. */
+const SHORT_VARIANTS = new WeakMap<DeviceTypes, Map<string, DeviceType>>();
+
+function shortVariants(types: DeviceTypes): Map<string, DeviceType> {
+  const cached = SHORT_VARIANTS.get(types);
+  if (cached) return cached;
+  const out = new Map<string, DeviceType>();
+  // the project's types before the app library's, as `findDeviceType`
+  const rows = [...types.values()].filter((t) => t.state !== 'rejected').sort((a, b) => Number(a.project_id == null) - Number(b.project_id == null) || a.id.localeCompare(b.id));
+  for (const t of rows) {
+    const m = key(t.model);
+    for (const k of keysOf(t)) {
+      if (!m || !k.startsWith(`${m}-`)) continue;
+      const rest = k.slice(m.length + 1).split('-');
+      for (let i = 1; i < rest.length; i++) {
+        const stem = `${m}-${rest.slice(0, i).join('-')}`;
+        if (!out.has(stem)) out.set(stem, t);
+      }
+    }
+  }
+  SHORT_VARIANTS.set(types, out);
+  return out;
+}
+
+/**
+ * The type a sheet's printed text names (T140, D234): its model or an alias, else a variant cut
+ * short — the drawings print `P-DOC-C-LR` for the alias `P-DOC-C-LR-X` of `P-DOC-C` (as the
+ * server's `plan_analysis.name_keys` keeps it).
+ */
+export function typeOfPrinted(types: DeviceTypes, text: string | null): DeviceType | null {
+  if (!text) return null;
+  return typeOfModel(types, text) ?? shortVariants(types).get(key(text)) ?? null;
+}
+
 /** The accessory-only type (T111) a model names, else null (T126: such a draft is an accessory, never a device). */
 export function accessoryTypeOf(types: DeviceTypes, model: string | null): DeviceType | null {
   const t = typeOfModel(types, model);

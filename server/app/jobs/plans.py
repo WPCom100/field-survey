@@ -6,6 +6,7 @@ pass, delivered to iPads as ops.
     worker: run_queued() → analyse (app.jobs.plan_analysis) → blobs + ops → done | skipped | failed
     python -m app.jobs.plans <project_id> <level_id> <sheet.pdf> [--kind display|source]
         [--user NAME]
+    python -m app.jobs.plans retag <project_id> [--user NAME]     re-read the tags (T140)
 
 One batch is one PDF. A **display** sheet is its first page: the PDF is rewritten with the
 "Source sheet boundaries" optional-content group off (D100) and stored as the sheet's blob, the
@@ -16,6 +17,11 @@ the same blob, text pass only. The same file (SHA-256) for the same level and ki
 imported twice (`skipped`). Room codes and tags are read with the project's
 `vocab(room_code_pattern)` / `vocab(tag_pattern)` rows (T79, D240; none = the Tower's built-in
 patterns); a pattern that does not compile is skipped and listed in the batch's `bad_patterns`.
+The tags also keep every device type the sheet prints beside a device — a model or alias of the
+project's library or the app library (T140, D234). `retag` re-reads the tags of a project's live
+sheets from their stored PDFs after the tag pass or the library changes (the same file is never
+uploaded twice, and a replaced display sheet leaves its pins behind until T77): one `set` of
+`features` per sheet whose tags changed, only `tags` replaced in it.
 Everything is one transaction through the ordinary apply loop
 (`Push`, trusted, the requesting user); a failure leaves the project as it was.
 """
@@ -41,7 +47,7 @@ from app.auth import system_user, upsert_user
 from app.blobs import object_key
 from app.ids import uuid7
 from app.jobs import plan_analysis, runner
-from app.models import Blob, FieldHead, ImportBatch, Level, Project, Sheet, User, Vocab
+from app.models import Blob, FieldHead, ImportBatch, Level, LibraryType, Project, Sheet, User, Vocab
 from app.storage import ObjectStore
 from app.sync import SERVER_INSTALL_ID, OpIn, Push, jsonable
 
@@ -51,6 +57,7 @@ PLANS_KIND = "plans"
 PDF_MIME = "application/pdf"
 CHANGE_TYPE = "Master edit"
 REASON = "Plan sheet upload"
+RETAG_REASON = "Plan sheet tags re-read"
 
 
 def _event(event: str, **data: Any) -> None:
@@ -104,9 +111,10 @@ def create_sheet_batch(
 class _Ops:
     """Trusted ops stamped by the requesting user from the server's install (as D127 does)."""
 
-    def __init__(self, project_id: uuid.UUID, user_id: uuid.UUID):
+    def __init__(self, project_id: uuid.UUID, user_id: uuid.UUID, reason: str = REASON):
         self.project_id = project_id
         self.user_id = user_id
+        self.reason = reason
         self.ts = datetime.now(UTC)
         self.ops: list[OpIn] = []
 
@@ -119,7 +127,7 @@ class _Ops:
             install_id=SERVER_INSTALL_ID,
             client_ts=self.ts,
             change_type=CHANGE_TYPE,
-            reason=REASON,
+            reason=self.reason,
             **kw,
         )
         self.ops.append(op)
@@ -225,6 +233,19 @@ def project_patterns(
     return patterns, source, bad
 
 
+def library_names(session: Session, project_id: uuid.UUID) -> frozenset[str]:
+    """The device names the text pass reads as printed types (T140, D234): the models and aliases
+    of the project's live library and the app library's, rejected types left out."""
+    rows = session.execute(
+        select(LibraryType.model, LibraryType.aliases).where(
+            (LibraryType.project_id == project_id) | (LibraryType.project_id.is_(None)),
+            LibraryType.deleted_at.is_(None),
+            LibraryType.state != "rejected",
+        )
+    ).all()
+    return plan_analysis.name_keys((r.model, r.aliases) for r in rows)
+
+
 def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> dict[str, Any]:
     """Apply one queued plans batch inside the caller's transaction; returns its stats."""
     if batch.kind != PLANS_KIND:
@@ -270,6 +291,7 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
     user_id = (requester or system_user(session, "import")).id
     ops = _Ops(project.id, user_id)
     patterns, pattern_source, bad_patterns = project_patterns(session, project.id)
+    names = library_names(session, project.id)
     title = Path(str(entry.get("name") or "sheet.pdf")).stem
     pages = range(1) if sheet_kind == "display" else range(plan_analysis.page_count(data))
     sheets: list[dict[str, Any]] = []
@@ -278,7 +300,7 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
     for i in pages:
         try:
             a = plan_analysis.analyse_sheet(
-                data, i, boundaries=sheet_kind == "display", patterns=patterns
+                data, i, boundaries=sheet_kind == "display", patterns=patterns, names=names
             )
         except plan_analysis.SheetTooLarge as e:
             raise runner.ImportError_(str(e)) from e
@@ -368,6 +390,67 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
     return stats
 
 
+def retag_sheets(
+    session: Session, store: ObjectStore, project_id: uuid.UUID, user_id: uuid.UUID
+) -> dict[str, Any]:
+    """Re-read the tags of the project's live sheets from their stored PDFs with its patterns and
+    library (T140): a sheet whose tags changed gets one `set` of `features` with only `tags`
+    replaced (rooms, bubbles and boundaries as stored), through the ordinary apply loop; the
+    caller commits. Returns what changed per sheet."""
+    patterns, _, bad_patterns = project_patterns(session, project_id)
+    names = library_names(session, project_id)
+    sheets = session.scalars(
+        select(Sheet)
+        .join(Level, Level.id == Sheet.level_id)
+        .where(
+            Level.project_id == project_id,
+            Sheet.deleted_at.is_(None),
+            Sheet.blob.is_not(None),
+        )
+        .order_by(Sheet.blob, Sheet.page)
+    ).all()
+    ops = _Ops(project_id, user_id, RETAG_REASON)
+    out: list[dict[str, Any]] = []
+    data, data_sha = b"", None
+    for sheet in sheets:
+        if sheet.blob != data_sha:  # one PDF in memory at a time; a source PDF's pages share it
+            data, data_sha = store.read(object_key(sheet.blob)), sheet.blob
+        tags = plan_analysis.sheet_tags(data, (sheet.page or 1) - 1, patterns=patterns, names=names)
+        old = dict(sheet.features or {})
+        before = old.get("tags") or []
+        if before == tags:
+            continue
+        ops.set(
+            "sheet",
+            sheet.id,
+            "features",
+            old,
+            {**old, "tags": tags},
+            _head(session, sheet.id, "features"),
+        )
+        out.append(
+            {"id": str(sheet.id), "title": sheet.title, "before": len(before), "after": len(tags)}
+        )
+    seq = None
+    if ops.ops:
+        push = Push(session, _Body(project_id), trusted=True)
+        res = push.run(ops.ops)
+        not_applied = [r for r in res.results if r.outcome != "applied"]
+        if not_applied:
+            raise runner.ImportError_(
+                f"{len(not_applied)} ops did not apply: "
+                + ", ".join(f"{r.op_id} {r.outcome}" for r in not_applied[:5])
+            )
+        seq = push.seq
+    _event("plans_retagged", project=str(project_id), sheets=len(sheets), changed=len(out))
+    return {
+        "sheets": len(sheets),
+        "changed": out,
+        "bad_patterns": bad_patterns,
+        "last_server_seq": seq,
+    }
+
+
 def run_queued(
     session_factory: runner.SessionFactory, store: ObjectStore, limit: int = 1
 ) -> list[str]:
@@ -382,6 +465,9 @@ def main(argv: list[str] | None = None) -> int:
     from app.db import SessionLocal
     from app.storage import get_object_store
 
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["retag"]:
+        return _retag_main(argv[1:])
     parser = argparse.ArgumentParser(prog="python -m app.jobs.plans")
     parser.add_argument("project_id", type=uuid.UUID)
     parser.add_argument("level_id", type=uuid.UUID)
@@ -412,6 +498,29 @@ def main(argv: list[str] | None = None) -> int:
     with SessionLocal() as s:
         print(json.dumps(runner.batch_out(s.get(ImportBatch, batch.id)), indent=2, default=str))
     return 0 if state in ("done", "skipped") else 1
+
+
+def _retag_main(argv: list[str]) -> int:
+    from app.db import SessionLocal
+    from app.storage import get_object_store
+
+    parser = argparse.ArgumentParser(prog="python -m app.jobs.plans retag")
+    parser.add_argument("project_id", type=uuid.UUID)
+    parser.add_argument("--user", default=None, help="team name to record on the ops")
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    store = get_object_store()
+    with SessionLocal() as s:
+        user = upsert_user(s, args.user) if args.user else system_user(s, "import")
+        try:
+            out = retag_sheets(s, store, args.project_id, user.id)
+        except runner.ImportError_ as e:
+            s.rollback()
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        s.commit()
+    print(json.dumps(out, indent=2, default=str))
+    return 0
 
 
 if __name__ == "__main__":

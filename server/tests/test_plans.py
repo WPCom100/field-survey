@@ -580,7 +580,8 @@ def test_the_job_reads_the_projects_patterns(session, store, factory, monkeypatc
     assert second.stats["patterns"] == {"room_code_pattern": "default", "tag_pattern": "project"}
     [bad] = second.stats["bad_patterns"]
     assert bad["list"] == "tag_pattern" and bad["pattern"] == "P-[A-Z" and bad["error"]
-    assert [rx.pattern for rx in seen[-1].tags] == ["EBDK", r"UFMP\d"]
+    # rows made in one millisecond have no set order (uuid7); any pattern that matches counts
+    assert sorted(rx.pattern for rx in seen[-1].tags) == ["EBDK", r"UFMP\d"]
     assert seen[-1].rooms == pa.DEFAULT_PATTERNS.rooms
 
     out = projects.create_project(

@@ -30,8 +30,9 @@
  * - Place devices (T46, Phase 3 §3.4): "⊕ Place" (or `initialPlacing`, from Setup → 5 Place devices
  *   and Needs review) shows the level's unplaced list in the side panel; a row is selected, then a
  *   tap on the plan (or a drag of its handle onto the plan) chooses the spot, and the confirm form
- *   places it. The sheet's panel tags propose dashed pins for unplaced panels; tapping one selects
- *   it with that spot. Nothing is placed until Place ✓.
+ *   places it. The types and panel tags the sheet prints propose dashed pins for unplaced items
+ *   (T140: stations and sensors too; a guess by role is drawn fainter); tapping one selects it with
+ *   that spot. Nothing is placed until Place ✓.
  * - A pin-position conflict (T26, Phase 3 §6) opened from Needs review (`reviewItemId`) draws
  *   side A solid at the device and side B dashed, both kept out of clusters, with Choose A /
  *   Choose B under the plan. Devices with an open review item have an amber ring (§13).
@@ -524,12 +525,17 @@ export function PlanScreen(props: PlanScreenProps) {
     return m;
   }, [tabData]);
   const placed = useMemo(() => visible.filter((d) => d.pin), [visible]);
-  /** Dashed pins at the sheet's panel tags for unplaced panels (T46); every pinned device's spot counts as taken. */
+  /** Dashed pins where the sheet prints an unplaced item's type or tag (T46, T140); every pinned device's spot counts as taken. */
   const proposals = useMemo((): Proposal[] => {
     if (!placing || !unplaced || !plan?.sheet) return [];
     const pins = plan.devices.filter((d) => d.pin).map((d) => d.pin!);
-    return tagProposals(plan.sheet.features, unplaced.items, pins);
+    return tagProposals(plan.sheet.features, unplaced.items, pins, unplaced.types);
   }, [placing, unplaced, plan]);
+  /** The printed tag behind the chosen spot when it is a guess by role (D234 (3)). */
+  const spotGuess = useMemo(() => {
+    if (!placeKey || !placeSpot) return null;
+    return proposals.find((p) => p.guess && p.itemKey === placeKey && p.at.x === placeSpot.x && p.at.y === placeSpot.y)?.tag ?? null;
+  }, [proposals, placeKey, placeSpot]);
   const renderPins = useMemo(() => {
     const pins = placed.map((d) => toRenderPin(d, pinConflict));
     const conflictDevice = pinConflict ? (plan?.devices.find((d) => d.id === pinConflict.deviceId) ?? null) : null;
@@ -558,7 +564,7 @@ export function PlanScreen(props: PlanScreenProps) {
       for (const p of proposals) {
         const item = itemOf.get(p.itemKey);
         if (!item || (placeKey === p.itemKey && placeSpot && placeSpot.x === p.at.x && placeSpot.y === p.at.y)) continue;
-        pins.push({ id: `${PROPOSAL_PREFIX}${p.key}`, x: p.at.x, y: p.at.y, category: item.category, role: item.role, fill: st.fill, hollow: false, glyph: '?', label: `${item.title}?`, plus: false, isNew: true, photos: 0, rank: 97, ghost: true, solo: true });
+        pins.push({ id: `${PROPOSAL_PREFIX}${p.key}`, x: p.at.x, y: p.at.y, category: item.category, role: item.role, fill: st.fill, hollow: false, glyph: '?', label: p.guess ? `${item.title}? guess` : `${item.title}?`, plus: false, isNew: true, photos: 0, rank: p.guess ? 96 : 97, ghost: true, faint: p.guess, solo: true });
       }
       const sel = placeKey ? itemOf.get(placeKey) : undefined;
       if (placeSpot && sel) {
@@ -1287,6 +1293,8 @@ export function PlanScreen(props: PlanScreenProps) {
               sheetId={plan.sheet.id}
               data={unplaced}
               proposals={proposals.length}
+              guesses={proposals.filter((p) => p.guess).length}
+              spotGuess={spotGuess}
               selectedKey={placeKey}
               spot={placeSpot}
               defaults={

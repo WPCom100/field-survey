@@ -651,6 +651,19 @@ Decision D238 (Proposed): a connection is deleted as one `delete` op on its cabl
 
 Decision D239 (Proposed): Undo / Put back deletes a device placed from a draft (its cable ends go back to waiting for the draft, so placing it again re-links them) and only clears the pin of any other device; the card offers it for every device with a pin, not only those placed from drafts; the reason starts as "Placed by mistake". → Approve / change:
 
+## T140 — Dashed proposals at the type the sheet prints, stations and sensors included  ·  Needs: no new build (JS update; server deploy first, then `plans retag` on the project — TASKS follow-up)
+
+**Why it matters:** on 2026-11-01 Landry found many proposals "very off" and none for stations or sensors on 03, though the drawing prints `PI1104`, `P-LS`, `P-DOC-C-LR`, `EBDK` beside each one. Use a project whose 03 sheet was re-read after the deploy (the `retag` run) and whose 03 has station / sensor drafts or master devices left to place.
+
+- [ ] **Stations and sensors get dashed pins.** Plan 03 → ⊕ Place: dashed "?" pins sit on the `PI1104` / `PI1002` / `PI1004` labels and the `P-DOC-C-LR` / `P-LS` labels, one per label, none on the legend tables at the sheet's edges. → saw:
+- [ ] **One draft, one pin per label.** Pick a station draft with ×n left: it has at most as many dashed pins as the plan prints its model, and no label carries two dashed pins. → saw:
+- [ ] **The right sensor variant.** A `P-DOC-C-LR` draft is never proposed at a `P-DOC-C-SR` label (on 02, where both are printed). → saw:
+- [ ] **Panels at their own tag.** The relay and Foundry panels' pins sit at `CT03LCPA` / `CT03LCPB` or the model printed under them (`ERP24-FT241P`), never at a `UFMP` of another size. → saw:
+- [ ] **Guesses look weaker.** If a pin is fainter (thin, sparse dash) and reads "… ? guess", the panel note counts it ("n faint ones are guesses…"), and tapping it shows "Guess: the sheet prints CT… here, not this model" above Place ✓. Say whether the guesses help or should go. → saw:
+- [ ] **Nothing written by a proposal.** Leave placing without confirming: no device moved, no new device. → saw:
+
+Decision D241 (Proposed): the text pass keeps every library model / alias / short variant printed on the sheet (legends and notes left out), proposals go printed model → type → panel tag → model part for every role, and only a left-over `CT…LCP` tag is guessed, drawn fainter; `plans retag` re-reads stored sheets. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

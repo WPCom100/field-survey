@@ -38,6 +38,8 @@ export type RenderPin = {
   review?: boolean;
   /** Side B of a pin conflict (Phase 3 §6): dashed outline, no fill. */
   ghost?: boolean;
+  /** A ghost drawn fainter: a placement guessed by role alone (T140, D234 (3)). */
+  faint?: boolean;
   /** Never merged into a cluster (both pins of a conflict stay visible). */
   solo?: boolean;
 };

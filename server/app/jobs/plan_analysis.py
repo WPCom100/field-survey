@@ -10,10 +10,11 @@ Pure functions over PDF bytes — no database, no object store — so the whole 
   `residual` is the RMS distance (pt) of every bubble from its label's line — `auto` below
   `AUTO_RESIDUAL_PT`, else `none` (the iPad's three-tap calibration makes it `manual`).
   `packages/core/src/grid.ts` reads the same JSON (`drawing_position` below is its Python twin).
-- `features`: the rest of the text pass — `rooms` (code + name), `tags` (panel / rack tags for
-  T46's pre-placement proposals), `bubbles` (circled labels no set claimed, for manual snapping)
-  and the `boundaries` the composite's "Source sheet boundaries" optional-content group draws
-  (D100), as polylines in sheet coordinates with their sheet labels.
+- `features`: the rest of the text pass — `rooms` (code + name), `tags` (panel / rack tags and
+  the device types printed beside devices, for T46's pre-placement proposals — T140), `bubbles`
+  (circled labels no set claimed, for manual snapping) and the `boundaries` the composite's
+  "Source sheet boundaries" optional-content group draws (D100), as polylines in sheet
+  coordinates with their sheet labels.
 - `display_pdf`: the same PDF with that optional-content group switched **off** in the default
   configuration, so PDFKit no longer paints the magenta and Skia draws the boundaries as a layer
   (D100); `None` when the file has no such group.
@@ -30,6 +31,7 @@ import re
 import statistics
 from array import array
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -705,17 +707,203 @@ def find_rooms(words: list[Word], patterns: Patterns = DEFAULT_PATTERNS) -> list
 
 
 MIN_TAG_SIZE = 4.0
+"""Smaller text is a legend symbol's label or the hairline text of a rack elevation, never the
+label beside a device: the composites print those labels at 5.5 pt, their legend tables at 8 pt
+and the legend symbols at 1–2.3 pt (T140; 06M, Level 02, Level 03)."""
+
+MIN_NAME_LEN = 4
+"""A library model or alias shorter than this (`NET`, `UPS`, `TBD`, `97`) reads as an ordinary word
+on a sheet — the Level 02 composite prints `NET` 142 times — so the text pass does not keep it."""
+
+JOIN_GAP = 0.1
+"""× size: fragments of one line this close are one word (the 03 composite draws `P-DOC` as
+`P`, `-D`, `O`, `C` with no gap between them)."""
+
+LINE_STEP = (0.6, 1.1)
+"""× size: how far below a word the next line of a two-line label sits (`P-DOC` / `C-LR`,
+`ERP24-FT` / `241P`)."""
+
+PROSE_GAP = 0.8
+"""× size: a plain word this close on the same line makes a type part of a note (`… SYSTEM EBDK
+LOCATION IN …`), not a label."""
+
+LEGEND_ROWS = 3
+LEGEND_STEP = 4.5
+"""A column of `LEGEND_ROWS`+ words of one size, centred on one x and at most this many × size
+apart, with two device names in it or headed `Description`, is a legend table ("Device Layout ·
+Description · Quantity"), not devices on the plan: the composites repeat each source sheet's."""
+LEGEND_HEADERS = frozenset({"DESCRIPTION"})
+
+_PLAIN_WORD = re.compile(r"[A-Za-z]{2,}[.,;:]?")
 
 
-def find_tags(words: list[Word], patterns: Patterns = DEFAULT_PATTERNS) -> list[dict[str, Any]]:
-    """Device tags printed on the sheet (panel names, EBDK, Foundry panels, rack components);
-    the hairline text of rack elevations is skipped."""
-    out = []
+def _name_key(s: str) -> str:
+    return "".join(s.split()).upper()
+
+
+def name_keys(types: Iterable[tuple[str | None, Sequence[Any] | None]]) -> frozenset[str]:
+    """The device types a sheet may print beside a device (T140, D234): every model and alias of
+    the project's live library, keyed as the library matches them (spaces and case ignored), and
+    each **variant cut short** — an alias that extends the model with `-` parts names a variant
+    (`P-DOC-C-LR-X` of `P-DOC-C`), and the drawings print it without its last parts
+    (`P-DOC-C-LR`). Names shorter than `MIN_NAME_LEN` or without a letter are left out."""
+    out: set[str] = set()
+    for model, aliases in types:
+        m = _name_key(model or "")
+        for k in [m, *(_name_key(a) for a in aliases or [] if isinstance(a, str))]:
+            out.add(k)
+            if m and k.startswith(m + "-"):
+                rest = k[len(m) + 1 :].split("-")
+                out.update(m + "-" + "-".join(rest[:i]) for i in range(1, len(rest)))
+    return frozenset(k for k in out if len(k) >= MIN_NAME_LEN and re.search("[A-Z]", k))
+
+
+def _merge(a: Word, b: Word, text: str) -> Word:
+    x0, y0 = min(a.x0, b.x0), min(a.y0, b.y0)
+    x1, y1 = max(a.x1, b.x1), max(a.y1, b.y1)
+    return Word(text, (x0 + x1) / 2, (y0 + y1) / 2, x0, y0, x1, y1, a.size, a.upright)
+
+
+def _join_fragments(words: list[Word]) -> list[Word]:
+    """Glue the fragments of one word back together: upright words of one size on one baseline
+    that touch, one of them at most two characters long (`P` + `-D` + `O` + `C` → `P-DOC`)."""
+    rows: dict[tuple[float, float], list[Word]] = defaultdict(list)
+    out: list[Word] = []
     for w in words:
-        if w.size >= MIN_TAG_SIZE and _any_match(patterns.tags, w.text):
-            out.append(
-                {"text": w.text, "x": round(w.x, 1), "y": round(w.y, 1), "size": round(w.size, 1)}
+        if w.upright:
+            rows[(round(w.size, 1), round(w.y, 1))].append(w)
+        else:
+            out.append(w)
+    for row in rows.values():
+        row.sort(key=lambda w: w.x0)
+        cur = row[0]
+        for w in row[1:]:
+            touching = abs(w.x0 - cur.x1) <= JOIN_GAP * cur.size
+            if touching and (len(w.text) <= 2 or len(cur.text) <= 2):
+                cur = _merge(cur, w, cur.text + w.text)
+            else:
+                out.append(cur)
+                cur = w
+        out.append(cur)
+    return out
+
+
+class _Near:
+    """Words bucketed by position, for the neighbours of one word."""
+
+    CELL = 24.0
+
+    def __init__(self, words: list[Word]):
+        self.cells: dict[tuple[int, int], list[Word]] = defaultdict(list)
+        for w in words:
+            self.cells[(int(w.x // self.CELL), int(w.y // self.CELL))].append(w)
+
+    def around(self, w: Word, reach: float) -> list[Word]:
+        n = int(reach // self.CELL) + 1
+        cx, cy = int(w.x // self.CELL), int(w.y // self.CELL)
+        return [
+            o
+            for i in range(cx - n, cx + n + 1)
+            for j in range(cy - n, cy + n + 1)
+            for o in self.cells.get((i, j), ())
+            if o is not w
+        ]
+
+
+def _is_kept(text: str, patterns: Patterns, names: frozenset[str]) -> bool:
+    return _name_key(text) in names or _any_match(patterns.tags, text)
+
+
+def _join_lines(words: list[Word], names: frozenset[str]) -> list[Word]:
+    """A type printed over two lines (`P-DOC` / `C-LR`, `ERP24-FT` / `241P`) is one word when the
+    two lines, run together with or without a `-`, are a library name."""
+    near = _Near(words)
+    used: set[int] = set()
+    joined: list[Word] = []
+    for a in words:
+        if id(a) in used or not a.upright:
+            continue
+        for b in near.around(a, LINE_STEP[1] * a.size):
+            if id(b) in used or not b.upright or abs(b.size - a.size) > 0.1:
+                continue
+            step = (b.y - a.y) / a.size
+            aligned = abs(b.x - a.x) <= 0.6 * a.size or abs(b.x0 - a.x0) <= 0.2 * a.size
+            if not (LINE_STEP[0] <= step <= LINE_STEP[1] and aligned):
+                continue
+            text = next(
+                (t for t in (a.text + b.text, f"{a.text}-{b.text}") if _name_key(t) in names),
+                None,
             )
+            if text:
+                used.update((id(a), id(b)))
+                joined.append(_merge(a, b, text))
+                break
+    return [w for w in words if id(w) not in used] + joined
+
+
+def _in_prose(w: Word, near: _Near, patterns: Patterns, names: frozenset[str]) -> bool:
+    for o in near.around(w, w.x1 - w.x0 + (PROSE_GAP + 8) * w.size):
+        if abs(o.size - w.size) > 0.1 or abs(o.y - w.y) > 0.2 * w.size:
+            continue
+        gap = max(o.x0 - w.x1, w.x0 - o.x1)
+        if -0.1 * w.size <= gap <= PROSE_GAP * w.size and _PLAIN_WORD.fullmatch(o.text):
+            if not _is_kept(o.text.rstrip(".,;:"), patterns, names):
+                return True
+    return False
+
+
+def _legend(kept: list[Word], near: _Near) -> set[int]:
+    """The kept words that stand in a legend table's device column: a column of `LEGEND_ROWS`+
+    words of one size centred on one x, rows at most `LEGEND_STEP` × size apart (its header
+    counts), holding two kept words or more — or any column under a `Description` header (a
+    legend of one row on the Level 02 composite)."""
+    out: set[int] = set()
+    seen: set[int] = set()
+    for k in kept:
+        if id(k) in seen:
+            continue
+        col, todo = {id(k): k}, [k]
+        while todo:
+            w = todo.pop()
+            for o in near.around(w, LEGEND_STEP * w.size):
+                if id(o) in col or abs(o.size - k.size) > 0.1 or abs(o.x - w.x) > 1.0:
+                    continue
+                if abs(o.y - w.y) <= LEGEND_STEP * k.size:
+                    col[id(o)] = o
+                    todo.append(o)
+        mine = [w for w in kept if id(w) in col]
+        seen.update(id(w) for w in mine)
+        headed = any(w.text.upper() in LEGEND_HEADERS for w in col.values())
+        if headed or (len(col) >= LEGEND_ROWS and len(mine) >= 2):
+            out.update(id(w) for w in mine)
+    return out
+
+
+def find_tags(
+    words: list[Word],
+    patterns: Patterns = DEFAULT_PATTERNS,
+    names: frozenset[str] = frozenset(),
+) -> list[dict[str, Any]]:
+    """What the sheet prints beside its devices: tags matching the project's tag patterns (panel
+    names, EBDK, Foundry panels, rack components) and — T140, D234 — every word that is a model or
+    alias of a library type (`names`, from `name_keys`: `PI1104`, `P-LS`, `P-DOC-C-LR`, `UFMP4`).
+    A type split into fragments or over two lines is joined; a word in a sentence of a note, a
+    legend table's device column and the hairline text of rack elevations and legend symbols are
+    left out."""
+    pieces = _join_fragments([w for w in words if w.size >= MIN_TAG_SIZE])
+    joined = _join_lines(pieces, names) if names else pieces
+    near = _Near(joined)
+    kept = [
+        w
+        for w in joined
+        if _is_kept(w.text, patterns, names) and not _in_prose(w, near, patterns, names)
+    ]
+    legend = _legend(kept, near)
+    out = [
+        {"text": w.text, "x": round(w.x, 1), "y": round(w.y, 1), "size": round(w.size, 1)}
+        for w in kept
+        if id(w) not in legend
+    ]
     out.sort(key=lambda t: (t["text"], t["y"], t["x"]))
     return out
 
@@ -968,6 +1156,21 @@ class SheetAnalysis:
     stats: dict[str, Any] = field(default_factory=dict)
 
 
+def sheet_tags(
+    data: bytes,
+    page_index: int = 0,
+    *,
+    patterns: Patterns = DEFAULT_PATTERNS,
+    names: frozenset[str] = frozenset(),
+) -> list[dict[str, Any]]:
+    """The tag pass alone over one page, for a sheet already stored (`plans.retag_sheets`, T140)."""
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        page = pdf.pages[page_index]
+        _read_page(pdf, page)
+        words = _page_words(page)
+    return find_tags(words, patterns, names)
+
+
 def page_count(data: bytes) -> int:
     return len(PdfReader(io.BytesIO(data)).pages)
 
@@ -978,9 +1181,11 @@ def analyse_sheet(
     *,
     boundaries: bool = True,
     patterns: Patterns = DEFAULT_PATTERNS,
+    names: frozenset[str] = frozenset(),
 ) -> SheetAnalysis:
     """The whole text pass over one page. `boundaries=False` skips the OCG work (source sheets);
-    `patterns` are the project's room-code and tag patterns (D240)."""
+    `patterns` are the project's room-code and tag patterns (D240), `names` the device names of
+    its library (`name_keys`, T140)."""
     reader = PdfReader(io.BytesIO(data))
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         page = pdf.pages[page_index]
@@ -996,7 +1201,7 @@ def analyse_sheet(
         if id(b) not in taken and rings.around(b.x, b.y)
     ]
     rooms = find_rooms(words, patterns)
-    tags = find_tags(words, patterns)
+    tags = find_tags(words, patterns, names)
     lines, labels, found = extract_boundaries(reader, page_index) if boundaries else ([], [], False)
     display = write_display_pdf(reader) if boundaries and found else None
     features = {

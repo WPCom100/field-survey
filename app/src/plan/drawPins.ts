@@ -83,15 +83,16 @@ function drawPin(canvas: SkCanvas, pin: RenderPin, x: number, y: number, fonts: 
   if (pin.ghost) {
     paint.setStyle(PaintStyle.Fill);
     paint.setColor(Skia.Color(HALO));
-    paint.setAlphaf(0.7);
+    paint.setAlphaf(pin.faint ? 0.35 : 0.7);
     canvas.drawPath(shape, paint);
-    paint.setAlphaf(1);
     paint.setStyle(PaintStyle.Stroke);
-    paint.setStrokeWidth(2.5);
+    paint.setStrokeWidth(pin.faint ? 1.5 : 2.5);
     paint.setColor(Skia.Color(pin.fill));
-    paint.setPathEffect(Skia.PathEffect.MakeDash([5, 4], 0));
+    paint.setAlphaf(pin.faint ? 0.5 : 1);
+    paint.setPathEffect(Skia.PathEffect.MakeDash(pin.faint ? [2, 5] : [5, 4], 0));
     canvas.drawPath(shape, paint);
     paint.setPathEffect(null);
+    paint.setAlphaf(1);
   } else if (pin.hollow) {
     paint.setStyle(PaintStyle.Fill);
     paint.setColor(Skia.Color(HALO));
