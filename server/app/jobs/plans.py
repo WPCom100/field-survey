@@ -6,24 +6,30 @@ pass, delivered to iPads as ops.
     worker: run_queued() → analyse (app.jobs.plan_analysis) → blobs + ops → done | skipped | failed
     python -m app.jobs.plans <project_id> <level_id> <sheet.pdf> [--kind display|source]
         [--user NAME]
-    python -m app.jobs.plans retag <project_id> [--user NAME]     re-read the tags (T140)
+    python -m app.jobs.plans retag <project_id> [--user NAME]      re-read the tags (T140)
+    python -m app.jobs.plans rasterise <project_id> [--user NAME]  heavy stored sheets (T141)
 
 One batch is one PDF. A **display** sheet is its first page: the PDF is rewritten with the
 "Source sheet boundaries" optional-content group off (D100) and stored as the sheet's blob, the
 level's `display_sheet_id` is set to the new sheet (the previous display sheet, if any, is
 soft-deleted — pins placed on it keep its id and show as "elsewhere" until moved, see TASKS), and
-the boundaries are kept in `sheet.features`. A **source** PDF gives one `sheet` per page, all on
-the same blob, text pass only. The same file (SHA-256) for the same level and kind is not
-imported twice (`skipped`). Room codes and tags are read with the project's
-`vocab(room_code_pattern)` / `vocab(tag_pattern)` rows (T79, D240; none = the Tower's built-in
-patterns); a pattern that does not compile is skipped and listed in the batch's `bad_patterns`.
-The tags also keep every device type the sheet prints beside a device — a model or alias of the
-project's library or the app library (T140, D234). `retag` re-reads the tags of a project's live
-sheets from their stored PDFs after the tag pass or the library changes (the same file is never
-uploaded twice, and a replaced display sheet leaves its pins behind until T77): one `set` of
-`features` per sheet whose tags changed, only `tags` replaced in it.
-Everything is one transaction through the ordinary apply loop
-(`Push`, trusted, the requesting user); a failure leaves the project as it was.
+the boundaries are kept in `sheet.features`. A display sheet drawing more than
+`plan_raster.RASTER_MIN_OBJECTS` page objects is **rasterised** (T141, D233, D242): the sheet's
+blob is a one-page image PDF of the same CropBox, and the vector PDF is kept beside it as
+`features.raster.vector_blob`, which the text pass, `retag` and the floor PDF read. A **source**
+PDF gives one `sheet` per page, all on the same blob, text pass only. The same file (SHA-256) for
+the same level and kind is not imported twice (`skipped`). Room codes and tags are read with the
+project's `vocab(room_code_pattern)` / `vocab(tag_pattern)` rows (T79, D240; none = the Tower's
+built-in patterns); a pattern that does not compile is skipped and listed in the batch's
+`bad_patterns`. The tags also keep every device type the sheet prints beside a device — a model
+or alias of the project's library or the app library (T140, D234). `retag` re-reads the tags of
+a project's live sheets from their stored PDFs after the tag pass or the library changes (the
+same file is never uploaded twice, and a replaced display sheet leaves its pins behind until
+T77): one `set` of `features` per sheet whose tags changed, only `tags` replaced in it.
+`rasterise` does for the display sheets already stored what an upload now does (T141): a heavy
+one gets the raster as its blob and `features.raster`, through ops, so the iPads download the new
+sheet; pins stay put. Everything is one transaction through the ordinary apply loop (`Push`,
+trusted, the requesting user); a failure leaves the project as it was.
 """
 
 from __future__ import annotations
@@ -35,10 +41,13 @@ import json
 import logging
 import sys
 import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import pypdfium2 as pdfium
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -46,7 +55,7 @@ from app import vocab
 from app.auth import system_user, upsert_user
 from app.blobs import object_key
 from app.ids import uuid7
-from app.jobs import plan_analysis, runner
+from app.jobs import plan_analysis, plan_raster, runner
 from app.models import Blob, FieldHead, ImportBatch, Level, LibraryType, Project, Sheet, User, Vocab
 from app.storage import ObjectStore
 from app.sync import SERVER_INSTALL_ID, OpIn, Push, jsonable
@@ -58,6 +67,7 @@ PDF_MIME = "application/pdf"
 CHANGE_TYPE = "Master edit"
 REASON = "Plan sheet upload"
 RETAG_REASON = "Plan sheet tags re-read"
+RASTER_REASON = "Plan sheet rasterised"
 
 
 def _event(event: str, **data: Any) -> None:
@@ -202,6 +212,51 @@ def _store_blob(session: Session, store: ObjectStore, data: bytes) -> tuple[str,
     return sha, True
 
 
+@dataclass
+class DisplayRaster:
+    """What `raster_display` made of a display sheet: the raster PDF (None = keep the vector
+    sheet) and the batch stats."""
+
+    pdf: bytes | None
+    stats: dict[str, Any]
+    dpi: float = 0.0
+    objects: int = 0
+
+    def feature(self, vector_sha: str) -> dict[str, Any]:
+        """`sheet.features.raster`: where the vector original is, and how the raster was made."""
+        return {"vector_blob": vector_sha, "dpi": round(self.dpi, 1), "objects": self.objects}
+
+
+def raster_display(display: bytes) -> DisplayRaster:
+    """The display sheet rasterised when it draws more than `RASTER_MIN_OBJECTS` page objects
+    (T141, D242). A PDF pdfium cannot count or render keeps its vector sheet (the text pass
+    already read it); the stats say why."""
+    try:
+        objects = plan_raster.page_objects(display)
+    except (pdfium.PdfiumError, OSError, ValueError) as e:
+        return DisplayRaster(None, {"objects": None, "raster": None, "raster_error": str(e)})
+    if objects <= plan_raster.RASTER_MIN_OBJECTS:
+        return DisplayRaster(None, {"objects": objects, "raster": None}, objects=objects)
+    try:
+        r = plan_raster.rasterise(display)
+    except (pdfium.PdfiumError, OSError, ValueError) as e:
+        log.warning(json.dumps({"event": "plans_raster_failed", "error": str(e)}))
+        return DisplayRaster(
+            None, {"objects": objects, "raster": None, "raster_error": str(e)}, objects=objects
+        )
+    stats = {
+        "objects": objects,
+        "raster": {
+            "dpi": round(r.dpi, 1),
+            "px": [r.width_px, r.height_px],
+            "tiles": r.tiles,
+            "bytes": len(r.pdf),
+            "vector_bytes": len(display),
+        },
+    }
+    return DisplayRaster(r.pdf, stats, r.dpi, objects)
+
+
 PATTERN_LISTS = ("room_code_pattern", "tag_pattern")
 
 
@@ -304,8 +359,19 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
             )
         except plan_analysis.SheetTooLarge as e:
             raise runner.ImportError_(str(e)) from e
+        features = a.features
+        raster_stats: dict[str, Any] = {}
         if sheet_kind == "display":
-            sha, stored = _store_blob(session, store, a.display_pdf or data)
+            display = a.display_pdf or data
+            raster = raster_display(display)
+            raster_stats = raster.stats
+            if raster.pdf is not None:
+                vector_sha, stored = _store_blob(session, store, display)
+                blobs_stored += int(stored)
+                sha, stored = _store_blob(session, store, raster.pdf)
+                features = {**features, "raster": raster.feature(vector_sha)}
+            else:
+                sha, stored = _store_blob(session, store, display)
         else:
             if source_sha is None:
                 source_sha, stored = _store_blob(session, store, data)
@@ -324,7 +390,7 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
                 "width_pt": round(a.width_pt, 2),
                 "height_pt": round(a.height_pt, 2),
                 "grid_sets": a.grid_sets,
-                "features": a.features,
+                "features": features,
                 "revision": None,
             },
         )
@@ -333,6 +399,7 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
                 "id": str(sheet_id),
                 "page": a.page,
                 **a.stats,
+                **raster_stats,
                 "residuals": [s["residual"] for s in a.grid_sets],
             }
         )
@@ -393,10 +460,10 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
 def retag_sheets(
     session: Session, store: ObjectStore, project_id: uuid.UUID, user_id: uuid.UUID
 ) -> dict[str, Any]:
-    """Re-read the tags of the project's live sheets from their stored PDFs with its patterns and
-    library (T140): a sheet whose tags changed gets one `set` of `features` with only `tags`
-    replaced (rooms, bubbles and boundaries as stored), through the ordinary apply loop; the
-    caller commits. Returns what changed per sheet."""
+    """Re-read the tags of the project's live sheets from their stored PDFs (the vector original
+    of a rasterised sheet, T141) with its patterns and library (T140): a sheet whose tags changed
+    gets one `set` of `features` with only `tags` replaced (rooms, bubbles and boundaries as
+    stored), through the ordinary apply loop; the caller commits. Returns what changed per sheet."""
     patterns, _, bad_patterns = project_patterns(session, project_id)
     names = library_names(session, project_id)
     sheets = session.scalars(
@@ -413,8 +480,9 @@ def retag_sheets(
     out: list[dict[str, Any]] = []
     data, data_sha = b"", None
     for sheet in sheets:
-        if sheet.blob != data_sha:  # one PDF in memory at a time; a source PDF's pages share it
-            data, data_sha = store.read(object_key(sheet.blob)), sheet.blob
+        vector = plan_raster.vector_blob(sheet.blob, sheet.features)
+        if vector != data_sha:  # one PDF in memory at a time; a source PDF's pages share it
+            data, data_sha = store.read(object_key(vector)), vector
         tags = plan_analysis.sheet_tags(data, (sheet.page or 1) - 1, patterns=patterns, names=names)
         old = dict(sheet.features or {})
         before = old.get("tags") or []
@@ -451,6 +519,64 @@ def retag_sheets(
     }
 
 
+def rasterise_sheets(
+    session: Session, store: ObjectStore, project_id: uuid.UUID, user_id: uuid.UUID
+) -> dict[str, Any]:
+    """Rasterise the project's live display sheets stored before T141 that draw more than
+    `RASTER_MIN_OBJECTS` page objects: per sheet a `set` of `blob` (the raster) and of
+    `features` (`raster` added, with the old blob as `vector_blob`), through the ordinary apply
+    loop; the caller commits. A sheet already rasterised is left alone, so a second run changes
+    nothing."""
+    sheets = session.scalars(
+        select(Sheet)
+        .join(Level, Level.id == Sheet.level_id)
+        .where(
+            Level.project_id == project_id,
+            Sheet.kind == "display",
+            Sheet.deleted_at.is_(None),
+            Sheet.blob.is_not(None),
+        )
+        .order_by(Level.floor_order, Sheet.id)
+    ).all()
+    ops = _Ops(project_id, user_id, RASTER_REASON)
+    done: list[dict[str, Any]] = []
+    kept: list[dict[str, Any]] = []
+    for sheet in sheets:
+        old = dict(sheet.features or {})
+        if old.get("raster"):
+            continue
+        assert sheet.blob is not None
+        r = raster_display(store.read(object_key(sheet.blob)))
+        row = {"id": str(sheet.id), "title": sheet.title, **r.stats}
+        if r.pdf is None:
+            kept.append(row)
+            continue
+        sha, _ = _store_blob(session, store, r.pdf)
+        ops.set("sheet", sheet.id, "blob", sheet.blob, sha, _head(session, sheet.id, "blob"))
+        ops.set(
+            "sheet",
+            sheet.id,
+            "features",
+            old,
+            {**old, "raster": r.feature(sheet.blob)},
+            _head(session, sheet.id, "features"),
+        )
+        done.append(row)
+    seq = None
+    if ops.ops:
+        push = Push(session, _Body(project_id), trusted=True)
+        res = push.run(ops.ops)
+        not_applied = [r for r in res.results if r.outcome != "applied"]
+        if not_applied:
+            raise runner.ImportError_(
+                f"{len(not_applied)} ops did not apply: "
+                + ", ".join(f"{r.op_id} {r.outcome}" for r in not_applied[:5])
+            )
+        seq = push.seq
+    _event("plans_rasterised", project=str(project_id), sheets=len(sheets), rasterised=len(done))
+    return {"sheets": len(sheets), "rasterised": done, "kept": kept, "last_server_seq": seq}
+
+
 def run_queued(
     session_factory: runner.SessionFactory, store: ObjectStore, limit: int = 1
 ) -> list[str]:
@@ -467,7 +593,9 @@ def main(argv: list[str] | None = None) -> int:
 
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["retag"]:
-        return _retag_main(argv[1:])
+        return _project_main("retag", retag_sheets, argv[1:])
+    if argv[:1] == ["rasterise"]:
+        return _project_main("rasterise", rasterise_sheets, argv[1:])
     parser = argparse.ArgumentParser(prog="python -m app.jobs.plans")
     parser.add_argument("project_id", type=uuid.UUID)
     parser.add_argument("level_id", type=uuid.UUID)
@@ -500,11 +628,15 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if state in ("done", "skipped") else 1
 
 
-def _retag_main(argv: list[str]) -> int:
+def _project_main(
+    command: str,
+    job: Callable[[Session, ObjectStore, uuid.UUID, uuid.UUID], dict[str, Any]],
+    argv: list[str],
+) -> int:
     from app.db import SessionLocal
     from app.storage import get_object_store
 
-    parser = argparse.ArgumentParser(prog="python -m app.jobs.plans retag")
+    parser = argparse.ArgumentParser(prog=f"python -m app.jobs.plans {command}")
     parser.add_argument("project_id", type=uuid.UUID)
     parser.add_argument("--user", default=None, help="team name to record on the ops")
     args = parser.parse_args(argv)
@@ -513,7 +645,7 @@ def _retag_main(argv: list[str]) -> int:
     with SessionLocal() as s:
         user = upsert_user(s, args.user) if args.user else system_user(s, "import")
         try:
-            out = retag_sheets(s, store, args.project_id, user.id)
+            out = job(s, store, args.project_id, user.id)
         except runner.ImportError_ as e:
             s.rollback()
             print(f"error: {e}", file=sys.stderr)

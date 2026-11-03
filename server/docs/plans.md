@@ -13,7 +13,8 @@ iPad: Setup ▸ 3 Sources ▸ Floor plans ▸ Choose… (a PDF from Files)
   → import_batch(kind="plans", job_state="queued"); the PDF is kept at imports/<batch>/<name>
 worker: plans.run_queued() → runner.run_batch(job=plans.import_sheets)
   → plan_analysis.analyse_sheet() per page
-  → blob: the display PDF rewritten with the boundary OCG off (D100), or the source PDF as is
+  → blob: the display PDF rewritten with the boundary OCG off (D100), or the source PDF as is;
+       a display sheet over 400,000 page objects: its raster, the vector PDF kept beside it (T141)
   → ops through Push (trusted, the requesting user, change type Master edit, reason "Plan sheet upload"):
        create sheet {level_id, kind, blob, page, title, width_pt, height_pt, grid_sets, features}
        display only: set level.display_sheet_id (base_op_id = the field head), delete the old display sheet
@@ -38,6 +39,37 @@ tags re-read") with only `tags` replaced; the rest of `features`, the grid sets 
 It prints what changed per sheet (`before` / `after` tag counts); a second run changes nothing.
 On the Droplet: `docker compose exec -T worker python -m app.jobs.plans retag <project_id>`
 (minutes per composite: the pass reads every word of the page).
+
+## Rasterised display sheets (T141, D233, D242)
+
+PDFKit walks every object of a vector page for each tile it draws, at every zoom: the Level 03
+composite (2.0 million page objects, 12.8 × the 06M sheet that passed TP-6) loads slowly and lags
+while panning. So a **display** sheet whose page draws more than `RASTER_MIN_OBJECTS` = 400,000
+page objects (paths, text runs, images, shadings, form contents — `plan_raster.page_objects`) is
+stored as a **raster**: `plan_raster.rasterise` renders the OCG-off display PDF with pdfium at
+`RASTER_DPI` = 200 (lowered so the image stays within `RASTER_MAX_PIXELS` = 250 MP: Level 02 at
+159 dpi) in bands of 2,048 rows, cuts 512-px JPEG tiles (quality 75, each with one pixel of its
+right and bottom neighbours so no seam shows), and writes a one-page PDF of those image XObjects
+whose MediaBox and CropBox are the vector page's CropBox and whose /Rotate is the same. The sheet's
+size, sheet coordinates, pins, ink and grid sets are therefore unchanged, and the viewer stays
+PDFKit. Measurements: `docs/perf/t141.md` (03: 24 MB, made in ~13 s on the PC, ~1 GB peak; pdfium
+draws it at fit in 0.5 s against 7.4 s for the vector page).
+
+- `sheet.blob` is the raster — what the iPads download and open. The vector PDF is stored too, as
+  `features.raster = {"vector_blob": <sha>, "dpi": 200.0, "objects": 1999744}`;
+  `plan_raster.vector_blob(sheet.blob, sheet.features)` is how the server reads the vector page:
+  `retag` and the floor PDF's plan snapshot and crops do. The text pass of an upload runs on the
+  vector PDF before any raster is made. Source sheets are never rasterised.
+- The batch stats carry, per sheet, `objects` and `raster` (`dpi`, `px`, `tiles`, `bytes`,
+  `vector_bytes`, or `null` for a vector sheet); a PDF pdfium cannot render keeps its vector sheet
+  with `raster_error`.
+- **Sheets stored before T141**: `python -m app.jobs.plans rasterise <project> [--user NAME]` does
+  the same for every live display sheet of the project not yet rasterised: one `set` of `blob` and
+  one of `features` (`raster` added; change type Master edit, reason "Plan sheet rasterised"), so
+  the iPads pull the change and prefetch the new sheet (until it is down, the plan offers "⤓
+  Download plan now"). Pins stay where they are. A second run changes nothing; a sheet under the
+  threshold is listed as `kept` with its count. On the Droplet: `docker compose exec -T worker
+  python -m app.jobs.plans rasterise <project_id>`.
 
 ## The text pass (`plan_analysis.analyse_sheet`)
 
@@ -172,3 +204,9 @@ old sheet, a source PDF → one sheet per page), refused uploads, the `/imports`
 the 06M, Level 02 and Level 03 composites with the catalogue's rows for what they print (each
 skipped when its fixture is missing; the 02 and 03 composites are ~15 MB each and read for about
 three minutes together); the job passing the project's and the app library's names; `retag`.
+`tests/test_plan_raster.py` (T141): the raster keeps the CropBox, MediaBox and /Rotate and draws a
+square where the vector page does (rotated or not), images only; no seams between tiles at
+fractional zooms; the pixel cap; page objects inside forms; the job storing a heavy sheet as a
+raster with the vector beside it (and a light one as before); `rasterise` on stored sheets, a
+second run, and `retag` reading the vector; 06M stays vector and 03 is rasterised on its CropBox
+(each skipped when its fixture is missing).

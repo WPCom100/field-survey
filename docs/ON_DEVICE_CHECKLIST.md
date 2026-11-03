@@ -664,6 +664,21 @@ Decision D239 (Proposed): Undo / Put back deletes a device placed from a draft (
 
 Decision D241 (Proposed): the text pass keeps every library model / alias / short variant printed on the sheet (legends and notes left out), proposals go printed model → type → panel tag → model part for every role, and only a left-over `CT…LCP` tag is guessed, drawn fainter; `plans retag` re-reads stored sheets. → Approve / change:
 
+## T141 — Heavy plan sheets open fast and pan smoothly (03 rasterised)  ·  Needs: no new build (JS update; server deploy first, then `plans rasterise` on the project — TASKS follow-up)
+
+**Why it matters:** on 2026-11-01 the 03 composite was "very slow to load and lags when moving around", in placing and in the survey tab. The server now stores a sheet that heavy as a 200-dpi picture of itself at the same size (D233), so the iPad no longer redraws two million lines on every zoom step. Numbers go in `docs/perf/t141.md` §On the iPad. Use a project with 03 (and 06M if it has one) uploaded; the timings come from the Metro / DevTools log or Sync → Export log, line `[plan] sheet_loaded {"ms":…}`.
+
+- [ ] **Before (optional, if you can do it before the `rasterise` run).** Open plan 03 from cold (close the app first): note the `sheet_loaded` ms, how long until the whole plan is drawn, and how panning / pinching feels. Do the same on 06M. → saw:
+- [ ] **The new sheet arrives.** After the `rasterise` run, sync (Wi-Fi): 03's plan downloads again on its own (or shows "Plan not downloaded … ⤓ Download plan now" briefly — tap it). The pins, ink and boundaries sit exactly where they were, on the same rooms and devices. → saw:
+- [ ] **Opens fast.** Close the app, open plan 03: the whole sheet is drawn in about the time 06M takes; write down the `sheet_loaded` ms and the seconds until drawn. → saw:
+- [ ] **Pans and zooms smoothly.** Pan across the sheet and pinch in and out at fit, mid and full zoom: no stalls, the picture sharpens within a moment after a zoom, pins stay glued. The survey tab (device card open) feels the same. → saw:
+- [ ] **Readable at full zoom.** Zoom all the way in on a station or sensor label (`PI1104`, `P-DOC-C-LR`) and on a room name: the text is legible (slightly soft is fine, blurry is not); no thin lines or seams across the plan where the picture's tiles meet. → saw:
+- [ ] **Memory.** Open 03 and stay at fit for a minute, then zoom in and out ten times: the app does not quit or reload. (Dev client: Perf Monitor RAM at fit and after the zooms.) → saw:
+- [ ] **06M unchanged.** Plan 06M still looks and behaves as before (it stays vector: under the threshold). → saw:
+- [ ] **Floor PDF still sharp.** Export a floor PDF for 03: the plan snapshot and the device crops are as crisp as before (they read the vector original). → saw:
+
+Decision D242 (Proposed): a display sheet over 400,000 page objects is stored as a 200-dpi raster (at most 250 megapixels; 512-px JPEG tiles, quality 75; same CropBox and rotation), the vector original kept beside it for the text pass, `retag` and the floor PDF; `plans rasterise` converts sheets stored earlier; T17b only if this is not enough. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

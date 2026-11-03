@@ -96,6 +96,7 @@ import type { JumpTarget } from '../card/model';
 import { NOT_WIRED } from '../card/proposals';
 import { ruleDecider } from '../rules/engine';
 import { useRulesVersion } from '../rules/useRulesVersion';
+import { logTo } from '../log';
 import { LIST_ENTITY } from '../rulings/model';
 import type { PhotoTarget } from '../photo/model';
 import { PhotoFlow, pickFromLibrary, type PhotoRequest } from '../photo/PhotoFlow';
@@ -611,6 +612,11 @@ export function PlanScreen(props: PlanScreenProps) {
 
   // `sheetTick` re-reads the cache after "Download plan".
   const sheetUri = useMemo(() => (plan?.sheet ? resolveSheetUri(plan.sheet) : null), [plan, resolveSheetUri, sheetTick]);
+  // When the viewer was handed the sheet, for the load time in the plan log (T141).
+  const sheetOpenedAt = useRef(0);
+  useEffect(() => {
+    if (sheetUri) sheetOpenedAt.current = Date.now();
+  }, [sheetUri]);
   const downloadSheet = useCallback(() => {
     const blob = plan?.sheet?.blob;
     if (!blob || !props.blobs) return;
@@ -1087,7 +1093,13 @@ export function PlanScreen(props: PlanScreenProps) {
                 onPageLongPressEnd={onPageLongPressEnd}
                 onInkMessage={inkBus.emit}
                 onLoadComplete={(pages, _path, sz) => {
-                  console.log(`[plan] pdf loaded: ${pages} page(s), ${Math.round(sz.width)}×${Math.round(sz.height)}`);
+                  logTo('plan', 'info', 'sheet_loaded', {
+                    ms: Date.now() - sheetOpenedAt.current,
+                    level: plan.level.code,
+                    blob: plan.sheet?.blob?.slice(0, 8) ?? null,
+                    pages,
+                    size: `${Math.round(sz.width)}×${Math.round(sz.height)}`,
+                  });
                   if (drawingRef.current) setPdfInkMode(true);
                 }}
                 onError={(e) => setError(`The sheet could not be opened: ${String((e as Error)?.message ?? e)}`)}

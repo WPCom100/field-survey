@@ -38,7 +38,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.blobs import object_key
-from app.jobs import export_xlsx, markup
+from app.jobs import export_xlsx, markup, plan_raster
 from app.models import (
     Device,
     InkLayer,
@@ -298,7 +298,8 @@ def load(
 
     if sheet is not None and ({"plan", "findings"} & set(data.sections)):
         progress("Plan snapshot")
-        data.sheet_pdf = _read(store, sheet.blob)
+        # the vector original of a rasterised sheet (T141): sharper crops than the raster
+        data.sheet_pdf = _read(store, plan_raster.vector_blob(sheet.blob, sheet.features))
         if data.sheet_pdf is None:
             data.checks.append("display sheet not in storage: no plan snapshot")
         data.sheet_size = (float(sheet.width_pt or 0), float(sheet.height_pt or 0))
