@@ -392,8 +392,12 @@ export const pct = (c: number | null): string => (c == null ? '—' : c.toFixed(
 
 type LevelRow = { id: string; level: string; floor_order: number | null; in_scope: number | boolean | null; split_of_id: string | null };
 
-export function levelKeyOf(levelId: string | null, ref: Record<string, unknown> | null): LevelKey {
+/** `project_pool` on a draft (T143): a person put it in the pool, so the extraction's level code no longer counts. */
+export const POOL_BASIS = 'project_pool';
+
+export function levelKeyOf(levelId: string | null, ref: Record<string, unknown> | null, basis: string | null = null): LevelKey {
   if (levelId) return levelId;
+  if (basis === POOL_BASIS) return POOL;
   const code = str(ref?.level_code);
   return code ? `code:${code}` : POOL;
 }
@@ -456,7 +460,7 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
       const row: DeviceDraftRow = {
         id: String(d.id),
         levelId,
-        levelCode: levelCode(levelId) ?? str(ref?.level_code),
+        levelCode: levelCode(levelId) ?? (str(d.level_basis) === POOL_BASIS ? null : str(ref?.level_code)),
         levelBasis: str(d.level_basis),
         model: str(d.model),
         modelRaw: str(d.model_raw),
@@ -561,7 +565,7 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
     l[what]++;
     if (open) l.open++;
   };
-  for (const d of devices) bump(levelKeyOf(d.levelId, d.sourceRef), d.levelCode, 'devices', d.state === 'proposed');
+  for (const d of devices) bump(levelKeyOf(d.levelId, d.sourceRef, d.levelBasis), d.levelCode, 'devices', d.state === 'proposed');
   for (const c of cables) bump(levelKeyOf(c.levelId, c.sourceRef), c.levelCode, 'cables', c.state === 'proposed');
 
   const data: DraftReviewData = {
@@ -624,12 +628,12 @@ export function markAccessories(devices: DeviceDraftRow[], types: DeviceTypes): 
   for (const d of devices) {
     const acc = accessory.get(d.id);
     if (!acc) continue;
-    const key = levelKeyOf(d.levelId, d.sourceRef);
+    const key = levelKeyOf(d.levelId, d.sourceRef, d.levelBasis);
     const at = bomOrder(d);
     let best: DeviceDraftRow | null = null;
     let bestScore: number[] | null = null;
     for (const p of devices) {
-      if (p === d || p.state === 'rejected' || p.placed > 0 || accessory.has(p.id) || levelKeyOf(p.levelId, p.sourceRef) !== key) continue;
+      if (p === d || p.state === 'rejected' || p.placed > 0 || accessory.has(p.id) || levelKeyOf(p.levelId, p.sourceRef, p.levelBasis) !== key) continue;
       const pt = typeOfModel(types, p.model);
       if (!pt || !listsAccessory(types, pt, acc)) continue;
       const po = bomOrder(p);
@@ -667,7 +671,7 @@ export type SortKey = 'confidence' | 'model' | 'state';
 
 /** The rows of one level under a filter; lowest confidence first by default (what needs eyes first). */
 export function devicesOn(data: DraftReviewData, key: LevelKey, f: DraftFilter, sort: SortKey = 'confidence'): DeviceDraftRow[] {
-  const rows = data.devices.filter((d) => levelKeyOf(d.levelId, d.sourceRef) === key && matchesFilter(d, f));
+  const rows = data.devices.filter((d) => levelKeyOf(d.levelId, d.sourceRef, d.levelBasis) === key && matchesFilter(d, f));
   return sortRows(rows, sort, (d) => d.model ?? '');
 }
 
@@ -690,7 +694,7 @@ function sortRows<T extends { confidence: number | null; state: DraftState; id: 
 
 /** The header counts of one level: devices, cables, and the open drafts that wait in Needs review. */
 export function levelCounts(data: DraftReviewData, key: LevelKey): { devices: number; cables: number; review: number; bulk: number } {
-  const ds = data.devices.filter((d) => levelKeyOf(d.levelId, d.sourceRef) === key && d.state !== 'rejected');
+  const ds = data.devices.filter((d) => levelKeyOf(d.levelId, d.sourceRef, d.levelBasis) === key && d.state !== 'rejected');
   const cs = data.cables.filter((c) => levelKeyOf(c.levelId, c.sourceRef) === key && c.state !== 'rejected');
   const review = [...ds, ...cs].filter((r) => r.state === 'proposed' && r.flagged).length;
   return { devices: ds.length, cables: cs.length, review, bulk: bulkDevices(data, key).length + bulkCables(data, key).length };
@@ -700,7 +704,7 @@ export function levelCounts(data: DraftReviewData, key: LevelKey): { devices: nu
 export function bulkDevices(data: DraftReviewData, key: LevelKey, min = BULK_MIN): DeviceDraftRow[] {
   return data.devices.filter(
     (d) =>
-      levelKeyOf(d.levelId, d.sourceRef) === key &&
+      levelKeyOf(d.levelId, d.sourceRef, d.levelBasis) === key &&
       d.state === 'proposed' &&
       d.levelId != null &&
       d.confidence != null &&
@@ -736,7 +740,7 @@ export function mismatchList(data: DraftReviewData, key: LevelKey): Mismatch[] {
     for (const e of [c.ends.from, c.ends.to]) if (e?.kind === 'draft_device') nRun.add(e.id);
   }
   for (const d of data.devices) {
-    if (levelKeyOf(d.levelId, d.sourceRef) !== key || d.state === 'rejected') continue;
+    if (levelKeyOf(d.levelId, d.sourceRef, d.levelBasis) !== key || d.state === 'rejected') continue;
     for (const text of deviceMismatches(d, code, nRun.has(d.id))) out.push({ draftId: d.id, kind: 'device', text });
   }
   for (const c of data.cables) {

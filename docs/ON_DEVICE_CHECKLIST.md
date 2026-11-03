@@ -687,6 +687,16 @@ Decision D242 (Proposed): a display sheet over 400,000 page objects is stored as
 - [ ] **A chain named.** In a new form, add 01, 02, 03; set 01 → 02 and 02 → 03: the line reads "Level 01 shares with 02, which itself shares with 03. Set it on one level only: 01 shares with 03 directly." Set 01 → 03: the line goes. Cancel. → saw:
 - [ ] **The server's reason.** With Wi-Fi off, Create project: "Could not create the project: the server is not reachable (no connection?)." (Any 4xx from the server now reads "the server answered 422 (<its reason>)".) → saw:
 
+## T143 — Move a flagged draft to another level or the pool  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01 (C-43) a draft flagged "not on this sheet" could only sit under Flagged; moving it meant Review drafts → Edit… → Level, refused once any unit was placed. Now the flagged row moves it in one tap. Use a level with an accepted draft of ×2 or more (a station or sensor draft is easiest).
+
+- [ ] **Move to another level.** Plan → ⊕ Place, select the draft, Flag: not on this sheet ⊗. Open Flagged, tap its row: beside Cancel there is **Move to…**; tap it — chips for the other in-scope levels and "Pool, every level" (not the level it is on). Tap another level: the note reads "<draft>: moved to <level>.", it is gone from Flagged and from this level's list. Open that level's plan → ⊕ Place: it is in the list (not flagged) with its units. → saw:
+- [ ] **Move to the pool after placing one.** Place one unit of a ×2+ draft, then flag it and open its Flagged row → Move to…: the line says "1 unit left move; the 1 placed keep their level." Tap "Pool, every level": the placed pin stays where it is (same ID); the draft shows under Pool on every in-scope level with the units left. → saw:
+- [ ] **Review drafts agrees.** Setup → Review drafts → the pool: the moved draft is listed there with Level "pool (no level)", basis `project_pool`; the one moved to a level is under that level, basis `manual`. → saw:
+
+Decision D243 (Proposed): Move to… on a flagged draft sets its level (or the pool) and unflags it in one edit, also after some units were placed (those keep their level); a draft put in the pool by hand is in the pool whatever level its extraction read. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

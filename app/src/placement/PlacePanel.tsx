@@ -1,8 +1,9 @@
 /**
  * "Place devices" in the plan's side panel (T46, Phase 3 §3.4): the level's unplaced list (this
  * level · pool · flagged, by type), the selected item with "tap the plan, or drag ⠿ onto it",
- * Flag: not on this sheet, and — once a spot is chosen — the confirm form: ID (the device's, or
- * `<level>-? NEW` for the server to number, D93 / D118), panel tag, Drawing Position and Room
+ * Flag: not on this sheet (a flagged one: Move to… another level or the pool, T143), and — once a
+ * spot is chosen — the confirm form: ID (the device's, or `<level>-? NEW` for the server to number,
+ * D93 / D118), panel tag, Drawing Position and Room
  * (defaults from the grid and the nearest room at the spot, T45) → Place ✓. Dashed pins on the
  * plan are proposals from what the sheet prints (types and panel tags, T140), a guess fainter and
  * named so in the form; tapping one selects it with its spot. The row
@@ -15,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { chipStyles } from '../plan/chips';
-import { flagNotOnSheet, placeItem, unplaceDevice, type PlaceResult } from './actions';
+import { flagNotOnSheet, moveDraft, placeItem, unplaceDevice, type PlaceResult } from './actions';
 import { TAGGED_ROLES, itemLine, itemsIn, rolesIn, type LevelUnplaced, type PlaceScope, type UnplacedItem } from './model';
 
 export type PlacePanelProps = {
@@ -147,6 +148,7 @@ export function PlacePanel(props: PlacePanelProps) {
           key={selected.key}
           item={selected}
           levelCode={props.levelCode}
+          levels={data?.levels ?? []}
           spot={spot}
           defaults={props.defaults}
           busy={busy}
@@ -160,6 +162,15 @@ export function PlacePanel(props: PlacePanelProps) {
               props.onSelect(null);
               props.onEdited();
               return flag ? `${selected.title}: flagged not on this sheet.` : `${selected.title}: back on the list.`;
+            })
+          }
+          onMove={(to) =>
+            void run(async () => {
+              if (!editor || selected.kind !== 'draft') return null;
+              await moveDraft(editor, selected, to);
+              props.onSelect(null);
+              props.onEdited();
+              return `${selected.title}: moved to ${to.code ?? 'the pool'}${to.levelId === props.levelId ? ', back on the list' : ''}.`;
             })
           }
           onPlace={(form) =>
@@ -211,6 +222,7 @@ type Form = { drawingPosition: string | null; room: string | null; panelName?: s
 function Selected(props: {
   item: UnplacedItem;
   levelCode: string;
+  levels: { levelId: string; code: string }[];
   spot: { x: number; y: number } | null;
   defaults: { drawingPosition: string | null; room: string | null } | null;
   busy: boolean;
@@ -218,6 +230,7 @@ function Selected(props: {
   onDrag: (pageX: number, pageY: number, end: boolean) => void;
   onCancel: () => void;
   onFlag: (flag: boolean) => void;
+  onMove: (to: { levelId: string | null; code: string | null }) => void;
   onPlace: (form: Form) => void;
 }) {
   const { item, spot } = props;
@@ -234,6 +247,8 @@ function Selected(props: {
   // a master panel of `Power Distribution` with no type is `other` but has its tag (T127)
   const tagged = (TAGGED_ROLES.has(item.role) && item.role !== 'equipment_rack') || (item.role === 'other' && !!item.panelName);
   const [panel, setPanel] = useState(item.panelName ?? '');
+  const [moving, setMoving] = useState(false);
+  const flagged = item.kind === 'draft' && item.notOnSheet ? item : null;
 
   const onDrag = useRef(props.onDrag);
   onDrag.current = props.onDrag;
@@ -267,8 +282,24 @@ function Selected(props: {
             {item.kind === 'draft' ? (
               <Btn label={item.notOnSheet ? 'Unflag: back on the list' : 'Flag: not on this sheet ⊗'} onPress={() => props.onFlag(!item.notOnSheet)} disabled={props.busy || !props.canEdit} />
             ) : null}
+            {flagged ? <Btn label="Move to…" onPress={() => setMoving(!moving)} disabled={props.busy || !props.canEdit} /> : null}
             <Btn label="Cancel" onPress={props.onCancel} />
           </View>
+          {flagged && moving && !props.busy ? (
+            <>
+              <Text style={styles.muted}>
+                {flagged.placed ? `${flagged.remaining} unit${flagged.remaining === 1 ? '' : 's'} left move; the ${flagged.placed} placed keep their level. ` : ''}It comes off Flagged.
+              </Text>
+              <View style={styles.rowWrap}>
+                {props.levels
+                  .filter((l) => l.levelId !== flagged.levelId)
+                  .map((l) => (
+                    <Chip key={l.levelId} label={l.code} on={false} onPress={() => props.onMove({ levelId: l.levelId, code: l.code })} />
+                  ))}
+                {!flagged.pool ? <Chip label="Pool, every level" on={false} onPress={() => props.onMove({ levelId: null, code: null })} /> : null}
+              </View>
+            </>
+          ) : null}
         </>
       ) : (
         <>

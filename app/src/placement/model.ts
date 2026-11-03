@@ -13,7 +13,7 @@
  *   placed from another draft; each device stands for one draft at most (drafts in id order). So
  *   reviewing a level seeded from the master never lists its panels twice (D193 (1)).
  * - A draft flagged **not on this sheet** (`draft_device.not_on_sheet`) leaves the list for the
- *   Flagged section until it is unflagged.
+ *   Flagged section until it is unflagged, or moved to another level or the pool (T143).
  * - A draft whose model is an **accessory-only** library type is never offered (T126): it is an
  *   accessory of another draft, folded into it in Review drafts.
  */
@@ -22,6 +22,7 @@ import { canonicalCategory, isRole, type Role, type SheetFeatures, type Store } 
 
 export type Point = { x: number; y: number };
 
+import { POOL_BASIS } from '../drafts/model';
 import { accessoryTypeOf, loadDeviceTypes, roleOfDevice, typeForDraft, typeOf, typeOfPrinted, type DeviceType, type DeviceTypes } from '../library/neuron';
 
 // ------------------------------------------------------------------ shapes
@@ -108,6 +109,8 @@ export type LevelUnplaced = {
   progress: LevelPlacement;
   /** The project's and the app library's types, for what the sheet prints (`tagProposals`, T140). */
   types: DeviceTypes;
+  /** The in-scope levels in floor order: where Move to… sends a flagged draft (T143). */
+  levels: { levelId: string; code: string }[];
 };
 
 // ------------------------------------------------------------------ small parsers
@@ -190,6 +193,8 @@ type DraftRec = {
   role: Role | null;
   qty: number;
   notOnSheet: boolean;
+  /** Put in the pool by a person (`project_pool`, T143): its level code no longer counts. */
+  pooledByHand: boolean;
   accessories: DraftAccessory[];
 };
 
@@ -255,10 +260,11 @@ async function compute(store: Store, projectId: string): Promise<Computed> {
       role: isRole(r.role) ? r.role : null,
       qty: Math.max(0, num(r.qty) ?? 1),
       notOnSheet: truthy(r.not_on_sheet),
+      pooledByHand: str(r.level_basis) === POOL_BASIS,
       accessories: accessoriesOf(r.accessories),
     };
     // a floor the project lacks (`code:09`) is nowhere to place it
-    if (!rec.levelId && rec.levelCode) continue;
+    if (!rec.levelId && rec.levelCode && !rec.pooledByHand) continue;
     // an accessory is no unit to place (T126)
     if (accessoryTypeOf(types, rec.model)) continue;
     const placed = placedBy.get(rec.id) ?? 0;
@@ -382,6 +388,7 @@ export async function loadUnplaced(store: Store, projectId: string, levelId: str
     flagged: drafts.filter((d) => d.notOnSheet),
     progress: progressOf(c, level),
     types: c.types,
+    levels: c.levels.filter(inScope).map((l) => ({ levelId: l.id, code: l.level })),
   };
 }
 

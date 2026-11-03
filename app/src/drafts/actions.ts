@@ -19,6 +19,7 @@ import { canonicalCategory, roleOfCategory, type Role } from '@field-survey/core
 
 import {
   BULK_MIN,
+  POOL_BASIS,
   RISER_KINDS,
   bulkCables,
   bulkDevices,
@@ -129,6 +130,8 @@ export async function editDevice(editor: Editor, d: DeviceDraftRow, f: DeviceFie
   const changes: Record<string, unknown> = { model, category, qty, name: f.name !== undefined ? f.name?.trim() || null : d.name };
   if (category !== known(d.category)) changes.role = roleFor(category);
   if (f.levelId !== undefined) changes.level_id = f.levelId;
+  // a level picked by hand: the extraction's level code no longer places it (T143)
+  if (f.levelId !== undefined && f.levelId !== d.levelId) changes.level_basis = f.levelId ? 'manual' : POOL_BASIS;
   return editor.group(ctx(`Draft review: edited ${label({ model, name: changes.name as string | null, qty })}`), async (g) => {
     await g.setFields('draft_device', d.id, changes);
     await g.setField('draft_device', d.id, 'state', 'edited');
@@ -222,7 +225,7 @@ export async function addDeviceDraft(editor: Editor, projectId: string, f: NewDe
       category,
       role: roleFor(category),
       qty: wholePositive(f.qty, 'Quantity'),
-      level_basis: f.levelId ? 'manual' : 'project_pool',
+      level_basis: f.levelId ? 'manual' : POOL_BASIS,
       extraction: 'manual',
       state: 'proposed',
     },
@@ -291,7 +294,8 @@ export async function promoteExcluded(editor: Editor, projectId: string, batch: 
       category: null,
       qty: line.qty && line.qty > 0 ? Math.round(line.qty) : 1,
       source_ref: { ...line.source_ref, file: batch.file, promoted: true, excluded_reason: line.reason, description: line.description },
-      level_basis: levelId ? 'manual' : 'project_pool',
+      // a line read for a floor the project lacks keeps its code (T143): it is not in the pool
+      level_basis: levelId ? 'manual' : line.source_ref.level_code ? null : POOL_BASIS,
       extraction: 'manual',
       state: 'proposed',
     },

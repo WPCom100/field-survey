@@ -1,7 +1,7 @@
 /**
- * Place devices (T46, Phase 3 §3.4, D205): put an unplaced item's pin on the plan, and flag a draft
- * not on this sheet. Every edit is an op through the `Editor` (`Master edit`, setup work); no React
- * or Expo imports, tested in Node.
+ * Place devices (T46, Phase 3 §3.4, D205): put an unplaced item's pin on the plan, flag a draft
+ * not on this sheet, and move a flagged one to another level or the pool (T143). Every edit is an
+ * op through the `Editor` (`Master edit`, setup work); no React or Expo imports, tested in Node.
  *
  * - A **device** of the baseline gets its pin, with the confirmed Drawing Position, Room and panel
  *   tag (only the fields that change), in one group.
@@ -19,6 +19,7 @@
 import { OpError, type EditContext, type Editor, type Op, type Store } from '@field-survey/core';
 
 import { commitWaitingCables } from '../drafts/actions';
+import { POOL_BASIS } from '../drafts/model';
 import type { DraftAccessory, UnplacedDevice, UnplacedDraft, UnplacedItem } from './model';
 
 export const PLACE_REASON = 'Place devices';
@@ -128,6 +129,21 @@ async function placeDraft(editor: Editor, store: Store, item: UnplacedDraft, inp
 /** Flag (or unflag) a draft as not on this sheet: it leaves the list for the Flagged section. */
 export async function flagNotOnSheet(editor: Editor, item: UnplacedDraft, flag: boolean): Promise<Op | null> {
   return editor.setField('draft_device', item.draftId, 'not_on_sheet', flag, ctx(`${flag ? 'not on this sheet' : 'back on the list'}: ${item.title}`));
+}
+
+/**
+ * Move to… (T143, D243): a flagged draft goes to another level (`levelId`) or the pool (null),
+ * unflagged, in one group — also once some of its units were placed, which keep their level; only
+ * the units left move. The level basis says a person picked it (`manual` / `project_pool`), so a
+ * pooled draft's extraction level code no longer holds it back.
+ */
+export async function moveDraft(editor: Editor, item: UnplacedDraft, to: { levelId: string | null; code: string | null }): Promise<Op[]> {
+  if (item.remaining <= 0) throw new OpError('No units of this draft are left to move.');
+  if (to.levelId === item.levelId) throw new OpError(to.levelId ? `It is on ${to.code ?? 'that level'} already.` : 'It is in the pool already.');
+  const where = to.levelId ? (to.code ?? 'another level') : 'the pool';
+  return editor.group(ctx(`moved to ${where}: ${item.title}`), async (g) => {
+    await g.setFields('draft_device', item.draftId, { level_id: to.levelId, level_basis: to.levelId ? 'manual' : POOL_BASIS, not_on_sheet: false });
+  });
 }
 
 /** The reason Undo writes (T139); the card's Put back… box starts with it. */

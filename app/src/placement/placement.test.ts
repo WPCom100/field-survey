@@ -11,7 +11,8 @@ import { describe, expect, it } from 'vitest';
 
 import { loadLockTable, lockQuestion, lockWarnings } from '../setup/lock';
 import { loadDeviceCard } from '../card/model';
-import { UNPLACE_REASON, flagNotOnSheet, perUnit, placeItem, unplaceDevice } from './actions';
+import { POOL, levelKeyOf, loadDraftReview } from '../drafts/model';
+import { UNPLACE_REASON, flagNotOnSheet, moveDraft, perUnit, placeItem, unplaceDevice } from './actions';
 import { typeOfPrinted, type DeviceType, type DeviceTypes } from '../library/neuron';
 import { itemLine, itemsIn, loadPlacementProgress, loadUnplaced, rolesIn, tagProposals, tagRoles, typeNameOf, type UnplacedDevice, type UnplacedDraft, type UnplacedItem } from './model';
 
@@ -266,6 +267,55 @@ describe('unplaced list (T46)', () => {
     expect(u.progress).toMatchObject({ draftUnits: 0, flagged: 1 });
     await flagNotOnSheet(editor, draftOf(u.flagged, ids.dSensor), false);
     expect((await loadUnplaced(store, PROJECT, ids.l06m))!.items.some((i) => i.key === sensor.key)).toBe(true);
+  });
+
+  it('Move to… another level: one group that moves the draft and clears the flag (T143)', async () => {
+    const { store, editor, ids } = await setup();
+    await flagNotOnSheet(editor, draftOf((await loadUnplaced(store, PROJECT, ids.l06m))!.items, ids.dSensor), true);
+    const u = (await loadUnplaced(store, PROJECT, ids.l06m))!;
+    expect(u.levels.map((l) => l.code)).toEqual(['02', '06M']);
+    const flagged = draftOf(u.flagged, ids.dSensor);
+    const ops = await moveDraft(editor, flagged, { levelId: ids.l02, code: '02' });
+    expect(ops.map((o) => [o.field, o.change_type])).toEqual([['level_id', 'Master edit'], ['level_basis', 'Master edit'], ['not_on_sheet', 'Master edit']]);
+    expect(new Set(ops.map((o) => o.group_id)).size).toBe(1);
+    expect(ops[0]!.reason).toBe('Place devices: moved to 02: P-DOC-C-LR');
+    expect(await store.get<Record<string, unknown>>('draft_device', ids.dSensor)).toMatchObject({ level_id: ids.l02, level_basis: 'manual', not_on_sheet: false });
+    const l06m = (await loadUnplaced(store, PROJECT, ids.l06m))!;
+    expect([...l06m.items, ...l06m.flagged].some((i) => i.key === flagged.key)).toBe(false);
+    // the master's 06M sensor stood for one unit there; on 02 nothing does
+    expect(draftOf((await loadUnplaced(store, PROJECT, ids.l02))!.items, ids.dSensor)).toMatchObject({ levelId: ids.l02, pool: false, remaining: 3, notOnSheet: false });
+    // refused: where it already is, nothing left
+    await expect(moveDraft(editor, { ...flagged, levelId: ids.l02 }, { levelId: ids.l02, code: '02' })).rejects.toThrow(OpError);
+    await expect(moveDraft(editor, { ...flagged, remaining: 0 }, { levelId: null, code: null })).rejects.toThrow('No units');
+  });
+
+  it('Move to… the pool after a unit was placed: the placed one keeps its level, the rest go to every level (T143)', async () => {
+    const { store, editor, ids } = await setup();
+    const placed = await placeItem(editor, store, draftOf((await loadUnplaced(store, PROJECT, ids.l06m))!.items, ids.dSensor), { levelId: ids.l06m, sheetId: ids.s06m, at: { x: 300, y: 300 } });
+    await flagNotOnSheet(editor, draftOf((await loadUnplaced(store, PROJECT, ids.l06m))!.items, ids.dSensor), true);
+    const flagged = draftOf((await loadUnplaced(store, PROJECT, ids.l06m))!.flagged, ids.dSensor);
+    expect(flagged).toMatchObject({ placed: 1, remaining: 1 });
+    await moveDraft(editor, flagged, { levelId: null, code: null });
+    expect(await store.get<Record<string, unknown>>('device', placed.deviceId)).toMatchObject({ level_id: ids.l06m, baseline_ref_id: ids.dSensor });
+    // in the pool nothing of a level stands for it: qty 3 − 1 placed
+    const l02 = (await loadUnplaced(store, PROJECT, ids.l02))!;
+    expect(draftOf(itemsIn(l02, 'pool'), ids.dSensor)).toMatchObject({ pool: true, placed: 1, remaining: 2 });
+    expect((await loadPlacementProgress(store, PROJECT)).pool).toEqual({ draftUnits: 5, flagged: 0 });
+  });
+
+  it('a draft the extraction read for a level, moved to the pool, is in the pool — here and in Review drafts (T143)', async () => {
+    const { store, editor, ids } = await setup();
+    const opts = { change_type: 'Master edit' as const, reason: 'test' };
+    const id = (await editor.create('draft_device', { project_id: PROJECT, level_id: ids.l02, model: 'PI1004', category: 'Station', qty: 1, state: 'accepted', level_basis: 'riser_band', source_ref: { kind: 'riser_symbol', level_code: '02', page: 1 } }, opts)).id;
+    await flagNotOnSheet(editor, draftOf((await loadUnplaced(store, PROJECT, ids.l02))!.items, id), true);
+    await moveDraft(editor, draftOf((await loadUnplaced(store, PROJECT, ids.l02))!.flagged, id), { levelId: null, code: null });
+    expect(draftOf(itemsIn((await loadUnplaced(store, PROJECT, ids.l06m))!, 'pool'), id)).toMatchObject({ pool: true, remaining: 1 });
+    const review = await loadDraftReview(store, PROJECT);
+    const row = review.devices.find((d) => d.id === id)!;
+    expect(row).toMatchObject({ levelId: null, levelCode: null, levelBasis: 'project_pool' });
+    expect(levelKeyOf(row.levelId, row.sourceRef, row.levelBasis)).toBe(POOL);
+    // the extraction's own pool reading still keys by its code (a floor the project lacks)
+    expect(levelKeyOf(null, { level_code: '09' }, 'riser_band')).toBe('code:09');
   });
 
   it('the Lock table counts drafts, flags and unconfirmed cables, and warns of unreviewed drafts', async () => {

@@ -59,6 +59,7 @@ import {
   endpointOptions,
   flaggedDraftCounts,
   levelCounts,
+  levelKeyOf,
   loadDraftReview,
   mismatchList,
   sourcesOf,
@@ -344,7 +345,12 @@ describe('draft review edits (T44)', () => {
     await expect(rejectDraft(editor, 'device', row(data.devices, ids.dG), ' ')).rejects.toThrow(/why/);
     await rejectDraft(editor, 'device', row(data.devices, ids.dG), 'Out of scope floor');
     data = await loadDraftReview(store, PROJECT);
-    expect(row(data.devices, ids.dF)).toMatchObject({ levelId: ids.l02, qty: 3, state: 'edited' });
+    expect(row(data.devices, ids.dF)).toMatchObject({ levelId: ids.l02, qty: 3, state: 'edited', levelBasis: 'manual' });
+    // to the pool by hand (T143): keyed as the pool whatever level code it was read with
+    await editDevice(editor, row(data.devices, ids.dF), { levelId: null });
+    const pooled = row((await loadDraftReview(store, PROJECT)).devices, ids.dF);
+    expect(pooled).toMatchObject({ levelId: null, levelBasis: 'project_pool' });
+    expect(levelKeyOf(pooled.levelId, { ...pooled.sourceRef, level_code: '02' }, pooled.levelBasis)).toBe(POOL);
     expect(row(data.devices, ids.dG).state).toBe('rejected');
     expect((await store.opsFor(ids.dG)).at(-1)!.reason).toBe('Draft review: rejected — Out of scope floor');
     await reopenDraft(editor, 'device', row(data.devices, ids.dG));
