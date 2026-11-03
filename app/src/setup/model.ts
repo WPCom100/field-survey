@@ -8,7 +8,9 @@
  * Project *creation* is not here: it happens on the server (`api.ts`, D127).
  */
 
-import { Editor, type EditBatch, type EditContext, type Store } from '@field-survey/core';
+import { Editor, TransportError, type EditBatch, type EditContext, type Store } from '@field-survey/core';
+
+import { detailOf } from '../crops/model';
 
 export const SETUP_CTX: EditContext = { change_type: 'Master edit', reason: 'Project setup' };
 export const DEFAULT_EXPORT_TITLE = 'ETC Lighting Controls Survey';
@@ -98,6 +100,45 @@ export function parseLevelRange(text: string): string[] {
   }
   if (out.length === 0) throw new SetupError('Type a level code or a range like 09-28');
   return [...new Set(out)];
+}
+
+/**
+ * The New project form's "Shares numbering with" column, checked before Create (T142): a share
+ * that comes back to its level (06 → 06M → 06; the server refuses it with "numbering sharing
+ * loops") or that points at a level which itself shares (A → B → C). One line naming the levels
+ * and the fix, or null when every share points at a level with its own group.
+ */
+export function shareProblem(levels: { code: string; shareWith: string | null }[]): string | null {
+  const share = new Map(levels.filter((l) => l.shareWith).map((l) => [l.code, l.shareWith!]));
+  for (const l of levels) {
+    const target = l.shareWith;
+    if (!target) continue;
+    const next = share.get(target);
+    if (next === undefined) continue;
+    if (next === l.code) {
+      return `Levels ${l.code} and ${target} share numbering with each other. Set it on one level only: ${l.code} shares with ${target}, and ${target} keeps "own group".`;
+    }
+    const path = [l.code, target, next];
+    for (let at = share.get(next); at !== undefined && !path.includes(at); at = share.get(at)) path.push(at);
+    const end = share.get(path[path.length - 1]!);
+    if (end !== undefined) {
+      return `Numbering sharing loops: ${[...path, end].join(' → ')}. Set it on one level only: pick the level that keeps "own group" and point the others at it.`;
+    }
+    const root = path[path.length - 1]!;
+    return `Level ${l.code} shares with ${target}, which itself shares with ${next}. Set it on one level only: ${l.code} shares with ${root} directly.`;
+  }
+  return null;
+}
+
+/** Why `POST /projects` failed, for the form: the server's reason (its `detail`) when it sent one. */
+export function createFailureText(e: unknown): string {
+  if (e instanceof TransportError) {
+    if (e.failure === 'network') return 'Could not create the project: the server is not reachable (no connection?).';
+    const why = detailOf(e.detail);
+    if (e.status === 401) return "Could not create the project: the server refused this iPad's token (401).";
+    return `Could not create the project: the server answered ${e.status ?? '?'}${why ? ` (${why})` : ''}.`;
+  }
+  return `Could not create the project: ${e instanceof Error ? e.message : String(e)}`;
 }
 
 function str(v: unknown): string {

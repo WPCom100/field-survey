@@ -29,9 +29,14 @@ export function failureText(what: string, e: unknown): string {
   return `${what} did not load: ${e instanceof Error ? e.message : String(e)}`;
 }
 
-function detailOf(body: unknown): string | null {
+/** The server's reason in a refusal body: FastAPI's `detail` string, a nested `detail` / `error`, or a validation list's `msg`s. */
+export function detailOf(body: unknown): string | null {
   const d = (body as { detail?: unknown } | null | undefined)?.detail;
   if (typeof d === 'string') return d;
+  if (Array.isArray(d)) {
+    const msgs = d.map((x) => (x as { msg?: unknown } | null)?.msg).filter((m): m is string => typeof m === 'string');
+    return msgs.length ? msgs.join('; ') : null;
+  }
   const inner = (d as { detail?: unknown; error?: unknown } | null | undefined) ?? null;
   if (typeof inner?.detail === 'string') return inner.detail;
   if (typeof inner?.error === 'string') return inner.error;

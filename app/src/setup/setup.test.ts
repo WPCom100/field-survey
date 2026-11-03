@@ -1,8 +1,8 @@
-import { Editor, Store, SyncEngine, rememberProjects, uuidv7, type Op } from '@field-survey/core';
+import { Editor, Store, SyncEngine, TransportError, rememberProjects, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver, FakeServer } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
-import { SetupActions, SetupError, loadProjectSetup, normLevelCode, parseLevelDate, parseLevelRange } from './model';
+import { SetupActions, SetupError, createFailureText, loadProjectSetup, normLevelCode, parseLevelDate, parseLevelRange, shareProblem } from './model';
 
 const ME = uuidv7();
 
@@ -221,5 +221,39 @@ describe('SetupActions', () => {
     expect(s.project.name).toBe('Tower');
     expect(s.levels.map((l) => l.code)).toEqual(['B2', '06', '06M', '09', '10', '11']);
     expect(s.levels[1]!.groupLabel).toBe('06/06M');
+  });
+});
+
+describe('New project: numbering shares and the server reason (T142)', () => {
+  const lv = (code: string, shareWith: string | null = null) => ({ code, shareWith });
+
+  it('accepts shares that point at a level with its own group', () => {
+    expect(shareProblem([lv('06'), lv('06M', '06'), lv('07')])).toBeNull();
+    expect(shareProblem([lv('06'), lv('06M', '06'), lv('06X', '06')])).toBeNull();
+    expect(shareProblem([])).toBeNull();
+  });
+
+  it('names a two-way share and the fix', () => {
+    expect(shareProblem([lv('06', '06M'), lv('06M', '06')])).toBe(
+      'Levels 06 and 06M share numbering with each other. Set it on one level only: 06 shares with 06M, and 06M keeps "own group".',
+    );
+  });
+
+  it('names a longer loop and a chain', () => {
+    expect(shareProblem([lv('A', 'B'), lv('B', 'C'), lv('C', 'A')])).toMatch(/^Numbering sharing loops: A → B → C → A\. Set it on one level only/);
+    expect(shareProblem([lv('A', 'B'), lv('B', 'C'), lv('C')])).toBe(
+      'Level A shares with B, which itself shares with C. Set it on one level only: A shares with C directly.',
+    );
+    expect(shareProblem([lv('A', 'B'), lv('B', 'C'), lv('C', 'D'), lv('D')])).toMatch(/A shares with D directly\.$/);
+  });
+
+  it('says the server detail on a refusal', () => {
+    const loop = new TransportError('rejected', 'POST /projects → 422', 422, { detail: 'numbering sharing loops at level 06' });
+    expect(createFailureText(loop)).toBe('Could not create the project: the server answered 422 (numbering sharing loops at level 06).');
+    const invalid = new TransportError('rejected', 'POST /projects → 422', 422, { detail: [{ loc: ['body', 'name'], msg: 'Field required' }] });
+    expect(createFailureText(invalid)).toBe('Could not create the project: the server answered 422 (Field required).');
+    expect(createFailureText(new TransportError('rejected', 'POST /projects → 400', 400, null))).toBe('Could not create the project: the server answered 400.');
+    expect(createFailureText(new TransportError('network', 'Network request failed'))).toMatch(/not reachable/);
+    expect(createFailureText(new Error('disk full'))).toBe('Could not create the project: disk full');
   });
 });

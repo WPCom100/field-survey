@@ -6,7 +6,7 @@ import { openAppStore } from '../db';
 import { listProjects, type HomeProject } from '../home/data';
 import { useIdentity } from '../identity/IdentityGate';
 import { createProject, fetchProjects, type NewLevel, type NewProjectBody } from '../setup/api';
-import { DEFAULT_EXPORT_TITLE, SetupError, normLevelCode, parseLevelRange } from '../setup/model';
+import { DEFAULT_EXPORT_TITLE, SetupError, createFailureText, normLevelCode, parseLevelRange, shareProblem } from '../setup/model';
 import { Btn, Check, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../setup/widgets';
 import { getSyncEngine } from '../sync/engine';
 
@@ -60,6 +60,7 @@ export default function NewProjectScreen() {
   }, [identity]);
 
   const codes = useMemo(() => levels.map((l) => ({ id: l.code, label: l.code })), [levels]);
+  const shareIssue = useMemo(() => shareProblem(levels), [levels]);
 
   const addLevel = () => {
     setError(null);
@@ -99,6 +100,7 @@ export default function NewProjectScreen() {
   const create = async () => {
     setError(null);
     if (!name.trim()) return setError('The project needs a name');
+    if (shareIssue) return setError(shareIssue);
     setBusy(true);
     try {
       const body: NewProjectBody = {
@@ -122,7 +124,7 @@ export default function NewProjectScreen() {
       await engine.requestSync(); // pulls the new project, its levels and copies
       router.replace({ pathname: '/', params: { project: created.id } });
     } catch (e) {
-      setError(`Could not create the project: ${e instanceof Error ? e.message : String(e)}`);
+      setError(createFailureText(e));
       setBusy(false);
     }
   };
@@ -225,6 +227,7 @@ export default function NewProjectScreen() {
             </View>
             <Btn title="Add range" onPress={addRange} />
           </View>
+          <Notice text={shareIssue} error />
         </Section>
 
         <Notice text={error} error />

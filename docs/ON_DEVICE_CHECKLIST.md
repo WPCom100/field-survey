@@ -679,6 +679,14 @@ Decision D241 (Proposed): the text pass keeps every library model / alias / shor
 
 Decision D242 (Proposed): a display sheet over 400,000 page objects is stored as a 200-dpi raster (at most 250 megapixels; 512-px JPEG tiles, quality 75; same CropBox and rotation), the vector original kept beside it for the text pass, `retag` and the floor PDF; `plans rasterise` converts sheets stored earlier; T17b only if this is not enough. → Approve / change:
 
+## T142 — New project: the server's reason, and a two-way numbering share refused  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01 creating a project said only "POST /projects → 422": 06 shared numbering with 06M and 06M with 06, and the form gave no hint. The form now names that before Create, and any refusal says the server's reason.
+
+- [ ] **Two-way share named.** Projects → New project, add levels 06 and 06M; set 06 → "Shares numbering with" 06M and 06M → 06. Under the levels table, in red: "Levels 06 and 06M share numbering with each other. Set it on one level only: 06 shares with 06M, and 06M keeps "own group"." Tap Create project: nothing is created, the same line shows by the button. Set 06M back to "own group": the line goes and Create works (the project opens with 06 and 06M in one numbering group). → saw:
+- [ ] **A chain named.** In a new form, add 01, 02, 03; set 01 → 02 and 02 → 03: the line reads "Level 01 shares with 02, which itself shares with 03. Set it on one level only: 01 shares with 03 directly." Set 01 → 03: the line goes. Cancel. → saw:
+- [ ] **The server's reason.** With Wi-Fi off, Create project: "Could not create the project: the server is not reachable (no connection?)." (Any 4xx from the server now reads "the server answered 422 (<its reason>)".) → saw:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".
