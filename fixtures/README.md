@@ -1,4 +1,6 @@
-# fixtures/ — golden test inputs (private repo)
+# fixtures/ — golden test inputs
+
+The GitHub repo is **public**: new PDFs and workbooks here are git-ignored and stay on the PC (golden tests skip when a file is missing). The level 02 and 03 composites (`server/tests/test_plan_raster.py`, `test_plan_tags.py`) are local only.
 
 | File | Role |
 |---|---|
