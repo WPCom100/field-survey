@@ -1,0 +1,10 @@
+{
+  // Maestro flows: schema + YAML validation (app/maestro/*.yaml)
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/mobile-dev-inc/maestro/main/maestro-client/src/main/resources/schema/maestro-flow.json": "app/maestro/*.yaml"
+  },
+  // Rig screenshots pulled back from the Mac land here (gitignored)
+  "files.exclude": { ".rig": false },
+  // Mac is Apple silicon; Remote-SSH should not guess
+  "remote.SSH.remotePlatform": { "mac": "macOS" }
+}

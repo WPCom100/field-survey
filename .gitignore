@@ -22,3 +22,6 @@ sshkey_*
 # tracked; add a new one only on purpose (git add -f) once it is cleared for publishing.
 fixtures/*.pdf
 fixtures/*.xlsx
+
+# Mac rig screenshots pulled to the PC
+.rig/

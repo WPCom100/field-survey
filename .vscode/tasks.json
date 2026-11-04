@@ -1,0 +1,42 @@
+{
+  // T149 Mac rig, driven from the Windows PC over SSH (docs/ops.md §6).
+  // Needs: `Host mac` in %USERPROFILE%\.ssh\config and the repo cloned at ~/field-survey on the Mac.
+  "version": "2.0.0",
+  "inputs": [
+    { "id": "sim", "type": "pickString", "description": "Simulator", "options": ["A", "B"], "default": "A" },
+    { "id": "flow", "type": "promptString", "description": "Flow file (blank = smoke.yaml)", "default": "" },
+    { "id": "serverCmd", "type": "pickString", "description": "e2e server", "options": ["start", "stop", "reset"], "default": "start" }
+  ],
+  "tasks": [
+    { "label": "rig: ssh check",  "type": "shell", "command": "ssh mac uname -a", "problemMatcher": [] },
+    { "label": "rig: pull main",  "type": "shell", "command": "ssh mac \"cd ~/field-survey && git pull --ff-only\"", "problemMatcher": [] },
+    { "label": "rig: setup (once)", "type": "shell", "command": "ssh -t mac \"cd ~/field-survey && bash scripts/mac/rig.sh setup\"", "problemMatcher": [] },
+    { "label": "rig: status",     "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh status\"", "problemMatcher": [] },
+    { "label": "rig: server",     "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh server ${input:serverCmd}\"", "problemMatcher": [] },
+    { "label": "rig: build",      "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh build\"", "problemMatcher": [] },
+    {
+      "label": "rig: metro",
+      "type": "shell",
+      "command": "ssh -t mac \"cd ~/field-survey && bash scripts/mac/rig.sh metro\"",
+      "isBackground": true,
+      "presentation": { "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    { "label": "rig: open",       "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh open ${input:sim}\"", "problemMatcher": [] },
+    { "label": "rig: flows",      "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh flows --device ${input:sim} ${input:flow}\"", "problemMatcher": [] },
+    { "label": "rig: second sim", "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh second\"", "problemMatcher": [] },
+    {
+      "label": "rig: screenshot",
+      "type": "shell",
+      "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh shot ${input:sim} /tmp/rig-shot.png\"; New-Item -ItemType Directory -Force .rig | Out-Null; scp mac:/tmp/rig-shot.png .rig/shot.png; Invoke-Item .rig/shot.png",
+      "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+      "problemMatcher": []
+    },
+    {
+      "label": "rig: session (server → open → flows)",
+      "dependsOrder": "sequence",
+      "dependsOn": ["rig: pull main", "rig: server", "rig: open", "rig: flows"],
+      "problemMatcher": []
+    }
+  ]
+}

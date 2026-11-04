@@ -1,0 +1,11 @@
+{
+  // T149 Mac rig: Remote-SSH opens the Mac's clone; YAML schema for Maestro flows.
+  "recommendations": [
+    "ms-vscode-remote.remote-ssh",
+    "ms-vscode-remote.remote-ssh-edit",
+    "redhat.vscode-yaml",
+    "dbaeumer.vscode-eslint",
+    "charliermarsh.ruff",
+    "expo.vscode-expo-tools"
+  ]
+}
