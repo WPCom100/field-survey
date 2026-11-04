@@ -1,0 +1,97 @@
+# F3: the card's ⋯ menu on the sensor (T81, T139, R6): Move pin… with a reason and a tap; Put back
+# in the unplaced list… (prefilled "Placed by mistake") clears the pin; Place pin… places it again;
+# Delete… → Deleted → Restore…; History names each change with who and why.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: card.close
+    optional: true            # the sensor's card is still open after + Note here
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: 'plan\.device\.06M-D\d+'
+- tapOn:
+    id: card.menu
+- tapOn:
+    id: card.menu.move
+- tapOn:
+    id: card.reason
+- inputText: 'Maestro: moved'
+- tapOn:
+    id: card.reason.ok
+- assertVisible: 'Tap the new position of 06M-D\d+\..*'
+- tapOn:
+    point: 45%,35%
+- extendedWaitUntil:
+    notVisible: 'Tap the new position of .*'
+    timeout: 10000
+# Put back in the unplaced list: a field addition keeps its record, its pin is cleared
+- tapOn:
+    id: card.menu
+- tapOn:
+    id: card.menu.unplace
+- assertVisible:
+    id: card.reason
+    text: Placed by mistake
+- tapOn:
+    id: card.reason.ok
+- tapOn:
+    id: card.menu
+- assertVisible:
+    id: card.menu.move
+    text: Place pin…
+- tapOn:
+    id: card.menu.move
+- tapOn:
+    id: card.reason
+- inputText: 'Maestro: placed again'
+- tapOn:
+    id: card.reason.ok
+- tapOn:
+    point: 40%,40%
+- extendedWaitUntil:
+    notVisible: 'Tap the new position of .*'
+    timeout: 10000
+- tapOn:
+    id: card.menu
+- assertVisible:
+    id: card.menu.move
+    text: Move pin…
+# Delete… with a reason, then Restore…
+- tapOn:
+    id: card.menu.delete
+- tapOn:
+    id: card.reason
+- inputText: 'Maestro: added in error'
+- tapOn:
+    id: card.reason.ok
+- assertVisible: 'Deleted: Maestro: added in error'
+- tapOn:
+    id: card.menu
+- tapOn:
+    id: card.menu.restore
+- tapOn:
+    id: card.reason
+- inputText: 'Maestro: it is there'
+- tapOn:
+    id: card.reason.ok
+- extendedWaitUntil:
+    notVisible: 'Deleted: .*'
+    timeout: 10000
+# History: who, when, why (R6)
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.history
+- tapOn:
+    id: card.section.history
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.history
+- assertVisible: '.*"Maestro: it is there".*'
+- assertVisible: '.*"Maestro: added in error".*'
+- assertVisible: '.*"Maestro: placed again".*'
+- assertVisible: '.*"Placed by mistake".*'
+- assertVisible: '.*"Maestro: moved".*'
+- assertVisible: '\d\d/\d\d \d\d:\d\d ${USER} · .*'

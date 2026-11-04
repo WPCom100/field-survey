@@ -880,7 +880,7 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
       {q?.input ? (
         <View style={styles.draftField}>
           <Text style={styles.draftLabel}>{q.input}</Text>
-          <TextInput style={styles.draftInput} value={answer} onChangeText={setAnswer} autoCapitalize="sentences" autoCorrect={false} autoFocus testID="card.quick.input" />
+          <TextInput style={styles.draftInput} value={answer} onChangeText={setAnswer} autoCapitalize="sentences" autoCorrect={false} autoFocus testID="card.quick.input" returnKeyType="done" onSubmitEditing={() => void apply()} />
           <View style={styles.rowWrap}>
             <SmallButton label="Apply" disabled={busy || (!q.optional && !answer.trim())} onPress={() => void apply()} testID="card.quick.apply" />
             <SmallButton label="Cancel" disabled={busy} onPress={() => setAsking(null)} />

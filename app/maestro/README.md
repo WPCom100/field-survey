@@ -15,6 +15,8 @@ team Ann / Bob), never to the Droplet.
 | `sync-now.yaml` | `rig.sh conflict` | relaunch keeping the store, Sync now |
 | `conflict-status.yaml`, `conflict-check.yaml` | `rig.sh conflict conflict-status.yaml conflict-check.yaml` | with the server stopped, A sets the first 06M device `Issue` and B `Not installed` (status bar "Offline · n pending"); after A then B sync, both cards show `✓ Issue` and "in review", Needs review counts a sync conflict (the orchestration's proof; wave 3 O2 resolves it) |
 | `ends.yaml` | `rig.sh flows ends.yaml` | F1 (T155): a fresh copy of the master (`_seed-copy`), then on 06M: C-23 Not installed → R3a Run draft → Accept → R4b kit → Accept (`src #n` after the sync); Issue "Run, not terminated" → R3a Terminate EC/ETC, "…; no term kit" → R3b Missing part EC/ETC → Accept, no second kit; C-12 one Run draft on end A, the item standing through a flip; no kit chip on the P run C-08; 06M-04's findings line; C-13 → Jump to 04-01 on Level 04; 04-05's `Run 120V to P-NSPS-D Power Supply`; Change placeholder… → Add & use, Vocabulary refuses its removal (about 11 min) |
+| `lists.yaml` | `rig.sh flows lists.yaml` | F2 (T155): a fresh copy of the master; on 06M the Conns rows `<this end> ↔ <other end> · <status>`, `C-14` → one row and its two end devices, `06M-02` → that device alone; B1's Punch #8 Device text from B1-S3 and Relocated followed at once; B2's Neuron ID item drops B2-S1 once its Neuron ID is typed; the NSPS card has no Neuron ID (about 8 min). Tracking / Part status: no screen yet (T162) |
+| `additions.yaml` | `rig.sh flows additions.yaml` | F3 (T155): a new project with the 06M sheet; long-press → + Device: the eleven categories, a Station → `06M-S1`, a Sensor → `06M-D1` after the sync; + Note here; the card's ⋯: Move pin…, Put back in the unplaced list… ("Placed by mistake"), Place pin…, Delete… → Restore…, each in History with who and why; Not found on site (once in the Notes, no item), Spot-check fixed, Non-ETC device, Relocated (about 6 min) |
 
 | Sub-flow | Walks |
 |---|---|
@@ -39,6 +41,11 @@ team Ann / Bob), never to the Droplet.
 | `_open-end.yaml` | the card's connection `CONN` (env, tapped by its C-label) → its end editor |
 | `_end-note-clear.yaml` | empties this end's note (two tap-and-erase passes: eraseText deletes before the cursor) |
 | `_ends-run.yaml`, `_ends-terminate.yaml`, `_ends-wire.yaml`, `_ends-elsewhere.yaml`, `_ends-placeholder.yaml` | the steps of `ends.yaml` |
+| `_search.yaml`, `_search-clear.yaml` | the plan's search box: `TERM` (env) typed, or emptied; Return closes the keyboard |
+| `_lists-conns.yaml`, `_lists-punch.yaml` | the steps of `lists.yaml` |
+| `_add-here.yaml` | long-press `AT` → + Device → `CAT`, new model `MODEL` → Add device → NEW, then the server's ID `IDRE` (env) |
+| `_quick-apply.yaml` | Return applies the open quick action; waits for its question to close |
+| `_additions-add.yaml`, `_additions-menu.yaml`, `_additions-quick.yaml` | the steps of `additions.yaml` |
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a
 regex on what is visible. A flow for a new screen gets its `testID`s in the same task.

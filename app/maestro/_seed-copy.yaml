@@ -33,13 +33,14 @@ appId: productions.luminarytechnology.fieldsurvey
     element:
       id: seed.import
     direction: DOWN
+- runFlow: _logbox.yaml     # T161's toast took this tap once and opened the dev log instead
 - tapOn:
     id: seed.import
 - scrollUntilVisible:
     element:
       id: seed.status
     direction: DOWN
-    timeout: 30000
+    timeout: 120000   # behind another upload job on the worker
 - extendedWaitUntil:
     visible:
       id: seed.status

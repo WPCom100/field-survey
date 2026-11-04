@@ -1,0 +1,9 @@
+# Applies the open quick action after its answer is typed (T155): Return applies it (the keyboard
+# covers Apply at the bottom of a long card), and the question closes once the action ran.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- pressKey: Enter
+- extendedWaitUntil:
+    notVisible:
+      id: card.quick.input
+    timeout: 8000

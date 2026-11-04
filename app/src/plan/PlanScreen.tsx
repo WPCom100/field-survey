@@ -1550,7 +1550,7 @@ export function PlanScreen(props: PlanScreenProps) {
                       // a connection opens its end editor; its device's pin is lit behind it
                       if (item.deviceId) select(item.deviceId, 'list');
                       setEndView({ endId: item.id, from: 'list' });
-                    } else if (item.deviceId) select(item.deviceId === selectedId ? null : item.deviceId, 'list');
+                    } else if (item.deviceId) select(item.deviceId, 'list'); // the list is hidden under an open card: a tap always opens it (T155)
                   }}
                 />
               ) : (
@@ -1559,7 +1559,7 @@ export function PlanScreen(props: PlanScreenProps) {
                   badges={lists?.deviceBadges.get(item.id) ?? NO_BADGES}
                   selected={picked ? picked.has(item.id) : item.id === selectedId}
                   picking={!!picked}
-                  onPress={() => (picked ? setPicked(togglePick(picked, item.id)) : select(item.id === selectedId ? null : item.id, 'list'))}
+                  onPress={() => (picked ? setPicked(togglePick(picked, item.id)) : select(item.id, 'list'))}
                 />
               )
             }

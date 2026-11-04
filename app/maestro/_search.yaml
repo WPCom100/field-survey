@@ -1,0 +1,8 @@
+# The plan's search box: emptied, then TERM typed (T155). The caller passes TERM in env.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: plan.search
+- eraseText: 30
+- inputText: ${TERM}
+- pressKey: Enter          # closes the keyboard: else the next tap only dismisses it

@@ -1,0 +1,60 @@
+# F3: the categories offered, a station and a sensor added by long-press, + Note here (T112, T92's
+# functional half). Starts on 06M's plan with the sheet; ends with the sensor's card open.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- longPressOn:
+    point: 30%,45%
+- tapOn:
+    id: press.device
+# the eleven categories of D196
+- assertVisible:
+    id: add.cat.Power Distribution
+- assertVisible:
+    id: add.cat.Emergency Equipment
+- assertVisible:
+    id: add.cat.Equipment
+- assertVisible:
+    id: add.cat.Equipment Panels
+- assertVisible:
+    id: add.cat.Equipment Rack
+- assertVisible:
+    id: add.cat.Power Supplies
+- assertVisible:
+    id: add.cat.Wall Plates
+- assertVisible:
+    id: add.cat.Lighting Console
+- assertVisible:
+    id: add.cat.Touchscreen
+- assertVisible:
+    id: add.cat.Station
+- assertVisible:
+    id: add.cat.Sensor
+- tapOn:
+    id: add.cancel
+- runFlow:
+    file: _add-here.yaml
+    env:
+      AT: 30%,45%
+      CAT: Station
+      MODEL: Maestro test station
+      IDRE: '06M-S\d+'
+- tapOn:
+    id: card.close
+- runFlow:
+    file: _add-here.yaml
+    env:
+      AT: 50%,60%
+      CAT: Sensor
+      MODEL: Maestro test sensor
+      IDRE: '06M-D\d+'
+# + Note here: the ink note box at the spot
+- longPressOn:
+    point: 20%,75%
+- tapOn:
+    id: press.note
+- assertVisible: Done
+- tapOn: Note text
+- inputText: Maestro note here
+- pressKey: Enter
+- tapOn: Done
+- assertNotVisible: Note text

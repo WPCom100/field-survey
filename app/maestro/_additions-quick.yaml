@@ -1,0 +1,96 @@
+# F3: the four quick actions (T34, T101). On the sensor: Not found on site → Not installed, "Not
+# Installed." once in its Notes however often it is tapped, no item. On the station: Spot-check
+# fixed → a closed ETC item; Non-ETC device → Not installed and the EC's item; Relocated → the
+# room reads "<new>; moved from <old>" (or the new room when there was none).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.section.quick
+- tapOn:
+    id: card.section.quick
+- tapOn:
+    id: card.quick.not_found
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.notes
+- extendedWaitUntil:
+    visible:
+      id: card.notes
+      text: Not Installed.
+    timeout: 10000
+- assertVisible: ✓ Not installed
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.quick.not_found
+- tapOn:
+    id: card.quick.not_found
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.notes
+- assertVisible:
+    id: card.notes
+    text: Not Installed.
+- assertVisible: '.*Punch items \(0\).*'
+# the station
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: 'plan\.device\.06M-S\d+'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.quick
+- tapOn:
+    id: card.section.quick
+- tapOn:
+    id: card.quick.E6
+- tapOn:
+    id: card.quick.input
+- inputText: loose wire
+- runFlow: _quick-apply.yaml
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: 'card\.punch\.Spot check: loose wire'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.quick.E7
+- tapOn:
+    id: card.quick.E7
+- tapOn:
+    id: card.quick.input
+- inputText: Wattstopper
+- runFlow: _quick-apply.yaml
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: 'card\.punch\.Confirm existing .*Wattstopper.*'
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.notes
+- assertVisible:
+    id: card.notes
+    text: '.*appears to be a Wattstopper, confirm\..*'
+- assertVisible: ✓ Not installed
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.quick.E9
+- tapOn:
+    id: card.quick.E9
+- tapOn:
+    id: card.quick.input
+- inputText: Maestro room B
+- runFlow: _quick-apply.yaml
+- extendedWaitUntil:
+    visible: '.*Maestro room B.*'
+    timeout: 10000

@@ -1,0 +1,24 @@
+# F3 (T155, rig plan wave 1): long-press additions and the card's ⋯ menu and quick actions, on a
+# new project with the 06M sheet (_sources). Long-press → + Device → the eleven D196 categories →
+# a station and a sensor, numbered 06M-S… and 06M-D… by the server (T112); + Note here; ⋯ → Move
+# pin…, Put back in the unplaced list… ("Placed by mistake"), Place pin…, Delete… → Restore…, each
+# in History with who and why (R6, T139, T81); the four quick actions (T34, T101).
+appId: productions.luminarytechnology.fieldsurvey
+name: F3 — long-press additions, the card's menu, quick actions
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _new-project.yaml
+- runFlow: _sources.yaml
+- runFlow: _logbox.yaml     # T161's toast can cover the screen after the pulls
+- tapOn:
+    id: plans.open.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible: ⊕ Place
+    timeout: 60000
+- runFlow: _additions-add.yaml
+- runFlow: _additions-menu.yaml
+- runFlow: _additions-quick.yaml

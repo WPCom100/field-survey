@@ -1,0 +1,25 @@
+# Long-press AT on the sheet → + Device (field addition) → category CAT → a new model MODEL → Add
+# device: the card opens on `<level>-?` NEW, and after the sync the server's ID matches IDRE (T155,
+# T112: the ID letter follows the role — S for a station, D for a sensor). Env: AT, CAT, MODEL, IDRE.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- longPressOn:
+    point: ${AT}
+- tapOn:
+    id: press.device
+- assertVisible: Add device (field addition)
+- tapOn:
+    id: add.cat.${CAT}
+- tapOn:
+    id: add.model
+- inputText: ${MODEL}
+- tapOn: 'ID'                      # a plain label: closes the keyboard over Add device
+- tapOn:
+    id: add.submit
+- extendedWaitUntil:
+    visible: NEW · ID assigned at sync
+    timeout: 10000
+- extendedWaitUntil:                # NEW first; the sync can bring the ID before `06M-?` is read
+
+    visible: ${IDRE}
+    timeout: 90000

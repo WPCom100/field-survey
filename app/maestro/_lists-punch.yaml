@@ -1,0 +1,100 @@
+# F2 on B1 and B2 (T81, T34, T68): the Punch list's Device text, a Relocated that it follows at
+# once, and the Neuron ID item's Notes. Starts on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: level.B1
+- tapOn:
+    id: plan.tab.punch
+- runFlow: _search-clear.yaml       # the Device text on a punch row is not searchable (filed: T163)
+- assertVisible:
+    id: plan.row.punch.8
+    text: '.*Install cover.*B1-S3 · .*Corridor XXB1-C005, north.*'
+- tapOn:
+    id: plan.row.punch.8
+- extendedWaitUntil:
+    visible:
+      id: card.close
+    timeout: 5000
+- assertVisible: B1-S3
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.quick
+- tapOn:
+    id: card.section.quick
+- tapOn:
+    id: card.quick.E9
+- tapOn:
+    id: card.quick.input
+- inputText: Corridor XXB1-C006
+- runFlow: _quick-apply.yaml
+- assertVisible: .*Corridor XXB1-C006; moved from Corridor XXB1-C005, north.*   # the card header
+- tapOn:
+    id: card.close
+- extendedWaitUntil:
+    visible:
+      id: plan.row.punch.8
+      text: '.*B1-S3 · .*Corridor XXB1-C006; moved from Corridor XXB1-C005, north.*'
+    timeout: 10000
+- tapOn:
+    id: plan.back
+# B2: "Missing all Device Neuron IDs" (#9) names B2-D1 and B2-S1
+- tapOn:
+    id: level.B2
+- tapOn:
+    id: plan.tab.punch
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: B2-S1
+- assertVisible:
+    id: plan.row.punch.9
+    text: '.*Missing all Device Neuron IDs.*'
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.B2-S1
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.neuron.type
+- tapOn:
+    id: card.neuron.type
+- inputText: 00A1B2C3D4E5
+- tapOn:
+    id: card.neuron.save
+- assertVisible: 00A1B2C3D4E5
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.punch
+- extendedWaitUntil:
+    notVisible:
+      id: plan.row.punch.9
+    timeout: 15000
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: B2-D1
+- assertVisible:
+    id: plan.row.punch.9
+    text: '.*Missing all Device Neuron IDs.*'
+- runFlow: _search-clear.yaml
+# T68: a rack or NSPS hosts the Unison bus and is asked for no Neuron ID; the station is
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.B2-03
+- extendedWaitUntil:
+    visible:
+      id: card.close
+    timeout: 5000
+- assertVisible: 'NSPS.*|.*P-NSPS-D.*'
+- assertNotVisible:
+    id: card.neuron.type
+- assertNotVisible: Neuron ID
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

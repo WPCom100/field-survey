@@ -1,0 +1,67 @@
+# F2 on 06M's plan (T95): the Conns rows, a C-nn search and a device search.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: plan.tab.connections
+- assertVisible:
+    id: plan.tab.connections
+    text: 'Conns 2[0-9]'
+# C-14: the rack's end of the DMX run from 06M-02
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: C-14
+- extendedWaitUntil:
+    visible:
+      id: plan.tab.connections
+      text: Conns 1
+    timeout: 5000
+- assertVisible:
+    id: plan.row.connections.C-14
+    text: '.*X → DMX to CT06LCPB.*06M-01 ↔ 06M-02 · Not installed.*'
+- tapOn:
+    id: plan.tab.devices
+- assertVisible:
+    id: plan.tab.devices
+    text: Devices 2
+- assertVisible:
+    id: plan.device.06M-01
+- assertVisible:
+    id: plan.device.06M-02
+- assertNotVisible:
+    id: plan.device.06M-04
+# a device's ID: the runs to and from it, and that device alone under Devices
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: 06M-02
+- extendedWaitUntil:
+    visible:
+      id: plan.tab.devices
+      text: Devices 1
+    timeout: 5000
+- assertVisible:
+    id: plan.device.06M-02
+- assertNotVisible:
+    id: plan.device.06M-01
+- assertNotVisible:
+    id: plan.device.06M-03
+- tapOn:
+    id: plan.tab.connections
+- assertVisible:
+    id: plan.row.connections.C-12
+    text: '.*06M-02 ↔ 06M-01 · Not installed.*'
+- assertVisible:
+    id: plan.row.connections.C-08
+    text: '.*06M-02 ↔ 06M-03 · Installed, untested.*'
+# a placeholder end reads its text
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: C-23
+- assertVisible:
+    id: plan.row.connections.C-23
+    text: '.*06M-01 ↔ Level 11 · Not started.*'
+- runFlow: _search-clear.yaml
+- tapOn:
+    id: plan.back
