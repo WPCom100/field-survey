@@ -30,15 +30,7 @@ appId: productions.luminarytechnology.fieldsurvey
       text: '(Done: .*|Already imported.*)'
     timeout: 90000
 # Floor plans: the 06M display sheet (single selection opens on tap)
-- tapOn:
-    id: plans.display.06M
-- runFlow: _pick-wait.yaml
-- tapOn:
-    point: 14%,46%          # On My iPad
-- runFlow: _pick-wait.yaml
-- tapOn:
-    point: 65%,35%          # 3rd file: the 06M composite PDF
-- extendedWaitUntil:
-    visible:
-      id: plans.open.06M     # shown once the sheet job is done and the sheet synced
-    timeout: 180000
+- runFlow:
+    file: _sheet.yaml
+    env:
+      AT: 65%,35%           # 3rd file: the 06M composite PDF

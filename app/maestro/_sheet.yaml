@@ -1,0 +1,26 @@
+# Setup → 3 Sources → Floor plans: the 06M display sheet from the Files app, then waits for the
+# sheet job and the synced sheet (T151, T155). The picker is another process, tapped by position:
+# the caller passes AT, the file's spot in "On My iPad" (`rig.sh flows` stages the files by name).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+    optional: true          # already on Setup
+- tapOn:
+    id: setup.step.sources
+- scrollUntilVisible:
+    element:
+      id: plans.display.06M
+    direction: DOWN
+- tapOn:
+    id: plans.display.06M
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 14%,46%          # On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: ${AT}
+- extendedWaitUntil:
+    visible:
+      id: plans.open.06M     # shown once the sheet job is done and the sheet synced
+    timeout: 180000

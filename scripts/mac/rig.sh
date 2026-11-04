@@ -67,6 +67,8 @@ usage: bash scripts/mac/rig.sh <command>
                         on RIG_PROJECT, already on both simulators: server stop, <edit-flow> on A
                         (Ann, SIDE=A) and on B (Bob, SIDE=B), server start, A syncs then B syncs
                         (sync-now.yaml), then [check-flow] on A and on B
+  place-two             F4 two-iPad half: place-two-setup.yaml on A, place-two-peer.yaml on B, then
+                        conflict place-two-edit.yaml place-two-check.yaml (one unit each, offline)
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
      RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
@@ -242,7 +244,12 @@ cmd_flows() {
   fi
   # flows that work on their own copy of the master (wave 1, T155) pick the workbook alone
   if grep -q "_seed-copy.yaml" "$ROOT/app/maestro/${flow:-smoke.yaml}" 2>/dev/null; then
-    cmd_files "$dev" fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx
+    if grep -q "_sheet.yaml" "$ROOT/app/maestro/${flow:-smoke.yaml}"; then
+      # ...and then the 06M sheet (place.yaml): by name the sheet is 1st, the workbook 2nd (SEED_AT)
+      cmd_files "$dev" "fixtures/Level_06M_-_Lighting_Composite_vector.pdf" fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx
+    else
+      cmd_files "$dev" fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx
+    fi
   fi
   udid="$(sim_for "$dev")"
   command -v maestro >/dev/null || export PATH="$HOME/.maestro/bin:$PATH"
@@ -438,6 +445,15 @@ cmd_conflict() {  # <edit-flow> [check-flow]: both iPads edit offline, then both
   say "conflict: green"
 }
 
+cmd_place_two() {  # F4 two-iPad half (T46): one pooled draft, one unit placed on each iPad offline
+  cmd_second
+  say "place-two on \"$PROJECT\": A (Ann) pools a Station draft of two, B (Bob) opens the plan, both place one unit offline"
+  USER_NAME=Ann cmd_flows --device A place-two-setup.yaml
+  USER_NAME=Bob cmd_flows --device B place-two-peer.yaml
+  RIG_PROJECT="$PROJECT" cmd_conflict place-two-edit.yaml place-two-check.yaml
+  say "place-two: green"
+}
+
 cmd_status() {
   say "simulators:"; xcrun simctl list devices | grep -E "$SIM_A|$SIM_B" || echo "  none"
   say "build: $(built_app || echo none)"
@@ -463,6 +479,7 @@ case "${1:-}" in
   media) shift; cmd_media "$@" ;;
   log) shift; cmd_log "$@" ;;
   conflict) shift; cmd_conflict "$@" ;;
+  place-two) cmd_place_two ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;
 esac

@@ -1,6 +1,11 @@
 # The plan's search box: emptied, then TERM typed (T155). The caller passes TERM in env.
+# Two tap-and-erase passes: a tap inside longer text puts the cursor mid-word, and eraseText
+# deletes only before it (place.yaml found "06M-04EQ" after one pass).
 appId: productions.luminarytechnology.fieldsurvey
 ---
+- tapOn:
+    id: plan.search
+- eraseText: 30
 - tapOn:
     id: plan.search
 - eraseText: 30

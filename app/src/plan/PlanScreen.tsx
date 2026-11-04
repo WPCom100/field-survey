@@ -1260,7 +1260,7 @@ export function PlanScreen(props: PlanScreenProps) {
               ) : null}
               <View style={styles.planTools}>
                 {editor && !drawing && !placing ? (
-                  <Pressable style={styles.tool} onPress={startPlacing}>
+                  <Pressable style={styles.tool} onPress={startPlacing} testID="plan.place">
                     <Text style={styles.toolText}>⊕ Place</Text>
                   </Pressable>
                 ) : null}
@@ -1507,13 +1507,13 @@ export function PlanScreen(props: PlanScreenProps) {
             </View>
           ) : (
             <View style={styles.sideHead}>
-              <Text style={styles.sideNote} numberOfLines={1}>
+              <Text style={styles.sideNote} numberOfLines={1} testID="plan.side.note">
                 {filtering || hits ? 'Filtered' : 'All'} · {tabData.length}
                 {tab === 'devices' && plan ? ` of ${plan.devices.length}` : ''}
                 {tab === 'devices' && notOnPlan > 0 ? ` · ${notOnPlan} not on the plan` : ''}
               </Text>
               {tab === 'devices' && notOnPlan > 0 && editor && sheetUri ? (
-                <Pressable onPress={startPlacing} hitSlop={8}>
+                <Pressable onPress={startPlacing} hitSlop={8} testID="plan.devices.place">
                   <Text style={styles.sideLink}>Place ▸</Text>
                 </Pressable>
               ) : null}

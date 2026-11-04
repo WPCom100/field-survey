@@ -1,0 +1,29 @@
+# `rig.sh place-two` through `rig.sh conflict`: with the server stopped, each iPad places one unit
+# of the pooled MAESTRO-PL on 06M (A and B at different spots, SIDE); the edit waits in the outbox.
+appId: productions.luminarytechnology.fieldsurvey
+name: Place two — one unit each, offline
+---
+- runFlow: _resume.yaml
+- runFlow:
+    file: _open-level.yaml
+    env:
+      LEVEL: 06M
+- tapOn:
+    id: plan.place
+- tapOn:
+    id: place.scope.pool
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '.*MAESTRO-PL.*pool ×2.*'
+      AT: "${SIDE == 'A' ? '15%,60%' : '40%,64%'}"
+      PLACED: 'Placed 06M-\? MAESTRO-PL\.'
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.back
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline · [1-9]\d* pending.*'
+    timeout: 60000

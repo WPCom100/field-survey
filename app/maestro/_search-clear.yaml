@@ -1,6 +1,9 @@
-# Empties the plan's search box (T155).
+# Empties the plan's search box (T155): two tap-and-erase passes, as in _search.yaml.
 appId: productions.luminarytechnology.fieldsurvey
 ---
+- tapOn:
+    id: plan.search
+- eraseText: 30
 - tapOn:
     id: plan.search
 - eraseText: 30

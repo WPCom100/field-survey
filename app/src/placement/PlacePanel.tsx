@@ -92,16 +92,16 @@ export function PlacePanel(props: PlacePanelProps) {
         </Pressable>
         <Text style={styles.title}>Place devices — {props.levelCode}</Text>
         {p ? (
-          <Text style={styles.muted}>
+          <Text style={styles.muted} testID="place.progress">
             Placed {p.placed} of {p.devices}
             {p.draftUnits ? ` · ${p.draftUnits} to place from drafts` : ''}
             {p.flagged ? ` · ${p.flagged} flagged` : ''}
           </Text>
         ) : null}
         <View style={styles.rowWrap}>
-          <Chip label={`${props.levelCode} ${counts.level}`} on={scope === 'level'} onPress={() => setScope('level')} />
-          <Chip label={`Pool ${counts.pool}`} on={scope === 'pool'} onPress={() => setScope('pool')} />
-          <Chip label={`Flagged ${counts.flagged}`} on={scope === 'flagged'} onPress={() => setScope('flagged')} />
+          <Chip label={`${props.levelCode} ${counts.level}`} on={scope === 'level'} onPress={() => setScope('level')} testID="place.scope.level" />
+          <Chip label={`Pool ${counts.pool}`} on={scope === 'pool'} onPress={() => setScope('pool')} testID="place.scope.pool" />
+          <Chip label={`Flagged ${counts.flagged}`} on={scope === 'flagged'} onPress={() => setScope('flagged')} testID="place.scope.flagged" />
         </View>
         {roles.length > 1 ? (
           <View style={styles.rowWrap}>
@@ -119,14 +119,15 @@ export function PlacePanel(props: PlacePanelProps) {
         ) : null}
         {spot && props.spotGuess ? <Text style={styles.warn}>Guess: the sheet prints {props.spotGuess} here, not this model. Check it is this unit before placing.</Text> : null}
         {!editor ? <Text style={styles.warn}>Pick who you are to place devices.</Text> : null}
-        {note ? <Text style={styles.note}>{note}</Text> : null}
+        {note ? <Text style={styles.note} testID="place.note">{note}</Text> : null}
         {last ? (
           <View style={[styles.row, styles.lastRow]}>
-            <Text style={[styles.rowText, styles.lastText]} numberOfLines={2}>
+            <Text style={[styles.rowText, styles.lastText]} numberOfLines={2} testID="place.last">
               {last.text}
             </Text>
             <Btn
               label="↶ Undo"
+              testID="place.undo"
               disabled={busy || !editor}
               onPress={() =>
                 void run(async () => {
@@ -269,7 +270,7 @@ function Selected(props: {
   const isNew = item.kind === 'device' ? item.isNew : true;
   return (
     <View style={styles.selected}>
-      <Text style={styles.selTitle} numberOfLines={2}>
+      <Text style={styles.selTitle} numberOfLines={2} testID="place.selected">
         {itemLine(item)}
       </Text>
       {!spot ? (
@@ -280,23 +281,23 @@ function Selected(props: {
               <Text style={styles.handleText}>⠿ Drag onto the plan</Text>
             </View>
             {item.kind === 'draft' ? (
-              <Btn label={item.notOnSheet ? 'Unflag: back on the list' : 'Flag: not on this sheet ⊗'} onPress={() => props.onFlag(!item.notOnSheet)} disabled={props.busy || !props.canEdit} />
+              <Btn label={item.notOnSheet ? 'Unflag: back on the list' : 'Flag: not on this sheet ⊗'} onPress={() => props.onFlag(!item.notOnSheet)} disabled={props.busy || !props.canEdit} testID="place.flag" />
             ) : null}
-            {flagged ? <Btn label="Move to…" onPress={() => setMoving(!moving)} disabled={props.busy || !props.canEdit} /> : null}
-            <Btn label="Cancel" onPress={props.onCancel} />
+            {flagged ? <Btn label="Move to…" onPress={() => setMoving(!moving)} disabled={props.busy || !props.canEdit} testID="place.move" /> : null}
+            <Btn label="Cancel" onPress={props.onCancel} testID="place.cancel" />
           </View>
           {flagged && moving && !props.busy ? (
             <>
-              <Text style={styles.muted}>
+              <Text style={styles.muted} testID="place.moveHint">
                 {flagged.placed ? `${flagged.remaining} unit${flagged.remaining === 1 ? '' : 's'} left move; the ${flagged.placed} placed keep their level. ` : ''}It comes off Flagged.
               </Text>
               <View style={styles.rowWrap}>
                 {props.levels
                   .filter((l) => l.levelId !== flagged.levelId)
                   .map((l) => (
-                    <Chip key={l.levelId} label={l.code} on={false} onPress={() => props.onMove({ levelId: l.levelId, code: l.code })} />
+                    <Chip key={l.levelId} label={l.code} on={false} onPress={() => props.onMove({ levelId: l.levelId, code: l.code })} testID={`place.moveTo.${l.code}`} />
                   ))}
-                {!flagged.pool ? <Chip label="Pool, every level" on={false} onPress={() => props.onMove({ levelId: null, code: null })} /> : null}
+                {!flagged.pool ? <Chip label="Pool, every level" on={false} onPress={() => props.onMove({ levelId: null, code: null })} testID="place.moveTo.pool" /> : null}
               </View>
             </>
           ) : null}
@@ -327,7 +328,7 @@ function Selected(props: {
               disabled={props.busy || !props.canEdit}
               onPress={() => props.onPlace({ drawingPosition: dp, room, ...(tagged ? { panelName: panel } : {}) })}
             />
-            <Btn label="Cancel" onPress={props.onCancel} />
+            <Btn label="Cancel" onPress={props.onCancel} testID="place.cancel" />
           </View>
           <Text style={styles.muted}>Tap the plan again to move the spot.</Text>
         </>
@@ -336,9 +337,9 @@ function Selected(props: {
   );
 }
 
-function Chip({ label, on, onPress, small }: { label: string; on: boolean; onPress: () => void; small?: boolean }) {
+function Chip({ label, on, onPress, small, testID }: { label: string; on: boolean; onPress: () => void; small?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, small && styles.chipSmall, on && styles.chipOn]}>
+    <Pressable onPress={onPress} style={[styles.chip, small && styles.chipSmall, on && styles.chipOn]} testID={testID}>
       <Text style={[styles.chipText, small && styles.chipTextSmall, on && styles.chipTextOn]} numberOfLines={1}>
         {label}
       </Text>

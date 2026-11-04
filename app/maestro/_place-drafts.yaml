@@ -1,0 +1,78 @@
+# F4: Setup → 4 Review drafts on 06M (from Setup): three hand device drafts, accepted — MAESTRO-EQ
+# Equipment ×1 (role other: no master device stands for it), MAESTRO-ST Station ×2 and MAESTRO-SN
+# Sensor ×2 (the seed's 06M has no station or sensor) — and an N cable draft 06M-04 → MAESTRO-EQ,
+# Confirm endpoint ✓: made at once on 06M-04, its far end waiting for the draft (T136, D235).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: setup.step.drafts
+- tapOn:
+    id: drafts.level.06M
+- runFlow:
+    file: _place-draft.yaml
+    env:
+      MODEL: MAESTRO-EQ
+      CAT: Equipment
+      QTY: '1'
+- runFlow:
+    file: _place-draft.yaml
+    env:
+      MODEL: MAESTRO-ST
+      CAT: Station
+      QTY: '2'
+- runFlow:
+    file: _place-draft.yaml
+    env:
+      MODEL: MAESTRO-SN
+      CAT: Sensor
+      QTY: '2'
+# the cable: + Draft cable N, then both ends picked with Change…
+- tapOn:
+    id: drafts.tab.cables
+- tapOn:
+    id: drafts.addCable
+- tapOn:
+    id: drafts.new.code.N
+- tapOn:
+    id: drafts.new.from
+- inputText: 06M-04
+- tapOn:
+    id: drafts.new.to
+- inputText: MAESTRO-EQ
+- tapOn:
+    id: drafts.new.addCable
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Draft added
+    timeout: 10000
+- tapOn:
+    id: draft.cable.change.from
+- tapOn:
+    id: draft.cable.search
+- inputText: 06M-04
+- tapOn:
+    id: draft.cable.option
+    text: '▣ 06M-04.*'
+- extendedWaitUntil:          # the picker closes on a pick
+    notVisible:
+      id: draft.cable.search
+    timeout: 10000
+- tapOn:
+    id: draft.cable.change.to
+- tapOn:
+    id: draft.cable.search
+- inputText: MAESTRO-EQ
+- tapOn:
+    id: draft.cable.option
+    text: '◌ .*MAESTRO-EQ.*'
+- extendedWaitUntil:
+    visible: '.*MAESTRO-EQ.*\(not placed yet\).*'
+    timeout: 10000
+- tapOn:
+    id: draft.cable.confirm
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: 'Accepted — the cable is made on the placed end; its far end follows when that draft is placed'
+    timeout: 15000

@@ -195,15 +195,15 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
       </View>
       <ScrollView horizontal style={styles.levels} contentContainerStyle={styles.chips} showsHorizontalScrollIndicator={false}>
         {data.levels.map((l) => (
-          <Chip key={l.key} on={l.key === level.key} label={`${l.code}${l.open ? ` · ${l.open}` : ''}`} dim={!l.inScope} onPress={() => (setLevelKey(l.key), setSelected(null))} />
+          <Chip key={l.key} on={l.key === level.key} label={`${l.code}${l.open ? ` · ${l.open}` : ''}`} dim={!l.inScope} onPress={() => (setLevelKey(l.key), setSelected(null))} testID={`drafts.level.${l.code}`} />
         ))}
       </ScrollView>
       <View style={styles.chips}>
-        <Chip label={`Devices (${counts.devices})`} on={tab === 'devices'} onPress={() => (setTab('devices'), setSelected(null), setAdding(false))} />
-        <Chip label={`Cables (${counts.cables})`} on={tab === 'cables'} onPress={() => (setTab('cables'), setSelected(null), setAdding(false))} />
+        <Chip label={`Devices (${counts.devices})`} on={tab === 'devices'} onPress={() => (setTab('devices'), setSelected(null), setAdding(false))} testID="drafts.tab.devices" />
+        <Chip label={`Cables (${counts.cables})`} on={tab === 'cables'} onPress={() => (setTab('cables'), setSelected(null), setAdding(false))} testID="drafts.tab.cables" />
         <Text style={styles.sep}>|</Text>
         {FILTERS.map(([f, t]) => (
-          <Chip key={f} label={t} on={filter === f} onPress={() => setFilter(f)} />
+          <Chip key={f} label={t} on={filter === f} onPress={() => setFilter(f)} testID={`drafts.filter.${f}`} />
         ))}
         <Text style={styles.sep}>|</Text>
         {(['confidence', 'model', 'state'] as SortKey[]).map((s) => (
@@ -213,7 +213,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
         {ready ? <Chip label={`Make ${ready} waiting cable${ready === 1 ? '' : 's'}`} onPress={() => void run(async () => `${await commitWaitingCables(editor, store, projectId, { riserBlob: batches ? riserBlobFor(batches, null) : null })} cables made`)} /> : null}
       </View>
       <Notice text={error} error />
-      <Notice text={notice} />
+      <Notice text={notice} testID="drafts.notice" />
 
       <View style={styles.body}>
         <ScrollView style={styles.left} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -340,9 +340,9 @@ function Radio({ label, on, onPress }: { label: string; on: boolean; onPress: ()
   );
 }
 
-function Line({ k, v }: { k: string; v: string }) {
+function Line({ k, v, testID }: { k: string; v: string; testID?: string }) {
   return (
-    <Text style={styles.kv}>
+    <Text style={styles.kv} testID={testID}>
       <Text style={styles.k}>{k} </Text>
       {v}
     </Text>
@@ -436,7 +436,7 @@ function DevicePanel({ d, data, batches, identity, editor, store, run }: { d: De
           ))}
         </View>
       ) : (
-        <Line k="Level" v={`${d.levelCode ?? 'pool (no level)'}  · basis: ${d.levelBasis ?? '—'}`} />
+        <Line k="Level" v={`${d.levelCode ?? 'pool (no level)'}  · basis: ${d.levelBasis ?? '—'}`} testID="draft.level" />
       )}
       <Line k="Confidence" v={`${pct(d.confidence)}${d.extraction ? ` (${d.extraction})` : ''}`} />
       {d.accessories.length ? <Line k="Accessories" v={d.accessories.map((a) => `${a.model} ×${a.qty ?? '?'}${a.role === 'component' ? ' (component)' : ''}`).join(' · ')} /> : null}
@@ -498,7 +498,7 @@ function EditDevice({ d, levels, onSave }: { d: DeviceDraftRow; levels: DraftRev
       <View style={styles.btnRow}>
         <View style={{ width: 90 }}>
           <Text style={w.label}>Qty</Text>
-          <TextInput style={w.input} value={qty} onChangeText={setQty} keyboardType="number-pad" />
+          <TextInput style={w.input} value={qty} onChangeText={setQty} keyboardType="number-pad" testID="draft.edit.qty" />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={w.label}>Name (panel tag)</Text>
@@ -589,7 +589,7 @@ function CablePanel({
         <View key={side} style={styles.end}>
           <Text style={w.label}>{side === 'from' ? 'From' : 'To'}</Text>
           <Text style={[styles.endText, !c.ends[side] && styles.warn]}>{endLine(side)}</Text>
-          {open ? <Btn title={picking === side ? 'Close' : 'Change…'} small onPress={() => setPicking((p) => (p === side ? null : side))} /> : null}
+          {open ? <Btn title={picking === side ? 'Close' : 'Change…'} small onPress={() => setPicking((p) => (p === side ? null : side))} testID={`draft.cable.change.${side}`} /> : null}
           {picking === side ? <EndpointPicker c={c} side={side} data={data} onPick={(e) => void run(() => setEndpoint(editor, store, c.id, side, e).then(() => setPicking(null)), 'Endpoint set')} /> : null}
         </View>
       ))}
@@ -604,7 +604,7 @@ function CablePanel({
         <>
           {blockers.length ? <Text style={styles.dim}>{blockers.join(' ')}</Text> : null}
           <View style={styles.btnRow}>
-            <Btn title="Confirm endpoint ✓" primary small disabled={blockers.length > 0} onPress={() => void run(() => acceptCable(editor, store, data, c, { confirm: true, riserBlob }).then(cableNote))} />
+            <Btn title="Confirm endpoint ✓" testID="draft.cable.confirm" primary small disabled={blockers.length > 0} onPress={() => void run(() => acceptCable(editor, store, data, c, { confirm: true, riserBlob }).then(cableNote))} />
             <Btn title="Accept unconfirmed" small disabled={blockers.length > 0} onPress={() => void run(() => acceptCable(editor, store, data, c, { confirm: false, riserBlob }).then(cableNote))} />
             <RejectForm onReject={(r) => void run(() => rejectDraft(editor, 'cable', c, r), 'Rejected')} />
           </View>
@@ -637,9 +637,9 @@ function EndpointPicker({ c, side, data, onPick }: { c: CableDraftRow; side: Sid
   const options = endpointOptions(data, c, side, q).slice(0, 40);
   return (
     <View style={styles.form}>
-      <TextInput style={w.input} value={q} onChangeText={setQ} placeholder="Search devices, drafts, placeholders (any level)" placeholderTextColor="#9aa0a8" autoCorrect={false} />
+      <TextInput style={w.input} value={q} onChangeText={setQ} placeholder="Search devices, drafts, placeholders (any level)" placeholderTextColor="#9aa0a8" autoCorrect={false} testID="draft.cable.search" />
       {options.map((e) => (
-        <Pressable key={`${e.kind}:${e.id}`} onPress={() => onPick(e)} style={styles.option}>
+        <Pressable key={`${e.kind}:${e.id}`} onPress={() => onPick(e)} style={styles.option} testID="draft.cable.option">
           <Text style={styles.optionText}>
             {e.kind === 'device' ? '▣' : e.kind === 'draft_device' ? '◌' : '⌂'} {e.label}
             {e.confidence != null ? `  · ${pct(e.confidence)}` : ''}
@@ -674,7 +674,7 @@ function AddDevice({ levels, levelId, onAdd }: { levels: DraftReviewData['levels
       <View style={styles.btnRow}>
         <View style={{ width: 90 }}>
           <Text style={w.label}>Qty</Text>
-          <TextInput style={w.input} value={qty} onChangeText={setQty} keyboardType="number-pad" />
+          <TextInput style={w.input} value={qty} onChangeText={setQty} keyboardType="number-pad" testID="drafts.new.qty" />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={w.label}>Name (panel tag)</Text>
@@ -716,13 +716,13 @@ function AddCable({
       <Text style={w.label}>Code</Text>
       <View style={styles.chips}>
         {codes.map((k) => (
-          <Chip key={k} label={k} on={code === k} onPress={() => setCode(k)} />
+          <Chip key={k} label={k} on={code === k} onPress={() => setCode(k)} testID={`drafts.new.code.${k}`} />
         ))}
       </View>
       <Text style={w.label}>From (as written)</Text>
-      <TextInput style={w.input} value={from} onChangeText={setFrom} autoCorrect={false} placeholder="CT02LCPA" placeholderTextColor="#9aa0a8" />
+      <TextInput style={w.input} value={from} onChangeText={setFrom} autoCorrect={false} placeholder="CT02LCPA" placeholderTextColor="#9aa0a8" testID="drafts.new.from" />
       <Text style={w.label}>To (as written)</Text>
-      <TextInput style={w.input} value={to} onChangeText={setTo} autoCorrect={false} placeholder="UFMP4 Level 03" placeholderTextColor="#9aa0a8" />
+      <TextInput style={w.input} value={to} onChangeText={setTo} autoCorrect={false} placeholder="UFMP4 Level 03" placeholderTextColor="#9aa0a8" testID="drafts.new.to" />
       <Text style={w.label}>Far end level</Text>
       <View style={styles.chips}>
         <Chip label="same level" on={toLevel === null} onPress={() => setToLevel(null)} />
@@ -732,7 +732,7 @@ function AddCable({
             <Chip key={l.key} label={l.code} on={toLevel === l.levelId} onPress={() => setToLevel(l.levelId)} />
           ))}
       </View>
-      <Btn title="Add draft" primary small disabled={!code || !from.trim() || !to.trim()} onPress={() => code && onAdd({ levelId, code, fromLabel: from, toLabel: to, toLevelId: toLevel })} />
+      <Btn title="Add draft" testID="drafts.new.addCable" primary small disabled={!code || !from.trim() || !to.trim()} onPress={() => code && onAdd({ levelId, code, fromLabel: from, toLabel: to, toLevelId: toLevel })} />
     </View>
   );
 }

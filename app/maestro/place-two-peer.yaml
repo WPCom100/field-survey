@@ -1,0 +1,27 @@
+# `rig.sh place-two`, step 2 on B (Bob): open A's project and its 06M plan while online, so the
+# sheet is on this iPad for the offline placement; the pooled draft is listed; sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Place two — B has the plan and the pool
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow:
+    file: _open-level.yaml
+    env:
+      LEVEL: 06M
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 90000
+- tapOn:
+    id: plan.place
+- tapOn:
+    id: place.scope.pool
+- assertVisible:
+    id: place.item
+    text: '.*MAESTRO-PL.*pool ×2.*'
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.back
+- runFlow: _sync.yaml

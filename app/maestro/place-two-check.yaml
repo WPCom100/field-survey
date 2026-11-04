@@ -1,0 +1,39 @@
+# `rig.sh place-two`, the check on each iPad after A then B synced: two stations on 06M numbered
+# by the server, nothing left in the pool, no sync conflict (T46 "Two iPads").
+appId: productions.luminarytechnology.fieldsurvey
+name: Place two — two devices, pool empty, nothing in review
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml
+- runFlow:
+    file: _open-level.yaml
+    env:
+      LEVEL: 06M
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: MAESTRO-PL
+- tapOn:
+    id: plan.tab.devices
+- assertVisible:
+    id: plan.side.note
+    text: 'Filtered · 2 of 2'
+- assertVisible:
+    id: plan.device.06M-S1
+- assertVisible:
+    id: plan.device.06M-S2
+- runFlow: _search-clear.yaml
+- tapOn:
+    id: plan.place
+- tapOn:
+    id: place.scope.pool
+    text: Pool 0
+- assertVisible: Nothing left in the pool.
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.needs-review
+- assertNotVisible: 'Sync conflict [1-9].*'
+- tapOn: ← Levels

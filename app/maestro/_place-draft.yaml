@@ -1,0 +1,32 @@
+# F4: + Draft device MODEL, category CAT, QTY units on 06M (env) → Add draft → Accept.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: drafts.tab.devices
+- tapOn:
+    id: drafts.addDevice
+- tapOn:
+    id: drafts.new.model
+- inputText: ${MODEL}
+- tapOn:
+    id: drafts.new.qty
+- eraseText: 3
+- inputText: ${QTY}
+- tapOn:
+    id: drafts.new.cat.${CAT}
+- tapOn:
+    id: drafts.new.level.06M
+- tapOn:
+    id: drafts.new.add
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Draft added
+    timeout: 10000
+- tapOn:
+    id: draft.accept
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Accepted
+    timeout: 10000

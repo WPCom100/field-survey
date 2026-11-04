@@ -171,9 +171,9 @@ export function Section({ title, children }: { title: string; children: ReactNod
   );
 }
 
-export function Notice({ text, error }: { text: string | null; error?: boolean }) {
+export function Notice({ text, error, testID }: { text: string | null; error?: boolean; testID?: string }) {
   if (!text) return null;
-  return <Text style={[styles.notice, error && styles.noticeError]}>{text}</Text>;
+  return <Text style={[styles.notice, error && styles.noticeError]} testID={testID}>{text}</Text>;
 }
 
 export const styles = StyleSheet.create({

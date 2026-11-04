@@ -1,0 +1,50 @@
+# F4: the three ways into Place devices (T46 "Entry points"), from Setup: Needs review's line
+# "Not on the plan, 06M: 4 devices and 5 to place from drafts" → the plan with the panel; the
+# Devices tab's "· 4 not on the plan" with Place ▸; ⊕ Place. ◀ Done placing closes it each time.
+# Leaves the panel open.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: setup.home
+- tapOn:
+    id: nav.needs-review
+- tapOn:
+    id: review.tab.all
+- extendedWaitUntil:
+    visible:
+      id: review.place.06M
+      text: '.*Not on the plan, 06M: 4 devices and 5 to place from drafts.*'
+    timeout: 20000
+- tapOn:
+    id: review.place.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: place.progress
+      text: 'Placed 0 of 4 · 5 to place from drafts'
+    timeout: 60000
+- tapOn:
+    id: place.done
+- extendedWaitUntil:
+    notVisible:
+      id: place.progress
+    timeout: 5000
+- tapOn:
+    id: plan.tab.devices
+- assertVisible:
+    id: plan.side.note
+    text: '.* · 4 not on the plan'
+- tapOn:
+    id: plan.devices.place
+- assertVisible:
+    id: place.progress
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.place
+- assertVisible:
+    id: place.progress
+    text: 'Placed 0 of 4 · 5 to place from drafts'
+- assertVisible: '3 dashed pins where the sheet prints the type or tag: tap one to confirm it\.'

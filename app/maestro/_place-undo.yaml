@@ -1,0 +1,103 @@
+# F4 (T139): with the panel open on 06M — ↶ Undo for a draft unit (the pin goes, the row is back at
+# ×2) and for a master device (06M-03 keeps its ID, Drawing Position and Room on its card); then
+# two placements: only the second has ↶ Undo, and none after ◀ Done placing. Leaves 06M-03 and one
+# MAESTRO-ST unit placed, the panel closed.
+appId: productions.luminarytechnology.fieldsurvey
+---
+# a draft unit, then Undo
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '.*MAESTRO-ST.*×2.*'
+      AT: 15%,60%
+      PLACED: 'Placed 06M-\? MAESTRO-ST\.'
+- assertVisible:
+    id: place.item
+    text: '.*MAESTRO-ST.*×1.*'
+- assertVisible:
+    id: place.progress
+    text: 'Placed 1 of 5 · 4 to place from drafts'
+- tapOn:
+    id: place.undo
+- extendedWaitUntil:
+    visible:
+      id: place.note
+      text: '06M-\? MAESTRO-ST: back in the unplaced list\.'
+    timeout: 10000
+- assertNotVisible:
+    id: place.undo
+- assertVisible:
+    id: place.item
+    text: '.*MAESTRO-ST.*×2.*'
+- assertVisible:
+    id: place.progress
+    text: 'Placed 0 of 4 · 5 to place from drafts'
+# a master device: its Drawing Position and Room come with it into the form; Undo clears the pin only
+- tapOn:
+    id: place.item
+    text: '06M-03.*'
+- tapOn:
+    point: 40%,64%
+- extendedWaitUntil:
+    visible:
+      id: place.confirm
+    timeout: 10000
+- assertVisible: C/13
+- assertVisible: Below CT06LCPB
+- tapOn:
+    id: place.confirm
+- extendedWaitUntil:
+    visible:
+      id: place.last
+      text: 'Placed 06M-03\.'
+    timeout: 15000
+- tapOn:
+    id: place.undo
+- extendedWaitUntil:
+    visible:
+      id: place.note
+      text: '06M-03: back in the unplaced list\.'
+    timeout: 10000
+- assertVisible:
+    id: place.item
+    text: '06M-03.*'
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-03
+- assertVisible: '.*C/13 · Below CT06LCPB.*'
+- tapOn:
+    id: card.close
+# two placements: only the latest can be undone, and not after the panel closes
+- tapOn:
+    id: plan.place
+- assertNotVisible:
+    id: place.undo
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '06M-03.*'
+      AT: 40%,64%
+      PLACED: 'Placed 06M-03\.'
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '.*MAESTRO-ST.*×2.*'
+      AT: 15%,60%
+      PLACED: 'Placed 06M-\? MAESTRO-ST\.'
+- assertNotVisible: 'Placed 06M-03\.'
+- assertVisible:
+    id: place.undo
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.place
+- assertNotVisible:
+    id: place.undo
+- assertVisible:
+    id: place.progress
+    text: 'Placed 2 of 5 · 4 to place from drafts'
+- tapOn:
+    id: place.done

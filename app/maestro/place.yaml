@@ -1,0 +1,27 @@
+# F4 (T155, rig plan wave 1): placement, undo, flags and Move to…, on a fresh copy of the master
+# with the 06M sheet. Hand drafts on 06M (an Equipment ×1 with an N cable from 06M-04 waiting on it,
+# a Station ×2, a Sensor ×2); the three ways into Place devices (T46); ↶ Undo for a draft unit and a
+# master device, only the latest, gone after ◀ Done placing (T139); the waiting cable made on
+# placing, kept through Put back… with its surveyed end, one cable after placing again (T139,
+# T136); Flag → Move to… 04, and to the pool after one unit is placed; Review drafts' level and
+# basis (T143); leaving a chosen spot unconfirmed writes nothing (T140). The two-iPad half is
+# `rig.sh place-two`. `rig.sh flows place.yaml` stages the sheet (1st) and the workbook (2nd).
+appId: productions.luminarytechnology.fieldsurvey
+name: F4 — place devices, undo, waiting cables, flags
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow:
+    file: _seed-copy.yaml
+    env:
+      SEED_AT: 53%,35%      # 2nd file: the master workbook
+- runFlow:
+    file: _sheet.yaml
+    env:
+      AT: 41%,35%           # 1st file: the 06M composite PDF
+- runFlow: _logbox.yaml
+- runFlow: _place-drafts.yaml
+- runFlow: _place-entry.yaml
+- runFlow: _place-undo.yaml
+- runFlow: _place-waiting.yaml
+- runFlow: _place-flag.yaml

@@ -1,0 +1,127 @@
+# F4 (T139 "Its connection waits, then follows", T136 "Placing links it", T139 "From the card" for a
+# draft): place MAESTRO-EQ → "1 waiting cable made"; on its card the N run to 06M-04, this end set
+# Not installed; ⋯ → Put back in the unplaced list… → Deleted; 06M-04's card shows the far end as
+# the draft again; place it again → the new device's card has the run with its end still Not
+# installed, and the Cable / riser view counts 81 cables (the seed's 80 and this one, not two).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: plan.place
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '.*MAESTRO-EQ.*×1.*'
+      AT: 60%,50%
+      PLACED: 'Placed 06M-\? MAESTRO-EQ\. 1 waiting cable made\.'
+- tapOn:
+    id: place.done
+# the placed device's card: its one connection, this end Not installed
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: MAESTRO-EQ
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: 'plan\.device\.06M-.*'
+- assertVisible:
+    id: card.section.connections
+    text: '.*Connections \(1\)'
+- assertNotVisible: '.*not placed yet.*'
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: '(C-\d+|NEW)'
+- tapOn:
+    id: end.this.status.Not installed
+- assertVisible:
+    id: end.this.status.Not installed
+    text: '✓ Not installed'
+- tapOn:
+    id: end.back
+# Put back: the device is deleted, its end waits for the draft again
+- tapOn:
+    id: card.menu
+- tapOn:
+    id: card.menu.unplace
+- assertVisible: 'Put 06M-[0-9?]+ back in the unplaced list \(the device is deleted, its draft.s unit is left to place\): why\?'
+- assertVisible:
+    id: card.reason
+    text: Placed by mistake
+- tapOn:
+    id: card.reason.ok
+- extendedWaitUntil:
+    visible: '.*Deleted: Placed by mistake.*'
+    timeout: 10000
+- tapOn:
+    id: card.close
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: 06M-04
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-04
+- assertVisible: '.*N → Network to MAESTRO-EQ, .*→ MAESTRO-EQ \(draft on 06M, not placed yet\).*'   # the row is one element
+- tapOn:
+    id: card.close
+# place it again: the same run, its end as surveyed
+- runFlow: _search-clear.yaml
+- tapOn:
+    id: plan.place
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '.*MAESTRO-EQ.*×1.*'
+      AT: 60%,50%
+      PLACED: 'Placed 06M-\? MAESTRO-EQ\. 1 waiting cable made\.'
+- tapOn:
+    id: place.done
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: MAESTRO-EQ
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: 'plan\.device\.06M-.*'
+- assertVisible:
+    id: card.section.connections
+    text: '.*Connections \(1\)'
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: '(C-\d+|NEW)'
+- assertVisible:
+    id: end.this.status.Not installed
+    text: '✓ Not installed'
+- tapOn:
+    id: end.back
+- tapOn:
+    id: card.close
+# 06M-04's card: the far end is the placed device, with its jump (T136 "Placing links it")
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: 06M-04
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-04
+- assertVisible: '.*N → Network to MAESTRO-EQ, .*06M-[0-9?]+ ▸.*'
+- assertNotVisible: '.*not placed yet.*'
+- tapOn:
+    id: card.close
+- runFlow: _search-clear.yaml
+- tapOn:
+    id: plan.back             # back to Needs review, where _place-entry opened the plan
+- tapOn:
+    text: ← Levels
+    optional: true            # opened from Levels instead
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: 'Cable / riser \(81\)'
+    timeout: 20000
+- tapOn: ← Levels

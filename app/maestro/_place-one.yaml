@@ -1,0 +1,20 @@
+# F4: in the open place panel, the row ROW (a regex on its text) → tap the sheet at AT → Place ✓ →
+# the "Placed …" row reads PLACED (env).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: place.item
+    text: ${ROW}
+- tapOn:
+    point: ${AT}
+- extendedWaitUntil:
+    visible:
+      id: place.confirm
+    timeout: 10000
+- tapOn:
+    id: place.confirm
+- extendedWaitUntil:
+    visible:
+      id: place.last
+      text: ${PLACED}
+    timeout: 15000

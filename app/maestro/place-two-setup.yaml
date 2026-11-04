@@ -1,0 +1,61 @@
+# F4's two-iPad half, step 1 on A (`rig.sh place-two`, T46 "Two iPads"): a new project with the
+# 06M sheet, a Station draft MAESTRO-PL ×2 accepted on 06M, then moved to the pool from the place
+# panel (Flag → Move to… → Pool, T143), sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Place two — a pooled draft of two units
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _new-project.yaml
+- runFlow: _sources.yaml
+- runFlow: _logbox.yaml
+- tapOn:
+    id: setup.step.drafts
+- runFlow:
+    file: _place-draft.yaml
+    env:
+      MODEL: MAESTRO-PL
+      CAT: Station
+      QTY: '2'
+- tapOn:
+    id: setup.step.sources
+- tapOn:
+    id: plans.open.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 60000
+- tapOn:
+    id: plan.place
+- tapOn:
+    id: place.item
+    text: '.*MAESTRO-PL.*×2.*'
+- tapOn:
+    id: place.flag
+- tapOn:
+    id: place.scope.flagged
+- tapOn:
+    id: place.item
+    text: '.*MAESTRO-PL.*'
+- tapOn:
+    id: place.move
+- tapOn:
+    id: place.moveTo.pool
+- extendedWaitUntil:
+    visible:
+      id: place.note
+      text: 'MAESTRO-PL: moved to the pool\.'
+    timeout: 10000
+- tapOn:
+    id: place.scope.pool
+    text: Pool 1
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml

@@ -216,7 +216,7 @@ export default function NeedsReviewScreen() {
       ? toPlace
           .filter((l) => !levelId || l.levelId === levelId)
           .map((l) => (
-            <Pressable key={l.levelId} onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: l.levelId, place: '1' } })} style={styles.row}>
+            <Pressable key={l.levelId} onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: l.levelId, place: '1' } })} style={styles.row} testID={`review.place.${l.code}`}>
               <Text style={styles.rowTitle}>
                 Not on the plan, {l.code}: {l.unplacedDevices} device{l.unplacedDevices === 1 ? '' : 's'}
                 {l.draftUnits ? ` and ${l.draftUnits} to place from drafts` : ''}

@@ -17,6 +17,8 @@ team Ann / Bob), never to the Droplet.
 | `ends.yaml` | `rig.sh flows ends.yaml` | F1 (T155): a fresh copy of the master (`_seed-copy`), then on 06M: C-23 Not installed → R3a Run draft → Accept → R4b kit → Accept (`src #n` after the sync); Issue "Run, not terminated" → R3a Terminate EC/ETC, "…; no term kit" → R3b Missing part EC/ETC → Accept, no second kit; C-12 one Run draft on end A, the item standing through a flip; no kit chip on the P run C-08; 06M-04's findings line; C-13 → Jump to 04-01 on Level 04; 04-05's `Run 120V to P-NSPS-D Power Supply`; Change placeholder… → Add & use, Vocabulary refuses its removal (about 11 min) |
 | `lists.yaml` | `rig.sh flows lists.yaml` | F2 (T155): a fresh copy of the master; on 06M the Conns rows `<this end> ↔ <other end> · <status>`, `C-14` → one row and its two end devices, `06M-02` → that device alone; B1's Punch #8 Device text from B1-S3 and Relocated followed at once; B2's Neuron ID item drops B2-S1 once its Neuron ID is typed; the NSPS card has no Neuron ID (about 8 min). Tracking / Part status: no screen yet (T162) |
 | `additions.yaml` | `rig.sh flows additions.yaml` | F3 (T155): a new project with the 06M sheet; long-press → + Device: the eleven categories, a Station → `06M-S1`, a Sensor → `06M-D1` after the sync; + Note here; the card's ⋯: Move pin…, Put back in the unplaced list… ("Placed by mistake"), Place pin…, Delete… → Restore…, each in History with who and why; Not found on site (once in the Notes, no item), Spot-check fixed, Non-ETC device, Relocated (about 6 min) |
+| `place.yaml` | `rig.sh flows place.yaml` | F4 (T155): a fresh copy of the master plus the 06M sheet; hand drafts on 06M (MAESTRO-EQ ×1 with an N cable from 06M-04 confirmed while it waits, MAESTRO-ST ×2, MAESTRO-SN ×2); Needs review's "Not on the plan, 06M: 4 devices and 5 to place from drafts", the Devices tab's Place ▸, ⊕ Place; ↶ Undo for a draft unit and for 06M-03 (keeps C/13 and its Room), only the latest, none after ◀ Done placing; MAESTRO-EQ placed → "1 waiting cable made", its end Not installed, Put back… → 06M-04 shows "(draft on 06M, not placed yet)" → placed again: the end still Not installed, `Cable / riser (81)`; Flag → Move to… 04, and to the pool with one unit placed; Review drafts: basis `manual` / `project_pool`; a spot left unconfirmed writes nothing |
+| `place-two-setup.yaml`, `place-two-peer.yaml`, `place-two-edit.yaml`, `place-two-check.yaml` | `rig.sh place-two` | F4 two-iPad half (T46): A pools a Station draft ×2 and syncs, B opens the 06M plan; with the server stopped each places one unit; after A then B sync, both see `06M-S1` and `06M-S2`, `Pool 0`, no sync conflict |
 
 | Sub-flow | Walks |
 |---|---|
@@ -26,6 +28,7 @@ team Ann / Bob), never to the Droplet.
 | `_connect.yaml` | Connect to server (URL, token) → pick the name `USER`; re-signs in when the keychain holds another name |
 | `_new-project.yaml` | Projects → + New project (`PROJECT`, level 06M) → home → open the level → back |
 | `_sources.yaml` | Setup → 3 Sources: DaVinci (two files), then the 06M display sheet; waits for both jobs |
+| `_sheet.yaml` | Setup → 3 Sources → the 06M display sheet from Files at `AT` (env), waits for the job and the sheet |
 | `_pick-wait.yaml` | waits for the Files picker before a position tap |
 | `_drafts.yaml` | Setup → 4 Review drafts: three hand drafts, accepted / edited / rejected |
 | `_place.yaml` | Setup → 5 Place devices → Place ▸ → first unit → tap the sheet → Place ✓ |
@@ -35,7 +38,7 @@ team Ann / Bob), never to the Droplet.
 | `_seed-import.yaml` | Setup → 3 Sources → Seed import: the master from Files, the Checks, the mapping (a wrong column flagged and put back), Import |
 | `_seed-vocab.yaml` | Vocabulary → Load standard lists twice |
 | `_seed-review.yaml` | Needs review on a fresh seed: Link, Create device ▸, Put on, Keep |
-| `_seed-copy.yaml` | + New project → Seed import of the master (no mapping detours) → "Imported" → sync → Load standard lists: each wave-1 run's own copy (T155; `rig.sh flows` stages the workbook) |
+| `_seed-copy.yaml` | + New project → Seed import of the master (no mapping detours) → "Imported" → sync → Load standard lists: each wave-1 run's own copy (T155; `rig.sh flows` stages the workbook); `SEED_AT` (env) is the workbook's spot when `rig.sh` stages the sheet beside it (place.yaml) |
 | `_open-level.yaml`, `_open-card.yaml` | Projects → `PROJECT` → level `LEVEL` (env) → its plan; `_open-card` then taps Devices → `DEVICE` |
 | `_side-down.yaml`, `_side-up.yaml` | swipe the plan's side panel (card, end editor) until `ID` (env) is on screen, then a little more, clear of the edge and of the card's fixed header |
 | `_open-end.yaml` | the card's connection `CONN` (env, tapped by its C-label) → its end editor |
@@ -46,6 +49,9 @@ team Ann / Bob), never to the Droplet.
 | `_add-here.yaml` | long-press `AT` → + Device → `CAT`, new model `MODEL` → Add device → NEW, then the server's ID `IDRE` (env) |
 | `_quick-apply.yaml` | Return applies the open quick action; waits for its question to close |
 | `_additions-add.yaml`, `_additions-menu.yaml`, `_additions-quick.yaml` | the steps of `additions.yaml` |
+| `_place-draft.yaml` | Review drafts: + Draft device `MODEL`, `CAT`, `QTY` on 06M → Add draft → Accept |
+| `_place-one.yaml` | in the open place panel: row `ROW` → tap `AT` → Place ✓ → the "Placed …" row reads `PLACED` |
+| `_place-drafts.yaml`, `_place-entry.yaml`, `_place-undo.yaml`, `_place-waiting.yaml`, `_place-flag.yaml` | the steps of `place.yaml` |
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a
 regex on what is visible. A flow for a new screen gets its `testID`s in the same task.

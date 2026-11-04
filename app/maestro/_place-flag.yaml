@@ -1,0 +1,156 @@
+# F4 (T143): from Levels, 06M's plan → ⊕ Place: MAESTRO-SN → Flag: not on this sheet → Flagged →
+# Move to… offers the other levels and the pool, not 06M → 04: gone from Flagged and from 06M, and
+# Needs review counts its 2 units on 04. MAESTRO-ST (1 of 2 placed) → Flag → Move to… "1 unit left
+# move; the 1 placed keep their level." → Pool: the pool lists it ×1, the placed one stays. Review
+# drafts: MAESTRO-SN on 04 basis manual, MAESTRO-ST in the pool basis project_pool. Then (T140)
+# a spot chosen and left unconfirmed writes nothing; a sync with nothing refused.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: level.06M
+- tapOn:
+    id: plan.place
+# a draft with nothing placed → 04
+- tapOn:
+    id: place.item
+    text: '.*MAESTRO-SN.*×2.*'
+- tapOn:
+    id: place.flag
+- extendedWaitUntil:
+    visible:
+      id: place.note
+      text: 'MAESTRO-SN: flagged not on this sheet\.'
+    timeout: 10000
+- assertNotVisible:
+    id: place.item
+    text: '.*MAESTRO-SN.*'
+- tapOn:
+    id: place.scope.flagged
+    text: Flagged 1
+- tapOn:
+    id: place.item
+    text: '.*MAESTRO-SN.*×2.*'
+- tapOn:
+    id: place.move
+- assertVisible:
+    id: place.moveHint
+    text: It comes off Flagged.
+- assertVisible:
+    id: place.moveTo.04
+- assertVisible:
+    id: place.moveTo.pool
+- assertNotVisible:
+    id: place.moveTo.06M
+- tapOn:
+    id: place.moveTo.04
+- extendedWaitUntil:
+    visible:
+      id: place.note
+      text: 'MAESTRO-SN: moved to 04\.'
+    timeout: 10000
+- assertVisible: Nothing flagged.
+- tapOn:
+    id: place.scope.level
+- assertNotVisible:
+    id: place.item
+    text: '.*MAESTRO-SN.*'
+# a draft with one unit placed → the pool; the placed unit keeps its level
+- tapOn:
+    id: place.item
+    text: '.*MAESTRO-ST.*×1.*'
+- tapOn:
+    id: place.flag
+- extendedWaitUntil:
+    visible:
+      id: place.note
+      text: 'MAESTRO-ST: flagged not on this sheet\.'
+    timeout: 10000
+- tapOn:
+    id: place.scope.flagged
+- tapOn:
+    id: place.item
+    text: '.*MAESTRO-ST.*'
+- tapOn:
+    id: place.move
+- assertVisible:
+    id: place.moveHint
+    text: '1 unit left move; the 1 placed keep their level\. It comes off Flagged\.'
+- tapOn:
+    id: place.moveTo.pool
+- extendedWaitUntil:
+    visible:
+      id: place.note
+      text: 'MAESTRO-ST: moved to the pool\.'
+    timeout: 10000
+- tapOn:
+    id: place.scope.pool
+    text: Pool 1
+- assertVisible:
+    id: place.item
+    text: '.*MAESTRO-ST.*pool ×1.*'
+- tapOn:
+    id: place.done
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: MAESTRO-ST
+- tapOn:
+    id: plan.tab.devices
+- assertVisible:
+    id: 'plan\.device\.06M-.*'
+- runFlow: _search-clear.yaml
+# T140: a spot chosen, left without Place ✓: no pin, no device
+- copyTextFrom:
+    id: plan.side.note
+- evalScript: ${output.before = maestro.copiedText}
+- tapOn:
+    id: plan.place
+- tapOn:
+    id: place.item
+    text: '06M-04.*'
+- tapOn:
+    point: 50%,72%
+- extendedWaitUntil:
+    visible:
+      id: place.confirm
+    timeout: 10000
+- tapOn:
+    id: place.done
+- copyTextFrom:
+    id: plan.side.note
+- assertTrue: ${maestro.copiedText == output.before && / · 3 not on the plan$/.test(output.before)}
+- tapOn:
+    id: plan.back
+# Needs review: 04 now has the sensor draft's two units to place
+- tapOn:
+    id: nav.needs-review
+- tapOn:
+    id: review.tab.all
+- assertVisible:
+    id: review.place.04
+    text: '.*Not on the plan, 04: \d+ devices? and 2 to place from drafts.*'
+- tapOn: ← Levels
+# Review drafts: the level and basis of each move
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.drafts
+- tapOn:
+    id: drafts.filter.all       # accepted drafts are not "Open"
+- tapOn:
+    id: drafts.level.04
+- tapOn:
+    id: drafts.device.MAESTRO-SN
+- assertVisible:
+    id: draft.level
+    text: '.*04  · basis: manual'
+- tapOn:
+    id: drafts.level.Pool
+- tapOn:
+    id: drafts.device.MAESTRO-ST
+- assertVisible:
+    id: draft.level
+    text: '.*pool \(no level\)  · basis: project_pool'
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml
