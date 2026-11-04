@@ -6,6 +6,21 @@ Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md)
 
 Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.
 
+### T46 — Place devices from the unplaced list  ·  Needs: no new build (JS update; no server change)
+
+**Why it matters:** setup ends with every device on its plan. Devices from the master and units of accepted drafts had no way onto the plan except one by one from the card; Landry could not tell what was unplaced without scrolling the whole list (M3 round A-4).
+
+Set-up: the T115 **scratch** project, with its BOM / riser drafts reviewed (some accepted in Review drafts) and 06M's composite uploaded as the display sheet (Setup → Sources → Floor plans), downloaded on this iPad.
+
+Tap to place (C-40) and Drag to place (C-41) passed 2026-10-18. C-40's note — "Need to include the full names of the devices to be placed. Having only their part numbers doesn't help." — is in **T127**.
+
+Passed 2026-11-01 with notes: proposals "very off", none for stations or sensors → **T140**; "no way to remove a placed device … put it back into the list" → **T139**; "does a flagged draft go back to review or into the pool?" → **T143** (Move to… from the Flagged row). Everything but Entry points and Two iPads passed.
+
+- [x] **Entry points (A-4).** Needs review → All (or Extraction): a line per level with something left, "Not on the plan, 06M: n devices and m to place from drafts — Place on the 06M plan ▸" opens the plan with the panel. On the plan's Devices tab, "· n not on the plan" has **Place ▸** beside it; ⊕ Place in the plan tools opens the panel too; ◀ Done placing closes it. → saw (Claude, rig, 2026-11-04, place.yaml, a seed copy with the 06M sheet and three hand drafts): Needs review → All reads `Not on the plan, 06M: 4 devices and 5 to place from drafts` → the plan opens with the panel (`Placed 0 of 4 · 5 to place from drafts`); ◀ Done placing closes it; Devices `… · 4 not on the plan` → **Place ▸** opens it; ⊕ Place opens it. After a sensor draft was moved to 04: `Not on the plan, 04: … and 2 to place from drafts`.
+- [x] **Two iPads.** Place two units of the same pooled draft, one on each iPad, offline; sync both: two devices, the pool down by two, nothing in review. → saw (Claude, rig, 2026-11-04, `rig.sh place-two`, twice): A (Ann) moves a Station draft MAESTRO-PL ×2 to the pool, B (Bob) opens the 06M plan; with the api stopped each places one unit (`Offline · n pending`); after A then B sync, both iPads list two devices `06M-S1` and `06M-S2` (`Filtered · 2 of 2`), the pool reads `Pool 0` "Nothing left in the pool.", no sync conflict in Needs review.
+
+Decision D205 (Proposed) stays in the checklist for Landry.
+
 ### T143 — Move a flagged draft to another level or the pool  ·  Needs: no new build (JS update only)
 
 **Why it matters:** on 2026-11-01 (C-43) a draft flagged "not on this sheet" could only sit under Flagged; moving it meant Review drafts → Edit… → Level, refused once any unit was placed. Now the flagged row moves it in one tap. Use a level with an accepted draft of ×2 or more (a station or sensor draft is easiest).
