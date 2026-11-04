@@ -1,0 +1,118 @@
+# Pipeline project (T154, rig plan §2): the checklist's "pipeline test" — a project B2–06M (PROJECT,
+# "Maestro pipeline" from `rig.sh pipeline`) with BOM.pdf and riser.pdf extracted on the server and
+# the 06M display sheet, synced. `rig.sh pipeline` stages exactly these three in "On My iPad", in
+# name order: BOM.pdf, Level_06M_-_Lighting_Composite_vector.pdf, riser.pdf. The rig has no Claude
+# key: the riser's far ends come back unresolved ("n far ends to pick"), which the endpoint-picker
+# flows need anyway. Needs the worker (rig.sh server starts it).
+appId: productions.luminarytechnology.fieldsurvey
+name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.new
+- assertVisible: New project
+- tapOn:
+    id: newProject.name
+- inputText: ${PROJECT}
+# B2, B1, 01–04, 06, 06M: one level at a time (Add range makes out-of-scope levels), each added
+# with Return: the "+ Add level" button slides under the keyboard as the table grows (T154)
+- tapOn:
+    id: newProject.levelCode
+- inputText: B2
+- pressKey: Enter
+- tapOn:
+    id: newProject.levelCode
+- inputText: B1
+- pressKey: Enter
+- tapOn:
+    id: newProject.levelCode
+- inputText: '01'
+- pressKey: Enter
+- tapOn:
+    id: newProject.levelCode
+- inputText: '02'
+- pressKey: Enter
+- tapOn:
+    id: newProject.levelCode
+- inputText: '03'
+- pressKey: Enter
+- tapOn:
+    id: newProject.levelCode
+- inputText: '04'
+- pressKey: Enter
+- tapOn:
+    id: newProject.levelCode
+- inputText: '06'
+- pressKey: Enter
+- tapOn:
+    id: newProject.levelCode
+- inputText: 06M
+- pressKey: Enter
+- tapOn: Levels                 # closes the keyboard over Create
+- scrollUntilVisible:
+    element:
+      id: newProject.create
+    direction: DOWN
+- tapOn:
+    id: newProject.create
+- extendedWaitUntil:
+    visible:
+      id: level.06M
+    timeout: 120000   # Create waits behind the first pull of every server project
+- assertVisible:
+    id: level.B2
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.sources
+# the BOM first, then the riser (the riser merges its devices into the BOM's drafts)
+- tapOn:
+    id: sources.bom
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 14%,46%          # sidebar: On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 41%,35%          # 1st file: BOM.pdf
+- extendedWaitUntil:
+    visible:
+      id: sources.bom.status
+      text: 'Done: \d+ device drafts, \d+ excluded lines, \d+ flagged'
+    timeout: 600000
+- tapOn:
+    id: sources.riser
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 14%,46%          # On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 65%,35%          # 3rd file: riser.pdf
+- extendedWaitUntil:
+    visible:
+      id: sources.riser.status
+      text: 'Done: \d+ device drafts \(\d+ merged into the BOM.s\), \d+ cable drafts, [1-9]\d* far ends to pick'
+    timeout: 600000
+# the 06M display sheet (single selection opens on tap)
+- scrollUntilVisible:
+    element:
+      id: plans.display.06M
+    direction: DOWN
+- tapOn:
+    id: plans.display.06M
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 14%,46%          # On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 53%,35%          # 2nd file: the 06M composite PDF
+- extendedWaitUntil:
+    visible:
+      id: plans.open.06M     # shown once the sheet job is done and the sheet synced
+    timeout: 180000
+- runFlow: _logbox.yaml
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml

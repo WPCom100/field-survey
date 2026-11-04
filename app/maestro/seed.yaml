@@ -10,6 +10,7 @@ name: Seed — the master workbook into Maestro master
 - runFlow: _connect.yaml
 - runFlow: _new-project.yaml
 - runFlow: _seed-import.yaml
+- runFlow: _logbox.yaml
 - tapOn:
     id: setup.home
 - runFlow: _sync.yaml

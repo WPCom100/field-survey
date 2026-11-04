@@ -1,0 +1,12 @@
+# Closes the dev client's red error toast (LogBox: a console.error, e.g. "[rules] run_failed") when
+# one is up. It spans the bottom of the screen and takes taps meant for what is under it ("Open the
+# levels screen ▸", T154). Its × is the right end of the toast; Maestro sees the toast as one element.
+# What the error said stays in the app's log: `rig.sh log A '<regex>'`.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    when:
+      visible: '!, .* ERROR .*'
+    commands:
+      - tapOn:
+          point: 97%,96%

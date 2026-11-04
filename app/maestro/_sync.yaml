@@ -1,6 +1,7 @@
 # Sidebar → Sync → Sync now → "… Synced <time>" → back to Levels.
 appId: productions.luminarytechnology.fieldsurvey
 ---
+- runFlow: _logbox.yaml
 - tapOn:
     id: nav.sync
 - assertVisible: Sync & uploads

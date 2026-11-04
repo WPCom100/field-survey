@@ -24,8 +24,10 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:
     visible: ${output.project}
     timeout: 20000
-- assertVisible:
-    id: level.06M
+- extendedWaitUntil:              # Create waits behind the first pull of every server project (T154)
+    visible:
+      id: level.06M
+    timeout: 120000
 - tapOn:
     id: level.06M
 - extendedWaitUntil:
