@@ -1,4 +1,4 @@
-# Sidebar → Sync → Sync now → "Synced <time>" → back to Levels.
+# Sidebar → Sync → Sync now → "… Synced <time>" → back to Levels.
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - tapOn:
@@ -7,7 +7,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: sync.now
 - extendedWaitUntil:
-    visible: Synced .*
+    visible: ".*Synced .*"   # "● Online · Synced <time>"; Maestro matches the whole text
     timeout: 20000
 - tapOn: ← Levels
 - assertVisible: Field Survey

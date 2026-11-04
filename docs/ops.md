@@ -314,8 +314,22 @@ Nothing on the Mac ships. The iPads only ever get EAS builds (§5), and `eas.jso
 Any Apple-silicon Mac; a base Mac mini is enough. On it:
 
 1. **Xcode** from the App Store (only for the Simulator and the local build). Open it once, install the iOS platform when it asks, then `sudo xcodebuild -license accept`.
-2. **Homebrew**, **Node 24** (`brew install node@24`), **Docker** (Docker Desktop or OrbStack), **Git**. Clone the repo; the `fixtures/` folder is private and comes from the PC.
-3. **SSH in from the PC** (System Settings → General → Sharing → Remote Login), so Claude Code on Windows runs `ssh mac 'cd field-survey && bash scripts/mac/rig.sh …'` and pulls screenshots back with `scp`. Claude Code can also run on the Mac itself.
+2. **Homebrew**, **Node 24** (`brew install node@24`), **Docker** (Docker Desktop or OrbStack), **Git**, **Java 17** (`brew install openjdk@17`; Maestro runs on the JVM and `rig.sh flows` stops without it). Clone the repo; the `fixtures/` folder is private and comes from the PC.
+3. **SSH in from the PC** (System Settings → General → Sharing → Remote Login), so Claude Code on Windows runs `ssh mac 'cd field-survey && bash scripts/mac/rig.sh …'` and pulls screenshots back with `scp`. Claude Code can also run on the Mac itself. `ssh mac "…"` starts a non-login shell that reads only `~/.zshenv`, so brew, Docker, Maestro and Java must be on the path there (first run, T151):
+
+   ```
+   # field-survey rig (T149): ssh mac "..." needs these without a login shell
+   [ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
+   export PATH="$HOME/.maestro/bin:$PATH"
+   export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8          # CocoaPods fails without a UTF-8 locale
+   # Docker Desktop's CLI
+   export PATH="/usr/local/bin:$HOME/.docker/bin:$PATH"
+   # Java 17 for Maestro (Homebrew's openjdk@17 is keg-only)
+   export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+   export PATH="$JAVA_HOME/bin:$PATH"
+   ```
+
+   The Mac also sleeps after a minute idle and the SSH session then times out. Run long commands under `caffeinate -i` (`ssh mac 'cd field-survey && caffeinate -i bash scripts/mac/rig.sh flows'`), or set System Settings → Energy → *Prevent automatic sleeping when the display is off* on the rig.
 4. In the repo: `bash scripts/mac/rig.sh setup`. It checks the Xcode command-line tools, installs **Maestro** (the official script, into `~/.maestro/bin`) and **CocoaPods**, runs `pnpm install`, and creates and boots the simulator **Field Survey iPad** (the newest iPad Pro device type on the newest iOS runtime). It ends with `rig: ready`.
 
 ### 6.2 Each session
@@ -342,7 +356,11 @@ A flow is YAML (`app/maestro/README.md`): `tapOn: {id: nav.sync}` taps a control
 
 - Controls a flow taps carry `testID="<screen>.<element>"`; the shared `Btn` and `Field` in `app/src/setup/widgets.tsx` pass it through. Add IDs in the task that writes the flow, never a text match on wording that a vocab ruling could change.
 - A task whose checks the rig can prove adds a flow (or extends one) and lists it in `TASKS.md`; the on-device checklist keeps only what the iPad or Landry must prove.
-- Flows are unverified until they have run on the Mac: T151 is the first run, and its checks sit in `docs/ON_DEVICE_CHECKLIST.md` under T149.
+- Flows are unverified until they have run on the Mac: T151 is the first run, and its checks sit in `docs/ON_DEVICE_CHECKLIST.md` under T149. `smoke.yaml` first ran green on 2026-11-03 (T151).
+- Text matches are a regex over the **whole** text of an element: `Synced .*` misses "● Online · Synced 8:45 PM"; write `.*Synced .*`.
+- `launchApp: clearState: true` wipes the app's sandbox but **not the keychain**, where `expo-secure-store` keeps the server, token and name. A run can start on any identity-gate state, and `_launch` / `_connect` handle all three. For a truly fresh run: `xcrun simctl keychain <udid> reset` first.
+- The dev client's floating **Tools button** sits over the top-right of every screen ("+ New project") and takes taps meant for it. `_launch` switches it off in the dev menu each run; launch arguments for its UserDefaults key did not take.
+- System sheets (iOS's *Save Password?* after the token field) belong to another process: Maestro sees neither the sheet nor the app behind it. `_connect` uses that: if the next screen is not visible, it taps the sheet's button by position.
 
 ### 6.4 What a run of the rig cannot tell you
 

@@ -1,21 +1,64 @@
-# The identity gate (app/src/identity/IdentityGate.tsx): server + token, then a name.
+# The identity gate (app/src/identity/IdentityGate.tsx): server + token, then a name. The keychain
+# outlives clearState (see _launch), so each step runs only when the gate is on it: a stored server
+# skips the connect form, a stored name skips the picker. A name the server does not know yet is
+# added through the picker's "Not listed?" field.
 appId: productions.luminarytechnology.fieldsurvey
 ---
-- assertVisible: Connect to server
-- tapOn:
-    id: connect.serverUrl
-- eraseText            # the field starts with "https://"
-- inputText: ${SERVER_URL}
-- tapOn:
-    id: connect.token
-- inputText: ${TOKEN}
-- tapOn:
-    id: connect.submit
-- extendedWaitUntil:
-    visible: Who is surveying?
-    timeout: 15000
-- tapOn:
-    id: identity.user.${USER}
+- runFlow:
+    when:
+      visible: Connect to server
+    commands:
+      - tapOn:
+          id: connect.serverUrl
+      - eraseText            # the field starts with "https://"
+      - inputText: ${SERVER_URL}
+      - tapOn:
+          id: connect.token
+      - inputText: ${TOKEN}
+      - tapOn:
+          id: connect.submit
+      # iOS offers to save the token (a secure field) as a password. The sheet belongs to another
+      # process: Maestro sees neither it nor the app behind it, so while the picker stays hidden
+      # the sheet is up, and its "Not Now" is tapped by position (T151).
+      - extendedWaitUntil:
+          visible: Who is surveying?
+          timeout: 5000
+          optional: true
+      - runFlow:
+          when:
+            notVisible: Who is surveying?
+          commands:
+            - tapOn:
+                point: 43%,57%
+      - extendedWaitUntil:
+          visible: Who is surveying?
+          timeout: 15000
+- runFlow:
+    when:
+      visible: Who is surveying?
+    commands:
+      # the team list loads after the screen; give it a moment before deciding to add the name
+      - extendedWaitUntil:
+          visible:
+            id: identity.user.${USER}
+          timeout: 5000
+          optional: true
+      - runFlow:
+          when:
+            visible:
+              id: identity.user.${USER}
+          commands:
+            - tapOn:
+                id: identity.user.${USER}
+      - runFlow:
+          when:
+            visible: Who is surveying?
+          commands:
+            - tapOn:
+                id: identity.newName
+            - inputText: ${USER}
+            - tapOn:
+                id: identity.add
 - extendedWaitUntil:
     visible: Signed in as ${USER}.*
     timeout: 15000
