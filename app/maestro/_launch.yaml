@@ -9,6 +9,27 @@ appId: productions.luminarytechnology.fieldsurvey
       true: ${METRO_URL != ''}
     commands:
       - openLink: fieldsurvey://expo-development-client/?url=${METRO_URL}
+      # iOS asks before a link opens the app; the dev client then shows its menu (onboarding
+      # on a cleared state, then the menu itself) over the app until it is closed (T151)
+      - tapOn:
+          text: Open
+          optional: true
+      - tapOn:
+          text: Continue
+          optional: true
+      - runFlow:
+          when:
+            visible: Toggle element inspector
+          commands:
+            - tapOn:
+                text: Close
+                optional: true
+      - runFlow:
+          when:
+            visible: Toggle element inspector
+          commands:
+            - tapOn:
+                point: 92%,43%
 - extendedWaitUntil:
     visible: Connect to server
     timeout: 90000

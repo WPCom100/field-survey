@@ -138,6 +138,9 @@ cmd_server() {
     up)
       [ -f .env ] || cp .env.example .env
       $COMPOSE up -d --build postgres s3 api
+      # a fresh volume runs initdb first: migrating before Postgres accepts connections fails (T151)
+      for _ in $(seq 1 60); do $COMPOSE exec -T postgres pg_isready -q && break; sleep 1; done
+      $COMPOSE exec -T postgres pg_isready -q || die "Postgres did not become ready within 60 s: $COMPOSE logs postgres"
       $COMPOSE exec -T api alembic upgrade head
       $COMPOSE exec -T api python -m app.storage ensure-bucket
       for _ in $(seq 1 30); do
@@ -187,11 +190,12 @@ cmd_flows() {
   done
   udid="$(sim_for "$dev")"
   command -v maestro >/dev/null || export PATH="$HOME/.maestro/bin:$PATH"
+  command -v java >/dev/null || die "Maestro needs Java 17+: brew install openjdk@17 and set JAVA_HOME (docs/ops.md §6.1)"
   say "maestro on $dev ($udid): ${flow:-smoke.yaml} against $SERVER_URL as $USER_NAME"
   maestro --device "$udid" test \
     -e SERVER_URL="$SERVER_URL" -e TOKEN="$TOKEN" -e METRO_URL="$METRO_URL" -e USER="$USER_NAME" \
     --debug-output "$OUT/maestro" \
-    "$ROOT/app/maestro${flow:+/$flow}"
+    "$ROOT/app/maestro/${flow:-smoke.yaml}"   # the folder would also run the _ sub-flows on their own (T151)
   say "screenshots of failures: $OUT/maestro and ~/.maestro/tests"
 }
 
