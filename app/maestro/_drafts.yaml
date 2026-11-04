@@ -1,0 +1,61 @@
+# Setup → 4 Review drafts: three hand-made device drafts on 06M, one accepted as is, one edited
+# (Save & accept), one rejected with a reason (T151). The new draft opens in the panel when added.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: setup.step.drafts
+# 1: accept
+- tapOn:
+    id: drafts.addDevice
+- tapOn:
+    id: drafts.new.model
+- inputText: MAESTRO-ST
+- tapOn:
+    id: drafts.new.cat.Station
+- tapOn:
+    id: drafts.new.level.06M
+- tapOn:
+    id: drafts.new.add
+- assertVisible: Draft added
+- tapOn:
+    id: draft.accept
+- assertVisible: Accepted
+# 2: edit → Save & accept
+- tapOn:
+    id: drafts.addDevice
+- tapOn:
+    id: drafts.new.model
+- inputText: MAESTRO-SN
+- tapOn:
+    id: drafts.new.cat.Sensor
+- tapOn:
+    id: drafts.new.add
+- assertVisible: Draft added
+- tapOn:
+    id: draft.edit
+- tapOn:
+    id: draft.edit.model
+- eraseText
+- inputText: MAESTRO-SN2
+- tapOn:
+    id: draft.save
+- assertVisible: Saved and accepted
+# 3: reject with a reason
+- tapOn:
+    id: drafts.addDevice
+- tapOn:
+    id: drafts.new.model
+- inputText: MAESTRO-X
+- tapOn:
+    id: drafts.new.cat.Equipment
+- tapOn:
+    id: drafts.new.add
+- assertVisible: Draft added
+- tapOn:
+    id: draft.reject
+- tapOn:
+    id: draft.reject.reason
+- inputText: Maestro reject
+- tapOn:
+    id: draft.reject.submit
+- assertVisible: Rejected

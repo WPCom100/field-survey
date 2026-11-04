@@ -120,6 +120,8 @@ bash scripts/mac/rig.sh server      # local e2e server in Docker on 127.0.0.1:80
 bash scripts/mac/rig.sh build       # local Simulator dev client via expo run:ios (first run: prebuild + pod install)
 bash scripts/mac/rig.sh metro       # Metro for the Simulator, in its own terminal
 bash scripts/mac/rig.sh flows       # maestro test app/maestro (smoke.yaml); screenshots in ~/.maestro/tests
+bash scripts/mac/rig.sh flows setup.yaml   # Sources (Files picker) → drafts → place → card → sync (app/maestro/README.md)
+bash scripts/mac/rig.sh two         # setup on A (Ann), peer on B (Bob), peer-back on A: one edit each way
 cd app && npx expo start --dev-client     # iPad with the dev build installed loads over Wi-Fi
 eas build --profile development --platform ios   # only when a native module changes
 eas submit --platform ios                        # TestFlight (D59)

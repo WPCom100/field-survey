@@ -1,0 +1,38 @@
+# Projects → PROJECT → level 06M → Devices → the first 06M device's card (T151).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.projects
+# a project made on the other iPad is listed by Refresh and downloads with the next sync; a project
+# already on this iPad shows its Open at once (A in peer-back)
+- runFlow:
+    when:
+      notVisible:
+        id: projects.open.${PROJECT}
+    commands:
+      - tapOn:
+          id: projects.refresh
+- extendedWaitUntil:
+    visible:
+      id: projects.open.${PROJECT}
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: level.06M
+    timeout: 30000
+- tapOn:
+    id: level.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- tapOn:
+    id: plan.tab.devices
+- extendedWaitUntil:
+    visible:
+      id: 'plan\.device\.06M-.*'
+    timeout: 30000
+- tapOn:
+    id: 'plan\.device\.06M-.*'
+    index: 0

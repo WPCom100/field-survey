@@ -85,7 +85,7 @@ export default function ProjectsScreen() {
         <View style={{ flex: 1 }} />
         <Btn title="Device-type library" onPress={() => router.push({ pathname: '/library', params: { scope: 'app' } })} />
         <Btn title="Rule defaults" onPress={() => router.push('/rule-defaults')} />
-        <Btn title={busy ? 'Refreshing…' : 'Refresh from server'} onPress={() => void refresh()} disabled={busy} />
+        <Btn title={busy ? 'Refreshing…' : 'Refresh from server'} onPress={() => void refresh()} disabled={busy} testID="projects.refresh" />
         <Btn title="+ New project" primary onPress={() => router.push('/new-project')} testID="projects.new" />
       </View>
       <Notice text={error} error />

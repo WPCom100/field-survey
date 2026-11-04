@@ -1,0 +1,26 @@
+# The device card from the plan's Devices list: status Issue, a note, and a punch item through the
+# quick action "Spot-check fixed" (the card has no hand-made punch item; T151). Status and the quick
+# action commit at once; the note commits on blur (Return).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: 'plan\.device\.06M-.*'
+    index: 0
+- tapOn:
+    id: card.status.Issue
+- assertVisible: '✓ Issue'
+- tapOn:
+    id: card.notes
+- inputText: Maestro note
+- pressKey: Enter
+- tapOn:
+    id: card.section.quick
+- tapOn:
+    id: card.quick.E6
+- tapOn:
+    id: card.quick.apply
+- extendedWaitUntil:
+    visible: '. Punch items \(1\).*'
+    timeout: 10000

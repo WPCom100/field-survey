@@ -1473,7 +1473,7 @@ export function PlanScreen(props: PlanScreenProps) {
             {TABS.map((t) => {
               const n = t === 'devices' ? visible.length : rowsByTab[t].length;
               return (
-                <Pressable key={t} style={[styles.tabBtn, tab === t && styles.tabBtnOn]} onPress={() => setTab(t)}>
+                <Pressable key={t} style={[styles.tabBtn, tab === t && styles.tabBtnOn]} onPress={() => setTab(t)} testID={`plan.tab.${t}`}>
                   <Text style={[styles.tabText, tab === t && styles.tabTextOn]} numberOfLines={1}>
                     {TAB_LABEL[t]} {n}
                   </Text>
@@ -1879,7 +1879,7 @@ function ListRowView({ row, selected, picking, onPress }: { row: ListRow; select
 function DeviceRow({ device, badges, selected, picking, onPress }: { device: PlanDevice; badges: Badges; selected: boolean; picking?: boolean; onPress: () => void }) {
   const st = pinStyleFor(device.status);
   return (
-    <Pressable style={[styles.row, selected && styles.rowSelected, device.deleted && styles.rowDeleted]} onPress={onPress}>
+    <Pressable style={[styles.row, selected && styles.rowSelected, device.deleted && styles.rowDeleted]} onPress={onPress} testID={`plan.device.${device.label}`}>
       {picking ? <Text style={styles.pickBox}>{selected ? '☑' : '☐'}</Text> : null}
       <Swatch {...st} />
       <View style={styles.rowMain}>

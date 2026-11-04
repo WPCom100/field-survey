@@ -140,9 +140,19 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
         <Text style={styles.kind}>{TITLE.davinci}</Text>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.file}>{davinci ? (davinci.files ?? []).map((f) => f.name).join(' + ') || '?' : '—'}</Text>
-          {davinci ? <Text style={[styles.line, davinci.job_state === 'failed' && styles.warn]}>{extractionLine('davinci', davinci)}</Text> : null}
+          {davinci ? (
+            <Text style={[styles.line, davinci.job_state === 'failed' && styles.warn]} testID="sources.davinci.status">
+              {extractionLine('davinci', davinci)}
+            </Text>
+          ) : null}
         </View>
-        <Btn title={davinci ? 'Upload again…' : 'Choose files…'} small disabled={busy !== null} onPress={() => void pickDavinci().catch((e: unknown) => setError(String(e)))} />
+        <Btn
+          title={davinci ? 'Upload again…' : 'Choose files…'}
+          small
+          disabled={busy !== null}
+          onPress={() => void pickDavinci().catch((e: unknown) => setError(String(e)))}
+          testID="sources.davinci"
+        />
       </View>
       <Check label="Retire the hand-made app-library types first (they are kept in History; project copies stay) — D199" value={retire} onChange={setRetire} />
       {busy ? <Text style={styles.hint}>{busy}</Text> : null}

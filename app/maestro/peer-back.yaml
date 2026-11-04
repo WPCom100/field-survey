@@ -1,0 +1,10 @@
+# Two simulators, last step (A again, store kept): sync, and B's status is on A's card (T151).
+appId: productions.luminarytechnology.fieldsurvey
+name: Peer back — A sees B's edit
+---
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- runFlow: _sync.yaml
+- runFlow: _open-device.yaml
+- assertVisible: '✓ No access'
+- assertVisible: Maestro note

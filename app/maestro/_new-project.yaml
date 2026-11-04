@@ -1,5 +1,6 @@
 # Projects → + New project → name, one level (06M) → Create → the home opens on it → open the
-# level (no sheet yet) → back. The name carries the time so every run makes its own project.
+# level (no sheet yet) → back. The name is PROJECT (rig.sh: "Maestro <date time>"), so every run
+# makes its own project and a second simulator can open the same one (T151).
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - tapOn:
@@ -8,7 +9,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: projects.new
 - assertVisible: New project
-- evalScript: ${output.project = 'Maestro ' + new Date().toISOString().slice(5, 16).replace('T', ' ')}
+- evalScript: ${output.project = PROJECT}
 - tapOn:
     id: newProject.name
 - inputText: ${output.project}

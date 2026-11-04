@@ -99,16 +99,22 @@ export function FloorPlans({ projectId }: { projectId: string }) {
         <View key={l.levelId} style={styles.row}>
           <Text style={styles.cLvl}>{l.code}</Text>
           <View style={styles.cDisplay}>
-            <Text style={styles.cell} numberOfLines={1}>
+            <Text style={styles.cell} numberOfLines={1} testID={`plans.sheet.${l.code}`}>
               {l.display ? `${l.display.title ?? 'sheet'}${l.display.cached ? '' : ' (not downloaded yet)'}` : '—'}
             </Text>
-            <Btn title={l.display ? 'Replace…' : 'Choose…'} small disabled={busy !== null} onPress={() => void pick(l.levelId, l.code, 'display').catch((e: unknown) => setError(String(e)))} />
+            <Btn
+              title={l.display ? 'Replace…' : 'Choose…'}
+              small
+              disabled={busy !== null}
+              onPress={() => void pick(l.levelId, l.code, 'display').catch((e: unknown) => setError(String(e)))}
+              testID={`plans.display.${l.code}`}
+            />
           </View>
           <View style={styles.cGrid}>
             {l.display ? (
               <>
                 <Text style={[styles.cell, l.display.grid.startsWith('needs') || l.display.grid.startsWith('no grid') ? styles.warn : styles.ok]}>{l.display.grid}</Text>
-                <Btn title="Open plan ▸" small onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: l.levelId } })} />
+                <Btn title="Open plan ▸" small onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: l.levelId } })} testID={`plans.open.${l.code}`} />
               </>
             ) : (
               <Text style={styles.dim}>—</Text>

@@ -1,0 +1,18 @@
+# Two simulators, second half (B, as Bob; `rig.sh two` runs setup.yaml on A first): open A's
+# project, see A's status and note, change the status, sync (T151).
+appId: productions.luminarytechnology.fieldsurvey
+name: Peer — B sees A's edit and makes one
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _open-device.yaml
+- assertVisible: '✓ Issue'
+- assertVisible: Maestro note
+- tapOn:
+    id: card.status.No access
+- assertVisible: '✓ No access'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- runFlow: _sync.yaml

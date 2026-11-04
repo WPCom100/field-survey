@@ -1,0 +1,44 @@
+# Setup → 3 Sources: the DaVinci library (library.json + DaVinci_categories.xlsx) and the 06M display
+# sheet, both from the Files app (T151). `rig.sh files` stages exactly these three in "On My iPad",
+# so the picker shows them in this order (by name): DaVinci_categories.xlsx, davinci-library-sample.json,
+# Level_06M_-_Lighting_Composite_vector.pdf. The picker is another process: Maestro sees none of it,
+# so it is tapped by position (iPad Pro 13" simulator, portrait).
+# Needs the worker (rig.sh server starts it): both uploads are server jobs. No Claude API.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.sources
+# DaVinci: multiple selection, then Open
+- tapOn:
+    id: sources.davinci
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 14%,46%          # sidebar: On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 41%,35%          # 1st file: DaVinci_categories.xlsx
+- tapOn:
+    point: 53%,35%          # 2nd file: davinci-library-sample.json
+- tapOn:
+    point: 92%,28%          # Open
+# app-library drafts are server-wide: the first run imports, later runs find the same files
+- extendedWaitUntil:
+    visible:
+      id: sources.davinci.status
+      text: '(Done: .*|Already imported.*)'
+    timeout: 90000
+# Floor plans: the 06M display sheet (single selection opens on tap)
+- tapOn:
+    id: plans.display.06M
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 14%,46%          # On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 65%,35%          # 3rd file: the 06M composite PDF
+- extendedWaitUntil:
+    visible:
+      id: plans.open.06M     # shown once the sheet job is done and the sheet synced
+    timeout: 180000

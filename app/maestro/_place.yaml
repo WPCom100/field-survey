@@ -1,0 +1,31 @@
+# Setup → 5 Place devices → Place ▸ on 06M: pick the first unplaced unit, tap the sheet, Place ✓
+# (T151). Pins are drawn by Skia and the sheet is PDFKit, so the spot is a point tap.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: setup.step.place
+- tapOn:
+    id: setup.place.06M
+- tapOn:                      # the sheet may not be cached on this iPad yet
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: place.item
+    timeout: 60000
+- tapOn:
+    id: place.item
+    index: 0
+- tapOn:
+    point: 35%,50%            # on the sheet, left of the side panel
+- extendedWaitUntil:
+    visible:
+      id: place.confirm
+    timeout: 10000
+- tapOn:
+    id: place.confirm
+- extendedWaitUntil:
+    visible: 'Placed .*'
+    timeout: 15000
+- tapOn:
+    id: place.done

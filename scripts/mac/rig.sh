@@ -14,6 +14,7 @@ SERVER_URL="${RIG_SERVER_URL:-http://127.0.0.1:8010}"
 TOKEN="${RIG_TOKEN:-e2e}"
 METRO_URL="${RIG_METRO_URL:-http://127.0.0.1:8081}"
 USER_NAME="${RIG_USER:-Ann}"
+PROJECT="${RIG_PROJECT:-Maestro $(date +"%m-%d %H:%M:%S")}"   # one name per rig.sh run: A and B open the same project
 BUNDLE="productions.luminarytechnology.fieldsurvey"
 COMPOSE="docker compose -f $ROOT/server/docker-compose.yml -f $ROOT/server/docker-compose.e2e.yml"
 OUT="${TMPDIR:-/tmp}/field-survey-rig"
@@ -39,10 +40,13 @@ usage: bash scripts/mac/rig.sh <command>
   flows [--device A|B] [flow.yaml]
                         maestro test app/maestro (smoke.yaml unless a flow is named)
   second                boot "$SIM_B" with the same build (two-iPad checks)
+  two                   setup.yaml on A (Ann), peer.yaml on B (Bob), peer-back.yaml on A: one project,
+                        one edit each way
+  files [A|B] <file>... put exactly these files in the Files app's "On My iPad" (document pickers)
   shot [A|B] [file]     screenshot of a simulator (default $OUT/shot-<time>.png)
   status                what is booted, built and running
 
-env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_SIM_A RIG_SIM_B
+env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
 EOF
 }
 
@@ -140,7 +144,7 @@ cmd_server() {
   case "${1:-up}" in
     up)
       [ -f .env ] || cp .env.example .env
-      $COMPOSE up -d --build postgres s3 api
+      $COMPOSE up -d --build postgres s3 api worker   # the worker runs the upload jobs (T151)
       # a fresh volume runs initdb first: migrating before Postgres accepts connections fails (T151)
       for _ in $(seq 1 60); do $COMPOSE exec -T postgres pg_isready -q && break; sleep 1; done
       $COMPOSE exec -T postgres pg_isready -q || die "Postgres did not become ready within 60 s: $COMPOSE logs postgres"
@@ -191,12 +195,18 @@ cmd_flows() {
       *) flow="$1"; shift ;;
     esac
   done
+  # flows that upload (Setup → Sources) pick these from the Files app by position (T151)
+  if grep -q "_sources.yaml" "$ROOT/app/maestro/${flow:-smoke.yaml}" 2>/dev/null; then
+    cmd_files "$dev" fixtures/DaVinci_categories.xlsx fixtures/davinci-library-sample.json \
+      "fixtures/Level_06M_-_Lighting_Composite_vector.pdf"
+  fi
   udid="$(sim_for "$dev")"
   command -v maestro >/dev/null || export PATH="$HOME/.maestro/bin:$PATH"
   command -v java >/dev/null || die "Maestro needs Java 17+: brew install openjdk@17 and set JAVA_HOME (docs/ops.md §6.1)"
-  say "maestro on $dev ($udid): ${flow:-smoke.yaml} against $SERVER_URL as $USER_NAME"
+  say "maestro on $dev ($udid): ${flow:-smoke.yaml} against $SERVER_URL as $USER_NAME, project \"$PROJECT\""
   maestro --device "$udid" test \
     -e SERVER_URL="$SERVER_URL" -e TOKEN="$TOKEN" -e METRO_URL="$METRO_URL" -e USER="$USER_NAME" \
+    -e PROJECT="$PROJECT" \
     --debug-output "$OUT/maestro" \
     "$ROOT/app/maestro/${flow:-smoke.yaml}"   # the folder would also run the _ sub-flows on their own (T151)
   say "screenshots of failures: $OUT/maestro and ~/.maestro/tests"
@@ -209,6 +219,39 @@ cmd_second() {
   udid="$(sim_for B)"
   xcrun simctl install "$udid" "$app"
   say "\"$SIM_B\" booted with $app; 'rig.sh open B' loads it from Metro, 'rig.sh flows --device B' runs the flows there"
+}
+
+cmd_two() {  # one edit each way between two simulators, on one project (T151)
+  cmd_second
+  say "two simulators on \"$PROJECT\": A (Ann) sets it up and edits, B (Bob) sees it and edits, A sees B's"
+  USER_NAME=Ann cmd_flows --device A setup.yaml
+  USER_NAME=Bob cmd_flows --device B peer.yaml
+  USER_NAME=Ann cmd_flows --device A peer-back.yaml
+  say "two: green"
+}
+
+cmd_files() {  # [A|B] file... -> the Files app's "On My iPad" on that simulator (document pickers, T151)
+  local dev=A udid group dest f
+  case "${1:-}" in A|a|B|b) dev="$1"; shift ;; esac
+  [ $# -gt 0 ] || die "files [A|B] <file>...: e.g. files fixtures/davinci-library-sample.json"
+  udid="$(sim_for "$dev")"
+  group="$(xcrun simctl get_app_container "$udid" com.apple.DocumentsApp groups 2>/dev/null \
+    | awk '$1 == "group.com.apple.FileProvider.LocalStorage" { print $2 }')"
+  if [ -z "$group" ]; then  # older runtimes: find the group by its container metadata
+    for g in "$HOME/Library/Developer/CoreSimulator/Devices/$udid/data/Containers/Shared/AppGroup"/*; do
+      [ "$(plutil -extract MCMMetadataIdentifier raw "$g/.com.apple.mobile_container_manager.metadata.plist" 2>/dev/null)" = group.com.apple.FileProvider.LocalStorage ] && group="$g"
+    done
+  fi
+  [ -n "$group" ] || die "no Files app storage on $dev yet: open the Files app on it once"
+  dest="$group/File Provider Storage"
+  # replace, not add: flows tap the picker by position, so the folder holds exactly these files
+  rm -rf "$dest"; mkdir -p "$dest"
+  for f in "$@"; do
+    case "$f" in /*) ;; *) f="$ROOT/$f" ;; esac
+    [ -f "$f" ] || die "no such file: $f"
+    cp "$f" "$dest/"
+    say "On My iPad ($dev): $(basename "$f")"
+  done
 }
 
 cmd_shot() {
@@ -234,6 +277,8 @@ case "${1:-}" in
   open) shift; cmd_open "$@" ;;
   flows) shift; cmd_flows "$@" ;;
   second) cmd_second ;;
+  two) cmd_two ;;
+  files) shift; cmd_files "$@" ;;
   shot) shift; cmd_shot "$@" ;;
   status) cmd_status ;;
   -h|--help|help|"") usage ;;

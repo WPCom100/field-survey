@@ -209,7 +209,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
         {(['confidence', 'model', 'state'] as SortKey[]).map((s) => (
           <Chip key={s} label={`Sort: ${s}`} on={sort === s} onPress={() => setSort(s)} />
         ))}
-        <Chip label={tab === 'devices' ? '+ Draft device' : '+ Draft cable'} on={adding} onPress={() => (setAdding((a) => !a), setSelected(null))} />
+        <Chip label={tab === 'devices' ? '+ Draft device' : '+ Draft cable'} testID={tab === 'devices' ? 'drafts.addDevice' : 'drafts.addCable'} on={adding} onPress={() => (setAdding((a) => !a), setSelected(null))} />
         {ready ? <Chip label={`Make ${ready} waiting cable${ready === 1 ? '' : 's'}`} onPress={() => void run(async () => `${await commitWaitingCables(editor, store, projectId, { riserBlob: batches ? riserBlobFor(batches, null) : null })} cables made`)} /> : null}
       </View>
       <Notice text={error} error />
@@ -252,9 +252,9 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
 
 type Run = (fn: () => Promise<unknown>, done?: string) => Promise<void>;
 
-function Chip({ label, on, onPress, dim }: { label: string; on?: boolean; onPress: () => void; dim?: boolean }) {
+function Chip({ label, on, onPress, dim, testID }: { label: string; on?: boolean; onPress: () => void; dim?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
+    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
       <Text style={[styles.chipText, on && styles.chipTextOn, dim && !on && styles.dimText]}>{label}</Text>
     </Pressable>
   );
@@ -276,7 +276,7 @@ function DeviceTable({ rows, selected, onSelect }: { rows: DeviceDraftRow[]; sel
         ))}
       </View>
       {rows.map((d) => (
-        <Pressable key={d.id} onPress={() => onSelect(d.id)} style={[styles.tr, selected === d.id && styles.trOn]}>
+        <Pressable key={d.id} onPress={() => onSelect(d.id)} style={[styles.tr, selected === d.id && styles.trOn]} testID={`drafts.device.${d.model ?? d.id}`}>
           <Text style={styles.cModel} numberOfLines={1}>
             {d.needs.model ? `${d.candidates[0]?.replace(/-(SR|LR)$/, '')}-?` : (d.model ?? '?')}
           </Text>
@@ -354,7 +354,7 @@ const REJECT_REASONS = ['Already in the baseline (master)', 'Not a device we sur
 function RejectForm({ onReject }: { onReject: (reason: string) => void }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
-  if (!open) return <Btn title="Reject…" small onPress={() => setOpen(true)} />;
+  if (!open) return <Btn title="Reject…" small onPress={() => setOpen(true)} testID="draft.reject" />;
   return (
     <View style={styles.form}>
       <Text style={w.label}>Why reject it?</Text>
@@ -363,9 +363,9 @@ function RejectForm({ onReject }: { onReject: (reason: string) => void }) {
           <Chip key={r} label={r} on={reason === r} onPress={() => setReason(r)} />
         ))}
       </View>
-      <TextInput style={w.input} value={reason} onChangeText={setReason} placeholder="Reason" placeholderTextColor="#9aa0a8" />
+      <TextInput style={w.input} value={reason} onChangeText={setReason} placeholder="Reason" placeholderTextColor="#9aa0a8" testID="draft.reject.reason" />
       <View style={styles.btnRow}>
-        <Btn title="Reject" small disabled={!reason.trim()} onPress={() => onReject(reason)} />
+        <Btn title="Reject" small disabled={!reason.trim()} onPress={() => onReject(reason)} testID="draft.reject.submit" />
         <Btn title="Cancel" small onPress={() => setOpen(false)} />
       </View>
     </View>
@@ -456,8 +456,8 @@ function DevicePanel({ d, data, batches, identity, editor, store, run }: { d: De
         <>
           {blockers.length ? <Text style={styles.dim}>{blockers.join(' ')}</Text> : null}
           <View style={styles.btnRow}>
-            <Btn title="Accept" primary small disabled={blockers.length > 0} onPress={() => void run(() => acceptDevice(editor, d, choice), 'Accepted')} />
-            <Btn title="Edit…" small onPress={() => setEditing((e) => !e)} />
+            <Btn title="Accept" primary small disabled={blockers.length > 0} onPress={() => void run(() => acceptDevice(editor, d, choice), 'Accepted')} testID="draft.accept" />
+            <Btn title="Edit…" small onPress={() => setEditing((e) => !e)} testID="draft.edit" />
             <RejectForm onReject={(r) => void run(() => rejectDraft(editor, 'device', d, r), 'Rejected')} />
           </View>
         </>
@@ -481,7 +481,7 @@ function EditDevice({ d, levels, onSave }: { d: DeviceDraftRow; levels: DraftRev
   return (
     <View style={styles.form}>
       <Text style={w.label}>Model</Text>
-      <TextInput style={w.input} value={model} onChangeText={setModel} autoCapitalize="characters" autoCorrect={false} />
+      <TextInput style={w.input} value={model} onChangeText={setModel} autoCapitalize="characters" autoCorrect={false} testID="draft.edit.model" />
       {d.candidates.length > 1 ? (
         <View style={styles.chips}>
           {d.candidates.map((m) => (
@@ -492,7 +492,7 @@ function EditDevice({ d, levels, onSave }: { d: DeviceDraftRow; levels: DraftRev
       <Text style={w.label}>Category</Text>
       <View style={styles.chips}>
         {DEVICE_CATEGORIES.map((c) => (
-          <Chip key={c} label={c} on={category === c} onPress={() => setCategory(c)} />
+          <Chip key={c} label={c} on={category === c} onPress={() => setCategory(c)} testID={`draft.edit.cat.${c}`} />
         ))}
       </View>
       <View style={styles.btnRow}>
@@ -514,7 +514,7 @@ function EditDevice({ d, levels, onSave }: { d: DeviceDraftRow; levels: DraftRev
             <Chip key={l.key} label={l.code} on={levelId === l.levelId} onPress={() => setLevelId(l.levelId)} />
           ))}
       </View>
-      <Btn title="Save & accept" primary small onPress={() => onSave({ model, category, qty: qty.trim() ? Number(qty) : null, name: name || null, levelId })} />
+      <Btn title="Save & accept" testID="draft.save" primary small onPress={() => onSave({ model, category, qty: qty.trim() ? Number(qty) : null, name: name || null, levelId })} />
     </View>
   );
 }
@@ -664,11 +664,11 @@ function AddDevice({ levels, levelId, onAdd }: { levels: DraftReviewData['levels
       <Text style={styles.h2}>Add a device draft by hand</Text>
       <Text style={styles.dim}>For a floor surveyed before its BOM and riser are extracted (K12). It is reviewed like any other draft.</Text>
       <Text style={w.label}>Model</Text>
-      <TextInput style={w.input} value={model} onChangeText={setModel} autoCapitalize="characters" autoCorrect={false} placeholder="PI1002" placeholderTextColor="#9aa0a8" />
+      <TextInput style={w.input} value={model} onChangeText={setModel} autoCapitalize="characters" autoCorrect={false} placeholder="PI1002" placeholderTextColor="#9aa0a8" testID="drafts.new.model" />
       <Text style={w.label}>Category</Text>
       <View style={styles.chips}>
         {DEVICE_CATEGORIES.map((c) => (
-          <Chip key={c} label={c} on={category === c} onPress={() => setCategory(c)} />
+          <Chip key={c} label={c} on={category === c} onPress={() => setCategory(c)} testID={`drafts.new.cat.${c}`} />
         ))}
       </View>
       <View style={styles.btnRow}>
@@ -686,10 +686,10 @@ function AddDevice({ levels, levelId, onAdd }: { levels: DraftReviewData['levels
         {levels
           .filter((l) => l.levelId)
           .map((l) => (
-            <Chip key={l.key} label={l.code} on={lvl === l.levelId} onPress={() => setLvl(l.levelId)} />
+            <Chip key={l.key} label={l.code} on={lvl === l.levelId} onPress={() => setLvl(l.levelId)} testID={`drafts.new.level.${l.code}`} />
           ))}
       </View>
-      <Btn title="Add draft" primary small disabled={!model.trim() || !category} onPress={() => category && onAdd({ levelId: lvl, model, category, qty: Number(qty), name: name || null })} />
+      <Btn title="Add draft" testID="drafts.new.add" primary small disabled={!model.trim() || !category} onPress={() => category && onAdd({ levelId: lvl, model, category, qty: Number(qty), name: name || null })} />
     </View>
   );
 }

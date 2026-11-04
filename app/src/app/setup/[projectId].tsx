@@ -103,33 +103,33 @@ export default function ProjectSetupScreen() {
         <Text style={styles.sideTitle} numberOfLines={2}>
           {setup.project.name}
         </Text>
-        <Pressable onPress={() => setStep('project')} style={[styles.step, step === 'project' && styles.stepOn]}>
+        <Pressable onPress={() => setStep('project')} testID="setup.step.project" style={[styles.step, step === 'project' && styles.stepOn]}>
           <Text style={styles.stepText}>1 Project</Text>
         </Pressable>
-        <Pressable onPress={() => setStep('levels')} style={[styles.step, step === 'levels' && styles.stepOn]}>
+        <Pressable onPress={() => setStep('levels')} testID="setup.step.levels" style={[styles.step, step === 'levels' && styles.stepOn]}>
           <Text style={styles.stepText}>2 Levels</Text>
         </Pressable>
-        <Pressable onPress={() => setStep('sources')} style={[styles.step, step === 'sources' && styles.stepOn]}>
+        <Pressable onPress={() => setStep('sources')} testID="setup.step.sources" style={[styles.step, step === 'sources' && styles.stepOn]}>
           <Text style={styles.stepText}>3 Sources</Text>
         </Pressable>
-        <Pressable onPress={() => setStep('drafts')} style={[styles.step, step === 'drafts' && styles.stepOn]}>
+        <Pressable onPress={() => setStep('drafts')} testID="setup.step.drafts" style={[styles.step, step === 'drafts' && styles.stepOn]}>
           <Text style={styles.stepText}>4 Review drafts</Text>
         </Pressable>
-        <Pressable onPress={() => setStep('place')} style={[styles.step, step === 'place' && styles.stepOn]}>
+        <Pressable onPress={() => setStep('place')} testID="setup.step.place" style={[styles.step, step === 'place' && styles.stepOn]}>
           <Text style={styles.stepText}>5 Place devices</Text>
         </Pressable>
-        <Pressable onPress={() => setStep('lock')} style={[styles.step, step === 'lock' && styles.stepOn]}>
+        <Pressable onPress={() => setStep('lock')} testID="setup.step.lock" style={[styles.step, step === 'lock' && styles.stepOn]}>
           <Text style={styles.stepText}>6 Lock baseline</Text>
         </Pressable>
         <View style={styles.sideRule} />
-        <Pressable onPress={() => setStep('assignments')} style={[styles.step, step === 'assignments' && styles.stepOn]}>
+        <Pressable onPress={() => setStep('assignments')} testID="setup.step.assignments" style={[styles.step, step === 'assignments' && styles.stepOn]}>
           <Text style={styles.stepText}>Assignments</Text>
         </Pressable>
-        <Pressable onPress={() => setStep('rules')} style={[styles.step, step === 'rules' && styles.stepOn]}>
+        <Pressable onPress={() => setStep('rules')} testID="setup.step.rules" style={[styles.step, step === 'rules' && styles.stepOn]}>
           <Text style={styles.stepText}>Rules</Text>
         </Pressable>
         <View style={{ flex: 1 }} />
-        <Pressable onPress={() => router.push({ pathname: '/', params: { project: projectId } })}>
+        <Pressable onPress={() => router.push({ pathname: '/', params: { project: projectId } })} testID="setup.home">
           <Text style={styles.back}>Open the levels screen ▸</Text>
         </Pressable>
       </View>
@@ -250,6 +250,7 @@ function PlaceStep({ progress }: { progress: PlacementProgress | null }) {
                 small
                 primary={!done}
                 onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: l.levelId, place: '1' } })}
+                testID={`setup.place.${l.code}`}
               />
             </View>
           </View>

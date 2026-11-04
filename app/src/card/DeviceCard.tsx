@@ -187,7 +187,7 @@ export function DeviceCard(props: DeviceCardProps) {
               <Text style={styles.headBtnText}>⋯</Text>
             </Pressable>
           ) : null}
-          <Pressable onPress={props.onClose} hitSlop={8} style={styles.headBtn}>
+          <Pressable onPress={props.onClose} hitSlop={8} style={styles.headBtn} testID="card.close">
             <Text style={styles.headBtnText}>×</Text>
           </Pressable>
         </View>
@@ -261,6 +261,7 @@ export function DeviceCard(props: DeviceCardProps) {
                   key={s}
                   disabled={readOnly}
                   onPress={() => !on && run((e) => setStatus(e, d.id, s))}
+                  testID={`card.status.${s}`}
                   style={[styles.statusBtn, on && (st.hollow ? { borderColor: st.fill, borderWidth: 2 } : { backgroundColor: st.fill, borderColor: st.fill })]}>
                   <Text style={[styles.statusText, on && { color: st.hollow ? st.fill : '#fff', fontWeight: '700' }]}>
                     {on ? '✓ ' : ''}
@@ -424,7 +425,7 @@ export function DeviceCard(props: DeviceCardProps) {
           ))}
         </Section>
 
-        <Section title="Quick actions" marks="" collapsed>
+        <Section title="Quick actions" marks="" collapsed testID="card.section.quick">
           <QuickActions deviceId={d.id} readOnly={readOnly} run={run} />
         </Section>
 
@@ -504,6 +505,7 @@ function NotesSection({ card, readOnly, run }: { card: Card; readOnly: boolean; 
           commit(typed.current);
         }}
         placeholder="Notes"
+        testID="card.notes"
         placeholderTextColor="#888"
         multiline
         submitBehavior="blurAndSubmit"
@@ -857,6 +859,7 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
         {QUICK_ACTIONS.map((x) => (
           <SmallButton
             key={x.key}
+            testID={`card.quick.${x.key}`}
             label={x.label}
             disabled={readOnly || !x.enabled || busy}
             onPress={() => {
@@ -874,9 +877,9 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
       {q?.input ? (
         <View style={styles.draftField}>
           <Text style={styles.draftLabel}>{q.input}</Text>
-          <TextInput style={styles.draftInput} value={answer} onChangeText={setAnswer} autoCapitalize="sentences" autoCorrect={false} autoFocus />
+          <TextInput style={styles.draftInput} value={answer} onChangeText={setAnswer} autoCapitalize="sentences" autoCorrect={false} autoFocus testID="card.quick.input" />
           <View style={styles.rowWrap}>
-            <SmallButton label="Apply" disabled={busy || (!q.optional && !answer.trim())} onPress={() => void apply()} />
+            <SmallButton label="Apply" disabled={busy || (!q.optional && !answer.trim())} onPress={() => void apply()} testID="card.quick.apply" />
             <SmallButton label="Cancel" disabled={busy} onPress={() => setAsking(null)} />
           </View>
         </View>
@@ -925,11 +928,11 @@ function HistoryLine({ h, names, onRestore }: { h: HistoryEntry; names: Readonly
 
 // ------------------------------------------------------------------ pieces
 
-function Section({ title, marks: m, collapsed, children }: { title: string; marks: string; collapsed?: boolean; children: ReactNode }) {
+function Section({ title, marks: m, collapsed, children, testID }: { title: string; marks: string; collapsed?: boolean; children: ReactNode; testID?: string }) {
   const [open, setOpen] = useState(!collapsed);
   return (
     <View style={[styles.section, m.includes('in review') && styles.review]}>
-      <Pressable onPress={() => setOpen((o) => !o)} style={styles.sectionHead} hitSlop={4}>
+      <Pressable onPress={() => setOpen((o) => !o)} style={styles.sectionHead} hitSlop={4} testID={testID}>
         <Text style={styles.sectionTitle}>
           {open ? '▾' : '▸'} {title}
         </Text>
@@ -940,9 +943,9 @@ function Section({ title, marks: m, collapsed, children }: { title: string; mark
   );
 }
 
-function SmallButton({ label, onPress, disabled, danger }: { label: string; onPress: () => void; disabled?: boolean; danger?: boolean }) {
+function SmallButton({ label, onPress, disabled, danger, testID }: { label: string; onPress: () => void; disabled?: boolean; danger?: boolean; testID?: string }) {
   return (
-    <Pressable disabled={disabled} onPress={onPress} style={[styles.btn, danger && styles.btnDanger, disabled && styles.btnDisabled]}>
+    <Pressable disabled={disabled} onPress={onPress} style={[styles.btn, danger && styles.btnDanger, disabled && styles.btnDisabled]} testID={testID}>
       <Text style={[styles.btnText, danger && styles.btnDangerText, disabled && styles.btnDisabledText]}>{label}</Text>
     </Pressable>
   );

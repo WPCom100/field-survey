@@ -1,0 +1,10 @@
+# Relaunch keeping the local store (the second half of the two-simulator check, T151).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- stopApp
+- launchApp:
+    clearState: false
+- runFlow: _devclient.yaml
+- extendedWaitUntil:
+    visible: 'Connect to server|Who is surveying\?|Signed in as .*'
+    timeout: 90000

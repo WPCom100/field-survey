@@ -87,7 +87,7 @@ export function PlacePanel(props: PlacePanelProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onClose} hitSlop={8}>
+        <Pressable onPress={props.onClose} hitSlop={8} testID="place.done">
           <Text style={styles.back}>◀ Done placing</Text>
         </Pressable>
         <Text style={styles.title}>Place devices — {props.levelCode}</Text>
@@ -200,7 +200,7 @@ export function PlacePanel(props: PlacePanelProps) {
             </Text>
           }
           renderItem={({ item }) => (
-            <Pressable onPress={() => props.onSelect(item.key === selectedKey ? null : item.key)} style={[styles.row, item.key === selectedKey && styles.rowOn]}>
+            <Pressable onPress={() => props.onSelect(item.key === selectedKey ? null : item.key)} style={[styles.row, item.key === selectedKey && styles.rowOn]} testID="place.item">
               <Text style={styles.rowText} numberOfLines={2}>
                 {itemLine(item)}
               </Text>
@@ -322,6 +322,7 @@ function Selected(props: {
           <View style={styles.rowWrap}>
             <Btn
               label={props.busy ? 'Placing…' : 'Place ✓'}
+              testID="place.confirm"
               primary
               disabled={props.busy || !props.canEdit}
               onPress={() => props.onPlace({ drawingPosition: dp, room, ...(tagged ? { panelName: panel } : {}) })}
@@ -345,9 +346,9 @@ function Chip({ label, on, onPress, small }: { label: string; on: boolean; onPre
   );
 }
 
-function Btn({ label, onPress, primary, disabled }: { label: string; onPress: () => void; primary?: boolean; disabled?: boolean }) {
+function Btn({ label, onPress, primary, disabled, testID }: { label: string; onPress: () => void; primary?: boolean; disabled?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, primary && styles.btnPrimary, disabled && styles.btnOff]}>
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, primary && styles.btnPrimary, disabled && styles.btnOff]} testID={testID}>
       {primary && disabled && label.endsWith('…') ? <ActivityIndicator color="#fff" /> : <Text style={[styles.btnText, primary && styles.btnTextPrimary]}>{label}</Text>}
     </Pressable>
   );

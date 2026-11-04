@@ -335,7 +335,7 @@ Any Apple-silicon Mac; a base Mac mini is enough. On it:
 ### 6.2 Each session
 
 ```
-bash scripts/mac/rig.sh server      # Docker: postgres, s3, api on 127.0.0.1:8010, token e2e, team Ann/Bob; migrated; bucket made
+bash scripts/mac/rig.sh server      # Docker: postgres, s3, api on 127.0.0.1:8010 and the worker (upload jobs); token e2e, team Ann/Bob; migrated; bucket made
 bash scripts/mac/rig.sh build       # expo run:ios → a local dev client on the simulator (first run 10–20 min: prebuild, pod install)
 bash scripts/mac/rig.sh metro       # own terminal: Metro on 8081 for that dev client
 bash scripts/mac/rig.sh open        # loads the app from Metro (the fieldsurvey://expo-development-client deep link)
@@ -345,7 +345,9 @@ bash scripts/mac/rig.sh flows       # maestro test app/maestro → smoke.yaml
 - `build` again only when native code changes (a new module, a patch, an SDK bump): JS changes arrive through Metro, as on the dev iPad. `build --release` embeds the JS (no Metro; flows then run with `RIG_METRO_URL=''`).
 - `flows <file.yaml>` runs one flow; `flows --device B` runs on the second simulator. Each run creates its own project on the local server (`Maestro <month-day hour:minute>`), never on the Droplet.
 - **Offline:** `rig.sh server stop` makes the app offline from its point of view (edits queue, the status bar shows the pending count); `rig.sh server start` brings it back. `server reset` wipes the local data.
-- **Two iPads:** `rig.sh second` boots **Field Survey iPad B** with the same build; `open B`, then `flows --device B` or hand-driven steps on both.
+- **Two iPads:** `rig.sh second` boots **Field Survey iPad B** with the same build; `open B`, then `flows --device B` or hand-driven steps on both. `rig.sh two` is the scripted check: `setup.yaml` on A as Ann, `peer.yaml` on B as Bob (opens A's project, sees A's edit, makes one), `peer-back.yaml` on A (sees B's), all on one `PROJECT`.
+- **Flows:** `smoke.yaml` (connect, project, level, sync) and `setup.yaml` (3 Sources → 4 Review drafts → 5 Place devices → the card → sync); the list is in `app/maestro/README.md`. `RIG_USER=Bob` runs as Bob; `RIG_PROJECT` names the project (default `Maestro <date time>`).
+- **Files for pickers:** `rig.sh files [A|B] <file>…` puts exactly those files in the simulator's Files app ("On My iPad"); `flows` does it for a flow that includes `_sources.yaml` (the DaVinci pair and the 06M composite from `fixtures/`). Upload jobs need the worker, which `rig.sh server` starts; the Mac's `server/.env` has no Anthropic key, so the riser's far ends stay empty there and nothing calls Claude.
 - **Screenshots:** `rig.sh shot [A|B] [file]` prints the file; Maestro keeps its own per failed step under `~/.maestro/tests/`.
 - **Logs:** Metro's terminal (press `j` for React Native DevTools, as on the iPad); the server's with `docker compose -f server/docker-compose.yml -f server/docker-compose.e2e.yml logs -f api`.
 - `rig.sh status` says what is booted, built and answering.
@@ -361,6 +363,10 @@ A flow is YAML (`app/maestro/README.md`): `tapOn: {id: nav.sync}` taps a control
 - `launchApp: clearState: true` wipes the app's sandbox but **not the keychain**, where `expo-secure-store` keeps the server, token and name. A run can start on any identity-gate state, and `_launch` / `_connect` handle all three. For a truly fresh run: `xcrun simctl keychain <udid> reset` first.
 - The dev client's floating **Tools button** sits over the top-right of every screen ("+ New project") and takes taps meant for it. `_launch` switches it off in the dev menu each run; launch arguments for its UserDefaults key did not take.
 - System sheets (iOS's *Save Password?* after the token field) belong to another process: Maestro sees neither the sheet nor the app behind it. `_connect` uses that: if the next screen is not visible, it taps the sheet's button by position.
+- The **Files picker** is another process too: the app's tree shows only the popover's `dismiss popup`. `_pick-wait` waits for it before every position tap (an early tap lands on the app: it once ticked "Retire the hand-made app-library types"), and `rig.sh files` keeps "On My iPad" to the files a flow expects, in name order.
+- A **flow's own `env:` block beats `-e`**: `smoke.yaml` once ran as Ann under `RIG_USER=Bob`. Top-level flows have none; `rig.sh` passes every variable.
+- An **in-app alert** sits over the screen it came from, and both can carry the same text ("Re-sign in"). Anchor the alert's button (`rightOf: Cancel`); `below:` the title picked the screen's button, because the alert's container carries the title and spans its buttons.
+- **Answer every "Open in Field Survey?"**: a `rig.sh open` left unanswered stacks under the flow's own, and answering *Open* on a running app reloads its JS, which crashes the Debug dev client in expo-sqlite's FTS5 teardown (`exsqlite3_finalize` from `closeDatabase`, T151; follow-up T153). `_devclient` cancels a leftover one.
 
 ### 6.4 What a run of the rig cannot tell you
 

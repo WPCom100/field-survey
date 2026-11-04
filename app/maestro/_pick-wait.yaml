@@ -1,0 +1,13 @@
+# Waits for the Files picker (another process) before _sources taps it by position. While it is up
+# the app's tree shows only the popover's "dismiss popup"; the first open in a fresh app is slow, and
+# an early position tap lands on the app (T151: it ticked the Retire box). The second wait is a
+# plain pause for the folder to list its files: Maestro cannot see them.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- extendedWaitUntil:
+    visible: dismiss popup
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'never shown, a 2 s pause'
+    timeout: 2000
+    optional: true

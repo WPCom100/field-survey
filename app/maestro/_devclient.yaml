@@ -1,0 +1,48 @@
+# Loads the JS from Metro into a just-launched local dev client (rig.sh build) and clears the dev
+# client's menu; skipped for a --release build (METRO_URL=''). Used by _launch and _resume.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    when:
+      true: ${METRO_URL != ''}
+    commands:
+      - openLink: fieldsurvey://expo-development-client/?url=${METRO_URL}
+      # iOS asks before a link opens the app; the dev client then shows its menu (onboarding
+      # on a cleared state, then the menu itself) over the app until it is closed (T151)
+      - tapOn:
+          text: Open
+          optional: true
+      - tapOn:
+          text: Continue
+          optional: true
+      - runFlow:
+          when:
+            visible: Toggle element inspector
+          commands:
+            # The floating Tools button sits over the screens' top-right controls (it took the tap
+            # on "+ New project", T151). Its switch reads "1" while on, so this only ever turns it
+            # off; `below` keeps the tap off the Fast refresh switch in the row above. Launch
+            # arguments for EXDevMenuShowFloatingActionButton did not take (T151).
+            - tapOn:
+                text: "1"
+                rightOf: Tools button
+                below: Fast refresh
+                optional: true
+            - tapOn:
+                text: Close
+                optional: true
+      - runFlow:
+          when:
+            visible: Toggle element inspector
+          commands:
+            - tapOn:
+                point: 92%,43%
+      # A second "Open in Field Survey?" can be stacked behind the first (a `rig.sh open` whose
+      # alert was never answered, T151 on simulator B); Maestro sees no app behind it. Cancel it:
+      # answering Open re-opens the link, reloads the running JS, and the dev client crashes in
+      # expo-sqlite's FTS5 teardown (T151).
+      - runFlow:
+          when:
+            visible: 'Open in .Field Survey.\?'
+          commands:
+            - tapOn: Cancel

@@ -1,0 +1,20 @@
+# Setup pipeline (T151): connect, create a project with 06M, 3 Sources (DaVinci + the 06M sheet from
+# Files), 4 Review drafts (accept / edit / reject), 5 Place devices (one pin), the device card
+# (status, note, punch item), sync. `rig.sh flows setup.yaml` stages the files and passes the env.
+appId: productions.luminarytechnology.fieldsurvey
+name: Setup — sources, drafts, place, card
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _new-project.yaml
+- runFlow: _sources.yaml
+- runFlow: _drafts.yaml
+- runFlow: _place.yaml
+- runFlow: _card.yaml
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: setup.home            # the plan returns to Setup; the sidebar link leads to Levels
+- runFlow: _sync.yaml
