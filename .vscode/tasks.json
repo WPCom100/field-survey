@@ -5,7 +5,7 @@
   "inputs": [
     { "id": "sim", "type": "pickString", "description": "Simulator", "options": ["A", "B"], "default": "A" },
     { "id": "flow", "type": "promptString", "description": "Flow file (blank = smoke.yaml)", "default": "" },
-    { "id": "serverCmd", "type": "pickString", "description": "e2e server", "options": ["start", "stop", "reset"], "default": "start" }
+    { "id": "serverCmd", "type": "pickString", "description": "e2e server", "options": ["up", "stop", "start", "reset"], "default": "up" }
   ],
   "tasks": [
     { "label": "rig: ssh check",  "type": "shell", "command": "ssh mac uname -a", "problemMatcher": [] },
