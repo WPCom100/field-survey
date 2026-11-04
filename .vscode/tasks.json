@@ -1,41 +1,166 @@
 {
   // T149 Mac rig, driven from the Windows PC over SSH (docs/ops.md §6).
   // Needs: `Host mac` in %USERPROFILE%\.ssh\config and the repo cloned at ~/field-survey on the Mac.
+  // "type": "process" runs ssh directly with an argument list: no Windows shell, so the
+  // remote command's && and quoting reach the Mac intact (PowerShell 5.1 broke them).
   "version": "2.0.0",
   "inputs": [
-    { "id": "sim", "type": "pickString", "description": "Simulator", "options": ["A", "B"], "default": "A" },
-    { "id": "flow", "type": "promptString", "description": "Flow file (blank = smoke.yaml)", "default": "" },
-    { "id": "serverCmd", "type": "pickString", "description": "e2e server", "options": ["up", "stop", "start", "reset"], "default": "up" }
+    {
+      "id": "sim",
+      "type": "pickString",
+      "description": "Simulator",
+      "options": [
+        "A",
+        "B"
+      ],
+      "default": "A"
+    },
+    {
+      "id": "flow",
+      "type": "promptString",
+      "description": "Flow file (blank = smoke.yaml)",
+      "default": ""
+    },
+    {
+      "id": "serverCmd",
+      "type": "pickString",
+      "description": "e2e server",
+      "options": [
+        "up",
+        "stop",
+        "start",
+        "reset"
+      ],
+      "default": "up"
+    }
   ],
   "tasks": [
-    { "label": "rig: ssh check",  "type": "shell", "command": "ssh mac uname -a", "problemMatcher": [] },
-    { "label": "rig: pull main",  "type": "shell", "command": "ssh mac \"cd ~/field-survey && git pull --ff-only\"", "problemMatcher": [] },
-    { "label": "rig: setup (once)", "type": "shell", "command": "ssh -t mac \"cd ~/field-survey && bash scripts/mac/rig.sh setup\"", "problemMatcher": [] },
-    { "label": "rig: status",     "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh status\"", "problemMatcher": [] },
-    { "label": "rig: server",     "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh server ${input:serverCmd}\"", "problemMatcher": [] },
-    { "label": "rig: build",      "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh build\"", "problemMatcher": [] },
     {
-      "label": "rig: metro",
-      "type": "shell",
-      "command": "ssh -t mac \"cd ~/field-survey && bash scripts/mac/rig.sh metro\"",
-      "isBackground": true,
-      "presentation": { "panel": "dedicated" },
+      "label": "rig: ssh check",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "mac",
+        "uname -a"
+      ],
       "problemMatcher": []
     },
-    { "label": "rig: open",       "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh open ${input:sim}\"", "problemMatcher": [] },
-    { "label": "rig: flows",      "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh flows --device ${input:sim} ${input:flow}\"", "problemMatcher": [] },
-    { "label": "rig: second sim", "type": "shell", "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh second\"", "problemMatcher": [] },
+    {
+      "label": "rig: pull main",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "mac",
+        "cd ~/field-survey && git pull --ff-only"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "rig: setup (once)",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "-t",
+        "mac",
+        "cd ~/field-survey && bash scripts/mac/rig.sh setup"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "rig: status",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "mac",
+        "cd ~/field-survey && bash scripts/mac/rig.sh status"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "rig: server",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "mac",
+        "cd ~/field-survey && bash scripts/mac/rig.sh server ${input:serverCmd}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "rig: build",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "mac",
+        "cd ~/field-survey && bash scripts/mac/rig.sh build"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "rig: metro",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "-t",
+        "mac",
+        "cd ~/field-survey && bash scripts/mac/rig.sh metro"
+      ],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "rig: open",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "mac",
+        "cd ~/field-survey && bash scripts/mac/rig.sh open ${input:sim}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "rig: flows",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "mac",
+        "cd ~/field-survey && bash scripts/mac/rig.sh flows --device ${input:sim} ${input:flow}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "rig: second sim",
+      "type": "process",
+      "command": "ssh",
+      "args": [
+        "mac",
+        "cd ~/field-survey && bash scripts/mac/rig.sh second"
+      ],
+      "problemMatcher": []
+    },
     {
       "label": "rig: screenshot",
-      "type": "shell",
-      "command": "ssh mac \"cd ~/field-survey && bash scripts/mac/rig.sh shot ${input:sim} /tmp/rig-shot.png\"; New-Item -ItemType Directory -Force .rig | Out-Null; scp mac:/tmp/rig-shot.png .rig/shot.png; Invoke-Item .rig/shot.png",
-      "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "ssh mac 'cd ~/field-survey && bash scripts/mac/rig.sh shot ${input:sim} /tmp/rig-shot.png'; New-Item -ItemType Directory -Force .rig | Out-Null; scp mac:/tmp/rig-shot.png .rig/shot.png; Invoke-Item .rig/shot.png"
+      ],
       "problemMatcher": []
     },
     {
       "label": "rig: session (server → open → flows)",
       "dependsOrder": "sequence",
-      "dependsOn": ["rig: pull main", "rig: server", "rig: open", "rig: flows"],
+      "dependsOn": [
+        "rig: pull main",
+        "rig: server",
+        "rig: open",
+        "rig: flows"
+      ],
       "problemMatcher": []
     }
   ]
