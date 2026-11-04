@@ -11,7 +11,7 @@ import {
   type HomeProject,
   type ProjectHome,
 } from '../home/data';
-import { pickProject, rememberProject } from '../home/currentProject';
+import { awaitingProject, pickProject, rememberProject } from '../home/currentProject';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { BaselineDialog } from '../setup/BaselineDialog';
 import { loadLockTable, type LockLevel } from '../setup/lock';
@@ -50,7 +50,7 @@ export default function ProjectHomeScreen() {
   const dataKey = syncDataKey(sync);
   const { project: wanted } = useLocalSearchParams<{ project?: string }>();
   const [projects, setProjects] = useState<HomeProject[]>([]);
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(typeof wanted === 'string' && wanted ? wanted : null);
 
   // The Projects screen and project creation open the home on a given project (T41).
   useEffect(() => {
@@ -73,10 +73,13 @@ export default function ProjectHomeScreen() {
       if (!live) return;
       setProjects(list);
       setWho(homeIdentityLine(user.name, store.installId, await loadInstallLabels(store)));
-      const id = pickProject(
-        list.map((p) => p.id),
-        projectId,
-      );
+      const known = list.map((p) => p.id);
+      if (awaitingProject(known, typeof wanted === 'string' ? wanted : null, projectId)) {
+        // just created: it arrives with the next sync, which re-runs this effect (dataKey)
+        setHome(null);
+        return;
+      }
+      const id = pickProject(known, projectId);
       if (id !== projectId) setProjectId(id);
       rememberProject(id);
       const next = id ? await loadProjectHome(store, id, user.id) : null;
@@ -88,7 +91,12 @@ export default function ProjectHomeScreen() {
     return () => {
       live = false;
     };
-  }, [projectId, user.id, user.name, dataKey, sync.pendingOps, reload]);
+  }, [projectId, wanted, user.id, user.name, dataKey, sync.pendingOps, reload]);
+  const waiting = awaitingProject(
+    projects.map((p) => p.id),
+    typeof wanted === 'string' ? wanted : null,
+    projectId,
+  );
 
   const rows = useMemo(() => (home ? filterLevels(home.levels, mineOnly) : []), [home, mineOnly]);
 
@@ -170,7 +178,11 @@ export default function ProjectHomeScreen() {
           </View>
         ) : null}
 
-        {!home ? (
+        {waiting ? (
+          <Text style={styles.empty} testID="home.waiting">
+            Downloading the project from the server…
+          </Text>
+        ) : !home ? (
           <View>
             <Text style={styles.empty}>No project on this iPad yet.</Text>
             <Link href="/projects" style={styles.link}>

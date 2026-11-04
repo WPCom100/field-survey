@@ -4,6 +4,24 @@
 # added through the picker's "Not listed?" field.
 appId: productions.luminarytechnology.fieldsurvey
 ---
+# Signed in as someone else (the keychain kept another run's name): Sync → Re-sign in, which
+# returns to the connect form below (T151, simulator B as Bob after a run as Ann).
+- runFlow:
+    when:
+      visible: 'Signed in as (?!${USER}\b).*'
+    commands:
+      - tapOn:
+          id: nav.sync
+      - tapOn:
+          id: sync.resign
+      # the confirm alert's button, not the screen's own behind it: `below: 'Re-sign in\?'` picks
+      # the screen's (the alert container carries the title text and spans the buttons, T151)
+      - tapOn:
+          text: Re-sign in
+          rightOf: Cancel
+      - extendedWaitUntil:
+          visible: Connect to server
+          timeout: 10000
 - runFlow:
     when:
       visible: Connect to server

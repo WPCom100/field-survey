@@ -14,6 +14,7 @@ never to the Droplet.
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a
 regex on what is visible. A flow for a new screen gets its `testID`s in the same task.
-Variables come from `rig.sh` (`-e SERVER_URL=… TOKEN=… METRO_URL=… USER=…`); the `env:` block in
-`smoke.yaml` holds the defaults. Failed steps leave screenshots under `~/.maestro/tests/` and the
+Variables come from `rig.sh` (`-e SERVER_URL=… TOKEN=… METRO_URL=… USER=…`; its `RIG_*` defaults).
+Top-level flows carry no `env:` block: a flow's own `env:` beats `-e` (T151), so run them through
+`rig.sh`, or pass all four `-e` values to `maestro test` yourself. Failed steps leave screenshots under `~/.maestro/tests/` and the
 `--debug-output` folder the script prints.

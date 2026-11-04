@@ -255,6 +255,7 @@ export default function SyncScreen() {
         <View style={styles.row}>
           <Btn
             label="Re-sign in"
+            testID="sync.resign"
             onPress={() =>
               Alert.alert('Re-sign in?', 'You will enter the server and token again. Edits on this iPad are kept and still sync afterwards.', [
                 { text: 'Cancel', style: 'cancel' },

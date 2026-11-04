@@ -39,6 +39,15 @@ appId: productions.luminarytechnology.fieldsurvey
           commands:
             - tapOn:
                 point: 92%,43%
+      # A second "Open in Field Survey?" can be stacked behind the first (a `rig.sh open` whose
+      # alert was never answered, T151 on simulator B); Maestro sees no app behind it. Cancel it:
+      # answering Open re-opens the link, reloads the running JS, and the dev client crashes in
+      # expo-sqlite's FTS5 teardown (T151).
+      - runFlow:
+          when:
+            visible: 'Open in .Field Survey.\?'
+          commands:
+            - tapOn: Cancel
 # clearState wipes the app sandbox but not the keychain (expo-secure-store), so the gate can open
 # on any of its three states: no server, a server and no name, or signed in. _connect handles each.
 - extendedWaitUntil:
