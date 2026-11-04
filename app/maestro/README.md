@@ -22,6 +22,7 @@ team Ann / Bob), never to the Droplet.
 | `offline-setup.yaml`, `offline-edit.yaml`, `offline-check.yaml` | `rig.sh offline` | O1 (T156): a fresh copy of the master; with the server stopped (status bar `Offline`) 06M-03 No access and a note, 06M-01's IP and DMX address, C-23 Not installed with its R3a Run and R4b kit drafts accepted, Confirm endpoint in Cables, a Lint finding dismissed, B2 locked, Dashboard and Rulings open, the Sync screen's Pending edits n; server back: `Synced` with nothing pending, the card still shows them, and `rig.sh` finds an applied op of each kind on the server (`client_ts` in the offline window) |
 | `conflicts-peer.yaml`, `conflicts-edit.yaml`, `conflicts-check.yaml` | `rig.sh conflicts` | O2 (T156): A (Ann) a seed copy (`offline-setup.yaml`), B (Bob) opens it; offline both set 06M-03's status, A applies a ruling (Append note on 06M-02) while B types 06M-02's note, both change the app library's EBDK aliases, A dismisses a finding; after A then B sync, A's values are official and in review; A chooses B for each (Needs review → Sync conflict 2; App library — needs review via `1 in review ▸`) and syncs: both iPads show B's values, nothing in review, B sees A's dismissal |
 | `same-user-setup.yaml`, `same-user-peer.yaml`, `same-user-edit.yaml`, `same-user-check.yaml` | `rig.sh same-user` | O3 (T156): A and B both as Ann on a project with the 06M sheet, a station and Ann's ink layer; offline both set 06M-S1's status and draw a stroke; after A then B sync: no sync conflict, B's status (the last write) on both, and A's log reads `ink_merged` (both strokes kept, D133) |
+| `resume-setup.yaml`, `resume-edit.yaml`, `resume-check.yaml` | `rig.sh resume` | O4 (T156): offline a status, a note and a library photo on 06M-S1; a kill and relaunch loses nothing from the outbox (the count never drops), the photo still waits, the card unchanged; Re-sign in while offline; server back: sign in again, `Synced`, 0 photos waiting, the server holds the ops |
 
 | Sub-flow | Walks |
 |---|---|
@@ -61,6 +62,7 @@ team Ann / Bob), never to the Droplet.
 | `_logbox-open.yaml` | dismisses the dev client's full error log when the T161 toast took a tap and opened it (`_logbox` runs it first) |
 | `_sheet-station.yaml` | a new project with the 06M sheet (`_sources`) and a Station by long-press (06M-S1); ends on the plan |
 | `_ink-stroke.yaml` | ✎ Ink → a stroke at `STROKE` (`setup`, `A`, `B`: literal spots, a swipe takes no variables) → `Saved` → Done |
+| `_photo-library.yaml` | the card's 🖼 Library → the picker (a position, `PHOTO_AT`) → Save → `Photos (1)` |
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a
 regex on what is visible. A flow for a new screen gets its `testID`s in the same task.

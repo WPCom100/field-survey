@@ -1,0 +1,83 @@
+# O4 step 2 of `rig.sh resume` (T156), with the server stopped: a status, a note and a library photo
+# on 06M-S1; then the app is killed and relaunched (`_resume`) before any sync: the outbox and the
+# photo queue survive (the pending count not lower, the photo still waiting, the card unchanged, T21). Then
+# Re-sign in, still offline: the connect form comes up and the edits wait (T25).
+appId: productions.luminarytechnology.fieldsurvey
+name: Resume — edits and a photo survive a kill and a re-sign-in
+---
+- runFlow: _resume.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline.*'
+    timeout: 60000
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- tapOn:
+    id: card.status.Issue
+- assertVisible: ✓ Issue
+- tapOn:
+    id: card.notes
+- inputText: Resume O4 note
+- pressKey: Enter
+- runFlow:
+    file: _photo-library.yaml
+    env:
+      PHOTO_AT: '39%,35%'      # the picker's first photo (portrait, iPad Pro 13")
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline · [1-9]\d* pending.*[1-9]\d* photos? waiting.*'   # photos sharing the picked image's blob all count
+    timeout: 30000
+- copyTextFrom:
+    id: status.bar
+- evalScript: ${output.pending = maestro.copiedText.match(/(\d+) pending/)[1]}
+
+# kill and relaunch before any sync
+- runFlow: _resume.yaml
+# nothing left the outbox: the count is the same or higher (the relaunch's rules run can add the
+# ops a kill cut short, T156: 3 → 4), and the photo still waits
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline · [1-9]\d* pending.*[1-9]\d* photos? waiting.*'
+    timeout: 60000
+- copyTextFrom:
+    id: status.bar
+- assertTrue: ${parseInt(maestro.copiedText.match(/(\d+) pending/)[1]) >= parseInt(output.pending)}
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- assertVisible: ✓ Issue
+- assertVisible:
+    id: card.notes
+    text: Resume O4 note
+- assertVisible:
+    id: card.section.photos
+    text: '.*Photos \(1\).*waiting.*'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# Re-sign in while offline: the edits stay in the outbox
+- tapOn:
+    id: nav.sync
+- assertVisible: '[1-9]\d* · oldest .*'
+- tapOn:
+    id: sync.resign
+- tapOn:
+    text: Re-sign in
+    rightOf: Cancel
+- extendedWaitUntil:
+    visible: Connect to server
+    timeout: 10000

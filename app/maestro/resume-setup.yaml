@@ -1,0 +1,13 @@
+# O4 step 1 of `rig.sh resume` (T156), online: a new project with the 06M sheet and a station
+# (06M-S1), synced. `rig.sh resume` has put two PNGs in the photo library first (`rig.sh media`).
+appId: productions.luminarytechnology.fieldsurvey
+name: Resume — a project with a station
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _sheet-station.yaml
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml

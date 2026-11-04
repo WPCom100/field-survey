@@ -1,0 +1,35 @@
+# O4 step 3 of `rig.sh resume` (T156), the server back: the relaunched app is on the connect form;
+# signing in again keeps every edit — they sync, the photo uploads (Photos waiting → 0), the card
+# still shows them. `rig.sh resume` then reads the server's ops.
+appId: productions.luminarytechnology.fieldsurvey
+name: Resume — signed in again, everything synced
+---
+- runFlow: _resume.yaml
+- assertVisible: Connect to server
+- runFlow: _connect.yaml
+- runFlow: _sync.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Synced [^·]*'       # nothing pending, no photo waiting
+    timeout: 120000
+- tapOn:
+    id: nav.sync
+- assertVisible: '0 photos · .*'
+- tapOn: ← Levels
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- assertVisible: ✓ Issue
+- assertVisible:
+    id: card.notes
+    text: Resume O4 note
+- assertVisible:
+    id: card.section.photos
+    text: '.*Photos \(1\)'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

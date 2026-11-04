@@ -1,0 +1,27 @@
+# On an open card: 🖼 Library → the system photo picker (another process: tapped by position) →
+# the first photo → the photo screen's Save → back on the card with one more photo (T156, F5).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.photo.library
+- tapOn:
+    id: card.photo.library
+# the picker is another process (Maestro sees nothing in it) and takes a few seconds to come up:
+# wait on a text that never shows, as a pause
+- extendedWaitUntil:
+    visible: 'zz-never-shown'
+    timeout: 5000
+    optional: true
+- tapOn:
+    point: ${PHOTO_AT}
+- extendedWaitUntil:
+    visible: Save
+    timeout: 20000
+- tapOn: Save
+- extendedWaitUntil:
+    visible:
+      id: card.section.photos
+      text: '.*Photos \(1\).*'
+    timeout: 20000

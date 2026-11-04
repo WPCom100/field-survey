@@ -32,6 +32,7 @@ appId: productions.luminarytechnology.fieldsurvey
     id: review.link.B1-S1
 - assertNotVisible:
     id: review.link.B1-01
+- tapOn: 'Link to a device on B1'   # a label: closes the keyboard, which takes the next tap (T156)
 - tapOn:
     id: review.link.B1-S1
 - tapOn:

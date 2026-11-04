@@ -97,7 +97,7 @@ Decision D164: answered 2026-10-14, **Approved**.
 
 ## Carried over: T21 — Upload resume  ·  Needs: no new build
 
-- [ ] **Upload resume.** On a real level take several photos, force-quit while they upload, relaunch: uploads finish, nothing sent twice; Sync shows Photos waiting → 0. (Not done 2026-10-14, close-out C-6.) → saw:
+- [ ] **Upload resume.** On a real level take several photos, force-quit while they upload, relaunch: uploads finish, nothing sent twice; Sync shows Photos waiting → 0. (Not done 2026-10-14, close-out C-6.) → saw: (Claude, rig, 2026-11-04, `rig.sh resume`, partial): with the api stopped a library photo on 06M-S1 (status bar "… photos waiting", the card's `Photos (1) 📷 1 waiting`); the app killed and relaunched: still waiting, the outbox not lower, the card unchanged; once the server is back and the app signed in again it uploads, Sync reads `0 photos`, and the server holds the photo. Killed while queued, not mid-upload, and "nothing sent twice" not checked here (core's blob e2e test kills between chunks); F5 (T158) takes the rest.
 
 ## T75 — A refused edit (only if one happens)  ·  Needs: no new build
 
