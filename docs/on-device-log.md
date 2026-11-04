@@ -2,6 +2,18 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## Claude ran (rig) 2026-11-04 — wave 3 of docs/rig-plan.md (T156), Mac rig Simulator, local e2e server
+
+Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.
+
+### T87 — One name on two iPads  ·  Needs: no new build; two iPads
+
+The two-name check passed in the close-out (Part A) and the name on the home passed 2026-10-18 (B-1). Sheet D-32.
+
+- [x] **Same name on two iPads: both inks survive.** Both iPads signed in under the **same** name, both cached 06M, airplane mode on both. A draws over the rack area first; a minute later B circles a station. Airplane mode off on B, wait for Synced; then A. Open 06M on A: within a few seconds A's strokes come back next to B's; the Metro log reads `[plan] ink: merged 1 concurrent write(s) into layer …`. Sync B and open 06M: the same strokes. No review item. → saw: (Claude, rig, 2026-11-04, `rig.sh same-user`): both simulators signed in as Ann with 06M cached and Ann's layer already holding one stroke; with the api stopped A strokes left of the sheet and B lower right, each "Saved"; A then B sync. Opening 06M on A logs `[plan] ink_merged {"writes":1,…}` (now in the log file, read with `rig.sh log A ink_merged`), and B's 06M shows both strokes; no sync conflict in Needs review on either. The same run set 06M-S1's status on both (A Issue, B Not installed): no review item, B's later write on both — after a fix: B had kept A's earlier value (see T156).
+
+Decision D162: answered 2026-10-14, **Approved**.
+
 ## Claude ran (rig) 2026-11-04 — wave 1 of docs/rig-plan.md (T155), Mac rig Simulator, local e2e server
 
 Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.

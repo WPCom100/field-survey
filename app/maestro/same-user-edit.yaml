@@ -1,0 +1,31 @@
+# O3 through `rig.sh conflict` with RIG_PEER=Ann (T156): the server stopped, A and B both signed in
+# as Ann. Each sets 06M-S1's status (A Issue, B Not installed) and draws one stroke on 06M at its
+# own spot, into Ann's one layer.
+appId: productions.luminarytechnology.fieldsurvey
+name: Same user — one field and one ink layer on two iPads, offline
+---
+- runFlow: _resume.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline.*'
+    timeout: 60000
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- tapOn:
+    id: "card.status.${SIDE == 'A' ? 'Issue' : 'Not installed'}"
+- assertVisible: "✓ ${SIDE == 'A' ? 'Issue' : 'Not installed'}"
+- tapOn:
+    id: card.close
+- runFlow:
+    file: _ink-stroke.yaml
+    env:
+      STROKE: ${SIDE}
+- tapOn:
+    id: plan.back
+- assertVisible:
+    id: status.bar
+    text: 'Offline · [1-9]\d* pending.*'

@@ -84,14 +84,6 @@ Skipped 2026-10-14 (close-out C-18, C-19). Everything else in T84 passed.
 
 Decision D157: answered 2026-10-14, **Approved**.
 
-## T87 — One name on two iPads  ·  Needs: no new build; two iPads
-
-The two-name check passed in the close-out (Part A) and the name on the home passed 2026-10-18 (B-1). Sheet D-32.
-
-- [ ] **Same name on two iPads: both inks survive.** Both iPads signed in under the **same** name, both cached 06M, airplane mode on both. A draws over the rack area first; a minute later B circles a station. Airplane mode off on B, wait for Synced; then A. Open 06M on A: within a few seconds A's strokes come back next to B's; the Metro log reads `[plan] ink: merged 1 concurrent write(s) into layer …`. Sync B and open 06M: the same strokes. No review item. → saw:
-
-Decision D162: answered 2026-10-14, **Approved**.
-
 ## T47 — Lock / unlock baseline (leftover)  ·  Needs: no new build; two iPads
 
 - [ ] **Offline and the other iPad.** Airplane mode on, lock a level (works, ↑ on the History line); airplane off, Synced. On the second iPad (different name) after its sync the level reads `🔒 Locked` on the Levels screen and the History line names who locked it. → saw: (Claude, rig, 2026-11-04, `rig.sh offline`, first half): with the server stopped Setup → 6 Lock baseline → Lock B2 ⚠ → Lock anyway reads `🔒 Locked`; once the server is back the app syncs and the server holds the `level` state op applied. The second iPad half is still yours.

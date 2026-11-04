@@ -243,6 +243,16 @@ cmd_open() {
   say "opened the dev client on ${1:-A} from $METRO_URL"
 }
 
+uses_sources() {  # flow -> 0 when it, or a sub-flow it runs, uploads through _sources.yaml (T156: _sheet-station)
+  local f="$ROOT/app/maestro/$1" sub
+  grep -q "_sources.yaml" "$f" 2>/dev/null && return 0
+  # no pipeline into grep -q here: under pipefail its early exit fails the whole test
+  for sub in $(grep -o '_[a-z-]*.yaml' "$f" 2>/dev/null | sort -u); do
+    grep -q "_sources.yaml" "$ROOT/app/maestro/$sub" 2>/dev/null && return 0
+  done
+  return 1
+}
+
 cmd_flows() {
   local dev=A flow="" udid
   while [ $# -gt 0 ]; do
@@ -253,9 +263,7 @@ cmd_flows() {
   done
   # flows that upload (Setup → Sources) pick these from the Files app by position (T151); also
   # through one of their sub-flows (_sheet-station.yaml, T156)
-  if grep -q "_sources.yaml" "$ROOT/app/maestro/${flow:-smoke.yaml}" 2>/dev/null \
-    || grep -o '_[a-z-]*\.yaml' "$ROOT/app/maestro/${flow:-smoke.yaml}" 2>/dev/null | sort -u \
-      | while read -r sub; do grep -q "_sources.yaml" "$ROOT/app/maestro/$sub" 2>/dev/null && echo y; done | grep -q y; then
+  if uses_sources "${flow:-smoke.yaml}"; then
     cmd_files "$dev" fixtures/DaVinci_categories.xlsx fixtures/davinci-library-sample.json \
       "fixtures/Level_06M_-_Lighting_Composite_vector.pdf"
   fi

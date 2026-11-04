@@ -1,0 +1,29 @@
+# O3's check through `rig.sh conflict` (T156), on A then B after A then B synced: one user on two
+# iPads never conflicts (D37) — 06M-S1 reads B's status (the last write), not in review, and Needs
+# review has no sync conflict. Opening 06M merges the two concurrent writes of Ann's ink layer
+# (D133, T87); `rig.sh same-user` then reads `ink_merged` in A's log. A sync sends the merge on.
+appId: productions.luminarytechnology.fieldsurvey
+name: Same user — no conflict, last write stands, inks merged
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- assertVisible: ✓ Not installed
+- assertNotVisible: '.*in review.*'
+- tapOn:
+    id: card.close
+- extendedWaitUntil:          # the sheet and its ink layers loaded (the merge runs on load)
+    visible:
+      id: plan.place
+    timeout: 60000
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.needs-review
+- assertNotVisible: 'Sync conflict [1-9].*'
+- tapOn: ← Levels
+- runFlow: _sync.yaml

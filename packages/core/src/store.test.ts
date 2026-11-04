@@ -280,6 +280,43 @@ describe('applyRemote', () => {
     expect((await store.outbox()).map((o) => o.kind)).toEqual(['create']); // only the unacknowledged create remains
   });
 
+  it('one person on two iPads: an earlier write pulled after a later one never puts the older value back (D37, T156)', async () => {
+    const id = await newDevice();
+    const heads = await store.fieldHeads(id);
+    // iPad A (install-B here) set Issue first, offline …
+    const fromA = remote({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'status', was: 'Installed, untested', now: 'Issue', base_op_id: heads.status, user_id: LANDRY }, 13);
+    // … this iPad set Not installed later and pushed it after A's: the server applied both, ours last
+    const mine = op({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'status', was: 'Installed, untested', now: 'Not installed', base_op_id: heads.status });
+    await store.apply(mine);
+    await store.acknowledgeMany([{ op_id: mine.op_id, outcome: 'applied', server_seq: 17 }]);
+    // the pull then brings A's earlier write
+    expect(await store.applyRemote(fromA)).toEqual({ outcome: 'applied', collided_pending: [] });
+    expect(await store.get('device', id)).toMatchObject({ status: 'Not installed', head_seq: 17 });
+    expect(await store.fieldHead(id, 'status')).toBe(mine.op_id);
+    // a later applied write still lands
+    const after = remote({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'status', was: 'Not installed', now: 'No access', base_op_id: mine.op_id }, 18);
+    await store.applyRemote(after);
+    expect((await store.get('device', id))!.status).toBe('No access');
+  });
+
+  it('one person on two iPads: a pending later edit here keeps its value against the earlier one pulled (D37, D84)', async () => {
+    const id = await newDevice();
+    const heads = await store.fieldHeads(id);
+    const earlier = remote({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'notes', now: 'from A', base_op_id: heads.notes, user_id: LANDRY }, 13);
+    await store.apply(op({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'notes', now: 'from B', base_op_id: heads.notes }));
+    await store.applyRemote(earlier);
+    expect((await store.get('device', id))!.notes).toBe('from B');
+    // a later one of the same person's (the server will supersede ours) and another person's still land
+    const later = remote({ entity_kind: 'device', entity_id: id, kind: 'set', field: 'notes', now: 'from A again', base_op_id: heads.notes, user_id: LANDRY }, 14);
+    await store.applyRemote(later);
+    expect((await store.get('device', id))!.notes).toBe('from A again');
+    const zach = await newDevice();
+    const zh = await store.fieldHeads(zach);
+    await store.apply(op({ entity_kind: 'device', entity_id: zach, kind: 'set', field: 'notes', now: 'mine', base_op_id: zh.notes }));
+    await store.applyRemote(remote({ entity_kind: 'device', entity_id: zach, kind: 'set', field: 'notes', now: 'Zach first', base_op_id: zh.notes, client_ts: '2000-01-01T00:00:00.000Z' }, 20));
+    expect((await store.get('device', zach))!.notes).toBe('Zach first'); // first-arrived of two people: official (D37)
+  });
+
   it('materialises another install\'s create/set/delete and records review ops without applying', async () => {
     const id = uuidv7();
     const create = remote({ entity_kind: 'device', entity_id: id, kind: 'create', payload: { level_id: LEVEL, display_id: '06M-05', status: 'Issue' } }, 1);

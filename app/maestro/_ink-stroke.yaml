@@ -1,0 +1,38 @@
+# On an open plan with a sheet: ✎ Ink → one finger stroke → "Saved" → Done (T156). STROKE (env) picks
+# the spot: setup, A or B. Maestro parses a swipe's start and end before it substitutes variables,
+# so each spot is a literal. The 06M sheet fills about 32–78 % of the screen's height (T155).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: plan.ink
+- runFlow:
+    when:
+      true: ${STROKE == 'setup'}
+    commands:
+      - swipe:
+          start: 15%,40%
+          end: 25%,42%
+          duration: 1500
+- runFlow:
+    when:
+      true: ${STROKE == 'A'}
+    commands:
+      - swipe:
+          start: 15%,55%
+          end: 25%,58%
+          duration: 1500
+- runFlow:
+    when:
+      true: ${STROKE == 'B'}
+    commands:
+      - swipe:
+          start: 40%,60%
+          end: 50%,66%
+          duration: 1500
+- extendedWaitUntil:
+    visible:
+      id: ink.save
+      text: Saved
+    timeout: 15000
+- tapOn:
+    id: ink.done

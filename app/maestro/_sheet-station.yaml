@@ -1,0 +1,25 @@
+# A new project PROJECT with the 06M sheet (_sources) and one Station added by long-press (06M-S1
+# once the server numbers it); ends on the 06M plan with the card closed (T156: O3, O4).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow: _new-project.yaml
+- runFlow: _sources.yaml
+- runFlow: _logbox.yaml     # T161's toast can cover the screen after the pulls
+- tapOn:
+    id: plans.open.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 60000
+- runFlow:
+    file: _add-here.yaml
+    env:
+      AT: 30%,45%
+      CAT: Station
+      MODEL: Maestro wave 3 station
+      IDRE: '06M-S1'
+- tapOn:
+    id: card.close

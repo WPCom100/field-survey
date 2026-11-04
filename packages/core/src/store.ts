@@ -273,6 +273,11 @@ export class Store {
     const stored = normalise(op, state);
     await this.insertOp(tx, stored);
     if (state !== 'applied') return { outcome: 'recorded', collided_pending: [] };
+    if ((stored.kind === 'set' || stored.kind === 'assign') && (await this.headIsLater(tx, stored))) {
+      // the server put this op before the value the field already has here: keep that (T156)
+      if (stored.server_seq != null) await this.bumpHeadSeq(tx, entity(stored.entity_kind), stored.entity_id, stored.server_seq);
+      return { outcome: 'applied', collided_pending: [] };
+    }
     const collided = await this.pendingCollisions(tx, stored);
     const ok = await this.materialise(tx, stored);
     return { outcome: ok ? 'applied' : 'orphan', collided_pending: collided };
@@ -315,6 +320,24 @@ export class Store {
         ]);
       }
     });
+  }
+
+  /**
+   * True when the field's head here comes after `op` in the server's order, so materialising
+   * `op` would put an older value back (T156, found by the rig's O3: one person on two iPads, B
+   * pushed its later edit, then pulled A's earlier one and showed A's value while the server and A
+   * had B's). Later means an applied op with a higher `server_seq`, or this person's own edit not
+   * yet pushed with a later `client_ts`, which the server will apply over `op` (D37, D84).
+   */
+  private async headIsLater(tx: SqlDriver, op: StoredOp): Promise<boolean> {
+    if (!op.field) return false;
+    const rows = await tx.query<{ op_id: string }>(`SELECT op_id FROM field_head WHERE entity_id = ? AND field = ?`, [op.entity_id, op.field]);
+    const headId = rows[0]?.op_id;
+    if (!headId || headId === op.op_id) return false;
+    const head = await this.getOpIn(tx, headId);
+    if (!head) return false;
+    if (head.server_seq != null && op.server_seq != null) return head.state === 'applied' && head.server_seq > op.server_seq;
+    return head.state === 'pending' && head.server_seq == null && head.user_id === op.user_id && head.client_ts > op.client_ts;
   }
 
   /** Local pending ops the incoming op will collide with on the server (PLAN §3.2 pull). */

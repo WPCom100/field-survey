@@ -1,0 +1,18 @@
+# O3 step 1 of `rig.sh same-user` (T156), on A as Ann, online: a new project with the 06M sheet and
+# a station (06M-S1), and one ink stroke on 06M, so Ann's ink layer exists before both iPads go
+# offline and both then write that same layer (T87). Sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Same user — a project, a station and Ann's ink layer
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _sheet-station.yaml
+- runFlow:
+    file: _ink-stroke.yaml
+    env:
+      STROKE: setup
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml

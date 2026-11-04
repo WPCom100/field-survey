@@ -1,0 +1,21 @@
+# O3 step 2 of `rig.sh same-user` (T156), on B — signed in as Ann too (`_connect` re-signs in when
+# the keychain holds Bob): open the project's 06M plan online so the sheet and Ann's layer are
+# here before both go offline; sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Same user — B as Ann has the plan
+---
+# keep the store (no clearState): a fresh one downloads every project on the rig server first, the
+# newest last, and with 45 of them it was still "downloading…" after 90 s (T156)
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- runFlow:
+    file: _open-level.yaml
+    env:
+      LEVEL: 06M
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 90000
+- tapOn:
+    id: plan.back
+- runFlow: _sync.yaml
