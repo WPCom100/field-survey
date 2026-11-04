@@ -2,6 +2,20 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## Claude ran (rig) 2026-11-04 — wave 1 of docs/rig-plan.md (T155), Mac rig Simulator, local e2e server
+
+Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.
+
+### T35 — One "Run …" draft per wire; 120V wording  ·  Needs: no new build (JS update)
+
+**Why it matters:** the golden test against the master (TP-8) showed the engine raising two "Run …" drafts for one unpulled wire when both ends were surveyed, and naming a 120V run after the power placeholder. The master has one item per wire and names the power supply.
+
+- [x] **Both ends surveyed, one draft.** On a cable whose two ends are both on cached levels (e.g. a DMX run between a relay panel on 04 and the rack on 06M), set the panel's end **Not installed**, then the rack's end **Not installed** too: only one `DRAFT ⚑ R3a Run DMX to …` exists, on the card at the **start of the run** (the lower floor's end on the Tower; the riser's origin once risers are imported); the other card shows none for that wire. Why: R3 says one Run item per unpulled wire (D177). → saw (Claude, rig, 2026-11-04, ends.yaml): C-12 / C-14 (X, 06M-02 → the rack 06M-01, both ends Not installed in the master): one `Run DMX to equipment rack` draft (end A, 06M-02), no `Run DMX to CT06LCPB` for the rack's end.
+- [x] **The accepted item stands.** Accept that draft, then set the other end back to empty and to **Not installed** again: no second Run draft appears on either card. → saw (Claude, rig, 2026-11-04, ends.yaml): accepted on 06M-02; its end flipped to **Installed, untested** and back to **Not installed**: the item stays on the card, no Run draft for the wire on either end. Also on C-23: the accepted `Run DMX to Level 11` stays when its end goes **Issue**.
+- [x] **120V wording.** On an NSPS or rack, set the 120V end **Not installed**: the draft reads `Run 120V to P-NSPS-D Power Supply` (rack: `Run 120V to Equipment rack`), not "… to 120v Power". → saw (Claude, rig, 2026-11-04, ends.yaml): NSPS 04-05 (its 120V end Not installed in the master) shows `Run 120V to P-NSPS-D Power Supply · Cable not run · EC`. The rack's wording is the master's imported #17 `Run 120V to equipment rack` on 06M-01, not a draft.
+
+Decision D177: answered 2026-10-15, **Approved** — "the start of the run holds the item" (side A in the data). Nothing to answer here.
+
 ## 2026-11-01 / 02 — Fresh-start round, Parts 0–C and the start of D (dev build `a5cbf96f` / TestFlight 15, server `f6c6aa0`, update `bf9eef31`)
 
 Landry ran the fresh-start sheet (https://claude.ai/artifact/TbM5bqU6V1F1VUZxXK5JMy as **ROUND-1101**, collection `round1101`) on **one** iPad after every project had been cleared (0-2): new projects `Scratch1` and `pipeline test`, the Pipeline checks on **level 03** ("it has more varied device types and connections"). Results pasted 2026-11-02 with notes outside the sheet; this session archived them, filed the tasks and rebuilt the sheet. **40 pass, 3 fail, 13 skip, 109 not done** (D-6 onward, Parts E, G, H and the two-iPad Part I).

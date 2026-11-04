@@ -1,0 +1,13 @@
+# Projects → PROJECT → level LEVEL → Devices → DEVICE's card (T155). The caller passes LEVEL and
+# DEVICE through runFlow's env (e.g. 06M, 06M-01).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow: _open-level.yaml
+- tapOn:
+    id: plan.tab.devices
+- extendedWaitUntil:
+    visible:
+      id: plan.device.${DEVICE}
+    timeout: 30000
+- tapOn:
+    id: plan.device.${DEVICE}

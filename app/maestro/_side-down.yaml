@@ -1,0 +1,25 @@
+# Scrolls the plan's side panel (card, end editor: the right 28% of the screen) down until ID is
+# on screen, then a little more so it sits clear of the bottom edge (T155). scrollUntilVisible
+# swipes the middle of the screen, which is the plan. The caller passes ID (an id regex) in env.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- repeat:
+    times: 25
+    while:
+      notVisible:
+        id: ${ID}
+    commands:
+      - swipe:
+          start: 86%,75%
+          end: 86%,47%
+          duration: 500
+      - waitForAnimationToEnd:
+          timeout: 2000
+- swipe:
+    start: 86%,70%
+    end: 86%,52%
+    duration: 500
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible:
+    id: ${ID}

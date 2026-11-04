@@ -1046,6 +1046,7 @@ export function PlanScreen(props: PlanScreenProps) {
           autoCorrect={false}
           clearButtonMode="while-editing"
           returnKeyType="search"
+          testID="plan.search"
         />
         <View style={styles.spacer} />
         <BarButton label="Layers" open={menu === 'layers'} onPress={() => setMenu(menu === 'layers' ? null : 'layers')} />
@@ -1700,11 +1701,11 @@ function PressMenu(props: {
         <View style={styles.pressDot} pointerEvents="none" />
       </View>
       <View style={[styles.pressMenu, { left, top, width: MENU_W }]}>
-        <PressItem label="+ Device (field addition)" disabled={!props.canEdit} onPress={props.onDevice} />
-        <PressItem label="+ Note here" disabled={!props.canInk} onPress={props.onNote} />
-        <PressItem label={props.deviceLabel ? `+ Photo of ${props.deviceLabel}` : '+ Photo here'} disabled={!props.canEdit || !props.canPhoto} onPress={props.onPhoto} />
-        <PressItem label="✎ Markup (ink)" disabled={!props.canInk} onPress={props.onInk} />
-        <PressItem label="Cancel" onPress={props.onClose} />
+        <PressItem testID="press.device" label="+ Device (field addition)" disabled={!props.canEdit} onPress={props.onDevice} />
+        <PressItem testID="press.note" label="+ Note here" disabled={!props.canInk} onPress={props.onNote} />
+        <PressItem testID="press.photo" label={props.deviceLabel ? `+ Photo of ${props.deviceLabel}` : '+ Photo here'} disabled={!props.canEdit || !props.canPhoto} onPress={props.onPhoto} />
+        <PressItem testID="press.ink" label="✎ Markup (ink)" disabled={!props.canInk} onPress={props.onInk} />
+        <PressItem testID="press.cancel" label="Cancel" onPress={props.onClose} />
       </View>
     </>
   );
@@ -1801,9 +1802,9 @@ function InkBar(props: {
   );
 }
 
-function PressItem({ label, onPress, disabled, note }: { label: string; onPress: () => void; disabled?: boolean; note?: string }) {
+function PressItem({ label, onPress, disabled, note, testID }: { label: string; onPress: () => void; disabled?: boolean; note?: string; testID?: string }) {
   return (
-    <Pressable style={styles.pressItem} onPress={disabled ? undefined : onPress}>
+    <Pressable style={styles.pressItem} onPress={disabled ? undefined : onPress} testID={testID}>
       <Text style={[styles.pressText, disabled && styles.disabled]}>{label}</Text>
       {note ? <Text style={styles.menuNoteInline}>{note}</Text> : null}
     </Pressable>
@@ -1861,7 +1862,7 @@ function togglePick(cur: ReadonlySet<string>, id: string): ReadonlySet<string> {
 function ListRowView({ row, selected, picking, onPress }: { row: ListRow; selected: boolean; picking?: boolean; onPress: () => void }) {
   const st = pinStyleFor(row.tab === 'connections' ? row.endStatus : row.deviceStatus);
   return (
-    <Pressable style={[styles.row, selected && styles.rowSelected, row.badges.deleted && styles.rowDeleted]} onPress={onPress}>
+    <Pressable style={[styles.row, selected && styles.rowSelected, row.badges.deleted && styles.rowDeleted]} onPress={onPress} testID={`plan.row.${row.tab}.${row.label}`}>
       {picking ? <Text style={styles.pickBox}>{selected ? '☑' : '☐'}</Text> : null}
       {row.tab === 'connections' ? <Swatch {...st} /> : <Text style={styles.rowNum}>{row.label}</Text>}
       <View style={styles.rowMain}>

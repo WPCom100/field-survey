@@ -1,0 +1,10 @@
+# Empties this end's note in the open end editor (T155). eraseText deletes before the cursor, and
+# a tap lands the cursor where it hits the text: twice, so what was after the cursor goes too.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: end.this.note
+- eraseText: 80
+- tapOn:
+    id: end.this.note
+- eraseText: 80

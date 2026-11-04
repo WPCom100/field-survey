@@ -1,0 +1,22 @@
+# Taps the card's connection CONN (on screen, see _side-down / _side-up) and waits for its end
+# editor (T155); a tap that landed while the panel still moved is repeated once.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: card.conn.${CONN}
+- extendedWaitUntil:
+    visible:
+      id: end.back
+    timeout: 4000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: end.back
+    commands:
+      - tapOn:
+          id: card.conn.${CONN}
+- extendedWaitUntil:
+    visible:
+      id: end.back
+    timeout: 5000

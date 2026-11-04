@@ -1,0 +1,73 @@
+# F1 step 3 (T155, T35, T118): the X run C-12 from 06M-02 (end A) to the rack 06M-01 (C-14) has both
+# ends Not installed in the master: one Run draft only, on the start of the run (R3a run.end = A);
+# accepted, the item stands when the end flips to Installed, untested and back, and no second
+# draft comes. The panic run C-08 takes no termination kits: its end offers no "no term kit" note.
+# Starts on the plan with a card open; ends on 06M-02's card.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-02
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.accept.Run DMX to equipment rack
+- assertNotVisible:
+    id: proposal.accept.Run DMX to CT06LCPB        # the B end's would-be draft (its To text)
+- tapOn:
+    id: proposal.accept.Run DMX to equipment rack
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.punch.Run DMX to equipment rack
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.conn.C-12
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-12
+- assertVisible: 'Other end: 06M-01 .*'
+- assertVisible:
+    id: end.other.status.Not installed
+    text: ✓ Not installed
+- tapOn:
+    id: end.this.status.Installed, untested
+- assertVisible: ✓ Installed, untested
+- tapOn:
+    id: end.this.status.Not installed
+- tapOn:
+    id: end.back
+# the accepted item stands; no second Run draft for the wire
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.punch.Run DMX to equipment rack
+- assertNotVisible:
+    id: proposal.accept.Run DMX to equipment rack
+- assertNotVisible:
+    id: proposal.accept.Run DMX to CT06LCPB
+# T118: a cable whose code takes no kits (P) offers no "no term kit" note chip; an X end does
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.conn.C-08
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-08
+- assertVisible:
+    id: 'end\.this\.note\.chip\.Run, not terminated'
+- assertNotVisible:
+    id: 'end\.this\.note\.chip\.Run, not terminated; no term kit'
+- tapOn:
+    id: 'end\.this\.note\.more'
+    optional: true            # only when the end offers more than four chips
+- assertNotVisible:
+    id: 'end\.this\.note\.chip\.Run, not terminated; no term kit'
+- tapOn:
+    id: end.back

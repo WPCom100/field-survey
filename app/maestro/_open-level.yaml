@@ -1,0 +1,29 @@
+# Projects → PROJECT → level LEVEL's plan (T155). The caller passes LEVEL through runFlow's env;
+# the plan opens with or without a sheet.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.projects
+- runFlow:
+    when:
+      notVisible:
+        id: projects.open.${PROJECT}
+    commands:
+      - tapOn:
+          id: projects.refresh
+- scrollUntilVisible:
+    element:
+      id: projects.open.${PROJECT}
+    direction: DOWN
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: level.${LEVEL}
+    timeout: 30000
+- tapOn:
+    id: level.${LEVEL}
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true

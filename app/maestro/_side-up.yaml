@@ -1,0 +1,25 @@
+# The side panel back up until ID is on screen (see _side-down.yaml), then a little more: a row
+# under the card's fixed header counts as visible (the scroll view clips it, its frame is on
+# screen) and a tap there would hit the header.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- repeat:
+    times: 25
+    while:
+      notVisible:
+        id: ${ID}
+    commands:
+      - swipe:
+          start: 86%,40%
+          end: 86%,68%
+          duration: 500
+      - waitForAnimationToEnd:
+          timeout: 2000
+- swipe:
+    start: 86%,40%
+    end: 86%,60%
+    duration: 500
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible:
+    id: ${ID}

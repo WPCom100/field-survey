@@ -307,6 +307,6 @@ export async function editPlaceholder(editor: Editor, store: Store, id: string, 
 /** Remove a placeholder; refused while a connection end still names it. */
 export async function removePlaceholder(editor: Editor, store: Store, id: string): Promise<void> {
   const used = await store.list<Row>('cable_end', { where: 'placeholder_id = ? AND deleted_at IS NULL', params: [id] });
-  if (used.length) throw new OpError(`${used.length} connection end${used.length === 1 ? '' : 's'} still use this placeholder.`);
+  if (used.length) throw new OpError(`${used.length} connection end${used.length === 1 ? ' still uses' : 's still use'} this placeholder.`);
   await editor.delete('placeholder', id, PLACEHOLDER_CTX);
 }

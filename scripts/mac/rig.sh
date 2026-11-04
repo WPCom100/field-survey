@@ -240,6 +240,10 @@ cmd_flows() {
     cmd_files "$dev" fixtures/DaVinci_categories.xlsx fixtures/davinci-library-sample.json \
       "fixtures/Level_06M_-_Lighting_Composite_vector.pdf"
   fi
+  # flows that work on their own copy of the master (wave 1, T155) pick the workbook alone
+  if grep -q "_seed-copy.yaml" "$ROOT/app/maestro/${flow:-smoke.yaml}" 2>/dev/null; then
+    cmd_files "$dev" fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx
+  fi
   udid="$(sim_for "$dev")"
   command -v maestro >/dev/null || export PATH="$HOME/.maestro/bin:$PATH"
   command -v java >/dev/null || die "Maestro needs Java 17+: brew install openjdk@17 and set JAVA_HOME (docs/ops.md §6.1)"

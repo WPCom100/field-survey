@@ -1,0 +1,23 @@
+# F1 (T155, rig plan wave 1): the end editor and the rules on a fresh copy of the master workbook
+# (PROJECT, made by _seed-copy: `rig.sh flows ends.yaml` stages the workbook). On 06M: an X run to a
+# placeholder Not installed → R3a Run draft → Accept → R4b kit draft → Accept, the kit's source
+# numbered after the sync; Issue "Run, not terminated" → R3a Terminate (EC/ETC), "…; no term kit" →
+# R3b (Missing part · EC/ETC), the Run item standing (T35); both ends Not installed → one Run draft,
+# on end A; no kit chip on a panic run (T118); the findings line; the jump to another level; the
+# NSPS's 120V wording; Change placeholder… → Add & use, and Vocabulary refuses its removal (T40).
+appId: productions.luminarytechnology.fieldsurvey
+name: F1 — the end editor and the rules
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-01
+- runFlow: _ends-run.yaml
+- runFlow: _ends-terminate.yaml
+- runFlow: _ends-wire.yaml
+- runFlow: _ends-elsewhere.yaml
+- runFlow: _ends-placeholder.yaml

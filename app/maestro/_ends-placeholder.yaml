@@ -1,0 +1,58 @@
+# F1 step 7 (T155, T40): C-23's far end is the placeholder "Level 11" → Change placeholder… → Add &
+# use "Maestro spare" → the end names it; Manage… → Vocabulary › Placeholders → Remove is refused
+# while the end uses it. Starts on any plan; ends on the Vocabulary screen.
+appId: productions.luminarytechnology.fieldsurvey
+---
+# the jump stacked Level 04 on 06M: back returns to 06M with C-13 still open
+- tapOn:
+    id: plan.back
+- runFlow:
+    when:
+      visible:
+        id: level.06M
+    commands:
+      - tapOn:
+          id: level.06M
+- tapOn:
+    id: end.back
+    optional: true
+- tapOn:
+    id: card.close
+    optional: true
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-01
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-23
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-23
+- tapOn:
+    id: end.other.placeholder
+- assertVisible: Choose a placeholder
+- assertVisible:
+    id: placeholder.pick.Level 11
+- tapOn:
+    id: placeholder.new
+- inputText: Maestro spare
+- pressKey: Enter          # Return adds it; the keyboard covers "Add & use"
+- extendedWaitUntil:
+    visible: 'Other end: Maestro spare'
+    timeout: 10000
+- tapOn:
+    id: end.other.placeholder
+- tapOn:
+    id: placeholder.manage
+- extendedWaitUntil:
+    visible:
+      id: vocab.placeholder.remove.Maestro spare
+    timeout: 10000
+- tapOn:
+    id: vocab.placeholder.remove.Maestro spare
+- assertVisible: 1 connection end still uses this placeholder.
+- assertVisible:
+    id: vocab.placeholder.remove.Maestro spare

@@ -183,7 +183,7 @@ export function DeviceCard(props: DeviceCardProps) {
           {d.fieldAddition ? <Text style={chipStyles.badgePlain}>+</Text> : null}
           <View style={styles.flex} />
           {editor ? (
-            <Pressable onPress={() => setMenu((m) => !m)} hitSlop={8} style={styles.headBtn}>
+            <Pressable onPress={() => setMenu((m) => !m)} hitSlop={8} style={styles.headBtn} testID="card.menu">
               <Text style={styles.headBtnText}>⋯</Text>
             </Pressable>
           ) : null}
@@ -203,15 +203,15 @@ export function DeviceCard(props: DeviceCardProps) {
       {menu ? (
         <View style={styles.menu}>
           {props.canMovePin && !d.deleted ? (
-            <MenuButton label={props.unplaced ? 'Place pin…' : 'Move pin…'} onPress={() => (setMenu(false), setPending({ kind: 'move', reason: '' }))} />
+            <MenuButton testID="card.menu.move" label={props.unplaced ? 'Place pin…' : 'Move pin…'} onPress={() => (setMenu(false), setPending({ kind: 'move', reason: '' }))} />
           ) : null}
           {!d.deleted && (d.placedFromDraft || d.pin) ? (
-            <MenuButton label="Put back in the unplaced list…" onPress={() => (setMenu(false), setPending({ kind: 'unplace', reason: UNPLACE_REASON }))} />
+            <MenuButton testID="card.menu.unplace" label="Put back in the unplaced list…" onPress={() => (setMenu(false), setPending({ kind: 'unplace', reason: UNPLACE_REASON }))} />
           ) : null}
           {d.deleted ? (
-            <MenuButton label="Restore…" onPress={() => (setMenu(false), setPending({ kind: 'restore', reason: '' }))} />
+            <MenuButton testID="card.menu.restore" label="Restore…" onPress={() => (setMenu(false), setPending({ kind: 'restore', reason: '' }))} />
           ) : (
-            <MenuButton label="Delete…" danger onPress={() => (setMenu(false), setPending({ kind: 'delete', reason: '' }))} />
+            <MenuButton testID="card.menu.delete" label="Delete…" danger onPress={() => (setMenu(false), setPending({ kind: 'delete', reason: '' }))} />
           )}
         </View>
       ) : null}
@@ -228,6 +228,7 @@ export function DeviceCard(props: DeviceCardProps) {
             autoFocus
             returnKeyType="done"
             onSubmitEditing={confirmPending}
+            testID="card.reason"
           />
           <View style={styles.rowWrap}>
             <SmallButton
@@ -235,8 +236,9 @@ export function DeviceCard(props: DeviceCardProps) {
               danger={danger}
               disabled={!pending.reason.trim()}
               onPress={confirmPending}
+              testID="card.reason.ok"
             />
-            <SmallButton label="Cancel" onPress={() => setPending(null)} />
+            <SmallButton label="Cancel" onPress={() => setPending(null)} testID="card.reason.cancel" />
           </View>
         </View>
       ) : null}
@@ -343,13 +345,13 @@ export function DeviceCard(props: DeviceCardProps) {
           </View>
         </Section>
 
-        <Section title={`Connections (${card.connections.length})`} marks="">
+        <Section title={`Connections (${card.connections.length})`} marks="" testID="card.section.connections">
           {card.connections.length === 0 ? <Text style={styles.muted}>None on this device.</Text> : null}
           {card.connections.map((c) => (
             <Pressable key={c.id} style={styles.item} onPress={() => props.onOpenEnd?.(c.id)} disabled={!props.onOpenEnd}>
               <View style={styles.itemLine}>
                 <Swatch {...pinStyleFor(c.status ?? 'Not started')} />
-                <Text style={styles.itemId}>{c.label}</Text>
+                <Text style={styles.itemId} testID={`card.conn.${c.label}`}>{c.label}</Text>
                 <Text style={styles.itemText} numberOfLines={2}>
                   {c.cable ?? '?'} → {c.to}
                 </Text>
@@ -359,7 +361,7 @@ export function DeviceCard(props: DeviceCardProps) {
                   {[c.status ?? 'Not started', c.singleRow ? '1 row' : null, c.statusSource === 'copied' ? 'copied' : null, c.note].filter(Boolean).join(' · ')}
                 </Text>
                 {c.jump && (c.jump.sameLevel || props.canOpenLevels) ? (
-                  <Pressable onPress={() => props.onJump(c.jump!)} hitSlop={6} style={styles.jump}>
+                  <Pressable onPress={() => props.onJump(c.jump!)} hitSlop={6} style={styles.jump} testID={`card.conn.${c.label}.jump`}>
                     <Text style={styles.jumpText}>{c.jump.label} ▸</Text>
                   </Pressable>
                 ) : null}
@@ -387,10 +389,10 @@ export function DeviceCard(props: DeviceCardProps) {
           ))}
         </Section>
 
-        <Section title={`Punch items (${card.punch.length})${card.drafts.length ? ` + proposals (${card.drafts.length})` : ''}`} marks="">
+        <Section title={`Punch items (${card.punch.length})${card.drafts.length ? ` + proposals (${card.drafts.length})` : ''}`} marks="" testID="card.section.punch">
           {card.punch.length === 0 && card.drafts.length === 0 ? <Text style={styles.muted}>None.</Text> : null}
           {card.punch.map((p) => (
-            <View key={p.id} style={[styles.item, !p.open && styles.closed]}>
+            <View key={p.id} style={[styles.item, !p.open && styles.closed]} testID={`card.punch.${p.item}`}>
               <View style={styles.itemLine}>
                 <Text style={styles.itemId}>{p.label === 'NEW' ? 'NEW' : `#${p.label}`}</Text>
                 <Text style={styles.itemText} numberOfLines={2}>
@@ -407,10 +409,10 @@ export function DeviceCard(props: DeviceCardProps) {
           ))}
         </Section>
 
-        <Section title={`Missing parts (${card.parts.length})`} marks="">
+        <Section title={`Missing parts (${card.parts.length})`} marks="" testID="card.section.parts">
           {card.parts.length === 0 ? <Text style={styles.muted}>None.</Text> : null}
           {card.parts.map((m) => (
-            <View key={m.id} style={[styles.item, m.partStatus === 'Installed' && styles.closed]}>
+            <View key={m.id} style={[styles.item, m.partStatus === 'Installed' && styles.closed]} testID={`card.part.${m.part}`}>
               <View style={styles.itemLine}>
                 <Text style={styles.itemId}>{m.label === 'NEW' ? 'NEW' : `#${m.label}`}</Text>
                 <Text style={styles.itemText} numberOfLines={2}>
@@ -429,7 +431,7 @@ export function DeviceCard(props: DeviceCardProps) {
           <QuickActions deviceId={d.id} readOnly={readOnly} run={run} />
         </Section>
 
-        <Section title={`History (${card.history.length})`} marks="" collapsed>
+        <Section title={`History (${card.history.length})`} marks="" collapsed testID="card.section.history">
           {card.history.map((h) => (
             <HistoryLine
               key={h.opId}
@@ -613,7 +615,7 @@ function NeuronSection({ card, store, readOnly, run }: { card: Card; store: Stor
         readOnly ? null : (
           <View style={styles.rowWrap}>
             <SmallButton label="Scan ▸" disabled onPress={() => {}} />
-            <SmallButton label="Type…" onPress={() => setTyping(d.neuronId ?? '')} />
+            <SmallButton label="Type…" onPress={() => setTyping(d.neuronId ?? '')} testID="card.neuron.type" />
           </View>
         )
       ) : (
@@ -632,8 +634,9 @@ function NeuronSection({ card, store, readOnly, run }: { card: Card; store: Stor
               maxLength={20}
               returnKeyType="done"
               onSubmitEditing={() => check && !check.error && void save()}
+              testID="card.neuron.input"
             />
-            <SmallButton label={dupes.length ? 'Save anyway' : 'Save'} disabled={!check || !!check.error} onPress={() => void save()} />
+            <SmallButton label={dupes.length ? 'Save anyway' : 'Save'} disabled={!check || !!check.error} onPress={() => void save()} testID="card.neuron.save" />
             <SmallButton label="Cancel" onPress={() => setTyping(null)} />
           </View>
           {check && typing ? (
@@ -799,15 +802,15 @@ export function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardD
             </View>
           ))}
           <View style={styles.rowWrap}>
-            <SmallButton label="Save & accept" disabled={!canAct} onPress={saveEdit} />
+            <SmallButton label="Save & accept" disabled={!canAct} onPress={saveEdit} testID={`proposal.save.${draft.title}`} />
             <SmallButton label="Cancel" disabled={busy} onPress={() => setEditing(null)} />
           </View>
         </View>
       ) : (
         <View style={styles.rowWrap}>
-          <SmallButton label="Accept" disabled={!canAct} onPress={() => act({ kind: 'accept' })} />
-          <SmallButton label="Edit" disabled={!canAct || draft.editable.length === 0} onPress={startEdit} />
-          <SmallButton label="Reject" disabled={!canAct} onPress={() => act({ kind: 'reject' })} />
+          <SmallButton label="Accept" disabled={!canAct} onPress={() => act({ kind: 'accept' })} testID={`proposal.accept.${draft.title}`} />
+          <SmallButton label="Edit" disabled={!canAct || draft.editable.length === 0} onPress={startEdit} testID={`proposal.edit.${draft.title}`} />
+          <SmallButton label="Reject" disabled={!canAct} onPress={() => act({ kind: 'reject' })} testID={`proposal.reject.${draft.title}`} />
           <Pressable onPress={toggleWhy} hitSlop={6}>
             <Text style={styles.jumpText}>why? {why !== null ? '▴' : '▸'}</Text>
           </Pressable>
@@ -951,9 +954,9 @@ function SmallButton({ label, onPress, disabled, danger, testID }: { label: stri
   );
 }
 
-function MenuButton({ label, onPress, danger }: { label: string; onPress: () => void; danger?: boolean }) {
+function MenuButton({ label, onPress, danger, testID }: { label: string; onPress: () => void; danger?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={styles.menuItem}>
+    <Pressable onPress={onPress} style={styles.menuItem} testID={testID}>
       <Text style={[styles.menuText, danger && styles.btnDangerText]}>{label}</Text>
     </Pressable>
   );

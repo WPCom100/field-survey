@@ -382,7 +382,7 @@ function Placeholders(props: { items: PlaceholderEntry[]; canEdit: boolean; run:
                       <Pressable onPress={() => setEditing({ id: p.id, text: p.label })}>
                         <Text style={styles.link}>Edit</Text>
                       </Pressable>
-                      <Pressable onPress={() => run((ed, s) => removePlaceholder(ed, s, p.id))}>
+                      <Pressable onPress={() => run((ed, s) => removePlaceholder(ed, s, p.id))} testID={`vocab.placeholder.remove.${p.label}`}>
                         <Text style={styles.danger}>Remove</Text>
                       </Pressable>
                     </>

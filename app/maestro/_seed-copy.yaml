@@ -1,0 +1,61 @@
+# A fresh copy of the master workbook in PROJECT (T155): + New project (06M) → Setup → 3 Sources →
+# Seed import (the workbook `rig.sh flows` stages alone in "On My iPad") → Import → "Imported" →
+# sync → Vocabulary → Load standard lists. The wave-1 flows edit, accept drafts and add records, so
+# each run works on its own copy: a second run on "Maestro master" would find the first run's
+# items already there. The mapping detours and the review items are seed.yaml's (S1), not here.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow: _new-project.yaml
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.sources
+- scrollUntilVisible:
+    element:
+      id: seed.choose
+    direction: DOWN
+- tapOn:
+    id: seed.kind.master_xlsx
+- tapOn:
+    id: seed.choose
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 14%,46%          # sidebar: On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 41%,35%          # the one file: the master workbook
+- extendedWaitUntil:
+    visible:
+      id: seed.matched
+    timeout: 60000
+- assertVisible: 'Devices: 210 rows'
+- scrollUntilVisible:
+    element:
+      id: seed.import
+    direction: DOWN
+- tapOn:
+    id: seed.import
+- scrollUntilVisible:
+    element:
+      id: seed.status
+    direction: DOWN
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: seed.status
+      text: Imported
+    timeout: 300000
+- runFlow: _logbox.yaml
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml
+- tapOn:
+    id: nav.vocabulary
+- tapOn:
+    id: vocab.loadStandard
+- extendedWaitUntil:
+    visible:
+      id: vocab.note
+      text: 'Added .* values? and .* placeholders?\.'
+    timeout: 20000
+- tapOn: ◀ Levels

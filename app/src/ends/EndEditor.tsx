@@ -99,7 +99,7 @@ export function EndEditor(props: EndEditorProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onBack} hitSlop={8}>
+        <Pressable onPress={props.onBack} hitSlop={8} testID="end.back">
           <Text style={styles.back}>◀ {props.backLabel}</Text>
         </Pressable>
         <View style={styles.headLine}>
@@ -169,6 +169,7 @@ export function EndEditor(props: EndEditorProps) {
       <ScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <EndSection
           title="This end"
+          side="this"
           end={mine}
           view={view}
           readOnly={readOnly}
@@ -185,6 +186,7 @@ export function EndEditor(props: EndEditorProps) {
         {other ? (
           <EndSection
             title="Other end"
+            side="other"
             end={other}
             view={view}
             readOnly={readOnly}
@@ -274,6 +276,8 @@ function fmt(at: string | null): string {
 
 function EndSection(props: {
   title: string;
+  /** `testID` prefix: `end.this.*` / `end.other.*` (Maestro, T155). */
+  side: 'this' | 'other';
   end: EndView;
   view: CableView;
   readOnly: boolean;
@@ -311,7 +315,7 @@ function EndSection(props: {
       </View>
       {ep.kind === 'draft' ? <Text style={styles.muted}>Its device is not on the plan yet: place the draft (Setup → Place devices), then survey this end.</Text> : null}
       {canPick && !picking ? (
-        <Pressable onPress={() => setPicking(true)} style={styles.btn}>
+        <Pressable onPress={() => setPicking(true)} style={styles.btn} testID={`end.${props.side}.placeholder`}>
           <Text style={styles.btnText}>{ep.kind === 'placeholder' ? 'Change placeholder…' : 'Choose placeholder…'}</Text>
         </Pressable>
       ) : null}
@@ -333,6 +337,7 @@ function EndSection(props: {
               key={s}
               disabled={readOnly}
               onPress={() => !(on && end.statusSource === 'surveyed') && run((e) => setEndStatus(e, end.id, s))}
+              testID={`end.${props.side}.status.${s}`}
               style={[styles.statusBtn, on && (st.hollow ? { borderColor: st.fill, borderWidth: 2 } : { backgroundColor: st.fill, borderColor: st.fill })]}>
               <Text style={[styles.statusText, on && { color: st.hollow ? st.fill : '#fff', fontWeight: '700' }]}>
                 {on ? '✓ ' : ''}
@@ -355,6 +360,7 @@ function EndSection(props: {
         review={review('note')}
         readOnly={readOnly}
         multiline
+        testID={`end.${props.side}.note`}
         phrases={view.phrases}
         onCommit={(t) => run((e) => setEndNote(e, end.id, t))}
       />
@@ -372,7 +378,7 @@ function EndSection(props: {
       <TextField label="To" value={end.toText} marks={marks('to_text')} review={review('to_text')} readOnly={readOnly} onCommit={(t) => run((e) => setEndText(e, end.id, 'to_text', t))} />
       <View style={styles.rowWrap}>
         {end.jump && canJump ? (
-          <Pressable onPress={() => props.onJump(end.jump!)} style={styles.btn}>
+          <Pressable onPress={() => props.onJump(end.jump!)} style={styles.btn} testID={`end.${props.side}.jump`}>
             <Text style={styles.btnText}>
               Jump to {end.jump.label}
               {end.jump.sameLevel ? '' : ` (Level ${ep.kind === 'device' ? ep.levelCode : '?'})`} ▸
@@ -409,6 +415,8 @@ function TextField(props: {
   multiline?: boolean;
   phrases?: readonly string[];
   onCommit: (text: string) => void;
+  /** The box's `testID`; its chips are `<testID>.chip.<phrase>`. */
+  testID?: string;
 }) {
   const [draft, setDraft] = useState(props.value ?? '');
   const [more, setMore] = useState(false);
@@ -454,6 +462,7 @@ function TextField(props: {
         multiline={props.multiline}
         submitBehavior="blurAndSubmit"
         returnKeyType="done"
+        testID={props.testID}
       />
       {!props.readOnly && chips.length ? (
         <View style={styles.rowWrap}>
@@ -461,6 +470,7 @@ function TextField(props: {
             <Pressable
               key={p}
               style={styles.phrase}
+              testID={props.testID ? `${props.testID}.chip.${p}` : undefined}
               onPress={() => {
                 const next = appendPhrase(typed.current, p);
                 edit(next);
@@ -472,7 +482,7 @@ function TextField(props: {
             </Pressable>
           ))}
           {props.phrases!.length > CHIPS_SHOWN ? (
-            <Pressable style={styles.phrase} onPress={() => setMore((m) => !m)}>
+            <Pressable style={styles.phrase} onPress={() => setMore((m) => !m)} testID={props.testID ? `${props.testID}.more` : undefined}>
               <Text style={styles.phraseMore}>{more ? 'less ▴' : `more (${props.phrases!.length - CHIPS_SHOWN}) ▾`}</Text>
             </Pressable>
           ) : null}

@@ -46,21 +46,21 @@ export function PlaceholderPicker(props: { store: Store; editor: Editor; current
       <Text style={styles.title}>Choose a placeholder</Text>
       <View style={styles.wrap}>
         {(items ?? []).map((p) => (
-          <Pressable key={p.id} onPress={() => pick(p.id)} style={[styles.chip, p.label === props.currentLabel && styles.chipOn]}>
+          <Pressable key={p.id} onPress={() => pick(p.id)} style={[styles.chip, p.label === props.currentLabel && styles.chipOn]} testID={`placeholder.pick.${p.label}`}>
             <Text style={p.label === props.currentLabel ? styles.chipTextOn : styles.chipText}>{p.label}</Text>
           </Pressable>
         ))}
         {items && !items.length ? <Text style={styles.muted}>None yet. Add one below, or load the standard list under Manage.</Text> : null}
       </View>
       <View style={styles.wrap}>
-        <TextInput value={text} onChangeText={setText} placeholder="New placeholder" placeholderTextColor="#888" style={styles.input} onSubmitEditing={add} />
-        <Pressable onPress={add} disabled={!text.trim()} style={[styles.btn, !text.trim() && styles.off]}>
+        <TextInput value={text} onChangeText={setText} placeholder="New placeholder" placeholderTextColor="#888" style={styles.input} onSubmitEditing={add} testID="placeholder.new" />
+        <Pressable onPress={add} disabled={!text.trim()} style={[styles.btn, !text.trim() && styles.off]} testID="placeholder.add">
           <Text style={styles.btnText}>Add & use</Text>
         </Pressable>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.wrap}>
-        <Pressable onPress={() => router.push({ pathname: '/vocabulary', params: { project: editor.projectId, tab: 'placeholders' } })}>
+        <Pressable onPress={() => router.push({ pathname: '/vocabulary', params: { project: editor.projectId, tab: 'placeholders' } })} testID="placeholder.manage">
           <Text style={styles.link}>Manage…</Text>
         </Pressable>
         <Pressable onPress={props.onClose}>

@@ -14,6 +14,7 @@ team Ann / Bob), never to the Droplet.
 | `pipeline.yaml` | `rig.sh pipeline` | `Maestro pipeline`: a project B2–06M, BOM.pdf → "Done: n device drafts …", riser.pdf → "Done: … n far ends to pick" (no Claude key on the rig), the 06M display sheet, sync. Once per server lifetime (T154) |
 | `sync-now.yaml` | `rig.sh conflict` | relaunch keeping the store, Sync now |
 | `conflict-status.yaml`, `conflict-check.yaml` | `rig.sh conflict conflict-status.yaml conflict-check.yaml` | with the server stopped, A sets the first 06M device `Issue` and B `Not installed` (status bar "Offline · n pending"); after A then B sync, both cards show `✓ Issue` and "in review", Needs review counts a sync conflict (the orchestration's proof; wave 3 O2 resolves it) |
+| `ends.yaml` | `rig.sh flows ends.yaml` | F1 (T155): a fresh copy of the master (`_seed-copy`), then on 06M: C-23 Not installed → R3a Run draft → Accept → R4b kit → Accept (`src #n` after the sync); Issue "Run, not terminated" → R3a Terminate EC/ETC, "…; no term kit" → R3b Missing part EC/ETC → Accept, no second kit; C-12 one Run draft on end A, the item standing through a flip; no kit chip on the P run C-08; 06M-04's findings line; C-13 → Jump to 04-01 on Level 04; 04-05's `Run 120V to P-NSPS-D Power Supply`; Change placeholder… → Add & use, Vocabulary refuses its removal (about 11 min) |
 
 | Sub-flow | Walks |
 |---|---|
@@ -32,6 +33,12 @@ team Ann / Bob), never to the Droplet.
 | `_seed-import.yaml` | Setup → 3 Sources → Seed import: the master from Files, the Checks, the mapping (a wrong column flagged and put back), Import |
 | `_seed-vocab.yaml` | Vocabulary → Load standard lists twice |
 | `_seed-review.yaml` | Needs review on a fresh seed: Link, Create device ▸, Put on, Keep |
+| `_seed-copy.yaml` | + New project → Seed import of the master (no mapping detours) → "Imported" → sync → Load standard lists: each wave-1 run's own copy (T155; `rig.sh flows` stages the workbook) |
+| `_open-level.yaml`, `_open-card.yaml` | Projects → `PROJECT` → level `LEVEL` (env) → its plan; `_open-card` then taps Devices → `DEVICE` |
+| `_side-down.yaml`, `_side-up.yaml` | swipe the plan's side panel (card, end editor) until `ID` (env) is on screen, then a little more, clear of the edge and of the card's fixed header |
+| `_open-end.yaml` | the card's connection `CONN` (env, tapped by its C-label) → its end editor |
+| `_end-note-clear.yaml` | empties this end's note (two tap-and-erase passes: eraseText deletes before the cursor) |
+| `_ends-run.yaml`, `_ends-terminate.yaml`, `_ends-wire.yaml`, `_ends-elsewhere.yaml`, `_ends-placeholder.yaml` | the steps of `ends.yaml` |
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a
 regex on what is visible. A flow for a new screen gets its `testID`s in the same task.

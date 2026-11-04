@@ -1,0 +1,90 @@
+# F1 step 2 (T155): after _ends-run, the kit part has its source number after the sync; C-23 is
+# pulled: This end Issue + the chip "Run, not terminated" → the R3a Terminate draft (EC/ETC for X),
+# and the accepted Run item still stands (T35). Then the note "Run, not terminated; no term kit"
+# (the X end offers that chip, T118) → the R3b kit item: Missing part · EC/ETC.
+appId: productions.luminarytechnology.fieldsurvey
+---
+# the part's Source names the accepted Run item by its number once the sync has numbered it
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.part.DMX termination kit - Level 11 run
+- extendedWaitUntil:
+    visible:
+      text: 'Needed · EC · src #\d+ · Need to be ordered'
+      below: 'DMX termination kit - Level 11 run.*'
+    timeout: 60000
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.conn.C-23
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-23
+- tapOn:
+    id: end.this.status.Issue
+- assertVisible: ✓ Issue
+- runFlow: _end-note-clear.yaml
+- pressKey: Enter
+- assertVisible:
+    id: 'end\.this\.note\.chip\.Run, not terminated; no term kit'
+- tapOn:
+    id: 'end\.this\.note\.chip\.Run, not terminated'
+- assertVisible:
+    id: end.this.note
+    text: Run, not terminated
+- tapOn:
+    id: end.back
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.accept.Terminate DMX to Level 11
+- assertVisible:
+    text: Termination · EC/ETC
+    below: 'Terminate DMX to Level 11'
+# T35: the Run item accepted in step 1 stays when the end flips to Issue
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.punch.Run DMX to Level 11
+# the note says the kit is missing: the kit item replaces the Terminate draft
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.conn.C-23
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-23
+- runFlow: _end-note-clear.yaml
+- inputText: Run, not terminated; no term kit
+- pressKey: Enter
+- assertVisible:
+    id: end.this.note
+    text: Run, not terminated; no term kit
+- tapOn:
+    id: end.back
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.accept.Terminate DMX to Level 11
+- assertVisible:
+    text: Missing part · EC/ETC
+    below: 'Terminate DMX to Level 11'
+- assertNotVisible: Termination · EC/ETC
+# T103: accepting the kit item adds no second kit for an end whose Run item already brought one
+- tapOn:
+    id: proposal.accept.Terminate DMX to Level 11
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.punch.Terminate DMX to Level 11
+- assertNotVisible:
+    id: proposal.accept.DMX termination kit - Level 11 run
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.parts
+- assertNotVisible:
+    id: proposal.accept.DMX termination kit - Level 11 run

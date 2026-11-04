@@ -1,0 +1,56 @@
+# F1 steps 4–6 (T155, T34, T35): the findings line on a card — 06M-04 (Issue in the master, both its
+# ends Issue) set Installed, untested → R1's "Installed, untested with outstanding wiring/termination";
+# Other end → Jump: C-13's far end 04-01 opens on Level 04's plan; there the 120V run of the NSPS
+# 04-05 reads "Run 120V to P-NSPS-D Power Supply" (D52 To text). Starts on a 06M card; ends on 04.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-04
+- tapOn:
+    id: card.status.Installed, untested
+- assertVisible: '✓ Installed, untested'
+- extendedWaitUntil:
+    visible: '⚑ R1\.untested: Installed, untested with outstanding wiring/termination → Issue \(suggested\)'
+    timeout: 15000
+- tapOn:
+    id: card.status.Issue
+- extendedWaitUntil:
+    notVisible: '⚑ R1\.untested: .*'
+    timeout: 15000
+# the far end on another level
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-13
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-13
+- assertVisible: 'Other end: 04-01 .*\(Level 04\)'
+- tapOn:
+    id: end.other.jump
+- extendedWaitUntil:
+    visible: ◀ 04
+    timeout: 15000
+- extendedWaitUntil:
+    visible: '04-01'
+    timeout: 10000
+# 120V on an NSPS (Not installed in the master, no item yet)
+- tapOn:
+    id: card.close
+    optional: true            # the jump opens the far card when the device is on this level's list
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.04-05
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.accept.Run 120V to P-NSPS-D Power Supply
+- assertVisible:
+    text: Cable not run · EC
+    below: 'Run 120V to P-NSPS-D Power Supply'
