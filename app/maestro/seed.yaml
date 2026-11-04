@@ -1,0 +1,18 @@
+# Seed (T154, rig plan §2 / S1): the master workbook imported through the app into PROJECT
+# ("Maestro master" from `rig.sh seed`, which stages the workbook alone in "On My iPad" and skips
+# when the server already has the project), the standard vocabulary, then Needs review's import
+# items: the "Device → link" rows (Link, Create device ▸; T81) and the "X item → which
+# connection?" rows (Put on, Keep on the device; T122).
+appId: productions.luminarytechnology.fieldsurvey
+name: Seed — the master workbook into Maestro master
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _new-project.yaml
+- runFlow: _seed-import.yaml
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml
+- runFlow: _seed-vocab.yaml
+- runFlow: _seed-review.yaml
+- runFlow: _sync.yaml

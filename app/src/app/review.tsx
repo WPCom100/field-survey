@@ -239,7 +239,7 @@ export default function NeedsReviewScreen() {
         <Text style={styles.title}>{projectId === LIBRARY_STREAM ? 'App library — needs review' : 'Needs review'} ({total})</Text>
         <ScrollView horizontal contentContainerStyle={styles.chips} showsHorizontalScrollIndicator={false}>
           {list?.tabs.map((t) => (
-            <Chip key={t.kind} label={`${t.label}${t.kind === 'all' ? '' : ` ${t.count}`}`} on={kind === t.kind} onPress={() => setKind(t.kind)} />
+            <Chip key={t.kind} label={`${t.label}${t.kind === 'all' ? '' : ` ${t.count}`}`} on={kind === t.kind} onPress={() => setKind(t.kind)} testID={`review.tab.${t.kind}`} />
           ))}
         </ScrollView>
         {projectId === LIBRARY_STREAM ? (
@@ -256,7 +256,7 @@ export default function NeedsReviewScreen() {
         <Text style={styles.filterLabel}>Level</Text>
         <Chip label="All" on={!levelId} onPress={() => setLevelId(null)} />
         {list?.levels.map((l) => (
-          <Chip key={l.id} label={l.code} on={levelId === l.id} onPress={() => setLevelId(l.id)} />
+          <Chip key={l.id} label={l.code} on={levelId === l.id} onPress={() => setLevelId(l.id)} testID={`review.level.${l.code}`} />
         ))}
         <Text style={[styles.filterLabel, { marginLeft: 16 }]}>Sort</Text>
         <Chip label={sort === 'oldest' ? 'Oldest first' : 'Newest first'} on={false} onPress={() => setSort(sort === 'oldest' ? 'newest' : 'oldest')} />
@@ -287,6 +287,12 @@ export default function NeedsReviewScreen() {
           }
         />
         <ScrollView style={styles.panel} contentContainerStyle={{ padding: 16, gap: 12 }}>
+          {/* the last action's line, above the next item: under its device list it was out of sight (T154) */}
+          {note ? (
+            <Text style={styles.note} testID="review.note">
+              {note}
+            </Text>
+          ) : null}
           {detail?.punchDevice && store && editor && projectId ? (
             <PunchDevicePanel detail={detail} review={detail.punchDevice} store={store} editor={editor} projectId={projectId} onLink={linkPunch} />
           ) : detail?.punchEnd ? (
@@ -296,7 +302,6 @@ export default function NeedsReviewScreen() {
           ) : (
             <Text style={styles.empty}>Select an item.</Text>
           )}
-          {note ? <Text style={styles.note}>{note}</Text> : null}
         </ScrollView>
       </View>
     </View>
@@ -305,7 +310,7 @@ export default function NeedsReviewScreen() {
 
 function Row({ row, selected, onPress }: { row: ReviewRow; selected: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[styles.row, selected && styles.rowOn]}>
+    <Pressable onPress={onPress} style={[styles.row, selected && styles.rowOn]} testID="review.row">
       <Text style={styles.rowTitle} numberOfLines={1}>
         <Text style={styles.dot}>● </Text>
         {row.subject} · {row.field}
@@ -503,13 +508,13 @@ function PunchDevicePanel(props: {
             that is really about a room or several devices can stay unlinked: the export then keeps the master&apos;s text.
           </Text>
           <View style={styles.btnRow}>
-            <Btn label="Create device ▸" onPress={() => setCreating(true)} />
+            <Btn label="Create device ▸" onPress={() => setCreating(true)} testID="review.createDevice" />
           </View>
           <Text style={styles.sideTitle}>Link to a device on {r.levelCode}</Text>
-          <TextInput style={styles.input} value={filter} onChangeText={setFilter} placeholder="Filter: ID, model, room" autoCorrect={false} autoCapitalize="none" />
+          <TextInput testID="review.filter" style={styles.input} value={filter} onChangeText={setFilter} placeholder="Filter: ID, model, room" autoCorrect={false} autoCapitalize="none" />
           {shown.length === 0 ? <Text style={styles.sub}>No device matches.</Text> : null}
           {shown.map((x) => (
-            <Pressable key={x.id} onPress={() => props.onLink(x.id, x.label, true)} style={styles.pick} accessibilityRole="button">
+            <Pressable key={x.id} onPress={() => props.onLink(x.id, x.label, true)} style={styles.pick} accessibilityRole="button" testID={`review.link.${x.label}`}>
               <Text style={styles.pickId}>{x.label}</Text>
               <Text style={styles.pickText} numberOfLines={1}>
                 {x.text ?? x.category ?? ''}
@@ -549,7 +554,7 @@ function PunchEndPanel(props: { detail: ReviewDetail; review: PunchEndReview; ca
           <Text style={styles.sideTitle}>Put on a {what} connection</Text>
           {r.ends.length === 0 ? <Text style={styles.sub}>This device has no {what} connection. Keep it on the device, or add the connection on the card and come back.</Text> : null}
           {r.ends.map((x) => (
-            <Pressable key={x.id} onPress={() => props.onPut(x.id, x.label)} style={styles.pick} accessibilityRole="button" disabled={!props.canEdit}>
+            <Pressable key={x.id} onPress={() => props.onPut(x.id, x.label)} style={styles.pick} accessibilityRole="button" disabled={!props.canEdit} testID={`review.put.${x.label}`}>
               <Text style={styles.pickId}>{x.label}</Text>
               <Text style={styles.pickText} numberOfLines={1}>
                 {[x.code, x.to].filter(Boolean).join(' · ')}
@@ -557,7 +562,7 @@ function PunchEndPanel(props: { detail: ReviewDetail; review: PunchEndReview; ca
             </Pressable>
           ))}
           <View style={styles.btnRow}>
-            <Btn label="Keep on the device" onPress={() => props.onPut(null, null)} disabled={!props.canEdit} />
+            <Btn label="Keep on the device" onPress={() => props.onPut(null, null)} disabled={!props.canEdit} testID="review.keep" />
           </View>
         </>
       )}
@@ -584,17 +589,17 @@ function Side(props: { letter: string; title: string; side: ReviewDetail['a']; v
   );
 }
 
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
+    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
       <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
     </Pressable>
   );
 }
 
-function Btn({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+function Btn({ label, onPress, disabled, testID }: { label: string; onPress: () => void; disabled?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled && { opacity: 0.4 }]} accessibilityRole="button">
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled && { opacity: 0.4 }]} accessibilityRole="button" testID={testID}>
       <Text style={styles.btnText}>{label}</Text>
     </Pressable>
   );

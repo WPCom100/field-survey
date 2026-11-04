@@ -9,5 +9,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:
     visible: ".*Synced .*"   # "● Online · Synced <time>"; Maestro matches the whole text
     timeout: 20000
+# a refused edit still reads "Synced …" with " · n need attention" after it: fail on it (T154: a
+# server reset left the keychain's old user id, and every edit went unknown-user for a whole session)
+- assertNotVisible: ".*need attention.*"
 - tapOn: ← Levels
 - assertVisible: Field Survey

@@ -1,0 +1,23 @@
+# Sidebar → Vocabulary → Load standard lists: the standard values and placeholders, then a second
+# tap adds nothing (T40, T112; T154).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.vocabulary
+- tapOn:
+    id: vocab.loadStandard
+- extendedWaitUntil:
+    visible:
+      id: vocab.note
+      text: 'Added .* values? and .* placeholders?\.'
+    timeout: 20000
+- assertVisible: Empty box on wall.            # a master phrase, Lists › Device notes
+- assertVisible: 'Placeholders · [1-9]\d*'     # the tab counts the placeholders added
+- tapOn:
+    id: vocab.loadStandard
+- extendedWaitUntil:
+    visible:
+      id: vocab.note
+      text: Everything standard is already here.
+    timeout: 20000
+- tapOn: ◀ Levels

@@ -91,7 +91,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onCancel} hitSlop={8} disabled={saving}>
+        <Pressable onPress={props.onCancel} hitSlop={8} disabled={saving} testID="add.cancel">
           <Text style={styles.back}>◀ Cancel</Text>
         </Pressable>
         <Text style={styles.title}>{props.title ?? 'Add device (field addition)'}</Text>
@@ -104,6 +104,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
           {DEVICE_CATEGORIES.map((c) => (
             <Chip
               key={c}
+              testID={`add.cat.${c}`}
               label={c}
               on={effectiveCategory === c}
               onPress={() => {
@@ -124,6 +125,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
             {choices.map((c) => (
               <Chip
                 key={c.id}
+                testID={`add.type.${c.model}`}
                 label={`${c.model}${c.projectId ? '' : ' · app'}`}
                 badge={c.state === 'draft' ? 'DRAFT' : undefined}
                 on={typeId === c.id}
@@ -147,6 +149,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
         )}
         <TextInput
           style={styles.input}
+          testID="add.model"
           value={typed}
           onChangeText={(t) => {
             setTyped(t);
@@ -177,10 +180,10 @@ export function AddDevicePanel(props: AddDeviceProps) {
         {props.defaults?.drawingPosition ? <Text style={styles.muted}>From the grid at the pin; edit if the drawing says otherwise.</Text> : null}
 
         <Text style={styles.label}>Room / Location (optional)</Text>
-        <TextInput style={styles.input} value={room} onChangeText={setRoom} placeholder="e.g. XX06M-1E05 Elec Rm" placeholderTextColor="#888" />
+        <TextInput testID="add.room" style={styles.input} value={room} onChangeText={setRoom} placeholder="e.g. XX06M-1E05 Elec Rm" placeholderTextColor="#888" />
         {props.defaults?.room ? <Text style={styles.muted}>The room code printed nearest the pin.</Text> : null}
 
-        <Pressable style={[styles.addBtn, (!ready || saving) && styles.addBusy]} onPress={add} disabled={!ready || saving}>
+        <Pressable style={[styles.addBtn, (!ready || saving) && styles.addBusy]} onPress={add} disabled={!ready || saving} testID="add.submit">
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.addText}>Add device</Text>}
         </Pressable>
       </ScrollView>
@@ -188,9 +191,9 @@ export function AddDevicePanel(props: AddDeviceProps) {
   );
 }
 
-function Chip({ label, on, onPress, badge }: { label: string; on: boolean; onPress: () => void; badge?: string }) {
+function Chip({ label, on, onPress, badge, testID }: { label: string; on: boolean; onPress: () => void; badge?: string; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
+    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
       <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>
         {label}
       </Text>

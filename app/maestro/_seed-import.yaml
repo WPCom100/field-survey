@@ -1,0 +1,97 @@
+# Setup → Sources → Seed import: the master workbook from Files (rig.sh seed stages it alone in
+# "On My iPad"), the Checks, a wrong column flagged and put back, Import, "Imported" (T154, S1).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.sources
+- scrollUntilVisible:
+    element:
+      id: seed.choose
+    direction: DOWN
+- tapOn:
+    id: seed.kind.master_xlsx
+- tapOn:
+    id: seed.choose
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 14%,46%          # sidebar: On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 41%,35%          # the one file: the master workbook
+- extendedWaitUntil:
+    visible:
+      id: seed.matched
+    timeout: 60000
+- assertVisible: 'Floors: B2, B1, 01, 02, 03, 04, 06, 06M .*'
+- assertVisible: 'Devices: 210 rows'
+- assertVisible: 'Punch List: 215 rows'
+- assertVisible: 'Missing Parts: 85 rows'
+# a wrong column: Devices › Room / Location set to "not in this workbook" is flagged, before and
+# after the server re-reads the workbook under that mapping; put back, everything matches again
+- scrollUntilVisible:
+    element:
+      id: seed.map.Devices.room_location
+    direction: DOWN
+- tapOn:
+    id: seed.map.Devices.room_location
+- tapOn:
+    id: seed.map.Devices.room_location.none
+- assertVisible:
+    id: seed.unmatched
+    text: '1 column not matched: Devices › Room / Location.*'
+- scrollUntilVisible:
+    element:
+      id: seed.recheck
+    direction: DOWN
+- tapOn:
+    id: seed.recheck
+- scrollUntilVisible:
+    element:
+      id: seed.unmatched
+      text: '1 column not matched: Devices › Room / Location.*'
+    direction: UP
+    timeout: 60000
+- scrollUntilVisible:
+    element:
+      id: seed.map.Devices.room_location
+    direction: DOWN
+- tapOn:
+    id: seed.map.Devices.room_location
+- tapOn:
+    id: seed.map.Devices.room_location.Room / Location
+- scrollUntilVisible:
+    element:
+      id: seed.recheck
+    direction: DOWN
+- tapOn:
+    id: seed.recheck
+- scrollUntilVisible:
+    element:
+      id: seed.matched
+    direction: UP
+    timeout: 60000
+- scrollUntilVisible:
+    element:
+      id: seed.import
+    direction: DOWN
+- tapOn:
+    id: seed.import
+- scrollUntilVisible:
+    element:
+      id: seed.status
+    direction: DOWN
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: seed.status
+      text: Imported
+    timeout: 300000
+- scrollUntilVisible:
+    element:
+      id: seed.openReview
+    direction: DOWN
+- assertVisible:
+    id: seed.stats
+    text: '31 items for Needs review · 4 findings · 8 unpaired connection ends'

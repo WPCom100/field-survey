@@ -12,9 +12,11 @@ appId: productions.luminarytechnology.fieldsurvey
     commands:
       - tapOn:
           id: projects.refresh
-- extendedWaitUntil:
-    visible:
+# the list outgrows the screen on a long-lived rig server: scroll to it (T154)
+- scrollUntilVisible:
+    element:
       id: projects.open.${PROJECT}
+    direction: DOWN
     timeout: 90000
 - tapOn:
     id: projects.open.${PROJECT}

@@ -133,14 +133,23 @@ export function SourcesStep({ projectId }: { projectId: string }) {
         </Text>
         <View style={styles.row}>
           {(Object.keys(KIND_LABEL) as ImportKind[]).map((k) => (
-            <Btn key={k} title={KIND_LABEL[k]} small primary={kind === k} disabled={running} onPress={() => setKind(k)} />
+            <Btn key={k} title={KIND_LABEL[k]} small primary={kind === k} disabled={running} onPress={() => setKind(k)} testID={`seed.kind.${k}`} />
           ))}
         </View>
         <View style={styles.row}>
-          <Btn title={file ? 'Choose another file…' : 'Choose workbook…'} onPress={() => void pick().catch(fail)} disabled={busy !== null || running} />
+          <Btn
+            title={file ? 'Choose another file…' : 'Choose workbook…'}
+            onPress={() => void pick().catch(fail)}
+            disabled={busy !== null || running}
+            testID="seed.choose"
+          />
           {file ? <Text style={styles.file}>{file.name}</Text> : null}
         </View>
-        {busy ? <Text style={styles.hint}>{busy}</Text> : null}
+        {busy ? (
+          <Text style={styles.hint} testID="seed.busy">
+            {busy}
+          </Text>
+        ) : null}
         <Notice text={error} error />
       </Section>
 
@@ -157,11 +166,13 @@ export function SourcesStep({ projectId }: { projectId: string }) {
               </Text>
             ))}
             {open.length ? (
-              <Text style={styles.warn}>
+              <Text style={styles.warn} testID="seed.unmatched">
                 {open.length} column{open.length === 1 ? '' : 's'} not matched: {open.map((o) => `${o.tab} › ${fieldLabel(o.field)}`).join(', ')}. Map them below, or import without.
               </Text>
             ) : (
-              <Text style={styles.ok}>Every column is matched.</Text>
+              <Text style={styles.ok} testID="seed.matched">
+                Every column is matched.
+              </Text>
             )}
             {preview.checks.slice(0, 12).map((c, i) => (
               <Text key={i} style={styles.check}>
@@ -188,6 +199,7 @@ export function SourcesStep({ projectId }: { projectId: string }) {
                             options={t.headers.map((h) => ({ id: h, label: h }))}
                             none="not in this workbook"
                             disabled={running}
+                            testID={`seed.map.${t.tab}.${f.field}`}
                             onPick={(h) => setMapping((m) => ({ ...m, [t.tab]: { ...m[t.tab], [f.field]: h ?? '' } }))}
                           />
                         </View>
@@ -197,8 +209,8 @@ export function SourcesStep({ projectId }: { projectId: string }) {
                 </View>
               ))}
             <View style={styles.row}>
-              <Btn title="Re-check with this mapping" disabled={busy !== null || running} onPress={() => void recheck()} />
-              <Btn title={`Import ${KIND_LABEL[kind].toLowerCase()}`} primary disabled={busy !== null || running} onPress={() => void run()} />
+              <Btn title="Re-check with this mapping" disabled={busy !== null || running} onPress={() => void recheck()} testID="seed.recheck" />
+              <Btn title={`Import ${KIND_LABEL[kind].toLowerCase()}`} primary disabled={busy !== null || running} onPress={() => void run()} testID="seed.import" />
             </View>
           </Section>
         </>
@@ -206,10 +218,12 @@ export function SourcesStep({ projectId }: { projectId: string }) {
 
       {batch ? (
         <Section title="Import">
-          <Text style={[styles.line, batch.job_state === 'failed' && styles.warnText]}>{jobLine(batch)}</Text>
+          <Text style={[styles.line, batch.job_state === 'failed' && styles.warnText]} testID="seed.status">
+            {jobLine(batch)}
+          </Text>
           {batch.job_state === 'done' && batch.stats ? (
             <>
-              <Text style={styles.line}>
+              <Text style={styles.line} testID="seed.stats">
                 {batch.stats.review_items ?? 0} items for Needs review · {batch.stats.findings ?? 0} findings · {batch.stats.unpaired_ends ?? 0} unpaired connection ends
               </Text>
               {(batch.stats.checks_list ?? []).slice(0, 12).map((c, i) => (
@@ -218,7 +232,7 @@ export function SourcesStep({ projectId }: { projectId: string }) {
                 </Text>
               ))}
               <View style={styles.row}>
-                <Btn title="Open Needs review" primary onPress={() => router.push({ pathname: '/review', params: { project: projectId } })} />
+                <Btn title="Open Needs review" primary onPress={() => router.push({ pathname: '/review', params: { project: projectId } })} testID="seed.openReview" />
               </View>
             </>
           ) : null}

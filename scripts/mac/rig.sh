@@ -15,6 +15,10 @@ TOKEN="${RIG_TOKEN:-e2e}"
 METRO_URL="${RIG_METRO_URL:-http://127.0.0.1:8081}"
 USER_NAME="${RIG_USER:-Ann}"
 PROJECT="${RIG_PROJECT:-Maestro $(date +"%m-%d %H:%M:%S")}"   # one name per rig.sh run: A and B open the same project
+SEED_PROJECT="${RIG_SEED_PROJECT:-Maestro master}"           # the checklist's "Tower round project" (T154)
+PIPELINE_PROJECT="${RIG_PIPELINE_PROJECT:-Maestro pipeline}" # the checklist's "pipeline test" (T154)
+SCALE_PROJECT="${RIG_SCALE_PROJECT:-Maestro scale}"          # TP-3 synthetic (T32, T154)
+SIDE=""                                                      # A or B in a conflict run; flows read ${SIDE}
 BUNDLE="productions.luminarytechnology.fieldsurvey"
 COMPOSE="docker compose -f $ROOT/server/docker-compose.yml -f $ROOT/server/docker-compose.e2e.yml"
 OUT="${TMPDIR:-/tmp}/field-survey-rig"
@@ -46,7 +50,26 @@ usage: bash scripts/mac/rig.sh <command>
   shot [A|B] [file]     screenshot of a simulator (default $OUT/shot-<time>.png)
   status                what is booted, built and running
 
+  seed [--device A|B]   seed.yaml: the master workbook into "$SEED_PROJECT" through the app, the
+                        standard vocabulary, the import's review items; once per server lifetime
+                        (skipped when the server has the project; 'server reset' clears it)
+  pipeline [--device A|B]
+                        pipeline.yaml: "$PIPELINE_PROJECT" (B2-06M) with BOM.pdf, riser.pdf and the
+                        06M sheet extracted; once per server lifetime like seed
+  scale [synthetic args]
+                        the TP-3 synthetic project "$SCALE_PROJECT" on the local server (T32; 2,000
+                        devices, 10,000 photos by default; e.g. --photos 1000); once per server lifetime
+  media [A|B]           two PNGs in the simulator's photo library (Library on the card, + Photo here)
+  log [A|B] [grep-regex]
+                        copy the app's log files out of the simulator's sandbox; prints the app.log
+                        path, or the matching lines of every log file with a regex
+  conflict <edit-flow> [check-flow]
+                        on RIG_PROJECT, already on both simulators: server stop, <edit-flow> on A
+                        (Ann, SIDE=A) and on B (Bob, SIDE=B), server start, A syncs then B syncs
+                        (sync-now.yaml), then [check-flow] on A and on B
+
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
+     RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
 EOF
 }
 
@@ -144,12 +167,21 @@ cmd_server() {
   case "${1:-up}" in
     up)
       [ -f .env ] || cp .env.example .env
-      $COMPOSE up -d --build postgres s3 api worker   # the worker runs the upload jobs (T151)
-      # a fresh volume runs initdb first: migrating before Postgres accepts connections fails (T151)
-      for _ in $(seq 1 60); do $COMPOSE exec -T postgres pg_isready -q && break; sleep 1; done
-      $COMPOSE exec -T postgres pg_isready -q || die "Postgres did not become ready within 60 s: $COMPOSE logs postgres"
+      # the worker (upload jobs, T151) starts after the migration: on a fresh database it dies on
+      # the first missing table (T154, after a reset)
+      $COMPOSE up -d --build postgres s3 api
+      # a fresh volume runs initdb first: migrating before Postgres accepts connections fails (T151);
+      # after a reset initdb once took longer than 60 s (T154)
+      for _ in $(seq 1 120); do $COMPOSE exec -T postgres pg_isready -q && break; sleep 1; done
+      $COMPOSE exec -T postgres pg_isready -q || die "Postgres did not become ready within 120 s: $COMPOSE logs postgres"
       $COMPOSE exec -T api alembic upgrade head
-      $COMPOSE exec -T api python -m app.storage ensure-bucket
+      # a fresh s3 volume starts slower than the api: retry until it answers (T154, after a reset)
+      for _ in $(seq 1 30); do
+        $COMPOSE exec -T api python -m app.storage ensure-bucket >/dev/null 2>&1 && break
+        sleep 1
+      done
+      $COMPOSE exec -T api python -m app.storage ensure-bucket || die "the bucket could not be made: $COMPOSE logs s3"
+      $COMPOSE up -d --build worker
       for _ in $(seq 1 30); do
         if curl -fsS "$SERVER_URL/health" >/dev/null 2>&1; then say "health: ok ($SERVER_URL)"; return; fi
         sleep 1
@@ -158,7 +190,15 @@ cmd_server() {
       ;;
     stop) $COMPOSE stop api; say "api stopped: the app is offline now" ;;
     start) $COMPOSE start api; say "api started" ;;
-    reset) $COMPOSE down -v; say "server data wiped; run 'rig.sh server' again" ;;
+    reset)
+      $COMPOSE down -v
+      # the keychain keeps each simulator's user id from the old server, which the new one does
+      # not know: every push is refused "unknown user" until the app signs in again (T154)
+      for sim in "$SIM_A" "$SIM_B"; do
+        u="$(sim_udid "$sim")"
+        [ -n "$u" ] && xcrun simctl keychain "$u" reset && say "keychain reset on \"$sim\""
+      done
+      say "server data wiped; run 'rig.sh server' again" ;;
     *) die "server [stop|start|reset]" ;;
   esac
 }
@@ -206,7 +246,7 @@ cmd_flows() {
   say "maestro on $dev ($udid): ${flow:-smoke.yaml} against $SERVER_URL as $USER_NAME, project \"$PROJECT\""
   maestro --device "$udid" test \
     -e SERVER_URL="$SERVER_URL" -e TOKEN="$TOKEN" -e METRO_URL="$METRO_URL" -e USER="$USER_NAME" \
-    -e PROJECT="$PROJECT" \
+    -e PROJECT="$PROJECT" -e SIDE="${SIDE:-$dev}" \
     --debug-output "$OUT/maestro" \
     "$ROOT/app/maestro/${flow:-smoke.yaml}"   # the folder would also run the _ sub-flows on their own (T151)
   say "screenshots of failures: $OUT/maestro and ~/.maestro/tests"
@@ -262,6 +302,138 @@ cmd_shot() {
   echo "$file"
 }
 
+# ---------------------------------------------------------------- rig plan §2 (T154)
+server_up() {
+  curl -fsS "$SERVER_URL/health" >/dev/null 2>&1 || die "the server does not answer on $SERVER_URL: rig.sh server"
+}
+
+project_levels() {  # name -> its level count on the local server, or -1 when there is no such project
+  curl -fsS -H "Authorization: Bearer $TOKEN" "$SERVER_URL/projects" | python3 -c '
+import json, sys
+found = [p for p in json.load(sys.stdin) if p["name"] == sys.argv[1]]
+print(len(found[0]["levels"]) if found else -1)
+' "$1"
+}
+
+project_exists() {  # name -> 0 when the local server has a project of that name
+  [ "$(project_levels "$1")" -ge 0 ]
+}
+
+made_once() {  # name, levels it has when made -> 0 when made (skip), 1 when absent; dies on a half-made one
+  local n
+  n="$(project_levels "$1")"
+  [ "$n" -lt 0 ] && return 1
+  [ "$n" -ge "$2" ] && return 0
+  die "\"$1\" is on the server with $n of its $2 levels: a run stopped half-way. 'rig.sh server reset' (wipes the rig server), or name another with RIG_SEED_PROJECT / RIG_PIPELINE_PROJECT"
+}
+
+device_arg() {  # [--device A|B] -> A|B
+  if [ "${1:-}" = "--device" ]; then echo "${2:-A}"; else echo A; fi
+}
+
+cmd_seed() {  # the master workbook into SEED_PROJECT, through the app (seed.yaml)
+  local dev
+  dev="$(device_arg "$@")"
+  server_up
+  if made_once "$SEED_PROJECT" 8; then   # the import adds B2 … 06 to the 06M it starts with
+    say "\"$SEED_PROJECT\" is on the server already: skipped ('server reset' clears it)"
+    return
+  fi
+  cmd_files "$dev" fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx
+  PROJECT="$SEED_PROJECT" cmd_flows --device "$dev" seed.yaml
+  made_once "$SEED_PROJECT" 8 || die "seed.yaml ran but the server has no \"$SEED_PROJECT\""
+  say "seed: \"$SEED_PROJECT\" imported"
+}
+
+cmd_pipeline() {  # PIPELINE_PROJECT with the BOM, the riser and the 06M sheet (pipeline.yaml)
+  local dev
+  dev="$(device_arg "$@")"
+  server_up
+  if made_once "$PIPELINE_PROJECT" 8; then
+    say "\"$PIPELINE_PROJECT\" is on the server already: skipped ('server reset' clears it)"
+    return
+  fi
+  # pipeline.yaml taps them by position: BOM.pdf, Level_06M_…, riser.pdf (name order)
+  cmd_files "$dev" fixtures/BOM.pdf "fixtures/Level_06M_-_Lighting_Composite_vector.pdf" fixtures/riser.pdf
+  PROJECT="$PIPELINE_PROJECT" cmd_flows --device "$dev" pipeline.yaml
+  say "pipeline: \"$PIPELINE_PROJECT\" ready"
+}
+
+cmd_scale() {  # the TP-3 synthetic project on the local server (T32); extra args go to the generator
+  server_up
+  if project_exists "$SCALE_PROJECT"; then
+    say "\"$SCALE_PROJECT\" is on the server already: skipped ('server reset' clears it)"
+    return
+  fi
+  cd "$ROOT/server"
+  # the image has no fixtures/: the generator's sheet goes in by hand
+  $COMPOSE cp "$ROOT/fixtures/Level_06M_-_Lighting_Composite_vector.pdf" api:/tmp/06M.pdf
+  say "generating \"$SCALE_PROJECT\" (several minutes at the default size)"
+  $COMPOSE exec -T api python -m app.jobs.synthetic --name "$SCALE_PROJECT" --users Ann,Bob \
+    --sheet /tmp/06M.pdf "$@"
+  say "scale: \"$SCALE_PROJECT\" on the server; an iPad gets it with Projects → Refresh"
+}
+
+cmd_media() {  # two PNGs in the photo library (the simulator has no camera)
+  local udid dir="$OUT/media"
+  udid="$(sim_for "${1:-A}")"
+  mkdir -p "$dir"
+  python3 - "$dir" <<'PY'
+import struct, sys, zlib
+def png(path, rgb, w=640, h=480):
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
+    rows = b"".join(b"\x00" + bytes(rgb) * w for _ in range(h))
+    data = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+    data += chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b"")
+    open(path, "wb").write(data)
+png(sys.argv[1] + "/rig-photo-1.png", (200, 40, 40))
+png(sys.argv[1] + "/rig-photo-2.png", (40, 90, 200))
+PY
+  xcrun simctl addmedia "$udid" "$dir/rig-photo-1.png" "$dir/rig-photo-2.png"
+  say "photo library (${1:-A}): rig-photo-1.png (red), rig-photo-2.png (blue)"
+}
+
+cmd_log() {  # [A|B] [regex]: the app's log files (Documents/logs, app/src/log) copied out
+  local dev=A udid data dest
+  case "${1:-}" in A|a|B|b) dev="$1"; shift ;; esac
+  udid="$(sim_for "$dev")"
+  data="$(xcrun simctl get_app_container "$udid" "$BUNDLE" data 2>/dev/null)" || die "the app is not installed on $dev"
+  [ -d "$data/Documents/logs" ] || die "no log folder yet on $dev: launch the app once"
+  dest="$OUT/log-$dev"
+  rm -rf "$dest"; mkdir -p "$dest"
+  cp "$data"/Documents/logs/*.log "$dest/" 2>/dev/null || die "no log files on $dev yet"
+  if [ $# -gt 0 ]; then
+    grep -hE "$1" "$dest"/*.log || die "no log line on $dev matches: $1"
+  else
+    echo "$dest/app.log"
+  fi
+}
+
+cmd_conflict() {  # <edit-flow> [check-flow]: both iPads edit offline, then both sync (rig plan O2)
+  local edit="${1:-}" check="${2:-}"
+  [ -n "$edit" ] || die "conflict <edit-flow> [check-flow]: the edit flow resumes the app (no clearState) and edits without syncing"
+  [ -n "${RIG_PROJECT:-}" ] || die "conflict needs RIG_PROJECT: a project already on both simulators (e.g. after 'RIG_PROJECT=… rig.sh two')"
+  server_up
+  say "conflict on \"$PROJECT\": $edit offline on A (Ann) and B (Bob), then A syncs, then B"
+  cmd_server stop
+  # whatever happens, the server comes back: a stopped api leaves every later run offline
+  trap 'cmd_server start >/dev/null 2>&1 || true' EXIT
+  USER_NAME=Ann SIDE=A cmd_flows --device A "$edit"
+  USER_NAME=Bob SIDE=B cmd_flows --device B "$edit"
+  cmd_server start
+  trap - EXIT
+  for _ in $(seq 1 30); do curl -fsS "$SERVER_URL/health" >/dev/null 2>&1 && break; sleep 1; done
+  server_up
+  USER_NAME=Ann SIDE=A cmd_flows --device A sync-now.yaml
+  USER_NAME=Bob SIDE=B cmd_flows --device B sync-now.yaml
+  if [ -n "$check" ]; then
+    USER_NAME=Ann SIDE=A cmd_flows --device A "$check"
+    USER_NAME=Bob SIDE=B cmd_flows --device B "$check"
+  fi
+  say "conflict: green"
+}
+
 cmd_status() {
   say "simulators:"; xcrun simctl list devices | grep -E "$SIM_A|$SIM_B" || echo "  none"
   say "build: $(built_app || echo none)"
@@ -281,6 +453,12 @@ case "${1:-}" in
   files) shift; cmd_files "$@" ;;
   shot) shift; cmd_shot "$@" ;;
   status) cmd_status ;;
+  seed) shift; cmd_seed "$@" ;;
+  pipeline) shift; cmd_pipeline "$@" ;;
+  scale) shift; cmd_scale "$@" ;;
+  media) shift; cmd_media "$@" ;;
+  log) shift; cmd_log "$@" ;;
+  conflict) shift; cmd_conflict "$@" ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;
 esac

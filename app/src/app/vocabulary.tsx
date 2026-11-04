@@ -100,9 +100,11 @@ export default function VocabularyScreen() {
   const run = useCallback(
     async (fn: (e: Editor, s: Store) => Promise<unknown>, on: Editor | null = editor) => {
       if (!on || !store) return false;
+      // clear before, not after: an action's own line ("Added n values …", "Promoted …") stays
+      // (T154: cleared after, it never showed)
+      setNote('');
       try {
         await fn(on, store);
-        setNote('');
         setTick((n) => n + 1);
         return true;
       } catch (e) {
@@ -155,7 +157,8 @@ export default function VocabularyScreen() {
               setNote(n.values || n.placeholders ? `Added ${what}.` : 'Everything standard is already here.');
             })
           }
-          style={styles.btn}>
+          style={styles.btn}
+          testID="vocab.loadStandard">
           <Text style={styles.btnText}>Load standard lists</Text>
         </Pressable>
       </View>
@@ -176,7 +179,11 @@ export default function VocabularyScreen() {
           </Pressable>
         ))}
       </View>
-      {note ? <Text style={styles.note}>{note}</Text> : null}
+      {note ? (
+        <Text style={styles.note} testID="vocab.note">
+          {note}
+        </Text>
+      ) : null}
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {shown === 'lists'
           ? VOCAB_LISTS.map((l) => <ListSection key={`${scope}-${l.list}`} list={l.list} title={l.title} hint={l.hint} entries={lists?.[l.list] ?? []} canEdit={!!editor} run={run} promote={promote} />)

@@ -90,27 +90,30 @@ export function ChipPicker({
   onPick,
   none = '—',
   disabled,
+  testID,
 }: {
   value: string | null;
   options: { id: string; label: string }[];
   onPick: (id: string | null) => void;
   none?: string;
   disabled?: boolean;
+  /** `<screen>.<element>`: the value is `testID`, the choices `testID.none` and `testID.<option id>` (T154). */
+  testID?: string;
 }) {
   const [open, setOpen] = useState(false);
   const current = options.find((o) => o.id === value)?.label ?? none;
   return (
     <View style={styles.picker}>
-      <Pressable onPress={() => !disabled && setOpen((o) => !o)} style={[styles.pickerValue, disabled && styles.btnDisabled]}>
+      <Pressable onPress={() => !disabled && setOpen((o) => !o)} style={[styles.pickerValue, disabled && styles.btnDisabled]} testID={testID}>
         <Text style={styles.pickerText}>{current} ▾</Text>
       </Pressable>
       {open ? (
         <View style={styles.pickerList}>
-          <Pressable onPress={() => (setOpen(false), onPick(null))} style={styles.pickerItem}>
+          <Pressable onPress={() => (setOpen(false), onPick(null))} style={styles.pickerItem} testID={testID && `${testID}.none`}>
             <Text style={styles.pickerItemText}>{none}</Text>
           </Pressable>
           {options.map((o) => (
-            <Pressable key={o.id} onPress={() => (setOpen(false), onPick(o.id))} style={styles.pickerItem}>
+            <Pressable key={o.id} onPress={() => (setOpen(false), onPick(o.id))} style={styles.pickerItem} testID={testID && `${testID}.${o.id}`}>
               <Text style={[styles.pickerItemText, o.id === value && styles.pickerItemOn]}>{o.label}</Text>
             </Pressable>
           ))}

@@ -1,0 +1,127 @@
+# Needs review on the freshly seeded master (T154, S1): the import's 31 items (8 import pairs, 13
+# "Device → link" rows, 10 "X / U item → which connection?" rows), then one of each action:
+# Link (T81, B1 #27), Create device ▸ (T81, 04 #34 "Elec XX04-1E01"), Put on (T122, 06M #2 on C-07,
+# only the X ends offered), Keep on the device (T122, 03 #10, a UFMP4 with no X end). 31 → 27.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.needs-review
+- extendedWaitUntil:
+    visible: 'Needs review \(31\)'
+    timeout: 20000
+- assertVisible:
+    id: review.tab.import_pair
+    text: Import pair 8
+- tapOn:
+    id: review.tab.lint
+- assertVisible:
+    id: review.row
+    text: '.*Device "Stations & sensors" → link.*'
+
+# Link (T81): B1 #27 "Walter Tower east wing" → filter S1 → B1-S1
+- tapOn:
+    id: review.level.B1
+- tapOn:
+    id: review.row
+    text: '.*Device "Walter Tower east wing" → link.*'
+- assertVisible: Walter Tower east wing
+- tapOn:
+    id: review.filter
+- inputText: S1
+- assertVisible:
+    id: review.link.B1-S1
+- assertNotVisible:
+    id: review.link.B1-01
+- tapOn:
+    id: review.link.B1-S1
+- tapOn:
+    text: Link
+    rightOf: Cancel
+- extendedWaitUntil:
+    visible:
+      id: review.note
+      text: 'Linked: .*B1-S1.*Walter Tower east wing.*'
+    timeout: 10000
+- assertNotVisible:
+    id: review.row
+    text: '.*Walter Tower east wing.*'
+
+# Create device ▸ (T81): 04 "Elec XX04-1E01" → a Power Distribution device, linked as 04-? (new)
+- tapOn:
+    id: review.level.04
+- tapOn:
+    id: review.row
+    text: '.*Punch #34 .*Device "Elec XX04-1E01" → link.*'
+- tapOn:
+    id: review.createDevice
+- assertVisible: Create device for this punch item
+- assertVisible: 'Not on the plan yet.*'
+- tapOn:
+    id: add.cat.Power Distribution
+- tapOn:
+    id: add.model
+- inputText: CT04LCPB
+- tapOn:
+    id: add.room
+- inputText: Elec XX04-1E01
+- tapOn: Create device for this punch item   # closes the keyboard (hideKeyboard fails on the iPad one)
+- tapOn:
+    id: add.submit
+- extendedWaitUntil:
+    visible:
+      id: review.note
+      text: 'Linked: .*04-\? \(new\).*'
+    timeout: 10000
+- assertNotVisible:
+    id: review.row
+    text: '.*Punch #34 .*'
+
+# Put on (T122): 06M #2 "Run 2x DMX cables …" offers the two X ends only → C-07
+- tapOn:
+    id: review.level.06M
+- tapOn:
+    id: review.row
+    text: '.*Punch #2 Run 2x DMX cables.*'
+- assertVisible: 06M-02 · CT06LCPB
+- assertVisible:
+    id: review.put.C-07
+    text: '.*X · DMX to Level 09.*'
+- assertVisible:
+    id: review.put.C-12
+    text: '.*X · DMX to equipment rack.*'
+- assertNotVisible:
+    id: 'review\.put\..*'
+    text: '.*(P|0-10V|120V) · .*'
+- tapOn:
+    id: review.put.C-07
+- tapOn:
+    text: Put on
+    rightOf: Cancel
+- extendedWaitUntil:
+    notVisible:
+      id: review.row
+      text: '.*Punch #2 Run 2x DMX cables.*'
+    timeout: 10000
+
+# Keep on the device (T122): 03 #10 "Terminate DMX" on a UFMP4 with no X connection
+- tapOn:
+    id: review.level.03
+- tapOn:
+    id: review.row
+    text: '.*Punch #10 Terminate DMX.*'
+- assertVisible: 'This device has no X connection.*'
+- tapOn:
+    id: review.keep
+- tapOn:
+    text: Keep
+    rightOf: Cancel
+- extendedWaitUntil:
+    notVisible:
+      id: review.row
+      text: '.*Punch #10 Terminate DMX.*'
+    timeout: 10000
+
+- extendedWaitUntil:
+    visible: 'Needs review \(27\)'
+    timeout: 10000
+- tapOn: ← Levels

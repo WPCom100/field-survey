@@ -126,9 +126,19 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
             <Text style={styles.kind}>{TITLE[kind]}</Text>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={styles.file}>{b ? (b.files?.[0]?.name ?? '?') : '—'}</Text>
-              {b ? <Text style={[styles.line, b.job_state === 'failed' && styles.warn]}>{extractionLine(kind, b)}</Text> : null}
+              {b ? (
+                <Text style={[styles.line, b.job_state === 'failed' && styles.warn]} testID={`sources.${kind}.status`}>
+                  {extractionLine(kind, b)}
+                </Text>
+              ) : null}
             </View>
-            <Btn title={b ? 'Upload another…' : 'Choose PDF…'} small disabled={busy !== null} onPress={() => void pick(kind).catch((e: unknown) => setError(String(e)))} />
+            <Btn
+              title={b ? 'Upload another…' : 'Choose PDF…'}
+              small
+              disabled={busy !== null}
+              onPress={() => void pick(kind).catch((e: unknown) => setError(String(e)))}
+              testID={`sources.${kind}`}
+            />
           </View>
         );
       })}

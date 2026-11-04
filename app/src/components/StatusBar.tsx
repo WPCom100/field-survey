@@ -14,7 +14,10 @@ export function GlobalStatusBar() {
       onPress={() => getSyncEngine().then((e) => e.requestSync())}
       style={[styles.bar, bad && styles.warn]}
       accessibilityRole="button"
-      accessibilityLabel="Sync status"
+      // No accessibilityLabel: it replaced the text, so VoiceOver and Maestro read "Sync status"
+      // instead of "Offline · 3 pending". Flows assert the text through the testID (T154).
+      accessibilityHint="Sync now"
+      testID="status.bar"
     >
       <View style={styles.row}>
         <Text style={styles.text}>{describeSync(sync)}</Text>
