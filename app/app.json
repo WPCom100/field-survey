@@ -37,6 +37,14 @@
           "cameraPermission": "Field Survey uses the camera to photograph devices, panels and wiring during the survey.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
       ]
     ],
     "experiments": {
