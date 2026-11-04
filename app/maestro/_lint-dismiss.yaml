@@ -1,12 +1,19 @@
-# Lint: the first open finding dismissed with a chip reason → "Dismissed 1" (T156). The rule drafts
-# with no device (T100) come first and can fill the list: their group is folded before the tap.
+# Lint: level LEVEL's (env) first open finding dismissed with a chip reason → the Dismissed count one higher (T156).
+# The rule drafts with no device (T100) come first and can fill the list: their group is folded
+# before the tap.
+# Pick a level the caller does not edit: a finding about an edited record can resolve on its own
+# (T156: A's Issue on 06M-03 raised one that Choose B then cleared).
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - tapOn:
     id: nav.lint
 - extendedWaitUntil:
-    visible: 'Lint \(\d+ open · 0 dismissed.*\)'
+    visible: 'Lint \(\d+ open · \d+ dismissed.*\)'
     timeout: 30000
+- copyTextFrom:
+    id: lint.show.dismissed
+- evalScript: ${output.dismissed = parseInt(maestro.copiedText.match(/Dismissed (\d+)/)[1])}
+- tapOn: '${LEVEL}'      # the level chip
 - runFlow:
     when:
       visible: '▾ Drafts with no device \(\d+\)'
@@ -25,5 +32,5 @@ appId: productions.luminarytechnology.fieldsurvey
     text: 'Dismissed: .*'
 - assertVisible:
     id: lint.show.dismissed
-    text: Dismissed 1
+    text: Dismissed ${output.dismissed + 1}
 - tapOn: ← Levels

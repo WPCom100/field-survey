@@ -1,0 +1,126 @@
+# O2's check through `rig.sh conflict` (T156), on A then on B, after A then B synced. A's values
+# arrived first and are official; B's wait in Needs review (D37, per field). On A: each of the three
+# is resolved with Choose B (the device status and the ruling's note in the project's Needs review,
+# EBDK's aliases in App library — needs review), then a sync. On both: B's values everywhere,
+# nothing in review; on B the finding A dismissed is dismissed too (T36 "Two iPads").
+appId: productions.luminarytechnology.fieldsurvey
+name: Conflicts — resolved in Needs review, both iPads agree
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml
+- runFlow:
+    when:
+      true: ${SIDE == 'A'}
+    commands:
+      - runFlow: _open-project.yaml
+      - tapOn:
+          id: nav.needs-review
+      - tapOn:
+          id: review.tab.sync_conflict
+          text: Sync conflict 2
+      - tapOn:
+          id: review.row
+          text: '.*06M-03.* · Status.*'
+      - assertVisible: A \(official now\)
+      - assertVisible: Issue
+      - assertVisible: Not installed
+      - tapOn:
+          id: review.choose.B
+      - tapOn: Resolve          # the confirm alert, reason auto-filled
+      - extendedWaitUntil:
+          notVisible:
+            id: review.row
+            text: '.*06M-03.* · Status.*'
+          timeout: 10000
+      - tapOn:
+          id: review.row
+          text: '.*06M-02.* · Notes.*'
+      - assertVisible: '.*Ruling O2.*'
+      - assertVisible: '.*Hand note B.*'
+      - tapOn:
+          id: review.choose.B
+      - tapOn: Resolve          # the confirm alert, reason auto-filled
+      - extendedWaitUntil:
+          notVisible:
+            id: review.row
+            text: '.*06M-02.* · Notes.*'
+          timeout: 10000
+      - tapOn: ← Levels
+      - tapOn:
+          id: nav.projects
+      - tapOn:
+          id: projects.library
+      - tapOn:
+          id: library.review
+          text: 1 in review ▸
+      - assertVisible: App library — needs review.*
+      - tapOn:
+          id: review.row
+          text: '.*Device type EBDK.*'
+      - assertVisible: '.*O2 A ${PROJECT}.*'
+      - assertVisible: '.*O2 B ${PROJECT}.*'
+      - tapOn:
+          id: review.choose.B
+      - tapOn: Resolve          # the confirm alert, reason auto-filled
+      - extendedWaitUntil:
+          notVisible:
+            id: review.row
+            text: '.*Device type EBDK.*'
+          timeout: 10000
+      - tapOn: ← Library
+      - tapOn: ◀ Projects
+      - tapOn: ◀ Levels
+      - runFlow: _sync.yaml
+
+# both iPads: B's values, nothing in review
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-03
+- assertVisible: ✓ Not installed
+- assertNotVisible: '.*in review.*'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.device.06M-02
+- assertVisible:
+    id: card.notes
+    text: '.*Hand note B.*'
+- assertNotVisible: '.*in review.*'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.rulings                 # the ruling A applied is listed on both (T37 "Two iPads")
+- assertVisible: '.*O2 ruling against a hand edit.*'
+- tapOn: ← Levels
+- tapOn:
+    id: nav.needs-review
+- assertNotVisible: 'Sync conflict [1-9].*'
+- tapOn: ← Levels
+- runFlow:
+    when:
+      true: ${SIDE == 'B'}
+    commands:
+      - tapOn:
+          id: nav.lint
+      - assertVisible:
+          id: lint.show.dismissed
+          text: 'Dismissed [1-9]\d*'
+      - tapOn: ← Levels
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- tapOn:
+    id: library.search
+- inputText: EBDK
+- assertVisible:
+    id: library.type
+    text: '.*EBDK.*O2 B ${PROJECT}.*'
+- assertNotVisible:
+    id: library.review
+- tapOn: ◀ Projects
+- tapOn: ◀ Levels

@@ -1,0 +1,19 @@
+# O2 step 2 of `rig.sh conflicts` (T156), on B (Bob), online: open A's seed copy (PROJECT) and its
+# 06M level so the project is on this iPad before both go offline; sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Conflicts — B has the project
+---
+# keep the store (no clearState): a fresh one downloads every project on the rig server first, the
+# newest last, and with 45 of them it was still "downloading…" after 90 s (T156)
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-03
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- runFlow: _sync.yaml

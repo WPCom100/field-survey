@@ -15,6 +15,7 @@ appId: productions.luminarytechnology.fieldsurvey
     element:
       id: projects.open.${PROJECT}
     direction: DOWN
+    visibilityPercentage: 50   # the newest project is the last row, partly under the edge (T156)
     timeout: 90000
 - tapOn:
     id: projects.open.${PROJECT}

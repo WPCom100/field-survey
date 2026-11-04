@@ -1,0 +1,122 @@
+# O2 through `rig.sh conflict` (T156), with the server stopped, on A (Ann, SIDE=A) and B (Bob,
+# SIDE=B): the same fields edited differently on both iPads —
+#   1. 06M-03's status: A Issue, B Not installed (a plain device field, D37);
+#   2. 06M-02's notes: A applies a ruling (Append note "Ruling O2"), B types a note by hand (T37);
+#   3. the app library's EBDK: its aliases, each side its own (T61);
+# and A dismisses a finding (T36 "Two iPads": B sees it dismissed, nothing in review).
+appId: productions.luminarytechnology.fieldsurvey
+name: Conflicts — the same fields edited on both iPads, offline
+---
+- runFlow: _resume.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline.*'
+    timeout: 60000
+
+# 1. a device field
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-03
+- tapOn:
+    id: "card.status.${SIDE == 'A' ? 'Issue' : 'Not installed'}"
+- assertVisible: "✓ ${SIDE == 'A' ? 'Issue' : 'Not installed'}"
+- tapOn:
+    id: card.close
+
+# 2. B's hand edit of 06M-02's notes (A's ruling is below, from the Rulings screen)
+- runFlow:
+    when:
+      true: ${SIDE == 'B'}
+    commands:
+      - tapOn:
+          id: plan.device.06M-02
+      - tapOn:
+          id: card.notes
+      - inputText: ' Hand note B'
+      - pressKey: Enter
+      - assertVisible:
+          id: card.notes
+          text: '.*Hand note B.*'
+      - tapOn:
+          id: card.close
+- tapOn:
+    id: plan.back
+- runFlow:
+    when:
+      true: ${SIDE == 'A'}
+    commands:
+      - tapOn:
+          id: nav.rulings
+      - tapOn:
+          id: rulings.new
+      - tapOn:
+          id: rulings.reason
+      - inputText: O2 ruling against a hand edit
+      - tapOn: New ruling      # the title: closes the keyboard (the first tap after typing only does that)
+      - tapOn:
+          id: rulings.where.device
+      - tapOn:
+          id: rulings.cond.field.display_id
+      - tapOn:
+          id: rulings.cond.op.eq
+      - tapOn:
+          id: rulings.cond.value
+      - inputText: 06M-02
+      - tapOn: New ruling
+      - tapOn:
+          id: rulings.action.append
+      - tapOn:
+          id: rulings.append
+      - inputText: Ruling O2
+      - tapOn: New ruling
+      - assertVisible: 'Preview ▸'
+      - tapOn:
+          id: rulings.preview
+      - tapOn:
+          id: rulings.apply
+          text: Apply 1
+      - extendedWaitUntil:
+          visible: 'Rulings \(\d+ standing · [1-9]\d* applied\)'
+          timeout: 10000
+      - tapOn: ← Levels
+      # T36 "Two iPads": a dismissal made on A
+      - runFlow:
+          file: _lint-dismiss.yaml
+          env:
+            LEVEL: B2
+
+# 3. the app library: EBDK's aliases, a value of this run and side (a re-run must differ from the last)
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- tapOn:
+    id: library.search
+- inputText: EBDK
+- tapOn:
+    id: library.type
+    text: '.*EBDK.*'
+    index: 0
+- tapOn:
+    id: library.aliases
+- eraseText: 200
+- tapOn:
+    id: library.aliases
+- eraseText: 200
+- inputText: 7180A1200, O2 ${SIDE} ${PROJECT}
+- tapOn: 'Aliases \(BOM\)'    # the label: closes the keyboard over the Save footer
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- tapOn: ◀ Projects
+- tapOn: ◀ Levels
+- assertVisible:
+    id: status.bar
+    text: 'Offline · [1-9]\d* pending.*'

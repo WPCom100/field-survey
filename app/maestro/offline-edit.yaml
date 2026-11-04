@@ -81,7 +81,10 @@ name: Offline — every kind of edit, server stopped
 - tapOn: ← Levels
 
 # Lint: dismiss the first open finding with a reason
-- runFlow: _lint-dismiss.yaml
+- runFlow:
+    file: _lint-dismiss.yaml
+    env:
+      LEVEL: B2
 
 # Setup → 6 Lock baseline: lock B2 (it has warnings, so the dialog says Lock anyway)
 - tapOn:

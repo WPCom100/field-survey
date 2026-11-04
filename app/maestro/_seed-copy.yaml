@@ -33,6 +33,7 @@ appId: productions.luminarytechnology.fieldsurvey
     element:
       id: seed.import
     direction: DOWN
+    centerElement: true     # mid-screen, clear of the T161 toast along the bottom edge (T156)
 - runFlow: _logbox.yaml     # T161's toast took this tap once and opened the dev log instead
 - tapOn:
     id: seed.import

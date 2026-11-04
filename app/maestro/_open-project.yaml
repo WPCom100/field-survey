@@ -1,0 +1,25 @@
+# Projects → PROJECT → its Levels home (T156). After a cold start the home shows the first project
+# on the iPad, and the sidebar's screens (Needs review, Lint, …) follow the home's project.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.projects
+- runFlow:
+    when:
+      notVisible:
+        id: projects.open.${PROJECT}
+    commands:
+      - tapOn:
+          id: projects.refresh
+- scrollUntilVisible:
+    element:
+      id: projects.open.${PROJECT}
+    direction: DOWN
+    visibilityPercentage: 50   # the newest project is the last row, partly under the edge (T156)
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 30000

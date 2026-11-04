@@ -230,7 +230,9 @@ cmd_build() {
 cmd_metro() {
   cd "$ROOT/app"
   say "Metro on $METRO_URL; leave this terminal open"
-  npx expo start --dev-client --port "${METRO_URL##*:}"
+  # EXPO_PUBLIC_RIG=1: the app keeps the dev client's error toasts off the screen (they took
+  # Maestro's taps, T161, T156); EXPO_PUBLIC_* is inlined at bundle time, so --clear when it changes
+  EXPO_PUBLIC_RIG=1 npx expo start --dev-client --port "${METRO_URL##*:}" "$@"
 }
 
 cmd_open() {
@@ -548,7 +550,7 @@ case "${1:-}" in
   setup) cmd_setup ;;
   server) shift; cmd_server "$@" ;;
   build) shift; cmd_build "$@" ;;
-  metro) cmd_metro ;;
+  metro) shift; cmd_metro "$@" ;;
   open) shift; cmd_open "$@" ;;
   flows) shift; cmd_flows "$@" ;;
   second) cmd_second ;;
