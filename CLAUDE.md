@@ -1,6 +1,6 @@
 # CLAUDE.md — Field Survey (ETC lighting-control installation survey, iPad)
 
-> Client stack is **React Native + Expo (TypeScript)**, built from Windows through EAS (D70). There is no Mac on the team and no Xcode anywhere in this workflow. Never propose Swift, Xcode, SwiftUI, PencilKit or SPM; use the React Native/Expo equivalents in §5.
+> Client stack is **React Native + Expo (TypeScript)**, built from Windows through EAS (D70). Every build that reaches an iPad comes from EAS; nobody on the team writes or opens Xcode projects. The one Mac is the **test rig** (`docs/ops.md` §6, D248): Xcode is installed there only so the iOS Simulator exists and `expo run:ios` can build a local dev client for it, and Claude drives that Simulator with Maestro flows (`app/maestro/`). Never propose Swift, Xcode, SwiftUI, PencilKit or SPM; use the React Native/Expo equivalents in §5.
 
 Read this file fully before every task. `PLAN.md` is the normative spec, `DECISIONS.md` the decision log, `TASKS.md` the ordered work. The phase documents in `docs/history/` are background only; when they disagree with `PLAN.md`, `PLAN.md` wins.
 
@@ -20,6 +20,7 @@ field-survey/
     app.json      name "Field Survey", slug field-survey, bundle id productions.luminarytechnology.fieldsurvey
     eas.json      profiles: development (dev client, internal), preview (internal), production (TestFlight)
     src/          screens (expo-router), components, plan viewer, camera, sync UI
+    maestro/      Maestro flows the Mac test rig runs against the Simulator (T149; `smoke.yaml` is the entry)
   packages/core/  TypeScript: models, SQL schema + migrations, Store.apply(op), op log, sync client,
                   blob queue - no React, no Expo imports; runs in Node for tests (better-sqlite3)
                   and on the iPad (expo-sqlite) through one SqlDriver interface
@@ -28,6 +29,7 @@ field-survey/
     app/          api, sync, numbering, blobs, claude (the API client), jobs (seed import, plan sheets + grid calibration, BOM and riser extraction, DaVinci library import, exports)
     tests/
     docker-compose.yml  Caddyfile
+  scripts/mac/    rig.sh — the Mac test rig: simulator, local e2e server, local dev-client build, Metro, flows (T149, docs/ops.md §6)
   fixtures/       golden inputs (private): Lighting_Control_Survey_Master_B2-06_4.xlsx,
                   riser.pdf, BOM.pdf, Level_06M_-_Lighting_Composite_vector.pdf,
                   15090056-BOM.pdf (format example only, never a project input — D4)
@@ -81,7 +83,8 @@ Export header strings: `ETC Lighting Controls Survey`; row 2 `Levels <first>-<la
 |---|---|
 | Client | TypeScript strict; React Native via Expo (managed workflow + config plugins, no ejecting); `expo-router` for navigation; `packages/core` and `packages/rules` have no React or Expo imports and are tested in Node with `vitest`. Native modules allowed (each needs a new EAS development build, so add them deliberately): `expo-sqlite`, `react-native-pdf` (PDFKit underneath), `@shopify/react-native-skia` (pins, ink, markup), `expo-camera`, `expo-image-picker`, `expo-image-manipulator`, `expo-document-picker` (workbook import, D135), `expo-file-system`, `expo-secure-store`, `expo-crypto` (random bytes for UUID v7, D82), `expo-auth-session` (Entra, from T04), `victory-native` (charts; JavaScript over Skia, so no new build — D181), `react-native-vision-camera` + OCR plugin (M7 only), `react-native-reanimated` (+ `react-native-worklets`) and `react-native-gesture-handler` for the UI-thread plan overlay (D95), `react-native-blob-util` (peer of `react-native-pdf`; the viewer carries a pnpm patch, D92 — see `patches/react-native-pdf.md`), `expo-updates` (over-the-air JS updates on the `production` channel, fingerprint runtime version, applied on the next cold launch and never by `reloadAsync`; D153, D157, `docs/ops.md` §5.5). Anything else is a decision for `DECISIONS.md` first. |
 | Database access | `packages/core` talks to SQLite only through its `SqlDriver` interface; `ExpoSqliteDriver` on the iPad, `BetterSqliteDriver` in Node tests. Same SQL in both; migrations live in core. |
-| Builds | No local native builds. `eas build --profile development --platform ios` produces the dev client; day-to-day work loads JS over Wi-Fi with `npx expo start --dev-client`. TestFlight uploads via `eas submit`. Build numbers auto-increment in EAS. |
+| Builds | No native builds on the PC. `eas build --profile development --platform ios` produces the dev client; day-to-day work loads JS over Wi-Fi with `npx expo start --dev-client`. TestFlight uploads via `eas submit`. Build numbers auto-increment in EAS. The Mac test rig builds its own Simulator dev client locally with `expo run:ios` (`scripts/mac/rig.sh build`); that build never ships and `eas.json` is not touched for it, because any edit to `eas.json` changes the runtime fingerprint and would cut the iPads off from updates (D249). |
+| Test IDs | Controls a Maestro flow taps carry `testID="<screen>.<element>"` (`connect.submit`, `nav.sync`, `newProject.create`, `level.06M`, `projects.open.<name>`); shared widgets (`Btn`, `Field` in `app/src/setup/widgets.tsx`) pass `testID` through. Flows tap by ID where one exists and by visible text otherwise; a new screen that a flow will walk gets IDs in the same task. |
 | IDs | UUID v7 for every record (`id`); display numbers are separate fields assigned by the server once, never reused (D25). Never renumber. |
 | Ops | Every field edit is one `op` (PLAN §4.1). Grouped edits share `group_id`. No direct table writes from UI code: UI → `Store.apply(op)` → tables + outbox. |
 | Soft delete | `deleted_at`; nothing is hard-deleted on either side. |
@@ -111,6 +114,12 @@ cd server && docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -
 FIELD_SURVEY_E2E_URL=http://127.0.0.1:8010 FIELD_SURVEY_E2E_TOKEN=e2e pnpm --filter @field-survey/core test:e2e
 pnpm --filter app typecheck         # tsc --noEmit
 pnpm --filter app lint
+# Mac test rig (docs/ops.md §6; the only commands that run on the Mac)
+bash scripts/mac/rig.sh setup       # once: Xcode CLT check, Maestro, CocoaPods, the "Field Survey iPad" simulator
+bash scripts/mac/rig.sh server      # local e2e server in Docker on 127.0.0.1:8010, token e2e (never the Droplet)
+bash scripts/mac/rig.sh build       # local Simulator dev client via expo run:ios (first run: prebuild + pod install)
+bash scripts/mac/rig.sh metro       # Metro for the Simulator, in its own terminal
+bash scripts/mac/rig.sh flows       # maestro test app/maestro (smoke.yaml); screenshots in ~/.maestro/tests
 cd app && npx expo start --dev-client     # iPad with the dev build installed loads over Wi-Fi
 eas build --profile development --platform ios   # only when a native module changes
 eas submit --platform ios                        # TestFlight (D59)
@@ -129,7 +138,7 @@ Golden tests read `fixtures/`; if a fixture is missing the test is skipped with 
 3. Implement, with tests named in the DoD. Run the full test suite for the package you touched.
 4. Update `TASKS.md`: mark the task `done`, note any deviation, and list follow-ups as new tasks at the end of the milestone (never silently expand scope).
 5. Append new decisions to `DECISIONS.md`.
-5a. If the task has anything only an iPad can prove (UI, Pencil, camera, airplane mode, two devices, a build), append a section to `docs/ON_DEVICE_CHECKLIST.md` in its format (what to do, what you should see, why it matters, `→ saw:`, new-dev-build flag, Decision lines for Proposed decisions) and have the task's `TASKS.md` entry say "checks added to the on-device checklist" instead of listing them inline. Mention the new checks in the summary.
+5a. If the task has anything only a device can prove, split it: what a Maestro flow on the Simulator can prove (taps, screens, labels, sync between two simulators, offline against a stopped server) goes into `app/maestro/` as a flow Claude runs on the Mac rig (`docs/ops.md` §6); what only an iPad can prove (Pencil, camera, real airplane mode, a TestFlight or dev build, performance on the hardware) and every check of whether the *information* is right (extraction results, wording, export content) goes to Landry. For the latter, append a section to `docs/ON_DEVICE_CHECKLIST.md` in its format (what to do, what you should see, why it matters, `→ saw:`, new-dev-build flag, Decision lines for Proposed decisions) and have the task's `TASKS.md` entry say "checks added to the on-device checklist" instead of listing them inline. Mention the new checks in the summary.
 5b. When Landry says **"tested"** (pasting the checklist back with results), do that as its own small session, not part of a feature task: copy the round with results into `docs/on-device-log.md` under a dated heading, add a `TASKS.md` task for every failure, record each answered Decision line in `DECISIONS.md`, then reset the checklist to its "Before you start" block with an empty list and a new round date. Untested items stay; nothing is dropped.
 6. Commit with the message `T<nn>: <title>` and a body listing what the DoD check showed.
 7. End with a 5-line summary: what was built, test results, deviations, open questions, next task.
@@ -149,7 +158,8 @@ Model and effort per task are in `TASKS.md` (D61). Do not switch tasks mid-sessi
 - The Change Log is **not** in the export (D51). History stays in the app.
 - Plan ink is one stroke-list blob per (sheet, user) (Skia strokes with pressure, our own JSON format) and never merged (D53).
 - Pins: **shape = role, fill colour = status** (D64, T112). Shapes by `library_type.role` (else the category's role), by default (the app library can move a role to another shape for every project — Vocabulary → Pin shapes, D214): relay_panel square · foundry_panel rounded square · ebdk wide rectangle · equipment_rack hexagon · nsps pentagon · touchscreen triangle · station circle · sensor diamond · other octagon. Colours: green `Complete`, purple `Installed, untested`, red `Issue`, red hollow "NI" `Not installed`, yellow `No access`, grey `Not started`. Colour is never the only signal (letter/glyph as backup).
-- Nothing in this repo compiles on Windows except TypeScript and Python: native iOS code is only ever built by EAS in the cloud. If a task seems to need Xcode, it is mis-specified; stop and ask.
+- Nothing in this repo compiles on Windows except TypeScript and Python: native iOS code that ships is only ever built by EAS in the cloud; the Mac test rig's `expo run:ios` build is for its Simulator only (D248). If a task seems to need Xcode beyond that, it is mis-specified; stop and ask.
+- `eas.json` is part of the runtime fingerprint (`.gitattributes`, T84): editing it, even to add a profile, gives the next update a runtime no installed build has. Change it only in a task that also makes new dev and TestFlight builds (D249).
 - Rules never test a category string: R2c / R2d / R2e, the lints, `addressNeeds` (the Neuron exception and the bus roles), `defaultIdScheme`, `defaultDeviceText` and the pin shapes read the device's **role** (`roleOf` in core, `app/roles.py` on the server: the type's `role`, else the type's category's, else the device's category's). `Power Distribution` and `Equipment` name no role, so a device of those categories needs a type to be a relay panel or an NSPS (T112, D201). What a device needs (Neuron ID, IP address, DMX address) is never a category default either: `addressNeeds(type, device, codes, params)` reads the codes of its live cable ends (else its accepted type's default cables), through the `R3c.neuron_codes` / `ip_codes` / `dmx_codes` maps, the type's `needs_*` flag over it (T146, D245, D247); `deviceAddressNeeds` in the rules, `deviceAddressNeeds` in `app/src/library/neuron.ts` for the card and dashboard.
 - Rules never hard-code an owner, an item / note / part wording or a starting status: they read `ctx.param(rule, key[, code])` (T102, D176, D211; the catalogue `PARAMS` in `packages/rules/src/params.ts` holds the defaults) and list what they read in the proposal's `params`. A project reads only its own `rule_param` rows; app-level defaults are copied at project creation.
 - The device-type library lives at app level and per project (D65); `library_type.project == null` means the app library. Projects copy from it; accepted project types can be promoted to it.

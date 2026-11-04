@@ -1,0 +1,22 @@
+# The identity gate (app/src/identity/IdentityGate.tsx): server + token, then a name.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- assertVisible: Connect to server
+- tapOn:
+    id: connect.serverUrl
+- eraseText            # the field starts with "https://"
+- inputText: ${SERVER_URL}
+- tapOn:
+    id: connect.token
+- inputText: ${TOKEN}
+- tapOn:
+    id: connect.submit
+- extendedWaitUntil:
+    visible: Who is surveying?
+    timeout: 15000
+- tapOn:
+    id: identity.user.${USER}
+- extendedWaitUntil:
+    visible: Signed in as ${USER}.*
+    timeout: 15000
+- assertVisible: Field Survey

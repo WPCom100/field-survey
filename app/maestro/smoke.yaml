@@ -1,0 +1,15 @@
+# Smoke flow (T149, D248): connect to the local e2e server, create a project with one level,
+# open that level, sync. `bash scripts/mac/rig.sh flows` runs it; the env values below are the
+# defaults the script overrides with -e. Sub-flows start with `_` and are not run on their own.
+appId: productions.luminarytechnology.fieldsurvey
+name: Smoke — connect, create a project, open its level, sync
+env:
+  SERVER_URL: http://127.0.0.1:8010
+  TOKEN: e2e
+  USER: Ann
+  METRO_URL: http://127.0.0.1:8081
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _new-project.yaml
+- runFlow: _sync.yaml

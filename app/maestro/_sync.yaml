@@ -1,0 +1,13 @@
+# Sidebar → Sync → Sync now → "Synced <time>" → back to Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.sync
+- assertVisible: Sync & uploads
+- tapOn:
+    id: sync.now
+- extendedWaitUntil:
+    visible: Synced .*
+    timeout: 20000
+- tapOn: ← Levels
+- assertVisible: Field Survey

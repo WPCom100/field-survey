@@ -1,0 +1,14 @@
+# Fresh launch. A local dev client (rig.sh build) opens on its launcher, so the Metro deep link
+# loads the app; a --release build has the JS embedded and METRO_URL is set to '' by the caller.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- launchApp:
+    clearState: true
+- runFlow:
+    when:
+      true: ${METRO_URL != ''}
+    commands:
+      - openLink: fieldsurvey://expo-development-client/?url=${METRO_URL}
+- extendedWaitUntil:
+    visible: Connect to server
+    timeout: 90000

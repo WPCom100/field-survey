@@ -147,7 +147,7 @@ export default function NewProjectScreen() {
 
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <Section title="Project">
-          <Field label="Name" value={name} onChange={setName} placeholder="Houston Methodist Centennial Tower" />
+          <Field label="Name" value={name} onChange={setName} placeholder="Houston Methodist Centennial Tower" testID="newProject.name" />
           <Field label="Site" value={site} onChange={setSite} placeholder="Houston, TX" />
           <View style={w.row}>
             <Field label="EC" value={ec} onChange={setEc} placeholder="Electrical contractor" />
@@ -218,9 +218,10 @@ export default function NewProjectScreen() {
                 onSubmitEditing={addLevel}
                 submitBehavior="submit"
                 returnKeyType="next"
+                testID="newProject.levelCode"
               />
             </View>
-            <Btn title="+ Add level" onPress={addLevel} />
+            <Btn title="+ Add level" onPress={addLevel} testID="newProject.addLevel" />
             <View style={{ width: 200 }}>
               <Text style={w.label}>Add range…</Text>
               <TextInput style={w.input} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onFocus={toBottom} onSubmitEditing={addRange} />
@@ -235,7 +236,7 @@ export default function NewProjectScreen() {
           <Pressable onPress={() => router.back()} style={styles.cancel}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
-          <Btn title={busy ? 'Creating…' : 'Create project'} primary onPress={() => void create()} disabled={busy} />
+          <Btn title={busy ? 'Creating…' : 'Create project'} primary onPress={() => void create()} disabled={busy} testID="newProject.create" />
         </View>
       </ScrollView>
     </View>

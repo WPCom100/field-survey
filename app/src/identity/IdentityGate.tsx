@@ -36,7 +36,10 @@ export function useSignOut(): () => Promise<void> {
   return out;
 }
 
-/** First-launch flow: server + token, then pick a name. Renders children once a user is set. */
+/**
+ * First-launch flow: server + token, then pick a name. Renders children once a user is set.
+ * `testID`s (`connect.*`, `identity.*`) are what the Maestro flows tap (T149, `app/maestro/`).
+ */
 export function IdentityGate({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<Identity | null | undefined>(undefined);
 
@@ -87,6 +90,7 @@ function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
         autoCorrect={false}
         placeholder="Server URL"
         placeholderTextColor="#888"
+        testID="connect.serverUrl"
       />
       <TextInput
         style={styles.input}
@@ -97,9 +101,10 @@ function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
         secureTextEntry
         placeholder="Team token"
         placeholderTextColor="#888"
+        testID="connect.token"
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable style={styles.button} onPress={submit}>
+      <Pressable style={styles.button} onPress={submit} testID="connect.submit">
         <Text style={styles.buttonText}>Connect</Text>
       </Pressable>
     </View>
@@ -124,7 +129,7 @@ function Picker({ identity, onDone }: { identity: Identity; onDone: (u: TeamMemb
     <View style={styles.center}>
       <Text style={styles.title}>Who is surveying?</Text>
       {team.map((m) => (
-        <Pressable key={m.id} style={styles.button} onPress={() => choose(m)}>
+        <Pressable key={m.id} style={styles.button} onPress={() => choose(m)} testID={`identity.user.${m.name}`}>
           <Text style={styles.buttonText}>{m.name}</Text>
         </Pressable>
       ))}
@@ -134,11 +139,13 @@ function Picker({ identity, onDone }: { identity: Identity; onDone: (u: TeamMemb
         onChangeText={setNewName}
         placeholder="Not listed? Add your name"
         placeholderTextColor="#888"
+        testID="identity.newName"
       />
       {newName.trim() ? (
         <Pressable
           style={styles.button}
           onPress={() => addTeamMember(identity, newName.trim()).then(choose, (e) => setError(String(e)))}
+          testID="identity.add"
         >
           <Text style={styles.buttonText}>Add and continue</Text>
         </Pressable>

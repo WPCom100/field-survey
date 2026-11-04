@@ -302,3 +302,48 @@ EXPO_PUBLIC_UPDATE_MESSAGE="$M" eas update --channel production --environment pr
 **Development builds** have `updates` off. They load JS from Metro (`npx expo start --dev-client`) and show "JS from the development server (Metro)" on the Sync screen. Nothing is ever published to the `development` or `preview` channels.
 
 Log every published update as an update row in §5.4.
+
+## 6. The Mac test rig (T149, D248)
+
+One Mac on the office Wi-Fi runs the **iOS Simulator**; Claude drives it with **Maestro** flows (`app/maestro/`) against a **local copy of the server** in Docker. It takes the functional half of the on-device checks (taps, screens, labels, sync between two simulators, offline against a stopped server). What stays on a real iPad: Pencil, camera, true airplane mode, TestFlight and dev builds and their updates, performance on the hardware, and every check of whether the *information* is right (CLAUDE.md §7 5a).
+
+Nothing on the Mac ships. The iPads only ever get EAS builds (§5), and `eas.json` is **not** edited for the rig: it is hashed into the runtime fingerprint, and a `simulator` profile moves the runtime from `24fe50c2` to `bd041b87` (measured 2026-11-03), after which the next CI update would reach no installed build. The profile waits for the next build cycle (T150, D249). Until then the rig builds its own Simulator app locally.
+
+### 6.1 Once: the Mac
+
+Any Apple-silicon Mac; a base Mac mini is enough. On it:
+
+1. **Xcode** from the App Store (only for the Simulator and the local build). Open it once, install the iOS platform when it asks, then `sudo xcodebuild -license accept`.
+2. **Homebrew**, **Node 24** (`brew install node@24`), **Docker** (Docker Desktop or OrbStack), **Git**. Clone the repo; the `fixtures/` folder is private and comes from the PC.
+3. **SSH in from the PC** (System Settings → General → Sharing → Remote Login), so Claude Code on Windows runs `ssh mac 'cd field-survey && bash scripts/mac/rig.sh …'` and pulls screenshots back with `scp`. Claude Code can also run on the Mac itself.
+4. In the repo: `bash scripts/mac/rig.sh setup`. It checks the Xcode command-line tools, installs **Maestro** (the official script, into `~/.maestro/bin`) and **CocoaPods**, runs `pnpm install`, and creates and boots the simulator **Field Survey iPad** (the newest iPad Pro device type on the newest iOS runtime). It ends with `rig: ready`.
+
+### 6.2 Each session
+
+```
+bash scripts/mac/rig.sh server      # Docker: postgres, s3, api on 127.0.0.1:8010, token e2e, team Ann/Bob; migrated; bucket made
+bash scripts/mac/rig.sh build       # expo run:ios → a local dev client on the simulator (first run 10–20 min: prebuild, pod install)
+bash scripts/mac/rig.sh metro       # own terminal: Metro on 8081 for that dev client
+bash scripts/mac/rig.sh open        # loads the app from Metro (the fieldsurvey://expo-development-client deep link)
+bash scripts/mac/rig.sh flows       # maestro test app/maestro → smoke.yaml
+```
+
+- `build` again only when native code changes (a new module, a patch, an SDK bump): JS changes arrive through Metro, as on the dev iPad. `build --release` embeds the JS (no Metro; flows then run with `RIG_METRO_URL=''`).
+- `flows <file.yaml>` runs one flow; `flows --device B` runs on the second simulator. Each run creates its own project on the local server (`Maestro <month-day hour:minute>`), never on the Droplet.
+- **Offline:** `rig.sh server stop` makes the app offline from its point of view (edits queue, the status bar shows the pending count); `rig.sh server start` brings it back. `server reset` wipes the local data.
+- **Two iPads:** `rig.sh second` boots **Field Survey iPad B** with the same build; `open B`, then `flows --device B` or hand-driven steps on both.
+- **Screenshots:** `rig.sh shot [A|B] [file]` prints the file; Maestro keeps its own per failed step under `~/.maestro/tests/`.
+- **Logs:** Metro's terminal (press `j` for React Native DevTools, as on the iPad); the server's with `docker compose -f server/docker-compose.yml -f server/docker-compose.e2e.yml logs -f api`.
+- `rig.sh status` says what is booted, built and answering.
+
+### 6.3 Writing flows
+
+A flow is YAML (`app/maestro/README.md`): `tapOn: {id: nav.sync}` taps a control by its `testID`, `tapOn: Cancel` by visible text (a regex), `inputText`, `assertVisible`, `extendedWaitUntil`, `runFlow` for sub-flows, `${VAR}` for the values `rig.sh` passes. Rules:
+
+- Controls a flow taps carry `testID="<screen>.<element>"`; the shared `Btn` and `Field` in `app/src/setup/widgets.tsx` pass it through. Add IDs in the task that writes the flow, never a text match on wording that a vocab ruling could change.
+- A task whose checks the rig can prove adds a flow (or extends one) and lists it in `TASKS.md`; the on-device checklist keeps only what the iPad or Landry must prove.
+- Flows are unverified until they have run on the Mac: T151 is the first run, and its checks sit in `docs/ON_DEVICE_CHECKLIST.md` under T149.
+
+### 6.4 What a run of the rig cannot tell you
+
+The Simulator runs on the Mac's CPU and GPU: timings (`[plan] …`, `[rules] run`, the Sync screen's timing line) do not transfer to the iPad, and PDFKit's rendering of a heavy sheet feels different. Camera capture does not exist (the photo library does); Pencil pressure does not exist; `expo-updates` is off in a Debug build. Those stay in the checklist.

@@ -34,6 +34,9 @@ const SIDEBAR = [
   'Sync',
 ] as const;
 
+/** Sidebar test IDs for the Maestro flows (T149): `nav.levels`, `nav.cable-riser`, `nav.needs-review`, … `nav.sync`. */
+const navId = (name: string) => `nav.${name.toLowerCase().replace(/[^a-z]+/g, '-').replace(/-$/, '')}`;
+
 const CACHE_LABEL: Record<HomeLevel['cache'], string> = {
   cached: 'Cached',
   downloading: 'Downloading…',
@@ -93,52 +96,52 @@ export default function ProjectHomeScreen() {
     <View style={styles.root}>
       <View style={styles.sidebar}>
         <Text style={styles.brand}>Field Survey</Text>
-        <Link href="/projects" style={[styles.navItem, styles.navText]}>
+        <Link href="/projects" style={[styles.navItem, styles.navText]} testID="nav.projects">
           Projects
         </Link>
         {SIDEBAR.map((name) =>
           name === 'Sync' ? (
-            <Link key={name} href="/sync" style={[styles.navItem, styles.navText]}>
+            <Link key={name} href="/sync" style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : name === 'Cable / riser' && projectId ? (
-            <Link key={name} href={{ pathname: '/cables', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+            <Link key={name} href={{ pathname: '/cables', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : name === 'Needs review' && projectId ? (
-            <Link key={name} href={{ pathname: '/review', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+            <Link key={name} href={{ pathname: '/review', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : name === 'Dashboard' && projectId ? (
-            <Link key={name} href={{ pathname: '/dashboard', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+            <Link key={name} href={{ pathname: '/dashboard', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : name === 'Rulings' && projectId ? (
-            <Link key={name} href={{ pathname: '/rulings', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+            <Link key={name} href={{ pathname: '/rulings', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : name === 'Lint' && projectId ? (
-            <Link key={name} href={{ pathname: '/lint', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+            <Link key={name} href={{ pathname: '/lint', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : name === 'Export' && projectId ? (
-            <Link key={name} href={{ pathname: '/export', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+            <Link key={name} href={{ pathname: '/export', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : name === 'Vocabulary' && projectId ? (
-            <Link key={name} href={{ pathname: '/vocabulary', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+            <Link key={name} href={{ pathname: '/vocabulary', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : name === 'Library' && projectId ? (
-            <Link key={name} href={{ pathname: '/library', params: { project: projectId } }} style={[styles.navItem, styles.navText]}>
+            <Link key={name} href={{ pathname: '/library', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : name === 'Setup' && projectId ? (
-            <Link key={name} href={{ pathname: '/setup/[projectId]', params: { projectId } }} style={[styles.navItem, styles.navText]}>
+            <Link key={name} href={{ pathname: '/setup/[projectId]', params: { projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
               {name}
             </Link>
           ) : (
-            <View key={name} style={[styles.navItem, name === 'Levels' && styles.navActive]}>
+            <View key={name} style={[styles.navItem, name === 'Levels' && styles.navActive]} testID={navId(name)}>
               <Text style={[styles.navText, name !== 'Levels' && styles.navDim]}>{name}</Text>
             </View>
           ),
@@ -249,7 +252,7 @@ function LevelRow({ level: l, lock, onLock }: { level: HomeLevel; lock: LockLeve
   // Every level opens, sheet or not (T71): without a sheet the plan area says so and the lists still work.
   return (
     <Link href={{ pathname: '/plan/[levelId]', params: { levelId: l.id } }} asChild>
-      <Pressable>{cells}</Pressable>
+      <Pressable testID={`level.${l.code}`}>{cells}</Pressable>
     </Link>
   );
 }
