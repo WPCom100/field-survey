@@ -122,6 +122,9 @@ bash scripts/mac/rig.sh metro       # Metro for the Simulator, in its own termin
 bash scripts/mac/rig.sh flows       # maestro test app/maestro (smoke.yaml); screenshots in ~/.maestro/tests
 bash scripts/mac/rig.sh flows setup.yaml   # Sources (Files picker) → drafts → place → card → sync (app/maestro/README.md)
 bash scripts/mac/rig.sh two         # setup on A (Ann), peer on B (Bob), peer-back on A: one edit each way
+bash scripts/mac/rig.sh seed        # "Maestro master" from the master workbook, once per server lifetime (T154)
+bash scripts/mac/rig.sh pipeline    # "Maestro pipeline" (B2–06M, BOM + riser + 06M sheet), once per server lifetime
+bash scripts/mac/rig.sh log A '<regex>'    # the app's log lines; also media, scale, conflict (docs/ops.md §6.2)
 cd app && npx expo start --dev-client     # iPad with the dev build installed loads over Wi-Fi
 eas build --profile development --platform ios   # only when a native module changes
 eas submit --platform ios                        # TestFlight (D59)

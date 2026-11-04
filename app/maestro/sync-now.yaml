@@ -1,0 +1,6 @@
+# Relaunch keeping the store, then Sync now (T154): the "both sync" step of `rig.sh conflict`.
+appId: productions.luminarytechnology.fieldsurvey
+name: Sync now
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml

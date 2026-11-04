@@ -371,6 +371,8 @@ A flow is YAML (`app/maestro/README.md`): `tapOn: {id: nav.sync}` taps a control
 - **Off-screen is not there.** `tapOn` and `assertVisible` find only what is on the screen: a long list (Projects on a rig server that has lived a while, the mapping grid, Needs review's device list) needs `scrollUntilVisible` first (T154).
 - **`hideKeyboard` fails on the iPad keyboard**; tap a plain label on the form instead (T154, the add-device form).
 - **A row's text spans lines** when an item has a line break ("Gain access" + its Device text): the regex still matches across them, so match the distinctive part (`'.*Device "Walter Tower east wing" → link.*'`).
+- **Quote a value with a JS expression in it**: `id: "card.status.${SIDE == 'A' ? 'Issue' : 'No access'}"`; unquoted, the `' : '` reads as a YAML key and the flow does not parse (T154).
+- **A focused field's keyboard covers what is under it** (Quick actions' Apply on a long card): tap a plain label inside the same scroll view to close it, then tap (T154, `_card.yaml`).
 - **The Files picker can open slowly**: once it was still blank and half-sized two seconds after "dismiss popup" showed, and the sidebar tap landed outside it and closed it. `_pick-wait` pauses 5 s (T154).
 - **Answer every "Open in Field Survey?"**: a `rig.sh open` left unanswered stacks under the flow's own, and answering *Open* on a running app reloads its JS, which crashes the Debug dev client in expo-sqlite's FTS5 teardown (`exsqlite3_finalize` from `closeDatabase`, T151; follow-up T153). `_devclient` cancels a leftover one.
 

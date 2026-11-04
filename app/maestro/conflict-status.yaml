@@ -1,0 +1,20 @@
+# The edit half of `rig.sh conflict conflict-status.yaml conflict-check.yaml` (T154; wave 3 O2 builds
+# on it): with the server stopped, open PROJECT's first 06M device and set its status — `Issue` on A,
+# `Not installed` on B — without syncing. The status bar says the edit is queued.
+appId: productions.luminarytechnology.fieldsurvey
+name: Conflict — one device status, offline
+---
+- runFlow: _resume.yaml
+- runFlow: _open-device.yaml
+- tapOn:
+    id: "card.status.${SIDE == 'A' ? 'Issue' : 'Not installed'}"
+- assertVisible: "✓ ${SIDE == 'A' ? 'Issue' : 'Not installed'}"
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline · [1-9]\d* pending.*'
+    timeout: 60000

@@ -1,0 +1,20 @@
+# The check half of `rig.sh conflict` (T154): after A and then B synced, the device's status is in
+# review on both iPads (A's value official, D37) and Needs review lists one sync conflict.
+appId: productions.luminarytechnology.fieldsurvey
+name: Conflict — the status is in review
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml
+- runFlow: _open-device.yaml
+- assertVisible: ✓ Issue                 # A synced first: A's value is the official one
+- assertVisible: '.*in review.*'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.needs-review
+- assertVisible:
+    id: review.tab.sync_conflict
+    text: 'Sync conflict [1-9]\d*'
+- tapOn: ← Levels

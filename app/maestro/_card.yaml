@@ -19,6 +19,9 @@ appId: productions.luminarytechnology.fieldsurvey
     id: card.section.quick
 - tapOn:
     id: card.quick.E6
+# the "What was found" field takes focus and the keyboard covers Apply since the card grew (T154):
+# a tap on its label (a plain text in the card's scroll view) closes the keyboard
+- tapOn: 'What Was Found \(Optional\)'
 - tapOn:
     id: card.quick.apply
 - extendedWaitUntil:
