@@ -19,6 +19,7 @@ team Ann / Bob), never to the Droplet.
 | `additions.yaml` | `rig.sh flows additions.yaml` | F3 (T155): a new project with the 06M sheet; long-press → + Device: the eleven categories, a Station → `06M-S1`, a Sensor → `06M-D1` after the sync; + Note here; the card's ⋯: Move pin…, Put back in the unplaced list… ("Placed by mistake"), Place pin…, Delete… → Restore…, each in History with who and why; Not found on site (once in the Notes, no item), Spot-check fixed, Non-ETC device, Relocated (about 6 min) |
 | `place.yaml` | `rig.sh flows place.yaml` | F4 (T155): a fresh copy of the master plus the 06M sheet; hand drafts on 06M (MAESTRO-EQ ×1 with an N cable from 06M-04 confirmed while it waits, MAESTRO-ST ×2, MAESTRO-SN ×2); Needs review's "Not on the plan, 06M: 4 devices and 5 to place from drafts", the Devices tab's Place ▸, ⊕ Place; ↶ Undo for a draft unit and for 06M-03 (keeps C/13 and its Room), only the latest, none after ◀ Done placing; MAESTRO-EQ placed → "1 waiting cable made", its end Not installed, Put back… → 06M-04 shows "(draft on 06M, not placed yet)" → placed again: the end still Not installed, `Cable / riser (81)`; Flag → Move to… 04, and to the pool with one unit placed; Review drafts: basis `manual` / `project_pool`; a spot left unconfirmed writes nothing |
 | `place-two-setup.yaml`, `place-two-peer.yaml`, `place-two-edit.yaml`, `place-two-check.yaml` | `rig.sh place-two` | F4 two-iPad half (T46): A pools a Station draft ×2 and syncs, B opens the 06M plan; with the server stopped each places one unit; after A then B sync, both see `06M-S1` and `06M-S2`, `Pool 0`, no sync conflict |
+| `offline-setup.yaml`, `offline-edit.yaml`, `offline-check.yaml` | `rig.sh offline` | O1 (T156): a fresh copy of the master; with the server stopped (status bar `Offline`) 06M-03 No access and a note, 06M-01's IP and DMX address, C-23 Not installed with its R3a Run and R4b kit drafts accepted, Confirm endpoint in Cables, a Lint finding dismissed, B2 locked, Dashboard and Rulings open, the Sync screen's Pending edits n; server back: `Synced` with nothing pending, the card still shows them, and `rig.sh` finds an applied op of each kind on the server (`client_ts` in the offline window) |
 
 | Sub-flow | Walks |
 |---|---|
@@ -52,6 +53,9 @@ team Ann / Bob), never to the Droplet.
 | `_place-draft.yaml` | Review drafts: + Draft device `MODEL`, `CAT`, `QTY` on 06M → Add draft → Accept |
 | `_place-one.yaml` | in the open place panel: row `ROW` → tap `AT` → Place ✓ → the "Placed …" row reads `PLACED` |
 | `_place-drafts.yaml`, `_place-entry.yaml`, `_place-undo.yaml`, `_place-waiting.yaml`, `_place-flag.yaml` | the steps of `place.yaml` |
+| `_card-address.yaml` | on an open card: the address `KIND` (`ip` or `dmx`) typed as `VALUE`, saved with Return; repeats the Type… tap clear of the card's fixed header when the input did not open |
+| `_lint-dismiss.yaml` | Lint → fold "Drafts with no device" → the first finding → Dismiss… → a chip reason → `Dismissed 1` |
+| `_logbox-open.yaml` | dismisses the dev client's full error log when the T161 toast took a tap and opened it (`_logbox` runs it first) |
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a
 regex on what is visible. A flow for a new screen gets its `testID`s in the same task.

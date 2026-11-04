@@ -4,6 +4,7 @@
 # What the error said stays in the app's log: `rig.sh log A '<regex>'`.
 appId: productions.luminarytechnology.fieldsurvey
 ---
+- runFlow: _logbox-open.yaml   # the full log, opened by a tap the toast took (T156)
 - runFlow:
     when:
       visible: '!, .* ERROR .*'

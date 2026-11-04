@@ -1265,7 +1265,7 @@ export function PlanScreen(props: PlanScreenProps) {
                   </Pressable>
                 ) : null}
                 {canInk && !drawing ? (
-                  <Pressable style={styles.tool} onPress={() => startDrawing('pen')}>
+                  <Pressable style={styles.tool} onPress={() => startDrawing('pen')} testID="plan.ink">
                     <Text style={styles.toolText}>✎ Ink</Text>
                   </Pressable>
                 ) : null}
@@ -1766,8 +1766,8 @@ function InkBar(props: {
           <Text style={styles.inkBtnText}>↶ Undo</Text>
         </Pressable>
         <View style={styles.spacer} />
-        {saveText ? <Text style={[styles.inkNote, props.save === 'error' && styles.inkErr]}>{saveText}</Text> : null}
-        <Pressable onPress={props.onDone} style={[styles.inkBtn, styles.inkDone]}>
+        {saveText ? <Text style={[styles.inkNote, props.save === 'error' && styles.inkErr]} testID="ink.save">{saveText}</Text> : null}
+        <Pressable onPress={props.onDone} style={[styles.inkBtn, styles.inkDone]} testID="ink.done">
           <Text style={[styles.inkBtnText, styles.inkBtnTextOn]}>Done</Text>
         </Pressable>
       </View>

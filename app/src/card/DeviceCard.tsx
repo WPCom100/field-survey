@@ -337,11 +337,11 @@ export function DeviceCard(props: DeviceCardProps) {
         {card.device.needsIpAddress || card.device.ipAddress ? <AddressSection kind="ip" card={card} store={store} readOnly={readOnly} run={run} /> : null}
         {card.device.needsDmxAddress || card.device.dmxAddress ? <AddressSection kind="dmx" card={card} store={store} readOnly={readOnly} run={run} /> : null}
 
-        <Section title={`Photos (${card.photos.length})`} marks={card.photosWaiting ? `📷 ${card.photosWaiting} waiting` : ''}>
+        <Section title={`Photos (${card.photos.length})`} marks={card.photosWaiting ? `📷 ${card.photosWaiting} waiting` : ''} testID="card.section.photos">
           <PhotoStrip photos={card.photos} resolveBlobUri={props.resolveBlobUri} onOpen={props.onOpenPhoto} />
           <View style={styles.rowWrap}>
             <SmallButton label="📷 Camera" disabled={readOnly || !props.onPhoto} onPress={() => props.onPhoto?.('camera')} />
-            <SmallButton label="🖼 Library" disabled={readOnly || !props.onPhoto} onPress={() => props.onPhoto?.('library')} />
+            <SmallButton label="🖼 Library" disabled={readOnly || !props.onPhoto} onPress={() => props.onPhoto?.('library')} testID="card.photo.library" />
           </View>
         </Section>
 
@@ -682,8 +682,8 @@ function AddressSection({ kind, card, store, readOnly, run }: { kind: 'ip' | 'dm
       {typing === null ? (
         readOnly ? null : (
           <View style={styles.rowWrap}>
-            <SmallButton label="Type…" onPress={() => setTyping(value ?? '')} />
-            {value ? <SmallButton label="Clear" onPress={() => void clear()} /> : null}
+            <SmallButton label="Type…" onPress={() => setTyping(value ?? '')} testID={`card.${kind}.type`} />
+            {value ? <SmallButton label="Clear" onPress={() => void clear()} testID={`card.${kind}.clear`} /> : null}
           </View>
         )
       ) : (
@@ -701,8 +701,9 @@ function AddressSection({ kind, card, store, readOnly, run }: { kind: 'ip' | 'dm
               maxLength={20}
               returnKeyType="done"
               onSubmitEditing={() => check && !check.error && void save()}
+              testID={`card.${kind}.input`}
             />
-            <SmallButton label={dupes.length ? 'Save anyway' : 'Save'} disabled={!check || !!check.error} onPress={() => void save()} />
+            <SmallButton label={dupes.length ? 'Save anyway' : 'Save'} disabled={!check || !!check.error} onPress={() => void save()} testID={`card.${kind}.save`} />
             <SmallButton label="Cancel" onPress={() => setTyping(null)} />
           </View>
           {check && typing ? <Text style={check.error ? styles.error : styles.muted}>{check.error ?? `${check.value} ✓`}</Text> : null}

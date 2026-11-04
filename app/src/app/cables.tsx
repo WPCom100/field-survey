@@ -251,7 +251,11 @@ export default function CablesScreen() {
             // a selected cable that left the list was deleted (T138): its devices' History restores it
             <Text style={styles.empty}>{selected && data ? 'This cable is deleted. Restore it from the History of a device at either end.' : 'Select a cable.'}</Text>
           )}
-          {note ? <Text style={styles.note}>{note}</Text> : null}
+          {note ? (
+            <Text style={styles.note} testID="cables.note">
+              {note}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -271,7 +275,7 @@ export default function CablesScreen() {
 
 function CableLine({ row: r, on, picked, onPress }: { row: CableRow; on: boolean; picked: boolean | null; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[styles.tr, on && styles.rowOn]}>
+    <Pressable onPress={onPress} style={[styles.tr, on && styles.rowOn]} testID="cables.row">
       {picked != null ? <Text style={styles.tick}>{picked ? '☑' : '☐'}</Text> : null}
       <Text style={styles.cCode} numberOfLines={1}>
         {r.code ?? '?'}
@@ -322,7 +326,7 @@ function CableChecks({ row: r, names, canEdit, onConfirm, projectId }: { row: Ca
       )}
       {r.checks.length ? <Text style={styles.muted}>{[...new Set(r.checks.map((k) => CABLE_CHECKS.find((c) => c.id === k.id)!.hint))].join(' ')}</Text> : null}
       <View style={styles.btnRow}>
-        {!r.endpointConfirmed ? <Btn label="Confirm endpoint" small disabled={!canEdit} onPress={onConfirm} /> : <Text style={styles.muted}>Endpoint confirmed{r.origin ? ` · origin ${r.origin}` : ''}</Text>}
+        {!r.endpointConfirmed ? <Btn label="Confirm endpoint" small disabled={!canEdit} onPress={onConfirm} testID="cables.confirm" /> : <Text style={styles.muted}>Endpoint confirmed{r.origin ? ` · origin ${r.origin}` : ''}</Text>}
         {r.reviewItemId && projectId ? <Btn label="Open Needs review item ▸" small plain onPress={() => router.push({ pathname: '/review', params: { project: projectId, item: r.reviewItemId! } })} /> : null}
       </View>
     </View>
@@ -337,9 +341,9 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
   );
 }
 
-function Btn({ label, onPress, disabled, plain, small }: { label: string; onPress: () => void; disabled?: boolean; plain?: boolean; small?: boolean }) {
+function Btn({ label, onPress, disabled, plain, small, testID }: { label: string; onPress: () => void; disabled?: boolean; plain?: boolean; small?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, plain && styles.btnPlain, small && styles.btnSmall, disabled && styles.off]} accessibilityRole="button">
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, plain && styles.btnPlain, small && styles.btnSmall, disabled && styles.off]} accessibilityRole="button" testID={testID}>
       <Text style={[styles.btnText, plain && styles.btnTextPlain, small && styles.btnTextSmall]}>{label}</Text>
     </Pressable>
   );

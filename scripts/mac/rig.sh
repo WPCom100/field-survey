@@ -69,6 +69,18 @@ usage: bash scripts/mac/rig.sh <command>
                         (sync-now.yaml), then [check-flow] on A and on B
   place-two             F4 two-iPad half: place-two-setup.yaml on A, place-two-peer.yaml on B, then
                         conflict place-two-edit.yaml place-two-check.yaml (one unit each, offline)
+  offline [setup edit check [entity:field ...]]
+                        O1 (T156): setup on A online, server stop, edit, server start, check; then the
+                        server must hold an applied op of each entity:field made while it was stopped
+                        (default offline-setup/-edit/-check.yaml and every kind of edit O1 makes)
+  conflicts             O2 (T156): offline-setup.yaml on A, conflicts-peer.yaml on B, then conflict
+                        conflicts-edit.yaml conflicts-check.yaml (a status, a ruling against a hand
+                        note, an app-library type; A resolves each with Choose B)
+  same-user             O3 (T156): A and B both as Ann; same-user-setup.yaml, -peer.yaml, then conflict
+                        same-user-edit.yaml same-user-check.yaml with RIG_PEER=Ann; A's log must read
+                        ink_merged (both strokes kept)
+  resume                O4 (T156): media on A, then offline resume-setup.yaml resume-edit.yaml
+                        resume-check.yaml (a kill and a re-sign-in before the sync keep the edits)
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
      RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
@@ -237,8 +249,11 @@ cmd_flows() {
       *) flow="$1"; shift ;;
     esac
   done
-  # flows that upload (Setup → Sources) pick these from the Files app by position (T151)
-  if grep -q "_sources.yaml" "$ROOT/app/maestro/${flow:-smoke.yaml}" 2>/dev/null; then
+  # flows that upload (Setup → Sources) pick these from the Files app by position (T151); also
+  # through one of their sub-flows (_sheet-station.yaml, T156)
+  if grep -q "_sources.yaml" "$ROOT/app/maestro/${flow:-smoke.yaml}" 2>/dev/null \
+    || grep -o '_[a-z-]*\.yaml' "$ROOT/app/maestro/${flow:-smoke.yaml}" 2>/dev/null | sort -u \
+      | while read -r sub; do grep -q "_sources.yaml" "$ROOT/app/maestro/$sub" 2>/dev/null && echo y; done | grep -q y; then
     cmd_files "$dev" fixtures/DaVinci_categories.xlsx fixtures/davinci-library-sample.json \
       "fixtures/Level_06M_-_Lighting_Composite_vector.pdf"
   fi
@@ -426,23 +441,91 @@ cmd_conflict() {  # <edit-flow> [check-flow]: both iPads edit offline, then both
   [ -n "$edit" ] || die "conflict <edit-flow> [check-flow]: the edit flow resumes the app (no clearState) and edits without syncing"
   [ -n "${RIG_PROJECT:-}" ] || die "conflict needs RIG_PROJECT: a project already on both simulators (e.g. after 'RIG_PROJECT=… rig.sh two')"
   server_up
-  say "conflict on \"$PROJECT\": $edit offline on A (Ann) and B (Bob), then A syncs, then B"
+  local peer="${RIG_PEER:-Bob}"   # RIG_PEER=Ann: one user on both iPads (O3, D37)
+  say "conflict on \"$PROJECT\": $edit offline on A (Ann) and B ($peer), then A syncs, then B"
   cmd_server stop
   # whatever happens, the server comes back: a stopped api leaves every later run offline
   trap 'cmd_server start >/dev/null 2>&1 || true' EXIT
   USER_NAME=Ann SIDE=A cmd_flows --device A "$edit"
-  USER_NAME=Bob SIDE=B cmd_flows --device B "$edit"
+  USER_NAME="$peer" SIDE=B cmd_flows --device B "$edit"
   cmd_server start
   trap - EXIT
   for _ in $(seq 1 30); do curl -fsS "$SERVER_URL/health" >/dev/null 2>&1 && break; sleep 1; done
   server_up
   USER_NAME=Ann SIDE=A cmd_flows --device A sync-now.yaml
-  USER_NAME=Bob SIDE=B cmd_flows --device B sync-now.yaml
+  USER_NAME="$peer" SIDE=B cmd_flows --device B sync-now.yaml
   if [ -n "$check" ]; then
     USER_NAME=Ann SIDE=A cmd_flows --device A "$check"
-    USER_NAME=Bob SIDE=B cmd_flows --device B "$check"
+    USER_NAME="$peer" SIDE=B cmd_flows --device B "$check"
   fi
   say "conflict: green"
+}
+
+server_ops() {  # project name, from, to (UTC) -> "<entity_kind>:<field or kind> <state> <count>" of the ops the server holds
+  # the window is the ops' client_ts: the simulators share the Mac's clock (T156)
+  printf "%s\n" "select o.entity_kind || ':' || coalesce(o.field, o.kind), o.state, count(*)
+    from op o join project p on p.id = o.project_id
+    where p.name = :'name' and o.client_ts >= :'t0' and o.client_ts <= :'t1'
+    group by 1, 2 order by 1, 2;" \
+  | $COMPOSE exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -F" " -v ON_ERROR_STOP=1 -v name="$1" -v t0="$2" -v t1="$3"' \
+      psql "$1" "$2" "$3"
+}
+
+cmd_conflicts() {  # O2 (T156): a device field, a ruling against a hand edit and an app-library type, on two iPads offline
+  cmd_second
+  say "conflicts on \"$PROJECT\": A (Ann) makes a seed copy, B (Bob) opens it, both edit the same fields offline, A resolves"
+  USER_NAME=Ann cmd_flows --device A offline-setup.yaml
+  USER_NAME=Bob cmd_flows --device B conflicts-peer.yaml
+  RIG_PROJECT="$PROJECT" cmd_conflict conflicts-edit.yaml conflicts-check.yaml
+  say "conflicts: green"
+}
+
+cmd_same_user() {  # O3 (T156): one user on two iPads, the same field and the same ink layer offline
+  cmd_second
+  say "same-user on \"$PROJECT\": A and B both as Ann; one status and Ann's ink layer edited on both offline"
+  USER_NAME=Ann cmd_flows --device A same-user-setup.yaml
+  USER_NAME=Ann cmd_flows --device B same-user-peer.yaml
+  RIG_PEER=Ann RIG_PROJECT="$PROJECT" cmd_conflict same-user-edit.yaml same-user-check.yaml
+  say "ink merges in the app logs (A, then B):"
+  ( cmd_log A 'ink_merged' ) || die "no ink_merged line on A: the two writes of Ann's layer were not merged"
+  ( cmd_log B 'ink_merged' ) || say "(no merge line on B: A's merge reached it already merged)"
+  say "same-user: green"
+}
+
+cmd_resume() {  # O4 (T156): edits and a photo survive a kill and a re-sign-in while offline, then drain
+  cmd_media A
+  cmd_offline resume-setup.yaml resume-edit.yaml resume-check.yaml device:status device:notes photo:create
+  say "resume: green"
+}
+
+O1_EXPECT="device:status device:notes device:ip_address device:dmx_address cable_end:status punch_item:create missing_part:create cable:endpoint_confirmed finding:state level:state"
+
+cmd_offline() {  # [setup edit check [entity:field ...]]: edits made with the server stopped drain when it is back (rig plan O1, O4)
+  local setup="${1:-offline-setup.yaml}" edit="${2:-offline-edit.yaml}" check="${3:-offline-check.yaml}" t0 t1 ops want missing=""
+  [ $# -ge 3 ] && shift 3 || set --
+  want="${*:-$O1_EXPECT}"
+  server_up
+  say "offline on \"$PROJECT\": $setup online, $edit with the server stopped, $check once it is back"
+  USER_NAME=Ann cmd_flows --device A "$setup"
+  t0="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  cmd_server stop
+  trap 'cmd_server start >/dev/null 2>&1 || true' EXIT
+  USER_NAME=Ann cmd_flows --device A "$edit"
+  t1="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  cmd_server start
+  trap - EXIT
+  for _ in $(seq 1 30); do curl -fsS "$SERVER_URL/health" >/dev/null 2>&1 && break; sleep 1; done
+  server_up
+  USER_NAME=Ann cmd_flows --device A "$check"
+  cd "$ROOT/server"
+  ops="$(server_ops "$PROJECT" "$t0" "$t1")"
+  say "the server's ops made between $t0 and $t1 (entity:field state count):"
+  printf '%s\n' "$ops" | sed 's/^/  /'
+  for w in $want; do
+    printf '%s\n' "$ops" | grep -q "^$w applied " || missing="$missing $w"
+  done
+  [ -z "$missing" ] || die "made offline but not applied on the server:$missing"
+  say "offline: green (every kind of edit drained: $want)"
 }
 
 cmd_place_two() {  # F4 two-iPad half (T46): one pooled draft, one unit placed on each iPad offline
@@ -480,6 +563,10 @@ case "${1:-}" in
   log) shift; cmd_log "$@" ;;
   conflict) shift; cmd_conflict "$@" ;;
   place-two) cmd_place_two ;;
+  offline) shift; cmd_offline "$@" ;;
+  conflicts) cmd_conflicts ;;
+  same-user) cmd_same_user ;;
+  resume) cmd_resume ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;
 esac

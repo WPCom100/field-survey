@@ -36,6 +36,14 @@ appId: productions.luminarytechnology.fieldsurvey
 - runFlow: _logbox.yaml     # T161's toast took this tap once and opened the dev log instead
 - tapOn:
     id: seed.import
+# ...and once more since (T156): the log opened over the screen, so close it and tap again
+- runFlow:
+    when:
+      visible: Console Error
+    commands:
+      - runFlow: _logbox-open.yaml
+      - tapOn:
+          id: seed.import
 - scrollUntilVisible:
     element:
       id: seed.status

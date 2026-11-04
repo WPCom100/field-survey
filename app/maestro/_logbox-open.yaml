@@ -1,0 +1,11 @@
+# When T161's toast took a tap and opened the dev client's full error log ("Console Error",
+# "Log n of n"), Dismiss it; the caller then repeats its tap (T156: the seed copy's Import once).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    when:
+      visible: Console Error
+    commands:
+      - tapOn: Dismiss
+      - waitForAnimationToEnd:
+          timeout: 3000

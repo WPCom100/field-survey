@@ -1,0 +1,9 @@
+# O1 step 1 of `rig.sh offline` (T156, rig plan wave 3), online: a fresh copy of the master in
+# PROJECT (`_seed-copy`), synced, so the edit step works on the iPad's local copy with the server off.
+appId: productions.luminarytechnology.fieldsurvey
+name: Offline — a seed copy to edit
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow: _sync.yaml

@@ -1,0 +1,29 @@
+# Lint: the first open finding dismissed with a chip reason → "Dismissed 1" (T156). The rule drafts
+# with no device (T100) come first and can fill the list: their group is folded before the tap.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.lint
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · 0 dismissed.*\)'
+    timeout: 30000
+- runFlow:
+    when:
+      visible: '▾ Drafts with no device \(\d+\)'
+    commands:
+      - tapOn: '▾ Drafts with no device \(\d+\)'
+- tapOn:
+    id: lint.row
+    index: 0
+- tapOn:
+    id: lint.dismiss
+- tapOn: 'Checked on site: correct as is'
+- tapOn:
+    id: lint.dismiss.ok
+- assertVisible:
+    id: lint.note
+    text: 'Dismissed: .*'
+- assertVisible:
+    id: lint.show.dismissed
+    text: Dismissed 1
+- tapOn: ← Levels

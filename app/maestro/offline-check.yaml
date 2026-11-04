@@ -1,0 +1,40 @@
+# O1 step 3 of `rig.sh offline` (T156), the server back: the queued edits drain — Synced with
+# nothing pending and nothing refused — and the local copy still shows them. `rig.sh offline` then
+# reads the server's op table for each kind of edit made while it was stopped.
+appId: productions.luminarytechnology.fieldsurvey
+name: Offline — the edits drained
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Synced [^·]*'      # no " · n pending", no " · n need attention"
+    timeout: 60000
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-03
+- assertVisible: ✓ No access
+- assertVisible: Offline O1 note
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.device.06M-01
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.dmx.type
+- assertVisible: 10.101.4.23
+- assertVisible: '1/0*1'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.lint
+- assertVisible:
+    id: lint.show.dismissed
+    text: Dismissed 1
+- tapOn: ← Levels

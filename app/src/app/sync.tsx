@@ -6,6 +6,7 @@ import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View 
 import { getBlobFiles, getBlobQueue } from '../blobs/queue';
 import { useBlobStatus } from '../blobs/useBlobStatus';
 import { openAppStore } from '../db';
+import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
 import { useIdentity, useSignOut } from '../identity/IdentityGate';
 import { exportLog } from '../log';
@@ -40,7 +41,11 @@ export default function SyncScreen() {
 
   const load = useCallback(async () => {
     const store = await openAppStore();
-    const [project] = await listProjects(store);
+    // the project the home shows (T83), not the first on the iPad: with several projects these
+    // were another project's counts (T156: "0" pending under a status bar reading "22 pending")
+    const projects = await listProjects(store);
+    const current = pickProject(projects.map((p) => p.id));
+    const project = projects.find((p) => p.id === current);
     setInstallId(store.installId);
     setProjectId(project?.id ?? null);
     if (!labelFocused) setLabel((await loadInstallLabels(store)).get(store.installId) ?? '');

@@ -149,8 +149,8 @@ export default function LintScreen() {
         <Chip label="Check" on={groupBy === 'check'} onPress={() => setGroupBy('check')} />
         <Chip label="Level" on={groupBy === 'level'} onPress={() => setGroupBy('level')} />
         <Text style={[styles.filterLabel, styles.gap]}>Show</Text>
-        <Chip label="Open" on={!dismissed} onPress={() => setDismissed(false)} />
-        <Chip label={`Dismissed ${view?.dismissed ?? 0}`} on={dismissed} onPress={() => setDismissed(true)} />
+        <Chip label="Open" on={!dismissed} onPress={() => setDismissed(false)} testID="lint.show.open" />
+        <Chip label={`Dismissed ${view?.dismissed ?? 0}`} on={dismissed} onPress={() => setDismissed(true)} testID="lint.show.dismissed" />
       </View>
 
       <View style={styles.body}>
@@ -190,7 +190,7 @@ export default function LintScreen() {
                 ))}
               </View>
             ) : (
-              <Pressable onPress={() => setSelected(item.row.id)} style={[styles.row, item.row.id === selected && styles.rowOn]}>
+              <Pressable onPress={() => setSelected(item.row.id)} style={[styles.row, item.row.id === selected && styles.rowOn]} testID="lint.row">
                 <Text style={styles.rowTitle} numberOfLines={1}>
                   {item.row.subject}
                 </Text>
@@ -221,7 +221,11 @@ export default function LintScreen() {
         />
         <ScrollView style={styles.panel} contentContainerStyle={styles.panelBody}>
           {row ? <Detail row={row} canEdit={!!engine} onAct={act} /> : <Text style={styles.empty}>Select a finding.</Text>}
-          {note ? <Text style={styles.note}>{note}</Text> : null}
+          {note ? (
+            <Text style={styles.note} testID="lint.note">
+              {note}
+            </Text>
+          ) : null}
         </ScrollView>
       </View>
     </View>
@@ -290,9 +294,9 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
       <View style={styles.btnRow}>
         {r.levelId ? <Btn label={r.deviceId ? 'Open card ▸' : 'Open level ▸'} onPress={openCard} /> : null}
         {r.state === 'open' ? (
-          <Btn label="Dismiss…" onPress={() => setDismissing(true)} disabled={!canEdit || dismissing} />
+          <Btn label="Dismiss…" onPress={() => setDismissing(true)} disabled={!canEdit || dismissing} testID="lint.dismiss" />
         ) : (
-          <Btn label="Reopen" onPress={() => onAct('reopen', r)} disabled={!canEdit} />
+          <Btn label="Reopen" onPress={() => onAct('reopen', r)} disabled={!canEdit} testID="lint.reopen" />
         )}
       </View>
       {dismissing ? (
@@ -303,10 +307,10 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
               <Chip key={c} label={c} on={reason === c} onPress={() => setReason(c)} />
             ))}
           </View>
-          <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="Reason (required)" multiline />
+          <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="Reason (required)" multiline testID="lint.reason" />
           <Text style={styles.sub}>Dismissed findings come back if their facts change (D178).</Text>
           <View style={styles.btnRow}>
-            <Btn label="Dismiss" disabled={!reason.trim()} onPress={() => onAct('dismiss', r, reason)} />
+            <Btn label="Dismiss" disabled={!reason.trim()} onPress={() => onAct('dismiss', r, reason)} testID="lint.dismiss.ok" />
             <Btn label="Cancel" onPress={() => setDismissing(false)} />
           </View>
         </View>
@@ -315,17 +319,17 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
   );
 }
 
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
+    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
       <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
     </Pressable>
   );
 }
 
-function Btn({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+function Btn({ label, onPress, disabled, testID }: { label: string; onPress: () => void; disabled?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled && styles.off]} accessibilityRole="button">
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled && styles.off]} accessibilityRole="button" testID={testID}>
       <Text style={styles.btnText}>{label}</Text>
     </Pressable>
   );

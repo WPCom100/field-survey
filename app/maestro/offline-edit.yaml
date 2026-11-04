@@ -1,0 +1,117 @@
+# O1 step 2 of `rig.sh offline` (T156), with the server stopped: every kind of edit on PROJECT's
+# local copy, none blocked — 06M-03's status and note; 06M-01's IP and DMX address; C-23's end
+# Not installed and its R3a Run and R4b kit drafts accepted (`_ends-run`); one cable's endpoint
+# confirmed (Cables); one finding dismissed (Lint); B2 locked (Setup → 6 Lock baseline). Dashboard,
+# Cables, Lint and Rulings open on local data. The Sync screen counts the edits as pending.
+appId: productions.luminarytechnology.fieldsurvey
+name: Offline — every kind of edit, server stopped
+---
+- runFlow: _resume.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline.*'
+    timeout: 60000
+
+# a status and a note
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-03
+- tapOn:
+    id: card.status.No access
+- assertVisible: ✓ No access
+- tapOn:
+    id: card.notes
+- inputText: Offline O1 note
+- pressKey: Enter
+- tapOn:
+    id: card.close
+
+# an IP and a DMX address (06M-01 has N and X runs, so the card asks for both, T146)
+- tapOn:
+    id: plan.device.06M-01
+- runFlow:
+    file: _card-address.yaml
+    env:
+      KIND: ip
+      VALUE: 10.101.4.23
+- assertVisible: 10.101.4.23
+- runFlow:
+    file: _card-address.yaml
+    env:
+      KIND: dmx
+      VALUE: 1/001
+- assertVisible: '1/0*1'
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.section.connections
+
+# an end status and two accepted drafts (a punch item and a missing part made offline)
+- runFlow: _ends-run.yaml
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# Cables: Confirm endpoint on the first cable → one less unconfirmed
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: 'Cable / riser \(\d+\)'
+    timeout: 30000
+- copyTextFrom:
+    text: '.*unconfirmed endpoint \d+.*'
+- evalScript: ${output.unconfirmed = parseInt(maestro.copiedText.match(/unconfirmed endpoint (\d+)/)[1])}
+- tapOn:
+    id: cables.row
+    index: 0
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: cables.confirm
+- tapOn:
+    id: cables.confirm
+- assertVisible:
+    id: cables.note
+    text: 'Endpoint confirmed: .*'
+- assertVisible: '.*unconfirmed endpoint ${output.unconfirmed - 1}.*'
+- tapOn: ← Levels
+
+# Lint: dismiss the first open finding with a reason
+- runFlow: _lint-dismiss.yaml
+
+# Setup → 6 Lock baseline: lock B2 (it has warnings, so the dialog says Lock anyway)
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.lock
+- tapOn: 'Lock B2( ⚠)?'
+- tapOn: 'Lock anyway|Lock B2'
+- extendedWaitUntil:
+    visible: '🔒 Locked.*'
+    timeout: 10000
+- tapOn:
+    id: setup.home
+
+# every screen still opens on the local data
+- tapOn:
+    id: nav.dashboard
+- assertVisible: Dashboard
+- assertVisible: '.*\(local data\)'
+- tapOn: ← Levels
+- tapOn:
+    id: nav.rulings
+- assertVisible: 'Rulings \(\d+ standing · \d+ applied\)'
+- tapOn: ← Levels
+
+# the edits wait in the outbox
+- tapOn:
+    id: nav.sync
+- assertVisible: '[1-9]\d* · oldest .*'
+- tapOn: ← Levels
+- assertVisible:
+    id: status.bar
+    text: 'Offline · [1-9]\d* pending.*'

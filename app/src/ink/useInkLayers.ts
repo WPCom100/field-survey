@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { prepareText, readCachedText, register } from '../blobs/store-bytes';
+import { logTo } from '../log';
 import { UNDO_LIMIT } from './history';
 import { INK_MERGE_PREFIX, listToSave, loadInkLayers, ownLayer, reconcileInkLayer, saveInkLayer } from './model';
 
@@ -141,7 +142,8 @@ export function useInkLayers(opts: {
             const sha = (await prepareText(serializeStrokeList(r.merged), 'ink')).sha256;
             if (sha !== row.blob) {
               const w = await writeBlob(row.id, r.merged, `${INK_MERGE_PREFIX}${r.mergedOpIds.join(',')}`);
-              console.log(`[plan] ink: merged ${r.mergedOpIds.length} concurrent write(s) into layer ${row.id.slice(-4)}`);
+              // to the log file too, so the rig can read it (`rig.sh log A ink_merged`, T156)
+              logTo('plan', 'info', 'ink_merged', { writes: r.mergedOpIds.length, layer: row.id.slice(-4) });
               row.blob = w.sha256;
             }
           }
@@ -181,7 +183,7 @@ export function useInkLayers(opts: {
           setError('Waiting for the newest copy of a layer to download before saving it.');
           return;
         }
-        if (next !== mine) console.log(`[plan] ink: layer ${l.layerId?.slice(-4)} changed elsewhere; merged before saving`);
+        if (next !== mine) logTo('plan', 'info', 'ink_merged_before_save', { layer: l.layerId?.slice(-4) ?? null });
         const w = await writeBlob(l.layerId, next);
         const cur = layers.current.get(key);
         if (!cur) continue;

@@ -407,8 +407,8 @@ function Panel({ detail: d, canEdit, onResolve }: { detail: ReviewDetail; canEdi
             <Btn label="Resolve on the plan ▸ (A solid, B dashed)" onPress={() => openOnPlan(true)} disabled={!d.row.levelId} />
           ) : null}
           <View style={styles.btnRow}>
-            <Btn label="Choose A" onPress={() => onResolve({ choice: 'A' })} disabled={!canEdit} />
-            <Btn label="Choose B" onPress={() => onResolve({ choice: 'B' })} disabled={!canEdit} />
+            <Btn label="Choose A" onPress={() => onResolve({ choice: 'A' })} disabled={!canEdit} testID="review.choose.A" />
+            <Btn label="Choose B" onPress={() => onResolve({ choice: 'B' })} disabled={!canEdit} testID="review.choose.B" />
             {d.choices.includes('combine') ? (
               <Btn label={combine === null ? 'Combine ▸' : 'Combine ▾'} onPress={() => setCombine(combine === null ? (d.combine ?? '') : null)} disabled={!canEdit} />
             ) : null}

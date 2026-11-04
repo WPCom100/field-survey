@@ -1,0 +1,44 @@
+# On an open card: the address KIND (ip | dmx) typed as VALUE and saved with Return (T156, T146).
+# After the IP field the card can rest with DMX's Type… just under its fixed header: Maestro counts
+# it visible, but the tap hits the header (T156: DMX right after IP, every time). When the input
+# does not open, _side-up brings Type… down clear of the header and the tap is repeated.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.${KIND}.type
+- tapOn:
+    id: card.${KIND}.type
+- extendedWaitUntil:
+    visible:
+      id: card.${KIND}.input
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: card.${KIND}.input
+    commands:
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - runFlow:
+          file: _side-up.yaml
+          env:
+            ID: card.${KIND}.type
+      - tapOn:
+          id: card.${KIND}.type
+      - extendedWaitUntil:
+          visible:
+            id: card.${KIND}.input
+          timeout: 5000
+- tapOn:
+    id: card.${KIND}.input
+- inputText: ${VALUE}
+- pressKey: Enter
+- extendedWaitUntil:
+    notVisible:
+      id: card.${KIND}.input
+    timeout: 10000

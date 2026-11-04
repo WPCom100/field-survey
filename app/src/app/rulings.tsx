@@ -157,7 +157,7 @@ export default function RulingsScreen() {
           ← Levels
         </Link>
         <View style={{ flex: 1 }} />
-        <Btn label="+ New ruling" onPress={() => setMode({ kind: 'edit', draft: emptyDraft(), source: null })} disabled={!engine} />
+        <Btn label="+ New ruling" onPress={() => setMode({ kind: 'edit', draft: emptyDraft(), source: null })} disabled={!engine} testID="rulings.new" />
       </View>
       <View style={styles.body}>
         <FlatList
@@ -255,7 +255,7 @@ export default function RulingsScreen() {
               ) : (
                 <Text style={styles.empty}>Select a ruling, or + New ruling. From the Lint view, &quot;Fix all via ruling&quot;; from a level&apos;s lists, Select → &quot;Apply as ruling…&quot;.</Text>
               )}
-              {note ? <Text style={styles.note}>{note}</Text> : null}
+              {note ? <Text style={styles.note} testID="rulings.note">{note}</Text> : null}
             </ScrollView>
           )}
         </View>
@@ -294,7 +294,7 @@ function EditorPanel({
     <>
       <Text style={styles.panelTitle}>New ruling{source ? ` · from ${source}` : ''}</Text>
       <Label text="Reason" />
-      <TextInput style={styles.input} value={d.text} onChangeText={(text) => onChange({ ...d, text })} placeholder="0-10V rows read Fixtures (the Change Log's Reason)" />
+      <TextInput style={styles.input} value={d.text} onChangeText={(text) => onChange({ ...d, text })} placeholder="0-10V rows read Fixtures (the Change Log's Reason)" testID="rulings.reason" />
 
       <Label text="Scope" />
       <View style={styles.wrap}>
@@ -307,7 +307,7 @@ function EditorPanel({
       <Label text="Where" />
       <View style={styles.wrap}>
         {RULING_ENTITIES.map((e) => (
-          <Chip key={e} label={ENTITY_LABEL[e]} on={entity === e} onPress={() => onChange(withEntity(d, e))} />
+          <Chip key={e} label={ENTITY_LABEL[e]} on={entity === e} onPress={() => onChange(withEntity(d, e))} testID={`rulings.where.${e}`} />
         ))}
       </View>
       {d.filter.ids?.length ? (
@@ -330,7 +330,7 @@ function EditorPanel({
       <Label text="Action" />
       <View style={styles.wrap}>
         {actionsFor(entity).map((k) => (
-          <Chip key={k} label={ACTION_LABEL[k]} on={a.kind === k} onPress={() => onChange(withActionKind(d, k))} />
+          <Chip key={k} label={ACTION_LABEL[k]} on={a.kind === k} onPress={() => onChange(withActionKind(d, k))} testID={`rulings.action.${k}`} />
         ))}
       </View>
       {a.kind === 'item' ? (
@@ -350,9 +350,9 @@ function EditorPanel({
         </View>
       ) : (
         <View style={styles.block}>
-          <FieldChips fields={actionFields(entity, a.kind)} value={a.field} onPick={(field) => setAction({ field })} />
+          <FieldChips fields={actionFields(entity, a.kind)} value={a.field} onPick={(field) => setAction({ field })} idPrefix="rulings.actionField" />
           {a.kind === 'set' ? (
-            <ValueInput field={fieldOf(entity, a.field, cables ?? undefined)} value={a.value} onChange={(value) => setAction({ value })} placeholder="New value" />
+            <ValueInput field={fieldOf(entity, a.field, cables ?? undefined)} value={a.value} onChange={(value) => setAction({ value })} placeholder="New value" testID="rulings.value" />
           ) : a.kind === 'rename' ? (
             <>
               <TextInput style={styles.input} value={a.from} onChangeText={(from) => setAction({ from })} placeholder="Old phrase (the whole value or one ; phrase)" />
@@ -363,7 +363,7 @@ function EditorPanel({
               Each record gets what its rule now words (Setup → Rules as it stands). A field changed by hand, or one no rule words any more, is left as it is; the preview names them.
             </Text>
           ) : (
-            <TextInput style={styles.input} value={a.text} onChangeText={(text) => setAction({ text })} placeholder="Phrase to append (once, after '; ')" />
+            <TextInput style={styles.input} value={a.text} onChangeText={(text) => setAction({ text })} placeholder="Phrase to append (once, after '; ')" testID="rulings.append" />
           )}
         </View>
       )}
@@ -381,7 +381,7 @@ function EditorPanel({
         </View>
       ) : null}
       <View style={styles.btnRow}>
-        <Btn label={busy ? 'Working…' : 'Preview ▸'} onPress={onPreview} disabled={busy || problems.length > 0} />
+        <Btn label={busy ? 'Working…' : 'Preview ▸'} onPress={onPreview} disabled={busy || problems.length > 0} testID="rulings.preview" />
         <Btn label="Cancel" onPress={onCancel} secondary />
       </View>
     </>
@@ -413,10 +413,10 @@ function ConditionRow({
           <Text style={styles.link}>✕ remove</Text>
         </Pressable>
       </View>
-      <FieldChips fields={RULING_FIELDS[entity]} value={c.field} onPick={(field) => onChange({ field })} />
+      <FieldChips fields={RULING_FIELDS[entity]} value={c.field} onPick={(field) => onChange({ field })} idPrefix="rulings.cond.field" />
       <View style={styles.wrap}>
         {FILTER_OPS.map((op) => (
-          <Chip key={op} label={OP_LABEL[op]} on={c.op === op} onPress={() => onChange({ op })} small />
+          <Chip key={op} label={OP_LABEL[op]} on={c.op === op} onPress={() => onChange({ op })} small testID={`rulings.cond.op.${op}`} />
         ))}
       </View>
       {UNARY_OPS.has(c.op) ? null : (
@@ -426,26 +426,27 @@ function ConditionRow({
           onChange={(value) => onChange({ value })}
           placeholder={c.op === 'in' ? 'Values, comma-separated' : 'Value'}
           append={c.op === 'in'}
+          testID="rulings.cond.value"
         />
       )}
     </View>
   );
 }
 
-function FieldChips({ fields, value, onPick }: { fields: readonly RulingField[]; value: string; onPick: (field: string) => void }) {
+function FieldChips({ fields, value, onPick, idPrefix }: { fields: readonly RulingField[]; value: string; onPick: (field: string) => void; idPrefix: string }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hscroll}>
       {fields.map((f) => (
-        <Chip key={f.field} label={f.label} on={value === f.field} onPress={() => onPick(f.field)} small />
+        <Chip key={f.field} label={f.label} on={value === f.field} onPress={() => onPick(f.field)} small testID={`${idPrefix}.${f.field}`} />
       ))}
     </ScrollView>
   );
 }
 
-function ValueInput({ field, value, onChange, placeholder, append }: { field: RulingField | null; value: string; onChange: (v: string) => void; placeholder: string; append?: boolean }) {
+function ValueInput({ field, value, onChange, placeholder, append, testID }: { field: RulingField | null; value: string; onChange: (v: string) => void; placeholder: string; append?: boolean; testID?: string }) {
   return (
     <>
-      {field?.strict ? null : <TextInput style={styles.input} value={value} onChangeText={onChange} placeholder={placeholder} autoCapitalize="none" />}
+      {field?.strict ? null : <TextInput style={styles.input} value={value} onChangeText={onChange} placeholder={placeholder} autoCapitalize="none" testID={testID} />}
       {field?.options?.length ? (
         <View style={styles.wrap}>
           {field.options.map((o) => {
@@ -485,7 +486,7 @@ function PreviewPanel({
         <Text style={styles.value}>{previewTitle(p, ticked)}</Text>
         <View style={{ flex: 1 }} />
         <Btn label={ticked === p.rows.length ? 'Untick all' : 'Tick all'} onPress={() => onAll(ticked !== p.rows.length)} secondary disabled={!p.rows.length} />
-        <Btn label={busy ? 'Applying…' : `Apply ${ticked}`} onPress={onApply} disabled={busy || (!ticked && !!mode.draft.id) || (!ticked && !mode.draft.standing)} />
+        <Btn label={busy ? 'Applying…' : `Apply ${ticked}`} onPress={onApply} disabled={busy || (!ticked && !!mode.draft.id) || (!ticked && !mode.draft.standing)} testID="rulings.apply" />
         <Btn label="Back" onPress={onBack} secondary />
       </View>
       <View style={[styles.tr, styles.th]}>
@@ -637,17 +638,17 @@ function Label({ text }: { text: string }) {
   return <Text style={styles.label}>{text}</Text>;
 }
 
-function Chip({ label, on, onPress, small }: { label: string; on: boolean; onPress: () => void; small?: boolean }) {
+function Chip({ label, on, onPress, small, testID }: { label: string; on: boolean; onPress: () => void; small?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, small && styles.chipSmall, on && styles.chipOn]}>
+    <Pressable onPress={onPress} style={[styles.chip, small && styles.chipSmall, on && styles.chipOn]} testID={testID}>
       <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
     </Pressable>
   );
 }
 
-function Btn({ label, onPress, disabled, secondary, small }: { label: string; onPress: () => void; disabled?: boolean; secondary?: boolean; small?: boolean }) {
+function Btn({ label, onPress, disabled, secondary, small, testID }: { label: string; onPress: () => void; disabled?: boolean; secondary?: boolean; small?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, secondary && styles.btn2, small && styles.btnSmall, disabled && styles.off]} accessibilityRole="button">
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, secondary && styles.btn2, small && styles.btnSmall, disabled && styles.off]} accessibilityRole="button" testID={testID}>
       <Text style={secondary ? styles.btn2Text : styles.btnText}>{label}</Text>
     </Pressable>
   );

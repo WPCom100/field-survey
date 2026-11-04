@@ -155,7 +155,7 @@ export function LibraryScreen(props: {
           {scope ? 'Device-type library' : 'App device-type library'} <Text style={styles.sub}>({types.filter((t) => t.state !== 'rejected').length} types{view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})</Text>
         </Text>
         {view?.inReview && props.onOpenReview ? (
-          <Pressable onPress={props.onOpenReview}>
+          <Pressable onPress={props.onOpenReview} testID="library.review">
             <Text style={styles.review}>{view.inReview} in review ▸</Text>
           </Pressable>
         ) : null}
@@ -169,12 +169,12 @@ export function LibraryScreen(props: {
           <Text style={styles.link}>Suggestions…</Text>
         </Pressable>
       </View>
-      {note ? <Text style={[styles.note, !note.error && styles.noteOk]}>{note.text}</Text> : null}
+      {note ? <Text style={[styles.note, !note.error && styles.noteOk]} testID="library.note">{note.text}</Text> : null}
       <View style={styles.split}>
         <View style={styles.list}>
           <View style={styles.filters}>
             <View style={styles.row}>
-              <TextInput value={query} onChangeText={setQuery} placeholder="Search model, alias or name" placeholderTextColor="#888" autoCorrect={false} autoCapitalize="none" clearButtonMode="while-editing" style={[styles.input, styles.grow]} />
+              <TextInput value={query} onChangeText={setQuery} placeholder="Search model, alias or name" testID="library.search" placeholderTextColor="#888" autoCorrect={false} autoCapitalize="none" clearButtonMode="while-editing" style={[styles.input, styles.grow]} />
               <Text style={styles.sub}>Drafts only</Text>
               <Switch value={draftsOnly} onValueChange={setDraftsOnly} />
             </View>
@@ -271,7 +271,7 @@ function GroupHead(props: { item: Extract<Item, { kind: 'head' }>; filtered: boo
 function TypeRow(props: { t: LibraryType; on: boolean; names: ReadonlyMap<string, string>; onPress: () => void }) {
   const { t } = props;
   return (
-    <Pressable onPress={props.onPress} style={[styles.typeRow, props.on && styles.typeRowOn]}>
+    <Pressable onPress={props.onPress} style={[styles.typeRow, props.on && styles.typeRowOn]} testID="library.type">
       <Text style={[styles.typeModel, t.state === 'rejected' && styles.dim]} numberOfLines={1}>
         {t.state === 'draft' ? <Text style={styles.draft}>DRAFT </Text> : null}
         {t.state === 'rejected' ? <Text style={styles.dim}>rejected </Text> : null}
@@ -457,7 +457,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
             </View>
           </Field>
           <Field label="Aliases (BOM)" hint="Comma-separated. A device whose Device text is the model or an alias is of this type.">
-            <TextInput value={aliases} onChangeText={setAliases} editable={!ro} placeholder="P-NSPS-D, P-NSPS-D-KIT" placeholderTextColor="#888" style={styles.input} />
+            <TextInput value={aliases} onChangeText={setAliases} editable={!ro} testID="library.aliases" placeholder="P-NSPS-D, P-NSPS-D-KIT" placeholderTextColor="#888" style={styles.input} />
           </Field>
           <Field label="ID scheme" hint="Level-number: 06M-04. Level-tag: 06M-S16 for stations, 06M-D3 for sensors. The server assigns the ID either way.">
             <View style={styles.wrap}>
@@ -530,7 +530,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
       </ScrollView>
       {props.canEdit ? (
         <View style={[styles.actions, styles.footer]}>
-          <Pressable disabled={!dirty} onPress={() => void save()} style={[styles.btn, !dirty && styles.off]}>
+          <Pressable disabled={!dirty} onPress={() => void save()} style={[styles.btn, !dirty && styles.off]} testID="library.save">
             <Text style={styles.btnText}>Save</Text>
           </Pressable>
           {t.state === 'draft' ? (
