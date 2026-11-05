@@ -1,4 +1,6 @@
-# S5 step 2 of `rig.sh sheets` (T158, T144, T130), on A after sheets-old.yaml: Sources → the
+# S5 step 2 of `rig.sh sheets` (T158, T144, T130, T111), on A after sheets-old.yaml: a hand-made
+# app-library type MAESTRO-CLASH-<n> (the upload carries a DaVinci type of that model: "1 model
+# clash", the hand-made one untouched, then rejected); Sources → the
 # DaVinci library with the CURRENT categories workbook (and a newer library.json, so the pair is
 # not "Already imported") → "Done: … n categories corrected" and no Neuron flag counted. App
 # library: ERn2-W-120 Mk2 under Equipment Panels; P-NSPS-D still reads Neuron ID Needed (a person's
@@ -8,11 +10,43 @@ appId: productions.luminarytechnology.fieldsurvey
 name: Sheets — the current DaVinci categories correct the ERn type
 ---
 - runFlow: _resume.yaml
-- runFlow: _open-project.yaml
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+# T111: a hand-made app-library type whose model this upload's library also carries (rig.sh adds
+# a DaVinci type MAESTRO-CLASH-<n>); synced before the upload, so the job finds it
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: MAESTRO-CLASH-${output.n}
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added MAESTRO-CLASH-${output.n} as a draft.
+    timeout: 10000
+- tapOn: ◀ Projects
+- scrollUntilVisible:          # the Projects screen has no sidebar: open PROJECT from its list
+    element:
+      id: projects.open.${PROJECT}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 30000
+- runFlow: _sync.yaml
 - runFlow: _davinci.yaml
 - assertVisible:
     id: sources.davinci.status
-    text: 'Done: .*\d+ categor(y|ies) corrected.*'
+    text: 'Done: .*\d+ categor(y|ies) corrected.*, 1 model clash'
 - assertNotVisible:
     id: sources.davinci.status
     text: '.*Neuron flags? corrected.*'
@@ -25,8 +59,31 @@ name: Sheets — the current DaVinci categories correct the ERn type
     id: nav.projects
 - tapOn:
     id: projects.library
+# T111: the hand-made type is untouched (a draft with no DaVinci source line); rejected so it
+# clashes with nothing later
 - tapOn:
     id: library.search
+- inputText: MAESTRO-CLASH-${output.n}
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: '.*MAESTRO-CLASH-${output.n}.*'
+- assertVisible: 0 devices · draft
+- assertNotVisible: 'From .*\(library .*\)'   # a DaVinci type's source line
+- assertNotVisible: Datasheet ↗
+- tapOn:
+    id: library.reject
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Rejected: .*'
+    timeout: 10000
+- tapOn:
+    id: library.search
+- eraseText: 30
+- tapOn:                     # a tap lands mid-word and eraseText deletes only before the cursor
+    id: library.search
+- eraseText: 30
 - inputText: ERn2-W-120
 - pressKey: Enter          # closes the keyboard: it covers the Save footer
 - assertVisible: '(▾ |▸ )?Equipment Panels.*'

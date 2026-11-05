@@ -299,9 +299,7 @@ Decision D195 (Proposed): the riser's boxes are measured on the page as it is di
 
 **Why it matters:** ETC's whole catalogue becomes app-library drafts in one upload, so types are picked, not typed, and every project created afterwards starts with the accepted ones.
 
-Passed 2026-10-18 (sheet B-2 … B-4, B-6, B-13 … B-15: the upload in 0.5 min, the drafts, the codes, Accept all, accessories not devices, a re-run). What stays:
-
-- [ ] **A hand-made model.** Make a draft type "P-TS7-PE" by hand in the app library, upload again (any newer file) with the Retire box **off**: the line ends "1 model clash"; your type is untouched. → saw:
+Passed 2026-10-18 (sheet B-2 … B-4, B-6, B-13 … B-15: the upload in 0.5 min, the drafts, the codes, Accept all, accessories not devices, a re-run). The last check, a hand-made model clash, ran on the Mac rig (`rig.sh sheets`; [on-device-log](on-device-log.md), "Claude ran (rig) 2026-11-05"). Only the Decision is yours:
 
 Decision D197 (Proposed): the import files its batch under the project you start it from (that project's Vocabulary takes the unmapped protocols as Cable codes drafts), writes the types to the app library as drafts with four new columns (description, datasheet, DaVinci provenance, accessory-only), keeps "one of these" accessory rules as a group on each row rather than an expected count, treats a model you already made by hand as a clash it reports and never merges, and never touches an accepted or rejected type on a re-run. → Approve / change:
 

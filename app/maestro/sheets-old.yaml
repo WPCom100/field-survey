@@ -68,6 +68,23 @@ name: Sheets — the older DaVinci categories, an ERn device, a Neuron flag by h
     id: library.type
     text: '.*P-NSPS-D.*'
     index: 0                 # P-NSPS-D sorts before P-NSPS-D-KIT
+# a run that stopped before sheets-new set it back leaves it on Needed (the app library is
+# server-wide): put it on the wires first, else Save has nothing to save
+- runFlow:
+    when:
+      visible:
+        id: library.neuron.needed
+        selected: true
+    commands:
+      - tapOn:
+          id: library.neuron.wires
+      - tapOn:
+          id: library.save
+      - extendedWaitUntil:
+          visible:
+            id: library.note
+            text: Saved.
+          timeout: 10000
 - tapOn:
     id: library.neuron.needed
 - assertVisible:
