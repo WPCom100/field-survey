@@ -2,6 +2,44 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## Claude ran (rig) 2026-11-04 — wave 4 of docs/rig-plan.md (T157), Mac rig Simulator, local e2e server
+
+Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.
+
+### T91 — Surveyed / Updated dates in Setup → Levels  ·  Needs: no new build (JS update)
+
+Set the date and Bad date refused passed 2026-10-18 (C-2, C-3). Sheet G-1.
+
+- [x] **Header follows.** Export screen's Floor PDF header line for 06M reads `Surveyed 2026-10-13`; a level with an empty box still shows its newest survey date (D159). → saw (Claude, rig, 2026-11-04, `rig.sh export`): 06M with its Surveyed box empty shows a date in the header; set to `2026-10-30` it reads `Surveyed 2026-10-30`.
+
+
+### T148 — Project search finds IP and DMX addresses  ·  Needs: no new build (JS update only; client migration 0020 runs on the first launch)
+
+**Why it matters:** T146 gave devices an IP address and a DMX address, but the dashboard search did not index them, so "which device is 10.101.4.23?" had no answer. Migration 0020 adds both to the search index and re-indexes every device once, so addresses typed before this update are found too. Use the Tower project.
+
+- [x] **Placeholder.** Dashboard: the search field reads `Search the project: ID, tag, room, item, notes, Neuron ID, IP, DMX`. → saw (Claude, rig, 2026-11-04, dashboard.yaml): the field reads `Search the project: ID, tag, room, item, notes, Neuron ID, IP, DMX`.
+- [x] **Find by IP.** Type an IP address on 01-06 (card → IP address → Type…, e.g. `10.101.4.23`), go back to the Dashboard and search `10.101.4.23`: 01-06 is the one device result; tap it and its card opens on the plan. A partial `10.101` finds it too. → saw (Claude, rig, 2026-11-04, dashboard.yaml): `10.101.4.23` → `Search “10.101.4.23” (1)`, the row 01-06; `10.101` finds 01-06 too.
+- [x] **Find by DMX address.** Type a DMX address on 01-01 (e.g. `1/001`) and search `1/001`: 01-01 is a device result. Change it to `2/017`, search again: `2/017` finds it and `1/001` no longer does. Clear both addresses afterwards if this is the real project. → saw (Claude, rig, 2026-11-04, dashboard.yaml): `1/001` finds 01-01; changed to `2/017` on its card, `2/017` finds it and `1/001` reads No matches.
+
+
+### T36 — Lint view: findings by check, dismiss with a reason  ·  Needs: no new build (JS update)
+
+**Why it matters:** the rules' findings and the PLAN §6.3 checks now have their own screen; a finding can be dismissed with a reason and comes back when its facts change, so nothing is silenced for good by mistake.
+
+- [x] **Open it.** On the Levels home tap **Lint** in the sidebar (the Tower round project): the title reads `Lint (<n> open · 0 dismissed)`; groups are listed by check, starting with the PLAN §6.3 ones (e.g. `Issue device without open punch item (…)`, `Cable with missing far end (…)`). Note the open count here. → saw (Claude, rig, 2026-11-04, lint.yaml): on a fresh copy of the master Lint opens titled `Lint (261 open · 0 dismissed · 13 drafts)` (the 13 are T146's R3c drafts), groups by check: Drafts with no device, IP / DMX address item missing, Value outside vocabulary (232), Cable with missing far end (12), Import (4).
+- [x] **The master's unresolved far ends.** `Cable with missing far end` lists the runs whose far end the import could not pair (the UFMP4 #1/#2 and (7) runs on 01, 03 and 04, and a few DMX/network runs on 01–04: 12 on a fresh import of the master). Each also sits in Needs review → Import pair. → saw (Claude, rig, 2026-11-04, lint.yaml): `Cable with missing far end (12)` lists 01 C-05, C-12, 02 C-01, C-02, C-05, 03 C-01, C-02, C-05, C-07, 04 C-02, C-12 and one NEW far end ("UFMP4 #1, #2"). The Import pair link from each row was not opened (R5).
+- [x] **Filter and group.** Tap a level chip: only that level's findings stay. Tap **Group by → Level**: one group per level, each row naming its check. Tap a group header: it folds and unfolds. → saw (Claude, rig, 2026-11-04, lint.yaml): chip 03 keeps `03 C-01` and drops `01 C-05`; Group by → Level gives `▾ Level 06M (n)` with rows reading `06M · Value outside vocabulary · …`; its header folds (`▸`, rows gone) and unfolds.
+- [x] **Open card.** Select a finding on a device, tap **Open card ▸**: the plan opens on that level with the device's card. Back returns to Lint. → saw (Claude, rig, 2026-11-04, lint.yaml): 06M-03 set Issue raises its finding; Open card ▸ opens the 06M plan (`◀ 06M`) with 06M-03's card; ◀ returns to Lint.
+- [x] **Dismiss with a reason.** Select an `Issue device without open punch item` finding → **Dismiss…** → the **Dismiss** button stays disabled until a reason is picked or typed; pick `Checked on site: correct as is` → **Dismiss**: the row leaves the list, the title counts one more dismissed, **Show → Dismissed** lists it with the reason. → saw (Claude, rig, 2026-11-04, lint.yaml): on 06M-03's `Issue device without open punch item` Dismiss… shows the Dismiss button disabled until the chip `Checked on site: correct as is` is picked; dismissed: `Dismissed: 06M-03 …`, title `· 1 dismissed`, chip `Dismissed 1`, the group gone from Open; Show → Dismissed lists it with `Dismissed: Checked on site: correct as is`.
+- [x] **It comes back when the facts change.** On that device's card set the status to anything but Issue, wait a second, then set it back to **Issue**: the finding is open again in Lint (the dismissal covered the earlier occurrence). For a message that names facts (e.g. `Duplicate Neuron ID … also on 02-S2`), changing those facts reopens it too. → saw (Claude, rig, 2026-11-04, lint.yaml): 06M-03 set Not installed from its card → the dismissed finding resolves (`Dismissed 0`); set back to Issue → `Issue device without open punch item (1)` is open again. The "message that names facts" half (a duplicate Neuron ID) was not exercised.
+- [x] **Reopen.** In **Show → Dismissed** select a dismissed finding → **Reopen**: it is back under Open. → saw (Claude, rig, 2026-11-04, lint.yaml): dismissed again with `Known; handled outside the app`, Show → Dismissed → Reopen → `Reopened: 06M-03 …`, `Dismissed 0`, back under Open.
+- [x] **Two iPads.** Dismiss a finding on iPad A, sync both: iPad B's Lint shows it dismissed with A's reason; Needs review stays empty. → saw: (Claude, rig, 2026-11-04, `rig.sh conflicts`): A dismisses B2's first finding offline ("Checked on site: correct as is"); after the syncs B's Lint reads `Dismissed 1` and Needs review has no sync conflict (A's reason itself not opened on B). Found on the way: a finding about a record the conflict then changes (A's Issue on 06M-03) resolves by itself once Choose B clears its condition — correct, so the flow dismisses one on a level it does not edit.
+- [x] **Fix all via ruling.** If a `Value outside vocabulary` group exists (a category outside the list, or an old spelling once T40 seeds the vocabulary), its header lists `"<value>" ×n` with **Fix all via ruling ▸**: since T37 tapping it opens the ruling editor pre-filled (see the T37 checks). Nothing is changed until a preview is applied. → saw (Claude, rig, 2026-11-04, lint.yaml): the `Value outside vocabulary (232)` group lists `"EBDK" ×11 → "Emergency Equipment"`, `"Relay panel" ×11 → "Power Distribution"` … each with Fix all via ruling ▸; EBDK's opens Rulings with `New ruling · from Lint` (applied in rulings.yaml).
+- [x] **Links into Lint.** Needs review → **Lint** tab → `Open the Lint view to dismiss or fix them ▸` opens Lint; Export's pre-flight `See the <n> lint findings ▸` opens Lint too. → saw (Claude, rig, 2026-11-04, lint.yaml, half): Needs review → Lint tab → `Open the Lint view to dismiss or fix them ▸` (in the list's footer, under the 31 review rows) opens Lint. Export's link: R6. Also (Claude, rig, 2026-11-04, `rig.sh export`, the other half): Export's pre-flight `See the n lint findings ▸` opens Lint.
+
+Decision D178 (Proposed): a dismissed finding stays dismissed while it says the same thing, comes back when its message (the facts it names) changes, and is raised again if its condition clears and returns. → Approve / change:
+
+
 ## Claude ran (rig) 2026-11-04 — wave 3 of docs/rig-plan.md (T156), Mac rig Simulator, local e2e server
 
 Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.

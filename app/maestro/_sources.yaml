@@ -13,6 +13,16 @@ appId: productions.luminarytechnology.fieldsurvey
 # DaVinci: multiple selection, then Open
 - tapOn:
     id: sources.davinci
+- extendedWaitUntil:
+    visible: dismiss popup
+    timeout: 20000
+    optional: true
+- runFlow:                  # the first picker after a fresh launch did not open twice in five (T157)
+    when:
+      notVisible: dismiss popup
+    commands:
+      - tapOn:
+          id: sources.davinci
 - runFlow: _pick-wait.yaml
 - tapOn:
     point: 14%,46%          # sidebar: On My iPad

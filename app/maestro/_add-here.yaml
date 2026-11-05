@@ -17,7 +17,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: add.submit
 - extendedWaitUntil:
-    visible: NEW · ID assigned at sync
+    visible: 'NEW · ID assigned at sync|${IDRE}'   # a quick sync can number it first (T157)
     timeout: 10000
 - extendedWaitUntil:                # NEW first; the sync can bring the ID before `06M-?` is read
 

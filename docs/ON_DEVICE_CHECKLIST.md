@@ -35,9 +35,9 @@ Decision D165: our own 0.3 s timer starts the long press (not UIKit's recogniser
 
 Failed 2026-10-14 (close-out B-3): "I did not see a surveyed date field anywhere" — Setup → Levels has no Surveyed field yet → **T91**, which adds it and its own checks.
 
-- [ ] **Export screen header line.** Export, Floor PDF, a level with no Surveyed date: the line reads `… — Level 06M · Surveyed <date>` (the day of the newest survey edit on it, else today), never a dash. → saw:
+- [x] **Export screen header line.** Export, Floor PDF, a level with no Surveyed date: the line reads `… — Level 06M · Surveyed <date>` (the day of the newest survey edit on it, else today), never a dash. → saw (Claude, rig, 2026-11-04, `rig.sh export`): a new project with the 06M sheet and a station, no Surveyed date set: Export → Floor PDF → 06M reads `Header: "ETC Lighting Controls Survey — Level 06M · Surveyed <yyyy-mm-dd>"`, a date, never a dash (which day it is was not compared).
 - [ ] **PDF header.** Generate that level's floor PDF and open it: every page after the cover carries the same date, no company name; the Connections, Punch list and Missing parts tables match the workbook for that level. → saw:
-- [ ] **A set date wins.** Set the level's Surveyed date in Setup → Levels (T91): the header shows that date. → saw:
+- [x] **A set date wins.** Set the level's Surveyed date in Setup → Levels (T91): the header shows that date. → saw (Claude, rig, 2026-11-04, `rig.sh export`): Setup → Levels → 06M Surveyed `2026-10-30` → the header line reads `… — Level 06M · Surveyed 2026-10-30`, and that PDF runs to `Ready · <size>`.
 
 ## T93 — A long export keeps its card; one at a time; Cancel  ·  Needs: no new build (server deploy + JS update)
 
@@ -47,7 +47,7 @@ Failed 2026-10-14 (close-out B-3): "I did not see a surveyed date field anywhere
 - [ ] **Leave and come back.** While it runs, go back to Levels, then open Export again: the same card is there with the stage and the time still counting, without pressing anything. → saw:
 - [ ] **Another iPad.** On a second iPad (any name), open Export on the same project: the same card, "Started by <first name>", same stage. Its Generate workbook button is disabled and the line above it reads `An export is already running (started by <name> hh:mm)`. Generate floor PDF stays available. → saw:
 - [ ] **Cancel.** On the second iPad tap *Cancel export* → confirm. Within a couple of seconds both iPads show `Cancelling…`, then `Cancelled by <name>`; Generate workbook is enabled again. → saw:
-- [ ] **Run one to the end.** Generate again and wait: the card ends at `Ready · <size>` and Share works; note the minutes from Generate to Ready (also T32's number below). → saw:
+- [ ] **Run one to the end.** Generate again and wait: the card ends at `Ready · <size>` and Share works; note the minutes from Generate to Ready (also T32's number below). → saw (Claude, rig, 2026-11-04, `rig.sh export`, part): on a small project a workbook (`Started by Ann`) and a floor PDF each end at `Ready · <size>` and History lists the `.xlsx` and the `.pdf` after Refresh; Share was not tapped and no minutes were taken. The long export, the second iPad and Cancel: follow-up T165.
 
 Decision D166 (already answered by you: one at a time per project and kind, anyone may Cancel) — nothing to approve.
 
@@ -111,9 +111,8 @@ Decision D145: answered 2026-10-14, **Approved**. Whether you want a **Discard**
 
 ## T91 — Surveyed / Updated dates in Setup → Levels  ·  Needs: no new build (JS update)
 
-Set the date and Bad date refused passed 2026-10-18 (C-2, C-3). Sheet G-1.
 
-- [ ] **Header follows.** Export screen's Floor PDF header line for 06M reads `Surveyed 2026-10-13`; a level with an empty box still shows its newest survey date (D159). → saw:
+Every check ran on the Mac rig (`rig.sh export`; [on-device-log](on-device-log.md), "Claude ran (rig) 2026-11-04 — wave 4"). Nothing is left for you here.
 
 ## T33 — Rule drafts: Accept / Edit / Reject on the card  ·  Needs: no new build (JS update; server deploy first)
 
@@ -147,16 +146,7 @@ Decision D175: **approved** (Landry, 2026-10-15) as the defaults; D176 makes eve
 
 **Why it matters:** the rules' findings and the PLAN §6.3 checks now have their own screen; a finding can be dismissed with a reason and comes back when its facts change, so nothing is silenced for good by mistake.
 
-- [x] **Open it.** On the Levels home tap **Lint** in the sidebar (the Tower round project): the title reads `Lint (<n> open · 0 dismissed)`; groups are listed by check, starting with the PLAN §6.3 ones (e.g. `Issue device without open punch item (…)`, `Cable with missing far end (…)`). Note the open count here. → saw (Claude, rig, 2026-11-04, lint.yaml): on a fresh copy of the master Lint opens titled `Lint (261 open · 0 dismissed · 13 drafts)` (the 13 are T146's R3c drafts), groups by check: Drafts with no device, IP / DMX address item missing, Value outside vocabulary (232), Cable with missing far end (12), Import (4).
-- [x] **The master's unresolved far ends.** `Cable with missing far end` lists the runs whose far end the import could not pair (the UFMP4 #1/#2 and (7) runs on 01, 03 and 04, and a few DMX/network runs on 01–04: 12 on a fresh import of the master). Each also sits in Needs review → Import pair. → saw (Claude, rig, 2026-11-04, lint.yaml): `Cable with missing far end (12)` lists 01 C-05, C-12, 02 C-01, C-02, C-05, 03 C-01, C-02, C-05, C-07, 04 C-02, C-12 and one NEW far end ("UFMP4 #1, #2"). The Import pair link from each row was not opened (R5).
-- [x] **Filter and group.** Tap a level chip: only that level's findings stay. Tap **Group by → Level**: one group per level, each row naming its check. Tap a group header: it folds and unfolds. → saw (Claude, rig, 2026-11-04, lint.yaml): chip 03 keeps `03 C-01` and drops `01 C-05`; Group by → Level gives `▾ Level 06M (n)` with rows reading `06M · Value outside vocabulary · …`; its header folds (`▸`, rows gone) and unfolds.
-- [x] **Open card.** Select a finding on a device, tap **Open card ▸**: the plan opens on that level with the device's card. Back returns to Lint. → saw (Claude, rig, 2026-11-04, lint.yaml): 06M-03 set Issue raises its finding; Open card ▸ opens the 06M plan (`◀ 06M`) with 06M-03's card; ◀ returns to Lint.
-- [x] **Dismiss with a reason.** Select an `Issue device without open punch item` finding → **Dismiss…** → the **Dismiss** button stays disabled until a reason is picked or typed; pick `Checked on site: correct as is` → **Dismiss**: the row leaves the list, the title counts one more dismissed, **Show → Dismissed** lists it with the reason. → saw (Claude, rig, 2026-11-04, lint.yaml): on 06M-03's `Issue device without open punch item` Dismiss… shows the Dismiss button disabled until the chip `Checked on site: correct as is` is picked; dismissed: `Dismissed: 06M-03 …`, title `· 1 dismissed`, chip `Dismissed 1`, the group gone from Open; Show → Dismissed lists it with `Dismissed: Checked on site: correct as is`.
-- [x] **It comes back when the facts change.** On that device's card set the status to anything but Issue, wait a second, then set it back to **Issue**: the finding is open again in Lint (the dismissal covered the earlier occurrence). For a message that names facts (e.g. `Duplicate Neuron ID … also on 02-S2`), changing those facts reopens it too. → saw (Claude, rig, 2026-11-04, lint.yaml): 06M-03 set Not installed from its card → the dismissed finding resolves (`Dismissed 0`); set back to Issue → `Issue device without open punch item (1)` is open again. The "message that names facts" half (a duplicate Neuron ID) was not exercised.
-- [x] **Reopen.** In **Show → Dismissed** select a dismissed finding → **Reopen**: it is back under Open. → saw (Claude, rig, 2026-11-04, lint.yaml): dismissed again with `Known; handled outside the app`, Show → Dismissed → Reopen → `Reopened: 06M-03 …`, `Dismissed 0`, back under Open.
-- [x] **Two iPads.** Dismiss a finding on iPad A, sync both: iPad B's Lint shows it dismissed with A's reason; Needs review stays empty. → saw: (Claude, rig, 2026-11-04, `rig.sh conflicts`): A dismisses B2's first finding offline ("Checked on site: correct as is"); after the syncs B's Lint reads `Dismissed 1` and Needs review has no sync conflict (A's reason itself not opened on B). Found on the way: a finding about a record the conflict then changes (A's Issue on 06M-03) resolves by itself once Choose B clears its condition — correct, so the flow dismisses one on a level it does not edit.
-- [x] **Fix all via ruling.** If a `Value outside vocabulary` group exists (a category outside the list, or an old spelling once T40 seeds the vocabulary), its header lists `"<value>" ×n` with **Fix all via ruling ▸**: since T37 tapping it opens the ruling editor pre-filled (see the T37 checks). Nothing is changed until a preview is applied. → saw (Claude, rig, 2026-11-04, lint.yaml): the `Value outside vocabulary (232)` group lists `"EBDK" ×11 → "Emergency Equipment"`, `"Relay panel" ×11 → "Power Distribution"` … each with Fix all via ruling ▸; EBDK's opens Rulings with `New ruling · from Lint` (applied in rulings.yaml).
-- [ ] **Links into Lint.** Needs review → **Lint** tab → `Open the Lint view to dismiss or fix them ▸` opens Lint; Export's pre-flight `See the <n> lint findings ▸` opens Lint too. → saw (Claude, rig, 2026-11-04, lint.yaml, half): Needs review → Lint tab → `Open the Lint view to dismiss or fix them ▸` (in the list's footer, under the 31 review rows) opens Lint. Export's link: R6.
+Every check ran on the Mac rig (lint.yaml, `rig.sh conflicts`, `rig.sh export`; [on-device-log](on-device-log.md), "Claude ran (rig) 2026-11-04 — wave 4"). Only the Decision is yours:
 
 Decision D178 (Proposed): a dismissed finding stays dismissed while it says the same thing, comes back when its message (the facts it names) changes, and is raised again if its condition clears and returns. → Approve / change:
 
@@ -707,9 +697,7 @@ Decision D247 (Proposed): "gets a wire" = the device's live cable ends (any stat
 
 **Why it matters:** T146 gave devices an IP address and a DMX address, but the dashboard search did not index them, so "which device is 10.101.4.23?" had no answer. Migration 0020 adds both to the search index and re-indexes every device once, so addresses typed before this update are found too. Use the Tower project.
 
-- [x] **Placeholder.** Dashboard: the search field reads `Search the project: ID, tag, room, item, notes, Neuron ID, IP, DMX`. → saw (Claude, rig, 2026-11-04, dashboard.yaml): the field reads `Search the project: ID, tag, room, item, notes, Neuron ID, IP, DMX`.
-- [x] **Find by IP.** Type an IP address on 01-06 (card → IP address → Type…, e.g. `10.101.4.23`), go back to the Dashboard and search `10.101.4.23`: 01-06 is the one device result; tap it and its card opens on the plan. A partial `10.101` finds it too. → saw (Claude, rig, 2026-11-04, dashboard.yaml): `10.101.4.23` → `Search “10.101.4.23” (1)`, the row 01-06; `10.101` finds 01-06 too.
-- [x] **Find by DMX address.** Type a DMX address on 01-01 (e.g. `1/001`) and search `1/001`: 01-01 is a device result. Change it to `2/017`, search again: `2/017` finds it and `1/001` no longer does. Clear both addresses afterwards if this is the real project. → saw (Claude, rig, 2026-11-04, dashboard.yaml): `1/001` finds 01-01; changed to `2/017` on its card, `2/017` finds it and `1/001` reads No matches.
+Every check ran on the Mac rig (dashboard.yaml; [on-device-log](on-device-log.md), "Claude ran (rig) 2026-11-04 — wave 4"). Nothing is left for you here.
 
 ## T149 — Mac test rig  ·  Needs: a Mac (Apple silicon, on the office Wi-Fi), not an iPad
 

@@ -1,0 +1,13 @@
+# Step 1 of `rig.sh export` (R6) and `rig.sh review` (R5) (T157), on A: a new project PROJECT with
+# the 06M sheet and a station (06M-S1), synced. Online.
+appId: productions.luminarytechnology.fieldsurvey
+name: A project with the 06M sheet and a station
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _sheet-station.yaml
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: setup.home            # the plan was opened from Setup, which has no sidebar
+- runFlow: _sync.yaml

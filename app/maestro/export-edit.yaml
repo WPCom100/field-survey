@@ -1,0 +1,45 @@
+# R6 step 2 of `rig.sh export` (T157, D94), with the server stopped: an edit waits in the outbox;
+# Export says why it cannot start and both Generate buttons stay disabled.
+appId: productions.luminarytechnology.fieldsurvey
+name: R6 — export gate offline
+---
+- runFlow: _resume.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline.*'
+    timeout: 60000
+- runFlow: _open-project.yaml
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- tapOn:
+    id: card.status.Issue
+- assertVisible: ✓ Issue
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.export
+- extendedWaitUntil:
+    visible:
+      id: export.gate
+      text: Offline\. Exports run on the server and need a connection\.
+    timeout: 15000
+- assertVisible:
+    id: export.generate
+    enabled: false
+# (the pre-flight line then reads "⚠ … · n unsynced edits on this iPad"; Maestro did not match it
+# in three runs although the hierarchy showed it, so the gate line above is the check, T157)
+- tapOn:
+    id: export.pane.pdf
+- assertVisible:
+    id: export.pdf.gate
+    text: Offline\. Exports run on the server and need a connection\.
+- assertVisible:
+    id: export.generatePdf
+    enabled: false
+- tapOn: ← Levels

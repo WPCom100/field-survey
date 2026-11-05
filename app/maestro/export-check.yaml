@@ -1,0 +1,111 @@
+# R6 step 3 of `rig.sh export` (T157): the server is back. Sync first → "Synced — …" and Generate
+# enabled (D94); the workbook's card (Started by Ann) to
+# Ready · <size>; the floor PDF's header line (newest edit's date, then a set Surveyed date
+# wins, T89, T91) and a PDF to Ready; History lists both; See the n lint findings ▸ opens Lint.
+appId: productions.luminarytechnology.fieldsurvey
+name: R6 — export
+---
+- runFlow: _resume.yaml
+- runFlow: _open-project.yaml
+- tapOn:
+    id: nav.export
+- tapOn:
+    id: export.syncFirst
+- extendedWaitUntil:
+    visible:
+      id: export.gate
+      text: Synced — the export will include every edit on this iPad\.
+    timeout: 60000
+- assertVisible:
+    id: export.generate
+    enabled: true
+- tapOn:
+    id: export.generate
+- extendedWaitUntil:
+    visible:
+      id: export.card
+    timeout: 15000
+- assertVisible: 'Started by Ann'
+# (leave and come back while it runs: a small project's export is done before the screen is open
+# again, and a fresh screen shows only a running export's card — the long export is T165's)
+- extendedWaitUntil:
+    visible:
+      id: export.card.state
+      text: 'Ready · .*'
+    timeout: 240000
+- copyTextFrom:
+    id: export.card.state
+- evalScript: ${output.xlsx = maestro.copiedText}
+
+# the lint link
+- tapOn:
+    id: export.lint
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · .*'
+    timeout: 15000
+- tapOn: ← Levels
+- tapOn:
+    id: nav.export
+
+# the floor PDF: its header line, a set Surveyed date wins, a PDF to Ready
+- tapOn:
+    id: export.pane.pdf
+- tapOn:
+    id: export.pdf.level.06M
+- assertVisible:
+    id: export.pdf.header
+    text: 'Header: "ETC Lighting Controls Survey — Level 06M · Surveyed \d{4}-\d{2}-\d{2}".*'
+- tapOn: ← Levels
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.levels
+- tapOn:
+    id: setup.level.06M.surveyed
+- eraseText: 12
+- inputText: 2026-10-30
+- pressKey: Enter
+- tapOn:
+    id: setup.home
+- tapOn:
+    id: nav.export
+- tapOn:
+    id: export.pane.pdf
+- tapOn:
+    id: export.pdf.level.06M
+- extendedWaitUntil:
+    visible:
+      id: export.pdf.header
+      text: 'Header: "ETC Lighting Controls Survey — Level 06M · Surveyed 2026-10-30".*'
+    timeout: 15000
+- runFlow:
+    when:
+      notVisible:
+        id: export.pdf.gate
+        text: Synced — .*
+    commands:
+      - tapOn:
+          id: export.pdf.syncFirst
+- extendedWaitUntil:
+    visible:
+      id: export.pdf.gate
+      text: Synced — .*
+    timeout: 60000
+- tapOn:
+    id: export.generatePdf
+- extendedWaitUntil:
+    visible:
+      id: export.card.state
+      text: 'Ready · .*'
+    timeout: 240000
+
+# History lists both
+- tapOn:
+    id: export.pane.history
+- tapOn:
+    id: export.history.refresh
+- extendedWaitUntil:
+    visible: '.*\.pdf'
+    timeout: 15000
+- assertVisible: '.*\.xlsx'
+- tapOn: ← Levels
