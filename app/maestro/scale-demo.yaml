@@ -1,0 +1,19 @@
+# W5 step 2 of `rig.sh scale-check` (T159), on A after scale.yaml: the demo plan with 500 pins
+# (`500 pins →` on the Levels sidebar, its own database) opened and closed; `rig.sh` reads its
+# `[plan] sheet_loaded` ms from A's log.
+appId: productions.luminarytechnology.fieldsurvey
+name: Scale — the 500-pin demo plan
+---
+- tapOn: 500 pins →
+- extendedWaitUntil:
+    visible: 'Demo data, 500 pins — not synced'
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: plan.tab.devices
+      text: 'Devices [5-9]\d\d'
+    timeout: 60000
+- tapOn:
+    id: plan.back
+- assertVisible:
+    id: level.06M

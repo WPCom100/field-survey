@@ -1,0 +1,63 @@
+# W5 step 1 of `rig.sh scale-check` (T159), on A: a fresh store downloads every project on the rig
+# server, the TP-3 synthetic project SCALE (2,000 devices, `rig.sh scale`) among them; the Sync
+# screen's timing line on a quiet cycle; then SCALE's 06M plan (its dense level: 1,000 pins).
+# `rig.sh` reads the numbers from A's log (`[sync] synced`, `[rules] run`, `[plan] sheet_loaded`)
+# and holds them to the ceilings in scripts/mac/scale-ceilings.txt (docs/perf/rig.md).
+appId: productions.luminarytechnology.fieldsurvey
+name: Scale — the synthetic project's timings
+---
+# a fresh store each run, so every run measures the same download
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- tapOn:
+    id: nav.projects
+- runFlow:                    # a fresh store lists nothing until Refresh downloads the server's projects
+    when:
+      notVisible:
+        id: projects.open.${SCALE}
+    commands:
+      - tapOn:
+          id: projects.refresh
+- scrollUntilVisible:
+    element:
+      id: projects.open.${SCALE}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 120000
+- tapOn:
+    id: projects.open.${SCALE}
+- extendedWaitUntil:
+    visible:
+      id: level.06M
+    timeout: 600000
+
+# the download is done when a cycle pulls nothing: the timing line on a quiet cycle
+- tapOn:
+    id: nav.sync
+- extendedWaitUntil:
+    visible:
+      id: sync.timing
+      text: 'Last cycle .* · 0 pushed, 0 pulled.*'
+    timeout: 600000
+- assertNotVisible: ".*need attention.*"
+- tapOn: ← Levels
+
+# the dense level's plan
+- tapOn:
+    id: level.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 120000
+- extendedWaitUntil:
+    visible:
+      id: plan.tab.devices
+      text: 'Devices 1\d\d\d'
+    timeout: 60000
+- tapOn:
+    id: plan.back
+- assertVisible:
+    id: level.06M

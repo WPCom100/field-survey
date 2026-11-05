@@ -1,0 +1,10 @@
+# Ceilings for `rig.sh scale-check` (T159, docs/perf/rig.md): about twice the first green run on
+# the Mac rig (2026-11-05: 99,100 / 96,004 / 6,617 / 769 / 1,243 / 971 ms). A run over one fails.
+# Simulator numbers on the Mac: a regression signal, not the iPad's (docs/ops.md §6.4).
+# key                  ms
+download_cycle_ms      200000
+download_apply_ms      200000
+rules_first_ms         15000
+quiet_cycle_ms         2000
+sheet_loaded_ms        3000
+demo_sheet_loaded_ms   2500

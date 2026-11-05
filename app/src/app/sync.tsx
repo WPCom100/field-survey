@@ -96,7 +96,7 @@ export default function SyncScreen() {
           Last successful sync {time(sync.lastSyncAt)}
           {seq ? ` (seq ${seq.toLocaleString()})` : ''}
         </Text>
-        <Text style={styles.sub}>{describeCycle(sync.lastCycle, lastRulesPass())}</Text>
+        <Text style={styles.sub} testID="sync.timing">{describeCycle(sync.lastCycle, lastRulesPass())}</Text>
         {hasProject === false ? (
           <Text style={styles.sub}>
             No project on this iPad yet, so there is nothing to push or pull; "Synced" means the server answered. The demo plan never syncs.
@@ -113,7 +113,7 @@ export default function SyncScreen() {
       </Section>
 
       <Section label="Pending edits">
-        <Text style={styles.value}>
+        <Text style={styles.value} testID="sync.pending">
           {data?.outbox.pending ?? sync.pendingOps}
           {data?.outbox.oldestAt ? ` · oldest ${time(data.outbox.oldestAt)}` : ''}
         </Text>
