@@ -466,7 +466,7 @@ function PhotoEditor(props: {
         {readOnly ? (
           <View style={{ width: 60 }} />
         ) : (
-          <Pressable onPress={save} disabled={saving || !fields} style={[styles.saveBtn, (saving || !fields) && styles.saveBusy]}>
+          <Pressable onPress={save} disabled={saving || !fields} testID="photo.save" style={[styles.saveBtn, (saving || !fields) && styles.saveBusy]}>
             {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save</Text>}
           </Pressable>
         )}
@@ -591,7 +591,7 @@ function PhotoEditor(props: {
 
 function LinkChip({ label, on, onPress, disabled }: { label: string; on: boolean; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable disabled={disabled} onPress={onPress} style={[styles.chip, on && styles.chipOn, disabled && styles.chipDisabled]}>
+    <Pressable disabled={disabled} onPress={onPress} testID="photo.chip" style={[styles.chip, on && styles.chipOn, disabled && styles.chipDisabled]}>
       <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>
         {label}
       </Text>

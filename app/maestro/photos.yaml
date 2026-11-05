@@ -1,0 +1,161 @@
+# F5 (T158, rig plan wave 1): library photos. Run with `rig.sh photos` (two PNGs in the photo
+# library first, then this flow, then the server's check: every photo once, its blobs uploaded).
+# A new project with the 06M sheet and two stations (06M-S1, 06M-S2). On 06M-S1: 🖼 Library → the
+# picker → Save → Photos (1); the app is killed and relaunched straight away, while the upload may
+# still be queued (T21): after the relaunch it finishes, the Sync screen reads `0 photos` and
+# Retry failed uploads is greyed (T25). The photo is linked to 06M-S2 in its caption sheet: 06M-S2's
+# card shows it (D128). + Photo here from the long-press menu → the camera stage (no camera on the
+# simulator) → 🖼 Library → the picker → Save: a level photo. Sync: nothing waits.
+appId: productions.luminarytechnology.fieldsurvey
+name: Photos — library photos, upload resume, a link, + Photo here
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _sheet-station.yaml       # PROJECT, the 06M sheet, 06M-S1 (30%,45%); on the plan
+# 06M-S2 within 144 pt of 06M-S1 (only nearby devices are offered as links; at fit 1 % of the
+# screen is ~59 pt across and ~77 pt down on this sheet): so close that a long-press would hit
+# 06M-S1's pin, so the Pins layer is off while it is added (the hit test skips hidden pins)
+- tapOn:
+    id: plan.layers
+- tapOn:
+    id: layer.pins
+- tapOn:
+    id: plan.layers
+- runFlow:
+    file: _add-here.yaml
+    env:
+      AT: 31%,46%            # ~96 pt from 06M-S1 (whole percentages only)
+      CAT: Station
+      MODEL: Maestro F5 second
+      IDRE: '06M-S2'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.layers
+- tapOn:
+    id: layer.pins
+- assertVisible:
+    id: layer.pins
+    text: '.*☑.*'
+- tapOn:
+    id: plan.layers
+
+# 1. a library photo on 06M-S1, then a kill before the upload is sure to be done
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-S1
+- runFlow:
+    file: _photo-library.yaml
+    env:
+      PHOTO_AT: '39%,35%'      # the picker's first photo (portrait, iPad Pro 13")
+- runFlow: _resume.yaml
+# the relaunch picks the queue up: nothing waits once the status bar reads Synced
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: '.*Synced.*'
+    timeout: 90000
+- extendedWaitUntil:
+    notVisible:
+      id: status.bar
+      text: '.*photos? waiting.*'
+    timeout: 90000
+- tapOn:
+    id: nav.sync
+- assertVisible: Sync & uploads
+- tapOn:
+    id: sync.now
+- extendedWaitUntil:
+    visible: '0 photos · 0 files \(0 B\), thumbnails first'
+    timeout: 60000
+- assertVisible:
+    text: Retry failed uploads
+    enabled: false
+- assertNotVisible: 'Upload failed.*'
+- tapOn: ← Levels
+
+# 2. the card: one photo, nothing waiting; link it to 06M-S2 in its caption sheet
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.photo.library
+- assertVisible:
+    id: card.section.photos
+    text: '▾ Photos \(1\)'        # the whole header: no "📷 n waiting" after it
+- tapOn:
+    id: 'photo\.thumb\..*'
+- extendedWaitUntil:
+    visible:
+      id: photo.save
+    timeout: 20000
+# no scrolling here: a swipe over the photo draws with the Pen (the chips sit near the top anyway)
+- tapOn:
+    id: photo.chip
+    text: '06M-S2.*'
+- assertVisible:
+    id: photo.chip
+    text: '✓ 06M-S2.*'
+- tapOn:
+    id: photo.save
+- extendedWaitUntil:
+    notVisible:
+      id: photo.save
+    timeout: 20000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.device.06M-S2
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.photo.library
+- assertVisible:
+    id: card.section.photos
+    text: '▾ Photos \(1\)'        # the linked photo, nothing waiting
+- tapOn:
+    id: card.close
+
+# 3. + Photo here away from the pins: the camera stage offers the library on the simulator
+- longPressOn:
+    point: 70%,65%
+- tapOn:
+    id: press.photo
+- tapOn:
+    text: "Don.t Allow"            # iOS's camera prompt, when it asks
+    optional: true
+- extendedWaitUntil:
+    visible: '🖼 Library'
+    timeout: 20000
+- tapOn: '🖼 Library'
+- extendedWaitUntil:
+    visible: 'zz-never-shown'      # the picker is another process: a pause, then a position
+    timeout: 5000
+    optional: true
+- tapOn:
+    point: '39%,35%'
+- extendedWaitUntil:
+    visible:
+      id: photo.save
+    timeout: 20000
+- assertVisible: 'Level 06M · Photo NEW'
+- tapOn:
+    id: photo.save
+- extendedWaitUntil:
+    notVisible:
+      id: photo.save
+    timeout: 20000
+- tapOn:
+    id: plan.back
+- runFlow: _sync.yaml
+- tapOn:
+    id: nav.sync
+- extendedWaitUntil:
+    visible: '0 photos · 0 files \(0 B\), thumbnails first'
+    timeout: 60000
+- tapOn: ← Levels

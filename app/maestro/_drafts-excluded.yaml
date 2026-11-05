@@ -1,0 +1,31 @@
+# S2 (T44 "Excluded lines"): Devices tab → Excluded BOM lines ▸ → Promote… the first → it is a draft
+# with Src BOM↑ that asks for its category before Accept.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: drafts.tab.devices
+- scrollUntilVisible:
+    element: 'Excluded BOM lines \(\d+ here, [1-9]\d* in all\) [▸▾]'
+    direction: DOWN
+- runFlow:
+    when:
+      visible: 'Excluded BOM lines \(\d+ here, [1-9]\d* in all\) ▸'
+    commands:
+      - tapOn: 'Excluded BOM lines \(\d+ here, [1-9]\d* in all\) ▸'
+- scrollUntilVisible:          # the list runs under the bottom edge: the button wholly on screen
+    element: 'Promote…'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    text: 'Promote…'
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: 'Promoted — pick its category and Accept'
+    timeout: 10000
+- scrollUntilVisible:
+    element: '.*BOM↑.*'
+    direction: UP
+- tapOn: '.*BOM↑.*'
+- assertVisible: 'Category — pick one'

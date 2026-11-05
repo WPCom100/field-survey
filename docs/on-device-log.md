@@ -2,6 +2,32 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## Claude ran (rig) 2026-11-05 — wave 2 of docs/rig-plan.md (T158), Mac rig Simulator, local e2e server
+
+Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.
+
+### Carried over: T21 — Upload resume  ·  Needs: no new build
+
+- [x] **Upload resume.** On a real level take several photos, force-quit while they upload, relaunch: uploads finish, nothing sent twice; Sync shows Photos waiting → 0. (Not done 2026-10-14, close-out C-6.) → saw: (Claude, rig, 2026-11-04, `rig.sh resume`, partial): with the api stopped a library photo on 06M-S1 (status bar "… photos waiting", the card's `Photos (1) 📷 1 waiting`); the app killed and relaunched: still waiting, the outbox not lower, the card unchanged; once the server is back and the app signed in again it uploads, Sync reads `0 photos`, and the server holds the photo. → saw (Claude, rig, 2026-11-05, `rig.sh photos`, twice): online, a library photo saved on 06M-S1 and the app killed at once and relaunched: the status bar reaches `Synced` with no photo waiting, Sync reads `0 photos · 0 files (0 B), thumbnails first`, the card `▾ Photos (1)` with nothing waiting; after a link and a second (level) photo the server holds exactly 2 photo rows, each once, image and thumbnail blobs `complete`, and 1 device link. A kill between chunks of one upload stays core's blob e2e test (the simulator's uploads are too quick to catch mid-file).
+
+### T133 — The mismatch list forgets what you settled  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01, after every review item on 03 was settled, the level's mismatch list still showed "No network (N) run drawn to P-NSPS-D on the riser" and "SR or LR? P-DOC-C-SR / P-DOC-C-LR — pick one" twice: an accepted draft kept asking. Now a device's warning shows only while its draft is open (not yet accepted, edited or rejected), and the N warning also goes once an N cable draft runs to that device. Use `pipeline test`, level 03.
+
+- [x] **Settled warnings are gone.** Setup → 4 Review drafts → 03: the mismatch list no longer shows the two SR / LR lines or the P-NSPS-D N line (those drafts are accepted). → saw (Claude, rig, 2026-11-05, drafts.yaml, twice, a fresh pipeline project): on 01, `• SR or LR? P-DOC-C-SR / P-DOC-C-LR — pick one` → its draft (Model — pick one) → ○ P-DOC-C-SR → Accept → the line is gone.
+- [x] **Reopen asks again.** Reopen one of the SR / LR sensor drafts: its "SR or LR? … — pick one" line comes back; Accept it with a pick: the line goes. → saw (Claude, rig, 2026-11-05, drafts.yaml): Reopen → "Reopened" → the line is back.
+- [x] **The N line answers itself.** On a level with an open NSPS draft showing "No network (N) run drawn to P-NSPS-D on the riser", + Add a cable draft of code `N` and set one end (Change…) to that NSPS draft: the line goes at once, without accepting the NSPS draft. Reject that N draft: the line comes back. (Skip if no level has an open one.) → saw (Claude, rig, 2026-11-05, drafts.yaml): 03 shows `• No network (N) run drawn to P-NSPS-D on the riser`; + Draft cable N (Maestro switch → Maestro NSPS) → Change… To → `◌ P-NSPS-D (draft, 03)` → "Endpoint set", the line is gone; Reject… "Maestro N line" → "Rejected", the line is back.
+
+### T137 — Endpoints read as the device, the riser's text a note  ·  Needs: no new build (JS update only)
+
+**Why it matters:** on 2026-11-01 (C-35) "it calls the device a P-NSPS-DIN, while everything else calls it a P-NSPS-D. When I searched for the 3rd floor P-NSPS-D and selected it, it auto input the P-NSPS-DIN." An end the riser read is now labelled by what it is — a draft by its model, name and level, a placed device by its ID and text, a placeholder by its label — with the riser's printed text after it as `· riser: …`. Use `pipeline test`, level 03, a cable draft whose To is the P-NSPS-D.
+
+On the rig's pipeline project the riser's N run to `PARADIGM P-NSPS-DIN` lands on the **02** NSPS draft (01's rack → 02), so the lines below read `(draft, 02)`.
+
+- [x] **The end line.** Setup → 4 Review drafts → 03 → that cable draft: To reads `P-NSPS-D (draft, 03)  (not placed yet)  · riser: PARADIGM P-NSPS-DIN` (or the device's ID and text if it is placed); the table's To column reads `P-NSPS-D (draft, 03)`. The line above, "The riser reads: …", still shows the riser's own text. → saw (Claude, rig, 2026-11-05, drafts.yaml, twice): 01 → Cables → the row `N, ERN4-RM-120 Equipment Rack 18U (draft, 01), P-NSPS-D (draft, 02), 02, 0.90, R`; the panel: `The riser reads: Equipment Rack 18U → PARADIGM P-NSPS-DIN · level 02 · confidence 0.90`, From `ERN4-RM-120 Equipment Rack 18U (draft, 01)  (not placed yet)`, To `P-NSPS-D (draft, 02)  (not placed yet)  · riser: PARADIGM P-NSPS-DIN`.
+- [x] **Search and pick.** Change… on To, type `P-NSPS-D`: the 03 draft is listed once, as `◌ P-NSPS-D (draft, 03) … · riser: PARADIGM P-NSPS-DIN`; typing `DIN` finds it too. Pick it: the end line still reads `P-NSPS-D (draft, 03)`. → saw (Claude, rig, 2026-11-05, drafts.yaml): `P-NSPS-D` lists `◌ P-NSPS-D (draft, 02)  · 0.90  · riser: PARADIGM P-NSPS-DIN` above the other levels' NSPS drafts (`◌ P-NSPS-D (draft, 03)` …, no riser text); `DIN` lists the same row; picked → "Endpoint set", the end line unchanged.
+- [x] **Confirm.** Confirm endpoint ✓, then open the draft's history (or the Change Log): the reason reads `… → P-NSPS-D (draft, 03)`, not `PARADIGM P-NSPS-DIN`. → saw (Claude, rig, 2026-11-05, `rig.sh drafts`): Confirm endpoint ✓ → "Accepted — both ends are drafts: it waits for one of them to be placed", the row `… ✓ waits for placing`; the server holds applied ops with the reason `Draft review: endpoint confirmed N ERN4-RM-120 Equipment Rack 18U (draft, 01) → P-NSPS-D (draft, 02)`.
+
 ## Claude ran (rig) 2026-11-04 — wave 4 of docs/rig-plan.md (T157), Mac rig Simulator, local e2e server
 
 Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.

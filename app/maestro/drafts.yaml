@@ -1,0 +1,36 @@
+# S2 (T158, rig plan wave 2): the riser half of Setup → 4 Review drafts, on a fresh pipeline project
+# (pipeline.yaml makes PROJECT: B2–06M, BOM.pdf, riser.pdf, the 06M sheet; `rig.sh drafts` stages the
+# files and then reads the confirm's reason on the server). On 01: the N run's ends read as drafts
+# with `· riser: …`, the crop enlarged and closed, Change… finds the 02 NSPS by model and by the
+# riser's DIN, Confirm endpoint → waits for placing (T137, T44, T129); the mismatch list (a line
+# selects its draft; SR / LR goes once accepted with a pick and comes back on Reopen), Accept all
+# asks first (T44, T133); an excluded BOM line promoted (T44); on 03 the NSPS's N line answers a hand
+# N draft and comes back when it is rejected (T133); the 06M rack placed, the F run to it made at
+# once with its far end waiting, surveyed from the placed end (T136).
+appId: productions.luminarytechnology.fieldsurvey
+name: Drafts — the riser's cable drafts, endpoints, mismatches, a waiting cable
+---
+- runFlow: pipeline.yaml
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.drafts
+- tapOn:
+    id: drafts.level.01
+- tapOn:
+    id: drafts.tab.cables
+- runFlow: _drafts-endpoint.yaml
+- runFlow: _drafts-mismatch.yaml
+- runFlow: _drafts-excluded.yaml
+- runFlow: _drafts-nline.yaml
+- runFlow: _drafts-waiting.yaml
+# Cable / riser: side B of the made run is the 01 draft
+- tapOn:
+    id: setup.home
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: '.*\(draft on 01, not placed yet\).*'
+    timeout: 20000
+- tapOn: ← Levels
+- runFlow: _sync.yaml

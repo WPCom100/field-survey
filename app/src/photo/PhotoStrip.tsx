@@ -19,7 +19,7 @@ export function PhotoStrip(props: {
       {props.photos.map((p) => {
         const uri = p.thumb ? props.resolveBlobUri(p.thumb, 'thumb') : null;
         return (
-          <Pressable key={p.id} style={styles.photo} onPress={() => props.onOpen?.(p.id)} disabled={!props.onOpen}>
+          <Pressable key={p.id} style={styles.photo} onPress={() => props.onOpen?.(p.id)} disabled={!props.onOpen} testID={`photo.thumb.${p.label}`}>
             {uri ? <Image source={{ uri }} style={styles.photoImg} /> : <Text style={styles.photoNum}>📷</Text>}
             <Text style={styles.photoLabel} numberOfLines={1}>
               {p.label}

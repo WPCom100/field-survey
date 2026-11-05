@@ -1,0 +1,49 @@
+# S2 (T137, T44): on Review drafts → 01 → Cables, the riser's N run from the 01 rack draft to the 02
+# NSPS draft. Both ends read as drafts (model, name, level) with the riser's text after `· riser:`;
+# Change… on To finds the 02 NSPS draft by its model and by the riser's DIN; picked, the line is
+# unchanged; Confirm endpoint ✓ → both ends are drafts, so it waits for placing (D193). The source
+# crop opens full screen and Close returns (T129, the pinch stays on the iPad).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn: '.*N, ERN4-RM-120 Equipment Rack 18U \(draft, 01\), P-NSPS-D \(draft, 02\).*'
+- assertVisible: 'The riser reads: Equipment Rack 18U → PARADIGM P-NSPS-DIN · level 02 · confidence 0.90'
+- assertVisible: 'ERN4-RM-120 Equipment Rack 18U \(draft, 01\)  \(not placed yet\)'
+- assertVisible: 'P-NSPS-D \(draft, 02\)  \(not placed yet\)  · riser: PARADIGM P-NSPS-DIN'
+# the crop, enlarged and closed
+- tapOn: 'Source crop: Riser 001 · level 01 · bubble .*Tap to enlarge.*'
+- extendedWaitUntil:
+    visible: 'Pinch to zoom · drag to pan · double-tap to zoom / fit'
+    timeout: 30000
+- tapOn: Close
+- extendedWaitUntil:
+    notVisible: 'Pinch to zoom · drag to pan · double-tap to zoom / fit'
+    timeout: 10000
+# the endpoint picker: by model, then by the riser's text
+- tapOn:
+    id: draft.cable.change.to
+- tapOn:
+    id: draft.cable.search
+- inputText: P-NSPS-D
+- assertVisible: '◌ P-NSPS-D \(draft, 02\)  · 0.90  · riser: PARADIGM P-NSPS-DIN'
+- eraseText: 20
+- inputText: DIN
+- assertVisible: '◌ P-NSPS-D \(draft, 02\)  · 0.90  · riser: PARADIGM P-NSPS-DIN'
+- tapOn: '◌ P-NSPS-D \(draft, 02\)  · 0.90  · riser: PARADIGM P-NSPS-DIN'
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Endpoint set
+    timeout: 10000
+- assertVisible: 'P-NSPS-D \(draft, 02\)  \(not placed yet\)  · riser: PARADIGM P-NSPS-DIN'
+- tapOn:
+    id: draft.cable.confirm
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: 'Accepted — both ends are drafts: it waits for one of them to be placed'
+    timeout: 10000
+- tapOn:
+    id: drafts.filter.all
+- assertVisible: '.*N, ERN4-RM-120 Equipment Rack 18U \(draft, 01\), P-NSPS-D \(draft, 02\), 02, 0.90, R, ✓ waits for placing.*'
+- tapOn:
+    id: drafts.filter.open

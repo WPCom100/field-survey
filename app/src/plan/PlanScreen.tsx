@@ -1049,7 +1049,7 @@ export function PlanScreen(props: PlanScreenProps) {
           testID="plan.search"
         />
         <View style={styles.spacer} />
-        <BarButton label="Layers" open={menu === 'layers'} onPress={() => setMenu(menu === 'layers' ? null : 'layers')} />
+        <BarButton label="Layers" open={menu === 'layers'} onPress={() => setMenu(menu === 'layers' ? null : 'layers')} testID="plan.layers" />
         {status ? <Text style={styles.status} numberOfLines={1}>{status}</Text> : null}
       </View>
 
@@ -1606,16 +1606,17 @@ export function PlanScreen(props: PlanScreenProps) {
               ) : null}
               {menu === 'layers' ? (
                 <>
-                  <MenuItem label="Pins" on={prefs.layers.pins} onPress={() => setLayer('pins')} />
-                  <MenuItem label="Labels (device type)" on={prefs.layers.labels} onPress={() => setLayer('labels')} />
-                  <MenuItem label="Photos (camera mark)" on={prefs.layers.photos} onPress={() => setLayer('photos')} />
-                  <MenuItem label="Ink (all users)" on={prefs.layers.ink} onPress={() => setLayer('ink')} />
+                  <MenuItem label="Pins" on={prefs.layers.pins} onPress={() => setLayer('pins')} testID="layer.pins" />
+                  <MenuItem label="Labels (device type)" on={prefs.layers.labels} onPress={() => setLayer('labels')} testID="layer.labels" />
+                  <MenuItem label="Photos (camera mark)" on={prefs.layers.photos} onPress={() => setLayer('photos')} testID="layer.photos" />
+                  <MenuItem label="Ink (all users)" on={prefs.layers.ink} onPress={() => setLayer('ink')} testID="layer.ink" />
                   <MenuItem
                     label="Boundaries (source sheets)"
                     on={prefs.layers.boundaries && !!plan?.sheet?.features.boundaries.length}
                     disabled={!plan?.sheet?.features.boundaries.length}
                     note={plan?.sheet?.features.boundaries.length ? undefined : 'No boundary data for this sheet'}
                     onPress={() => setLayer('boundaries')}
+                    testID="layer.boundaries"
                   />
                 </>
               ) : null}
@@ -1821,10 +1822,10 @@ function Centered({ text, spinner }: { text?: string; spinner?: boolean }) {
   );
 }
 
-function BarButton({ label, count, open, onPress }: { label: string; count?: number; open: boolean; onPress: () => void }) {
+function BarButton({ label, count, open, onPress, testID }: { label: string; count?: number; open: boolean; onPress: () => void; testID?: string }) {
   const on = !!count;
   return (
-    <Pressable style={[styles.chip, (on || open) && styles.chipOn]} onPress={onPress}>
+    <Pressable style={[styles.chip, (on || open) && styles.chipOn]} onPress={onPress} testID={testID}>
       <Text style={[styles.chipText, (on || open) && styles.chipTextOn]}>
         {label}
         {count ? ` (${count})` : ''} ▾
@@ -1840,9 +1841,10 @@ function MenuItem(props: {
   swatch?: { fill: string; hollow: boolean; glyph: string };
   disabled?: boolean;
   note?: string;
+  testID?: string;
 }) {
   return (
-    <Pressable style={styles.menuItem} onPress={props.disabled ? undefined : props.onPress}>
+    <Pressable style={styles.menuItem} onPress={props.disabled ? undefined : props.onPress} testID={props.testID}>
       <Text style={[styles.menuCheck, props.disabled && styles.disabled]}>{props.on ? '☑' : '☐'}</Text>
       {props.swatch ? <Swatch {...props.swatch} /> : null}
       <View style={styles.menuLabelBox}>

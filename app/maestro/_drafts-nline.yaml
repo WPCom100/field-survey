@@ -1,0 +1,54 @@
+# S2 (T133 "The N line answers itself"): on Review drafts → 03 the open P-NSPS-D draft's line "No
+# network (N) run drawn to P-NSPS-D on the riser"; a hand N cable draft with its To set (Change…) to
+# that draft clears it at once, without accepting the NSPS; rejecting the N draft brings it back.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: drafts.level.03
+- tapOn:
+    id: drafts.tab.cables
+- assertVisible: '• No network \(N\) run drawn to P-NSPS-D on the riser'
+- tapOn:
+    id: drafts.addCable
+- tapOn:
+    id: drafts.new.code.N
+- tapOn:
+    id: drafts.new.from
+- inputText: Maestro switch
+- tapOn:
+    id: drafts.new.to
+- inputText: Maestro NSPS
+- tapOn: 'To \(as written\)'       # a plain label: closes the keyboard over Add draft
+- tapOn:
+    id: drafts.new.addCable
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Draft added
+    timeout: 10000
+- tapOn:
+    id: draft.cable.change.to
+- tapOn:
+    id: draft.cable.search
+- inputText: P-NSPS-D
+- tapOn: '◌ P-NSPS-D \(draft, 03\).*'
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Endpoint set
+    timeout: 10000
+- assertNotVisible: '• No network \(N\) run drawn to P-NSPS-D on the riser'
+- tapOn:
+    id: draft.reject
+- tapOn:
+    id: draft.reject.reason
+- inputText: Maestro N line
+- tapOn: 'Why reject it\?'          # closes the keyboard over Reject
+- tapOn:
+    id: draft.reject.submit
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Rejected
+    timeout: 10000
+- assertVisible: '• No network \(N\) run drawn to P-NSPS-D on the riser'

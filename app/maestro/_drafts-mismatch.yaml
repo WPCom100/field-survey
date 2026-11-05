@@ -1,0 +1,33 @@
+# S2 (T44 "Mismatch list", T133): on Review drafts → 01, the mismatch list under the table. A line
+# selects its draft; the SR / LR sensor's line goes once it is accepted with a pick, and comes back
+# when it is reopened. Accept all ≥ 0.9 asks first (Cancel here).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: drafts.tab.devices
+- tapOn: '• BOM qty 1 ≠ riser 2 \(PI1004\)'
+- assertVisible: 'Quantity — the sources differ'
+- assertVisible: '○ BOM 1'
+- assertVisible: '○ Riser 2'
+- tapOn: '• SR or LR\? P-DOC-C-SR / P-DOC-C-LR — pick one'
+- assertVisible: 'Model — pick one; nothing is chosen for you \(D28\)'
+- tapOn: '○ P-DOC-C-SR'
+- tapOn:
+    id: draft.accept
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Accepted
+    timeout: 10000
+- assertNotVisible: '• SR or LR\? P-DOC-C-SR / P-DOC-C-LR — pick one'
+- tapOn: Reopen
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Reopened
+    timeout: 10000
+- assertVisible: '• SR or LR\? P-DOC-C-SR / P-DOC-C-LR — pick one'
+# Accept all asks first
+- tapOn: 'Accept all ✓ ≥ 0.9 \([1-9]\d*\)'
+- assertVisible: 'Accept all ≥ 0.9 on 01\?'
+- tapOn: Cancel

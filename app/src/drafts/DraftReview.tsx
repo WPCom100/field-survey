@@ -311,7 +311,7 @@ function CableTable({ rows, selected, onSelect }: { rows: CableDraftRow[]; selec
         ))}
       </View>
       {rows.map((c) => (
-        <Pressable key={c.id} onPress={() => onSelect(c.id)} style={[styles.tr, selected === c.id && styles.trOn]}>
+        <Pressable key={c.id} onPress={() => onSelect(c.id)} style={[styles.tr, selected === c.id && styles.trOn]} testID={`drafts.cable.${c.code ?? 'unknown'}`}>
           <Text style={[styles.cCode, !c.code && styles.warn]}>{c.code ?? '?'}</Text>
           <Text style={styles.cFrom} numberOfLines={1}>
             {c.ends.from?.label ?? c.fromLabel ?? '—'}
@@ -762,7 +762,12 @@ function Excluded({ batches, data, level, levelCode, run, editor, projectId }: {
               {promoted.has(l.key) ? (
                 <Text style={styles.green}>promoted ✓</Text>
               ) : (
-                <Btn title="Promote…" small onPress={() => void run(() => promoteExcluded(editor, projectId, l.batch, l, levelFor(l)), 'Promoted — pick its category and Accept')} />
+                <Btn
+                  title="Promote…"
+                  small
+                  // promoteExcluded returns the new draft's id, which run() would show as the notice (T158)
+                  onPress={() => void run(() => promoteExcluded(editor, projectId, l.batch, l, levelFor(l)).then(() => 'Promoted — pick its category and Accept'))}
+                />
               )}
             </View>
           ))

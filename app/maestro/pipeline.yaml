@@ -18,40 +18,31 @@ name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
     id: newProject.name
 - inputText: ${PROJECT}
 # B2, B1, 01–04, 06, 06M: one level at a time (Add range makes out-of-scope levels), each added
-# with Return: the "+ Add level" button slides under the keyboard as the table grows (T154)
+# with Return: the "+ Add level" button slides under the keyboard as the table grows (T154). The
+# field keeps focus after Return, so it is tapped once: re-tapped, it sits under the keyboard by the
+# fifth level and the tap types a key into it ("403", "E04", T158)
 - tapOn:
     id: newProject.levelCode
 - inputText: B2
 - pressKey: Enter
-- tapOn:
-    id: newProject.levelCode
 - inputText: B1
 - pressKey: Enter
-- tapOn:
-    id: newProject.levelCode
 - inputText: '01'
 - pressKey: Enter
-- tapOn:
-    id: newProject.levelCode
 - inputText: '02'
 - pressKey: Enter
-- tapOn:
-    id: newProject.levelCode
 - inputText: '03'
 - pressKey: Enter
-- tapOn:
-    id: newProject.levelCode
 - inputText: '04'
 - pressKey: Enter
-- tapOn:
-    id: newProject.levelCode
 - inputText: '06'
 - pressKey: Enter
-- tapOn:
-    id: newProject.levelCode
 - inputText: 06M
 - pressKey: Enter
+- waitForAnimationToEnd:         # the form scrolls itself to the bottom after each Return: a tap
+    timeout: 5000                #   meanwhile landed on 01's numbering picker (T158)
 - tapOn: Levels                 # closes the keyboard over Create
+- assertNotVisible: own group    # no numbering picker open (its list's first chip)
 - scrollUntilVisible:
     element:
       id: newProject.create

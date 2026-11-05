@@ -1,0 +1,113 @@
+# S2 (T136, D237): a cable with one placed end is made at once. The 06M rack draft (ERN4-RM-120,
+# "Equipment Rack 18U") is accepted and placed on the 06M sheet; the riser's F run from the 01 rack
+# draft to it is confirmed → made on the placed end, its far end waiting for the 01 draft. On the
+# placed rack's card the run reads "(draft on 01, not placed yet)"; its end editor has this end
+# editable and the far end not on a plan yet; this end Not installed → the R3a Run draft. Cable /
+# riser lists side B as the draft. Starts and ends on Review drafts (Setup).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: drafts.level.06M
+- tapOn:
+    id: drafts.tab.devices
+- tapOn: '.*ERN4-RM-120, Equipment Rack 18U, Equipment Panels, 1, .*'
+- tapOn:
+    id: draft.accept
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Accepted
+    timeout: 10000
+# 5 Place devices → 06M → the rack → a spot → Place ✓
+- tapOn:
+    id: setup.step.place
+- tapOn:
+    id: setup.place.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: place.item
+    timeout: 60000
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '.*ERN4-RM-120.*'
+      AT: 40%,50%
+      PLACED: 'Placed 06M-\? Equipment Rack 18U\.'
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.back
+# back on Review drafts: the F run 01 rack → 06M rack, its To now the placed device
+- tapOn:
+    id: setup.step.drafts
+- tapOn:
+    id: drafts.level.01
+- tapOn:
+    id: drafts.tab.cables
+- tapOn: '.*F, ERN4-RM-120 Equipment Rack 18U \(draft, 01\), .*'
+- assertVisible: 'ERN4-RM-120 Equipment Rack 18U \(draft, 01\)  \(not placed yet\)'
+- tapOn:
+    id: draft.cable.confirm
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: 'Accepted — the cable is made on the placed end; its far end follows when that draft is placed'
+    timeout: 10000
+- tapOn:
+    id: drafts.filter.all
+- assertNotVisible: '.*F, ERN4-RM-120 Equipment Rack 18U \(draft, 01\), .*waits for placing.*'
+- tapOn:
+    id: drafts.filter.open
+# the placed rack's card on 06M (Setup has no sidebar: the plan through Sources)
+- tapOn:
+    id: setup.step.sources
+- scrollUntilVisible:
+    element:
+      id: plans.open.06M
+    direction: DOWN
+- tapOn:
+    id: plans.open.06M
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 60000
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: 'plan\.device\.06M-.*'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.connections
+- assertVisible: '.*F → .*\(draft on 01, not placed yet\).*'
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: '(C-\d+|NEW)'
+- assertVisible: '.*not on the plan yet.*'
+- tapOn:
+    id: end.this.status.Not installed
+- assertVisible:
+    id: end.this.status.Not installed
+    text: '✓ Not installed'
+- tapOn:
+    id: end.back
+- extendedWaitUntil:              # the rules run after the edit
+    visible: 'zz-never-shown'
+    timeout: 3000
+    optional: true
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.accept\.Run .* to .*'
+- assertVisible:
+    id: 'proposal\.accept\.Run .* to .*'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: setup.step.drafts

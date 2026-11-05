@@ -86,6 +86,12 @@ usage: bash scripts/mac/rig.sh <command>
   export                R6 (T157): offline station-setup.yaml export-edit.yaml export-check.yaml
                         device:status (the gate offline, then a workbook and a floor PDF to Ready)
   projects              R7 (T157): projects.yaml on A, then projects-offline.yaml with the server stopped
+  photos                F5 (T158): media on A, photos.yaml, then the server holds each photo once, uploaded whole
+  drafts [--device A|B] S2 (T158): drafts.yaml (its own pipeline project, then the riser drafts), then the
+                        server holds the confirm whose reason names the drafts by model
+  lock                  S3 (T158): lock.yaml on A (Ann), lock-peer.yaml on B (Bob), lock-check.yaml on A
+  ink                   F6 (T158): ink-setup.yaml on A (Ann), ink-peer.yaml on B (Bob), ink-check.yaml on A; each
+                        sees the other's stroke in its log (ink_loaded)
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
      RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
@@ -280,6 +286,11 @@ cmd_flows() {
     else
       cmd_files "$dev" fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx
     fi
+  fi
+  # flows that make their own pipeline project first (drafts.yaml runs pipeline.yaml, T158): the
+  # three files it taps by position, in name order
+  if grep -q "runFlow: pipeline.yaml" "$ROOT/app/maestro/${flow:-smoke.yaml}" 2>/dev/null; then
+    cmd_files "$dev" fixtures/BOM.pdf "fixtures/Level_06M_-_Lighting_Composite_vector.pdf" fixtures/riser.pdf
   fi
   udid="$(sim_for "$dev")"
   command -v maestro >/dev/null || export PATH="$HOME/.maestro/bin:$PATH"
@@ -580,6 +591,71 @@ cmd_export() {  # R6 (T157): the export gate offline, then a workbook and a floo
   say "export: green"
 }
 
+server_sql() {  # project name, sql (reads :'name') -> rows, space-separated (T158)
+  printf "%s\n" "$2" \
+  | (cd "$ROOT/server" && $COMPOSE exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -F" " -v ON_ERROR_STOP=1 -v name="$1"' psql "$1")
+}
+
+cmd_photos() {  # F5 (T158): library photos, a kill while queued, a link, + Photo here; then each photo once on the server
+  local rows
+  server_up
+  cmd_media A
+  USER_NAME=Ann cmd_flows --device A photos.yaml
+  # every photo once (a resumed upload must not make a second record), each with its image and
+  # thumbnail uploaded whole, and the one link to 06M-S2
+  rows="$(server_sql "$PROJECT" "select count(*), count(distinct ph.id),
+      count(*) filter (where ph.device_id is null),
+      count(*) filter (where bi.upload_state = 'complete' and bt.upload_state = 'complete'),
+      (select count(*) from photo_link pl join photo p2 on p2.id = pl.photo_id join level l2 on l2.id = p2.level_id
+         join project q on q.id = l2.project_id where q.name = :'name' and pl.target_kind = 'device' and pl.deleted_at is null)
+    from photo ph join level l on l.id = ph.level_id join project p on p.id = l.project_id
+    left join blob bi on bi.sha256 = ph.image_blob left join blob bt on bt.sha256 = ph.thumb_blob
+    where p.name = :'name' and ph.deleted_at is null;")"
+  say "server photos on \"$PROJECT\" (rows, distinct, level-only, uploaded whole, device links): $rows"
+  [ "$rows" = "2 2 1 2 1" ] || die "expected 2 photos (one on the level only), both uploaded whole, one device link; got: $rows"
+  say "photos: green"
+}
+
+cmd_drafts() {  # S2 (T158): drafts.yaml on its own pipeline project, then the confirm's reason on the server (T137)
+  local n
+  server_up
+  cmd_flows --device "$(device_arg "$@")" drafts.yaml
+  n="$(server_sql "$PROJECT" "select count(*) from op o join project p on p.id = o.project_id
+    where p.name = :'name' and o.state = 'applied'
+      and o.reason = 'Draft review: endpoint confirmed N ERN4-RM-120 Equipment Rack 18U (draft, 01) → P-NSPS-D (draft, 02)';")"
+  say "applied ops whose reason names the drafts by model (T137): $n"
+  [ "${n:-0}" -ge 1 ] || die "no applied op with the confirm's reason naming P-NSPS-D (draft, 02)"
+  say "drafts: green"
+}
+
+cmd_lock() {  # S3 (T158): the Rules tab, a lock and an assignment on A; B sees them and unticks; A follows and unlocks
+  cmd_second
+  say "lock on \"$PROJECT\": A (Ann) changes rules, locks 06M, assigns 06 to Ann; B (Bob) sees it and unticks; A unlocks"
+  USER_NAME=Ann cmd_flows --device A lock.yaml
+  USER_NAME=Bob cmd_flows --device B lock-peer.yaml
+  USER_NAME=Ann cmd_flows --device A lock-check.yaml
+  say "lock: green"
+}
+
+log_since() {  # A|B, ISO time, regex -> the app's log lines at or after that time that match (T158)
+  ( cmd_log "$1" >/dev/null ) || return 1
+  cat "$OUT/log-$1"/*.log | awk -v t="$2" '$1 >= t' | grep -E "$3"
+}
+
+cmd_ink() {  # F6 (T158): Ann's stroke and the layer switch on A, B sees it and draws, A sees B's
+  local t0 t1
+  cmd_second
+  say "ink on \"$PROJECT\": A (Ann) draws and switches the layer, B (Bob) sees it and draws, A sees both"
+  t0="$(date -u +%Y-%m-%dT%H:%M:%S)"
+  USER_NAME=Ann cmd_flows --device A ink-setup.yaml
+  USER_NAME=Bob cmd_flows --device B ink-peer.yaml
+  log_since B "$t0" 'ink_loaded .*"others":1' || die "B's log has no ink_loaded with Ann's one stroke since $t0"
+  t1="$(date -u +%Y-%m-%dT%H:%M:%S)"
+  USER_NAME=Ann cmd_flows --device A ink-check.yaml
+  log_since A "$t1" 'ink_loaded \{"layers":2,"mine":1,"others":1\}' || die "A's log has no ink_loaded with both layers since $t1"
+  say "ink: green"
+}
+
 cmd_status() {
   say "simulators:"; xcrun simctl list devices | grep -E "$SIM_A|$SIM_B" || echo "  none"
   say "build: $(built_app || echo none)"
@@ -613,6 +689,10 @@ case "${1:-}" in
   projects) cmd_projects ;;
   review) cmd_review ;;
   export) cmd_export ;;
+  photos) cmd_photos ;;
+  ink) cmd_ink ;;
+  lock) cmd_lock ;;
+  drafts) shift; cmd_drafts "$@" ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;
 esac
