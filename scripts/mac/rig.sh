@@ -92,6 +92,8 @@ usage: bash scripts/mac/rig.sh <command>
   lock                  S3 (T158): lock.yaml on A (Ann), lock-peer.yaml on B (Bob), lock-check.yaml on A
   ink                   F6 (T158): ink-setup.yaml on A (Ann), ink-peer.yaml on B (Bob), ink-check.yaml on A; each
                         sees the other's stroke in its log (ink_loaded)
+  library-two           S4 (T158): library-two.yaml on A (Ann: a type, its card, kits, a pin shape, an app-library
+                        type), library-two-peer.yaml on B (Bob sees each and puts the app-wide ones back)
   sheets                S5 (T158): sheets-old.yaml on A with a generated older DaVinci_categories.xlsx (ERn →
                         Equipment), sheets-new.yaml with the current one; the server's two batches each
                         corrected the ERn category and no Neuron flag. Alone: the app library is server-wide
@@ -648,11 +650,22 @@ cmd_sheets() {  # S5 (T158): two DaVinci uploads — an older categories workboo
   # imported": the library gets this run's timestamp (a "newer copy from DaVinci")
   stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   rm -rf "$d1" "$d2" "$OUT/sheets-0"; mkdir -p "$d1" "$d2" "$OUT/sheets-0"
+  # the second upload also carries a new DaVinci type whose model sheets-new.yaml first makes by
+  # hand in the app library (T111: "1 model clash", the hand-made type untouched)
   for n in 0 1 2; do
-    python3 - "$ROOT/fixtures/davinci-library-sample.json" "$OUT/sheets-$n/davinci-library-sample.json" "$stamp rig $n" <<'PY'
-import json, sys
+    python3 - "$ROOT/fixtures/davinci-library-sample.json" "$OUT/sheets-$n/davinci-library-sample.json" "$stamp rig $n" \
+      "$([ $n = 2 ] && echo "MAESTRO-CLASH-${PROJECT//[^0-9]/}")" <<'PY'
+import copy, json, sys, uuid
 d = json.load(open(sys.argv[1]))
 d["timestamp"] = sys.argv[3]
+if sys.argv[4]:
+    items = lambda t: ((t.get("modelInformation") or {}).get("generatorData") or {}).get("items") or []
+    # the Paradigm 7" touchscreen (its model pattern is "P-TS7-E" + a property)
+    src = next(t for t in d["types"] if [i.get("value") for i in items(t)][:1] == ["P-TS7-E"])
+    t = copy.deepcopy(src)
+    t["typeId"] = str(uuid.uuid4())
+    t["modelInformation"]["generatorData"]["items"] = [{"type": "string", "value": sys.argv[4]}]
+    d["types"].append(t)
 json.dump(d, open(sys.argv[2], "w"), indent=1)
 PY
   done
@@ -686,6 +699,19 @@ PY
   echo "$rows" | awk 'NF == 4 && $1 >= 1 && $2 == 0 && $3 >= 1 && $4 == 0 { ok = 1 } END { exit !ok }' \
     || die "expected two batches, each with a category corrected and no Neuron flag; got: $rows"
   say "sheets: green"
+}
+
+cmd_library_two() {  # S4 (T158): the second-iPad halves of the library, chips, kits and pin shapes
+  local n
+  cmd_second
+  say "library-two on \"$PROJECT\": A (Ann) sets up a station type, its card, a kit choice, Station → Square and an app type; B (Bob) sees them"
+  USER_NAME=Ann cmd_flows --device A library-two.yaml
+  USER_NAME=Bob cmd_flows --device B library-two-peer.yaml
+  n="$(server_sql "$PROJECT" "select count(*) from cable c join project p on p.id = c.project_id
+    where p.name = :'name' and c.deleted_at is null and c.cable = 'N' and c.term_kit = false;")"
+  say "N cables on \"$PROJECT\" with Termination kits No on the server: $n"
+  [ "${n:-0}" -eq 1 ] || die "expected one N cable with term_kit false"
+  say "library-two: green"
 }
 
 log_since() {  # A|B, ISO time, regex -> the app's log lines at or after that time that match (T158)
@@ -743,6 +769,7 @@ case "${1:-}" in
   photos) cmd_photos ;;
   ink) cmd_ink ;;
   lock) cmd_lock ;;
+  library-two) cmd_library_two ;;
   sheets) cmd_sheets ;;
   drafts) shift; cmd_drafts "$@" ;;
   -h|--help|help|"") usage ;;

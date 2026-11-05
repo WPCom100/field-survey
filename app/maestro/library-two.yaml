@@ -1,0 +1,272 @@
+# S4 step 1 of `rig.sh library-two` (T158, the second-iPad halves), on A as Ann: a new project with
+# the 06M sheet and a station typed freely (`Maestro L2 station`: a draft project type, its card
+# has a Neuron ID section). The type: Neuron ID Not needed, optional N → switch (Far Network
+# switch), accessory Back box → Save, Accept, a type chip `Maestro L2 chip`. The card: the chip,
+# `+ add N → switch` and `+ add Back box` added, no Neuron ID section. After a sync the new
+# connection (C-01) → Termination kits No. Vocabulary → Pin shapes: Station → Square (app-wide;
+# B puts it back). App library: + New type MAESTRO-A2-<n> accepted (B rejects it). Sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Library two — Ann's type, chip, kits, pin shape and app-library type
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- runFlow: _new-project.yaml
+- runFlow: _sources.yaml
+- runFlow: _logbox.yaml     # T161's toast can cover the screen after the pulls
+- tapOn:
+    id: plans.open.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 60000
+- runFlow:
+    file: _add-here.yaml
+    env:
+      AT: 30%,45%
+      CAT: Station
+      MODEL: Maestro L2 station
+      IDRE: '06M-S1'
+# a station rides the Unison bus: its card asks for a Neuron ID
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.neuron.type
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: setup.home            # the plan was opened from Setup, which has no sidebar
+
+# the type the free-typed model made
+- tapOn:
+    id: nav.library
+- tapOn:
+    id: library.search
+- inputText: Maestro L2
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: '.*Maestro L2 station.*'
+- assertVisible: 1 device · draft
+- scrollUntilVisible:
+    element:
+      id: library.neuron.not
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.neuron.not
+- scrollUntilVisible:
+    element:
+      id: library.optional.add
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.optional.add
+- scrollUntilVisible:
+    element:
+      id: library.optional.0.code.N
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.optional.0.code.N
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.optional.0.to
+      TEXT: switch
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.optional.0.far
+      TEXT: Network switch
+# "+ add" of the accessories sits half under the fixed Save footer: push the pane up first
+- scrollUntilVisible:
+    element:
+      id: library.acc.add
+    direction: DOWN
+    centerElement: true
+- swipe:
+    start: 66%,75%
+    end: 66%,40%
+    duration: 500
+- waitForAnimationToEnd
+- tapOn:
+    id: library.acc.add
+- extendedWaitUntil:
+    visible:
+      id: library.acc.0.model
+    timeout: 5000
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.acc.0.model
+      TEXT: Back box
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- tapOn:
+    id: library.accept
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Accepted.
+    timeout: 10000
+- assertVisible: 1 device · accepted
+- scrollUntilVisible:
+    element:
+      id: sugg.input
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: sugg.input
+- inputText: Maestro L2 chip
+- pressKey: Enter          # onSubmitEditing adds it
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added "Maestro L2 chip" as a draft.
+    timeout: 10000
+- tapOn: ◀ Levels
+
+# the card: the chip, no Neuron ID, the optional run and the accessory added
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.notes
+- assertVisible: Maestro L2 chip
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.offer.N → switch
+- tapOn:
+    id: card.offer.N → switch
+- extendedWaitUntil:
+    notVisible:
+      id: card.offer.N → switch
+    timeout: 10000
+- assertVisible: '.*N → switch.*'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.offer.Back box
+- tapOn:
+    id: card.offer.Back box
+- extendedWaitUntil:
+    visible: Back box expected 1.*
+    timeout: 10000
+- assertNotVisible:
+    id: card.offer.Back box
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.punch
+- assertNotVisible:
+    id: card.neuron.type
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- runFlow: _sync.yaml
+
+# the new run, numbered: Termination kits No
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-01
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-01
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: end.termkit.no
+- assertVisible:
+    id: end.termkit.as
+    selected: true
+- tapOn:
+    id: end.termkit.no
+- extendedWaitUntil:
+    visible:
+      id: end.termkit.no
+      selected: true
+    timeout: 10000
+- tapOn:
+    id: end.back
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# Pin shapes (app-wide): Station → Square
+- tapOn:
+    id: nav.vocabulary
+- tapOn:
+    id: vocab.tab.shapes
+- tapOn:
+    id: vocab.shape.station.square
+- extendedWaitUntil:
+    visible:
+      id: vocab.shape.station.square
+      selected: true
+    timeout: 10000
+- tapOn: ◀ Levels
+
+# the app library: a type accepted (B sees it with no project open)
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- assertVisible: 'App device-type library.*'
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: MAESTRO-A2-${output.n}
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added MAESTRO-A2-${output.n} as a draft.
+    timeout: 10000
+- tapOn:
+    id: library.accept
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Accepted.
+    timeout: 10000
+- tapOn: ◀ Projects
+- scrollUntilVisible:          # the Projects screen has no sidebar: open PROJECT from its list
+    element:
+      id: projects.open.${PROJECT}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 30000
+- runFlow: _sync.yaml

@@ -1,0 +1,165 @@
+# S4 step 2 of `rig.sh library-two` (T158), on B as Bob after A's library-two.yaml: after a sync
+# the app library lists MAESTRO-A2-<n> accepted (T61; Bob then rejects it: new projects copy the
+# app library's accepted types); Pin shapes reads Station on Square (T104; Bob puts it back to
+# Circle — app-wide); the project's Library: `Maestro L2 station` accepted, Neuron ID Not needed,
+# the optional N → switch, the draft chip (T48, T68, T99); 06M-S1's card: the chip, no Neuron ID,
+# the N → switch connection and `Back box expected 1` with neither offered (T105); C-01's
+# Termination kits No (T103). Sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Library two — B sees Ann's library, card, kits and pin shape
+---
+# keep the store (no clearState): a fresh one downloads every rig project first (T156)
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- runFlow: _sync.yaml
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- runFlow: _open-project.yaml   # downloads A's new project (Refresh from server), so it is listed below
+
+# the app library (the Projects screen, no project open), then put back
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- assertVisible: 'App device-type library.*'
+- tapOn:
+    id: library.search
+- inputText: MAESTRO-A2-${output.n}
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: MAESTRO-A2-${output.n}.*
+- assertVisible: 0 devices · accepted
+- tapOn:
+    id: library.reopen
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Back to draft.
+    timeout: 10000
+- tapOn:
+    id: library.reject
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Rejected: .*'
+    timeout: 10000
+- tapOn: ◀ Projects
+- scrollUntilVisible:          # the Projects screen has no sidebar: open PROJECT from its list
+    element:
+      id: projects.open.${PROJECT}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 30000
+
+# Pin shapes: A's Square arrived; back to Circle (app-wide, every flow expects Circle)
+- tapOn:
+    id: nav.vocabulary
+- tapOn:
+    id: vocab.tab.shapes
+- assertVisible:
+    id: vocab.shape.station.square
+    selected: true
+- assertVisible:
+    id: vocab.shape.station
+    text: '.*Station.*shares its shape with another role'
+- tapOn:
+    id: vocab.shape.station.circle
+- extendedWaitUntil:
+    visible:
+      id: vocab.shape.station.circle
+      selected: true
+    timeout: 10000
+- tapOn: ◀ Levels
+
+# the project's library
+- tapOn:
+    id: nav.library
+- tapOn:
+    id: library.search
+- inputText: Maestro L2
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: '.*Maestro L2 station.*'
+- assertVisible: 1 device · accepted
+- scrollUntilVisible:
+    element:
+      id: library.neuron.not
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: library.neuron.not
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: library.optional.0.far
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: library.optional.0.far
+    text: Network switch
+- scrollUntilVisible:
+    element:
+      id: sugg.row.Maestro L2 chip
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: sugg.row.Maestro L2 chip
+    text: DRAFT Maestro L2 chip
+- tapOn: ◀ Levels
+
+# the card
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.notes
+- assertVisible: Maestro L2 chip
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-01
+- assertVisible: '.*N → switch.*'
+- assertNotVisible:
+    id: card.offer.N → switch
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.punch
+- assertVisible: Back box expected 1.*
+- assertNotVisible:
+    id: card.offer.Back box
+- assertNotVisible:
+    id: card.neuron.type
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.conn.C-01
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-01
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: end.termkit.no
+- assertVisible:
+    id: end.termkit.no
+    selected: true
+- tapOn:
+    id: end.back
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- runFlow: _sync.yaml
