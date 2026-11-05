@@ -34,6 +34,8 @@ team Ann / Bob), never to the Droplet.
 | `drafts.yaml` | `rig.sh drafts` (`--device B` too) | S2 (T158): its own pipeline project (`pipeline.yaml`), then Setup → 4 Review drafts: 01's riser N run to `P-NSPS-D (draft, 02)` with `· riser: PARADIGM P-NSPS-DIN`, the source crop enlarged and closed, Change… by model and by `DIN`, Confirm endpoint → waits for placing; 01's mismatch list (a line selects its draft, SR / LR gone once accepted and back on Reopen), Accept all asks first; an excluded BOM line promoted; 03's NSPS N line answered by a hand N draft and back when it is rejected; the 06M rack placed and 01's F run to it made at once (`draft on 01, not placed yet` on its card and in Cable / riser, its end surveyed). `rig.sh` then finds the confirm's reason naming the drafts on the server (about 10 min) |
 | `ink-setup.yaml`, `ink-peer.yaml`, `ink-check.yaml` | `rig.sh ink` | F6 (T158): A (Ann) a project with the 06M sheet, a stroke (`Saved`), Layers → Ink (all users) off and on; B (Bob) syncs and opens 06M (its log: `ink_loaded … "others":1`), draws its own stroke, syncs; A syncs and opens 06M (`ink_loaded {"layers":2,"mine":1,"others":1}`). The same-name merge is O3 (`rig.sh same-user`) |
 | `lock.yaml`, `lock-peer.yaml`, `lock-check.yaml` | `rig.sh lock` | S3 (T158, part): A (Ann) a seed copy, C-23's Run item accepted; the Rules tab — all on the defaults, Only what is changed, R3a Run item owner → ETC with Reset, Review accepted items ▸ → the reword ruling applied, a new signal code ZZ in every per-code table; Lock 06M; 06 × Ann (`06  ●`, Assigned to me); B (Bob) sees the lock, the rule change and the assignment and unticks it; A follows and unlocks with a reason (about 18 min) |
+| `rules.yaml` | `rig.sh flows rules.yaml` | S3 (T158, the rest): A (Ann) a seed copy with C-23 and C-12 Run items accepted and 06M-04's C-13 Run draft open; R3a Run item owner → ETC on the draft, not the accepted items, the box with an untick and the one left, Reset, the draft rejected; Run item text → `Pull <signal> to <far end>` → one reword ruling over both items (each its own far end), the rejected draft back as "Pull DMX to …", the stored ruling (no Standing, Preview again names the pulled run's item), Reset; R4b kits per code and the cable's own Yes / No against the "no term kit" chip (C-17 N, C-23 X); R3c's per-code tables and the DMX owner on Lint's drafts; the Spot-check owner (about 20 min) |
+| `sheets-old.yaml`, `sheets-new.yaml` | `rig.sh sheets` (alone) | S5 (T158, T144, T130): a new project; the DaVinci library with an older categories workbook rig.sh generates (ERn → Equipment) → n categories corrected; an ERn2 device under Equipment; P-NSPS-D's Neuron ID Needed by hand; then the current workbook with a newer library.json → n categories corrected and no Neuron flag; ERn2 under Equipment Panels, P-NSPS-D still Needed (set back); Lint's "Category differs from its type (1)" → Fix all via ruling. rig.sh checks both batches on the server |
 
 | Sub-flow | Walks |
 |---|---|
@@ -43,6 +45,7 @@ team Ann / Bob), never to the Droplet.
 | `_connect.yaml` | Connect to server (URL, token) → pick the name `USER`; re-signs in when the keychain holds another name |
 | `_new-project.yaml` | Projects → + New project (`PROJECT`, level 06M) → home → open the level → back |
 | `_sources.yaml` | Setup → 3 Sources: DaVinci (two files), then the 06M display sheet; waits for both jobs |
+| `_davinci.yaml` | Setup → 3 Sources → DaVinci library: the first two files of "On My iPad", then the Done / Already imported line (`_sources.yaml`'s first half) |
 | `_sheet.yaml` | Setup → 3 Sources → the 06M display sheet from Files at `AT` (env), waits for the job and the sheet |
 | `_pick-wait.yaml` | waits for the Files picker before a position tap |
 | `_drafts.yaml` | Setup → 4 Review drafts: three hand drafts, accepted / edited / rejected |
@@ -76,6 +79,7 @@ team Ann / Bob), never to the Droplet.
 | `_photo-library.yaml` | the card's 🖼 Library → the picker (a position, `PHOTO_AT`) → Save → `Photos (1)` |
 | `_drafts-endpoint.yaml`, `_drafts-mismatch.yaml`, `_drafts-excluded.yaml`, `_drafts-nline.yaml`, `_drafts-waiting.yaml` | the steps of `drafts.yaml` (each starts on Review drafts) |
 | `_lock-rules.yaml`, `_lock-baseline.yaml` | the steps of `lock.yaml` (the Rules tab; Lock 06M and 06 × Ann) |
+| `_rules-setup.yaml`, `_rules-owner.yaml`, `_rules-reword.yaml`, `_rules-kits.yaml`, `_rules-r3c.yaml` | the steps of `rules.yaml` (two accepted Run items and a draft; owners; the reword ruling; kits; R3c and Spot-check) |
 | `_lint-open.yaml` | Sidebar → Lint, the title loaded, "Drafts with no device" folded (it comes back unfolded on every visit) |
 | `_lint-fold.yaml` | folds the Lint group `GROUP` (env) until its header reads ▸ (a tap while a long group renders is lost) |
 | `_lint-drafts.yaml`, `_lint-findings.yaml` | the steps of `lint.yaml` |

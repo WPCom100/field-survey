@@ -1,0 +1,172 @@
+# S3 (T158) rules step 3 (T103 "The setting", "Per cable"; T118 "Turning network kits off", "One
+# cable's own setting"): R4b Takes termination kits reads X, F, N, NG on and U off; N off → 06M-01's
+# N end C-17 no longer offers "Run, not terminated; no term kit" and its Termination kits read
+# "As N (no)"; Yes on that cable alone offers it again; back to As N. The X cable C-23 reads
+# "As X (yes)"; No → its end no longer offers the note; back to As X. N on again. Starts and ends
+# on Levels. A switch's state is its label ("N: on"), which Maestro matches as its text.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- scrollUntilVisible:
+    element:
+      id: rules.R4b.kit.NG
+    direction: DOWN
+    centerElement: true
+    timeout: 60000           # the Rules tab is long
+- assertVisible:
+    id: rules.R4b.kit.X
+    text: 'X: on'
+- assertVisible:
+    id: rules.R4b.kit.F
+    text: 'F: on'
+- assertVisible:
+    id: rules.R4b.kit.N
+    text: 'N: on'
+- assertVisible:
+    id: rules.R4b.kit.NG
+    text: 'NG: on'
+- assertVisible:
+    id: rules.R4b.kit.U
+    text: 'U: off'
+- tapOn:
+    id: rules.R4b.kit.N
+- extendedWaitUntil:
+    visible:
+      id: rules.R4b.kit.N
+      text: 'N: off'
+    timeout: 10000
+- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- tapOn:
+    id: setup.home
+
+# the N end: no kit note while N is off; the cable's own Yes brings it back
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-01
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-17
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-17
+- assertVisible:
+    id: 'end\.this\.note\.chip\.Run, not terminated'
+- tapOn:
+    id: 'end\.this\.note\.more'
+    text: 'more .*'
+    optional: true
+- assertNotVisible:
+    id: 'end\.this\.note\.chip\.Run, not terminated; no term kit'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: end.termkit.as
+- assertVisible:
+    id: end.termkit.as
+    text: 'As N \(no\)'
+    enabled: false              # the selected option is the disabled one
+- tapOn:
+    id: end.termkit.yes
+- extendedWaitUntil:
+    visible:
+      id: end.termkit.yes
+      enabled: false
+    timeout: 10000
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: 'end\.this\.note\.chip\.Run, not terminated'
+- tapOn:
+    id: 'end\.this\.note\.more'
+    text: 'more .*'
+    optional: true
+- assertVisible:
+    id: 'end\.this\.note\.chip\.Run, not terminated; no term kit'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: end.termkit.as
+- tapOn:
+    id: end.termkit.as
+- extendedWaitUntil:
+    visible:
+      id: end.termkit.as
+      enabled: false
+    timeout: 10000
+- tapOn:
+    id: end.back
+
+# the X cable: As X (yes); No → no kit note on its end
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-23
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-23
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: end.termkit.as
+- assertVisible:
+    id: end.termkit.as
+    text: 'As X \(yes\)'
+    enabled: false
+- tapOn:
+    id: end.termkit.no
+- extendedWaitUntil:
+    visible:
+      id: end.termkit.no
+      enabled: false
+    timeout: 10000
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: 'end\.this\.note\.chip\.Run, not terminated'
+- tapOn:
+    id: 'end\.this\.note\.more'
+    text: 'more .*'
+    optional: true
+- assertNotVisible:
+    id: 'end\.this\.note\.chip\.Run, not terminated; no term kit'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: end.termkit.as
+- tapOn:
+    id: end.termkit.as
+- extendedWaitUntil:
+    visible:
+      id: end.termkit.as
+      enabled: false
+    timeout: 10000
+- tapOn:
+    id: end.back
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# N back on
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- tapOn:
+    id: rules.only            # only the changed rows: no long scroll (T158)
+- tapOn:
+    id: rules.R4b.kit.N
+- extendedWaitUntil:          # N was the only change: back on, nothing is set away
+    visible: Nothing changed yet.
+    timeout: 10000
+- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- tapOn:
+    id: setup.home

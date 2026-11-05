@@ -1,0 +1,55 @@
+# S3 (T158) rules step 0: on a fresh seed copy, two rule-accepted Run items with different far
+# ends (06M-01's C-23 "Run DMX to Level 11" with its kit, `_ends-run`; 06M-02's C-12 "Run DMX to
+# equipment rack") and an open Run draft on 06M-04 (C-13, Issue in the master, set Not installed).
+# Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-01
+- runFlow: _ends-run.yaml
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-02
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.accept.Run DMX to equipment rack
+- tapOn:
+    id: proposal.accept.Run DMX to equipment rack
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.punch.Run DMX to equipment rack
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-04
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.conn.C-13
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-13
+- tapOn:
+    id: end.this.status.Not installed
+- assertVisible: ✓ Not installed
+- tapOn:
+    id: end.back
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.reject\.Run DMX to .*CT04LCPA'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

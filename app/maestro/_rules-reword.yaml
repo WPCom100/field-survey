@@ -1,0 +1,156 @@
+# S3 (T158) rules step 2 (T120, T102 "A rejected draft comes back"): R3a Run item text (any other
+# code) → `Pull <signal> to <far end>`: the box offers ONE entry "2 punch items: Item reworded
+# (2 wordings)" → the reword ruling (Reword from the rule, no Standing switch) → Preview, one row
+# per item with its own far end → Apply. The plan reads "Pull DMX to equipment rack"; 06M-04's
+# rejected draft is offered again as "Pull DMX to …". C-23 is then pulled (Installed, untested):
+# the stored ruling reads "reword Item from its rule", no Standing, and Preview again has nothing
+# to change and names the record its rule no longer words. Reset to default: 06M-04's draft reads
+# "Run DMX to …" again. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- scrollUntilVisible:
+    element:
+      id: 'rules\.R3a\.run\.item\.\*'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'rules\.R3a\.run\.item\.\*'
+- eraseText: 40
+- eraseText: 40           # a tap lands mid-word; eraseText deletes only before the cursor
+- inputText: Pull <signal> to <far end>
+- pressKey: Enter         # commits (onSubmitEditing) and closes the keyboard
+- extendedWaitUntil:
+    visible: 'Run item text  changed'
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: rules.only
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: rules.review
+      text: 'Review accepted items ▸  2 punch items: Item reworded \(2 wordings\)'
+    timeout: 20000
+- tapOn:
+    id: rules.review
+    text: 'Review accepted items ▸  2 punch items: Item reworded \(2 wordings\)'
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview
+    timeout: 15000
+- assertVisible: '.*Reword from the rule.*'
+- assertNotVisible:
+    id: rulings.standing
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '2 changes on 1 level'
+    timeout: 15000
+- assertVisible: '.*Run DMX to Level 11.*Pull DMX to Level 11.*'
+- assertVisible: '.*Run DMX to equipment rack.*Pull DMX to equipment rack.*'
+- assertVisible: Each row reads what its rule now words, the rule parameters as they stand.
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied .*: 2 changes\.'
+    timeout: 15000
+- tapOn: ← Levels
+
+# the plan follows; the rejected draft is offered again in the new wording
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-02
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.punch.Pull DMX to equipment rack
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-04
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.accept\.Pull DMX to .*CT04LCPA'
+# C-23 pulled: its Run item is no longer worded by the rule
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-01
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-23
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-23
+- tapOn:
+    id: end.this.status.Installed, untested
+- assertVisible: ✓ Installed, untested
+- tapOn:
+    id: end.back
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# the stored ruling
+- tapOn:
+    id: nav.rulings
+- tapOn:
+    id: rulings.row
+    text: '.*(Run item text|reworded).*'
+- assertVisible: '.*reword Item from its rule'
+- assertNotVisible:
+    id: rulings.detail.standing
+- tapOn:
+    id: rulings.previewAgain
+- extendedWaitUntil:
+    visible: 'Nothing to change: every matching record is already right.'
+    timeout: 15000
+- assertVisible: '1 record its rule no longer words, left as it is: 06M #\d+\.'
+- tapOn:
+    id: rulings.back
+- tapOn: ← Levels
+
+# Reset to default: the draft reads "Run DMX to …" again
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- tapOn:
+    id: rules.only            # only the changed rows: no long scroll (T158)
+- tapOn:
+    id: 'rules\.R3a\.run\.item\.reset'
+- assertNotVisible: 'Run item text  changed'
+- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- tapOn:
+    id: setup.home
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-04
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.accept\.Run DMX to .*CT04LCPA'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

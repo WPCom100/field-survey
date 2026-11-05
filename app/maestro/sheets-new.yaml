@@ -1,0 +1,108 @@
+# S5 step 2 of `rig.sh sheets` (T158, T144, T130), on A after sheets-old.yaml: Sources → the
+# DaVinci library with the CURRENT categories workbook (and a newer library.json, so the pair is
+# not "Already imported") → "Done: … n categories corrected" and no Neuron flag counted. App
+# library: ERn2-W-120 Mk2 under Equipment Panels; P-NSPS-D still reads Neuron ID Needed (a person's
+# flag stands), set back to By the wires. Lint: "Category differs from its type (1)" for the ERn
+# device → Fix all via ruling → Preview 1 → Apply → the check is gone. Sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Sheets — the current DaVinci categories correct the ERn type
+---
+- runFlow: _resume.yaml
+- runFlow: _open-project.yaml
+- runFlow: _davinci.yaml
+- assertVisible:
+    id: sources.davinci.status
+    text: 'Done: .*\d+ categor(y|ies) corrected.*'
+- assertNotVisible:
+    id: sources.davinci.status
+    text: '.*Neuron flags? corrected.*'
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml
+
+# the app library: ERn2 under Equipment Panels; the hand-set flag stands
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- tapOn:
+    id: library.search
+- inputText: ERn2-W-120
+- pressKey: Enter          # closes the keyboard: it covers the Save footer
+- assertVisible: '(▾ |▸ )?Equipment Panels.*'
+- tapOn:
+    id: library.type
+    text: '.*ERn2-W-120 Mk2.*'
+- assertVisible:
+    id: library.category.Equipment Panels
+    selected: true
+- tapOn:
+    id: library.search
+- eraseText: 30
+- tapOn:                     # a tap lands mid-word and eraseText deletes only before the cursor
+    id: library.search
+- eraseText: 30
+- inputText: P-NSPS-D
+- pressKey: Enter          # closes the keyboard: it covers the Save footer
+- tapOn:
+    id: library.type
+    text: '.*P-NSPS-D.*'
+    index: 0
+- assertVisible:
+    id: library.neuron.needed
+    selected: true
+- tapOn:
+    id: library.neuron.wires
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- tapOn: ◀ Projects
+- tapOn: ◀ Levels
+
+# Lint: the ERn device's category differs from its type's → one ruling
+- tapOn:
+    id: nav.lint
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · \d+ dismissed.*\)'
+    timeout: 30000
+- runFlow:
+    when:
+      visible: '▸ Category differs from its type \(1\)'
+    commands:
+      - tapOn: '▸ Category differs from its type \(1\)'
+- assertVisible: '▾ Category differs from its type \(1\)'
+- tapOn:
+    id: lint.fixAll.Equipment
+- extendedWaitUntil:
+    visible:
+      id: rulings.editor.title
+      text: New ruling · from Lint
+    timeout: 10000
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '1 change on 1 level'
+    timeout: 15000
+- assertVisible: '.*Equipment.*Equipment Panels.*'
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied .*: 1 change\.'
+    timeout: 15000
+- tapOn: ← Levels
+- tapOn:
+    id: nav.lint
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · \d+ dismissed.*\)'
+    timeout: 30000
+- assertNotVisible: '. Category differs from its type.*'
+- tapOn: ← Levels
+- runFlow: _sync.yaml

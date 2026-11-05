@@ -1,0 +1,124 @@
+# S3 (T158) rules step 1 (T102, T116): with two accepted Run items (06M-01's "Run DMX to Level 11",
+# 06M-02's "Run DMX to equipment rack") and an open Run draft on 06M-04 (C-13 set Not installed by
+# _rules-setup), R3a Run item owner (any other code) → ETC: the box offers both accepted items →
+# Preview, untick one, Apply → swipe back to Setup: the box lists the one left (the box is an offer
+# on the change, held by the Setup screen while it stays open: `← Levels` leaves it). The open
+# draft reads ETC. Reset to default: the draft reads EC again and is rejected (after the reset, so
+# the wording step proves the reject alone). Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- scrollUntilVisible:
+    element:
+      id: 'rules\.R3a\.run\.owner\.\*\.ETC'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'rules\.R3a\.run\.owner\.\*\.ETC'
+- assertVisible: 'Run item owner  changed'
+- scrollUntilVisible:
+    element:
+      id: rules.only
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: rules.review
+      text: 'Review accepted items ▸  2 punch items: Owner → .ETC.'
+    timeout: 20000
+
+# the box: two items, untick one, Apply → back in Setup, one left
+- tapOn:
+    id: rules.review
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview
+    timeout: 15000
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '2 changes on 1 level'
+    timeout: 15000
+- tapOn:
+    id: rulings.preview.row
+    index: 0
+- assertVisible:
+    id: rulings.preview.title
+    text: '.* · 1 unticked'
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied .*: 1 change, 1 unticked\.'
+    timeout: 15000
+- swipe:                     # the stack's back gesture: Rulings was pushed from Setup
+    start: 1%,50%
+    end: 75%,50%
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: rules.review
+      text: 'Review accepted items ▸  1 punch item: Owner → .ETC.'
+    timeout: 20000
+- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- tapOn:
+    id: setup.home
+
+# the open draft follows the new owner
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-04
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.reject\.Run DMX to .*CT04LCPA'
+- extendedWaitUntil:
+    visible: 'Cable not run · ETC'      # the draft's line: type · owner (no tracking)
+    timeout: 10000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# Reset to default; then the draft reads EC again and is rejected
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- tapOn:
+    id: rules.only            # only the changed rows: no long scroll (T158)
+- tapOn:
+    id: 'rules\.R3a\.run\.owner\.reset'
+- assertNotVisible: 'Run item owner  changed'
+- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- tapOn:
+    id: setup.home
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-04
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.reject\.Run DMX to .*CT04LCPA'
+- extendedWaitUntil:
+    visible: 'Cable not run · EC'
+    timeout: 10000
+- tapOn:
+    id: 'proposal\.reject\.Run DMX to .*CT04LCPA'
+- extendedWaitUntil:
+    notVisible:
+      id: 'proposal\.reject\.Run DMX to .*CT04LCPA'
+    timeout: 10000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

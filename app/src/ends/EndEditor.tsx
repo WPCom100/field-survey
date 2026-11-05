@@ -233,10 +233,10 @@ export function EndEditor(props: EndEditorProps) {
  */
 function TermKitSection({ view, readOnly, run }: { view: CableView; readOnly: boolean; run: Run }) {
   const { own, code, takes } = view.termKit;
-  const options: { value: boolean | null; label: string }[] = [
-    { value: null, label: `As ${view.code ?? 'its code'} (${code ? 'yes' : 'no'})` },
-    { value: true, label: 'Yes' },
-    { value: false, label: 'No' },
+  const options: { value: boolean | null; label: string; id: string }[] = [
+    { value: null, label: `As ${view.code ?? 'its code'} (${code ? 'yes' : 'no'})`, id: 'as' },
+    { value: true, label: 'Yes', id: 'yes' },
+    { value: false, label: 'No', id: 'no' },
   ];
   return (
     <View style={styles.section}>
@@ -252,6 +252,7 @@ function TermKitSection({ view, readOnly, run }: { view: CableView; readOnly: bo
               style={[styles.statusBtn, on && styles.optionOn]}
               accessibilityRole="radio"
               accessibilityState={{ selected: on, disabled: readOnly }}
+              testID={`end.termkit.${o.id}`}
             >
               <Text style={[styles.statusText, on && styles.optionOnText]}>{o.label}</Text>
             </Pressable>

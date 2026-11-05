@@ -1,0 +1,85 @@
+# S5 step 1 of `rig.sh sheets` (T158, T144, T130), on A as Ann: a new project with 06M; Sources →
+# the DaVinci library with the OLDER categories workbook rig.sh generated (the ERn enclosures under
+# Equipment, as before D232) → "Done: … n categories corrected" (the server-wide ERn type back to
+# Equipment); the 06M sheet. A field addition of type ERn2-W-120 Mk2 under Equipment (the device
+# takes its type's category). App library: P-NSPS-D's Neuron ID set to Needed by hand. Sync.
+# Runs alone: the app library is server-wide. rig.sh then stages the current workbook.
+appId: productions.luminarytechnology.fieldsurvey
+name: Sheets — the older DaVinci categories, an ERn device, a Neuron flag by hand
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _new-project.yaml
+- runFlow: _davinci.yaml
+- assertVisible:
+    id: sources.davinci.status
+    text: 'Done: .*\d+ categor(y|ies) corrected.*'
+- runFlow:
+    file: _sheet.yaml
+    env:
+      AT: 65%,35%           # 3rd file: the 06M composite PDF
+- runFlow: _logbox.yaml
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml        # the corrected type reaches the iPad's app library
+
+# an ERn device under Equipment, its type's category since the older upload
+- tapOn:
+    id: level.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 60000
+- longPressOn:
+    point: 30%,45%
+- tapOn:
+    id: press.device
+- tapOn:
+    id: add.cat.Equipment
+- extendedWaitUntil:
+    visible:
+      id: add.type.ERn2-W-120 Mk2
+    timeout: 30000
+- tapOn:
+    id: add.type.ERn2-W-120 Mk2
+- tapOn:
+    id: add.submit
+- extendedWaitUntil:
+    visible: 'NEW · ID assigned at sync|06M-\d+'
+    timeout: 10000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# P-NSPS-D's Neuron ID set by hand (T130)
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- tapOn:
+    id: library.search
+- inputText: P-NSPS-D
+- pressKey: Enter          # closes the keyboard: it covers the Save footer
+- tapOn:
+    id: library.type
+    text: '.*P-NSPS-D.*'
+    index: 0                 # P-NSPS-D sorts before P-NSPS-D-KIT
+- tapOn:
+    id: library.neuron.needed
+- assertVisible:
+    id: library.neuron.needed
+    selected: true
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- tapOn: ◀ Projects
+- tapOn: ◀ Levels
+- runFlow: _sync.yaml

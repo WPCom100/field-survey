@@ -1,0 +1,147 @@
+# S3 (T158) rules step 4 (T146 "Rules tab", T102 "Per code and quick actions"): R3c's three
+# per-code tables (U needs a Neuron ID; N and NG an IP address; X a DMX address); the DMX item
+# owner → ETC: Lint's open R3c drafts on 01 both read ETC (the DMX one was EC); Reset. Quick action
+# Spot-check fixed → Owner EC: Spot-check on 06M-02 makes an item with Owner EC (default ETC);
+# Reset. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- scrollUntilVisible:
+    element:
+      id: rules.R3c.dmx_codes.X
+    direction: DOWN
+    centerElement: true
+    timeout: 60000           # the Rules tab is long
+- assertVisible:
+    id: rules.R3c.dmx_codes.X
+    text: 'X: on'
+- scrollUntilVisible:
+    element:
+      id: rules.R3c.neuron_codes.U
+    direction: UP
+    centerElement: true
+    timeout: 60000           # the Rules tab is long
+- assertVisible:
+    id: rules.R3c.neuron_codes.U
+    text: 'U: on'
+- scrollUntilVisible:
+    element:
+      id: rules.R3c.ip_codes.NG
+    direction: DOWN
+    centerElement: true
+    timeout: 60000           # the Rules tab is long
+- assertVisible:
+    id: rules.R3c.ip_codes.N
+    text: 'N: on'
+- assertVisible:
+    id: rules.R3c.ip_codes.NG
+    text: 'NG: on'
+- scrollUntilVisible:
+    element:
+      id: 'rules\.R3c\.dmx\.owner\.ETC'
+    direction: UP
+    centerElement: true
+    timeout: 60000           # the Rules tab is long
+- tapOn:
+    id: 'rules\.R3c\.dmx\.owner\.ETC'
+- assertVisible: 'DMX address item owner  changed'
+- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- tapOn:
+    id: setup.home
+
+# Lint's R3c drafts on 01: the IP one was ETC, the DMX one now ETC too
+- tapOn:
+    id: nav.lint
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · \d+ dismissed · \d+ drafts\)'
+    timeout: 60000
+- tapOn:
+    id: lint.level.01
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · \d+ dismissed · 2 drafts\)'
+    timeout: 10000
+- assertVisible: Missing all Device DMX addresses
+- assertVisible:
+    text: 'Information · ETC · Open'
+    index: 1                     # both drafts
+- assertNotVisible: 'Information · EC · Open'
+- tapOn: ← Levels
+
+# Reset; then Spot-check fixed → Owner EC
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- tapOn:
+    id: rules.only            # only the changed rows: no long scroll (T158)
+- tapOn:
+    id: 'rules\.R3c\.dmx\.owner\.reset'
+- extendedWaitUntil:
+    visible: Nothing changed yet.
+    timeout: 10000
+- tapOn:
+    id: rules.only            # the whole list again for E6
+- scrollUntilVisible:
+    element:
+      id: 'rules\.E6\.owner\.EC'
+    direction: DOWN
+    timeout: 60000           # the Rules tab is long; E6 sits too near its end to be centred
+- tapOn:
+    id: 'rules\.E6\.owner\.EC'
+- assertVisible:
+    id: 'rules\.E6\.owner\.reset'
+- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- tapOn:
+    id: setup.home
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-02
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.quick
+- tapOn:
+    id: card.section.quick
+- tapOn:
+    id: card.quick.E6
+- tapOn:
+    id: card.quick.input
+- inputText: maestro owner
+- runFlow: _quick-apply.yaml
+# the card can jump back to its top after the action (a sync re-renders it): from Connections,
+# which sits above the punch items wherever the card was, down to the new item
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.section.connections
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'card\.punch\.Spot check: maestro owner'
+- assertVisible:
+    text: '(.* · )?Information · EC · Closed.*'
+    childOf:
+      id: 'card\.punch\.Spot check: maestro owner'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+# Only what is changed: the one changed row, no scroll down the long tab (E6 sits near its end)
+- tapOn:
+    id: rules.only
+- tapOn:
+    id: 'rules\.E6\.owner\.reset'
+- assertVisible: Nothing changed yet.
+- tapOn:
+    id: rules.only
+- tapOn:
+    id: setup.home

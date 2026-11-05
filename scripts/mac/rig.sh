@@ -92,6 +92,9 @@ usage: bash scripts/mac/rig.sh <command>
   lock                  S3 (T158): lock.yaml on A (Ann), lock-peer.yaml on B (Bob), lock-check.yaml on A
   ink                   F6 (T158): ink-setup.yaml on A (Ann), ink-peer.yaml on B (Bob), ink-check.yaml on A; each
                         sees the other's stroke in its log (ink_loaded)
+  sheets                S5 (T158): sheets-old.yaml on A with a generated older DaVinci_categories.xlsx (ERn →
+                        Equipment), sheets-new.yaml with the current one; the server's two batches each
+                        corrected the ERn category and no Neuron flag. Alone: the app library is server-wide
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
      RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
@@ -274,7 +277,8 @@ cmd_flows() {
   done
   # flows that upload (Setup → Sources) pick these from the Files app by position (T151); also
   # through one of their sub-flows (_sheet-station.yaml, T156)
-  if uses_sources "${flow:-smoke.yaml}"; then
+  # (RIG_KEEP_FILES=1: the caller staged its own, e.g. `rig.sh sheets`' generated DaVinci pair)
+  if [ -z "${RIG_KEEP_FILES:-}" ] && uses_sources "${flow:-smoke.yaml}"; then
     cmd_files "$dev" fixtures/DaVinci_categories.xlsx fixtures/davinci-library-sample.json \
       "fixtures/Level_06M_-_Lighting_Composite_vector.pdf"
   fi
@@ -637,6 +641,53 @@ cmd_lock() {  # S3 (T158): the Rules tab, a lock and an assignment on A; B sees 
   say "lock: green"
 }
 
+cmd_sheets() {  # S5 (T158): two DaVinci uploads — an older categories workbook, then the current one (T144, T130)
+  local d1="$OUT/sheets-1" d2="$OUT/sheets-2" stamp rows
+  server_up
+  # every upload is a new (library, categories) pair, else the server skips it as "already
+  # imported": the library gets this run's timestamp (a "newer copy from DaVinci")
+  stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  rm -rf "$d1" "$d2" "$OUT/sheets-0"; mkdir -p "$d1" "$d2" "$OUT/sheets-0"
+  for n in 0 1 2; do
+    python3 - "$ROOT/fixtures/davinci-library-sample.json" "$OUT/sheets-$n/davinci-library-sample.json" "$stamp rig $n" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["timestamp"] = sys.argv[3]
+json.dump(d, open(sys.argv[2], "w"), indent=1)
+PY
+  done
+  (cd "$ROOT/server" && $COMPOSE cp "$ROOT/scripts/mac/davinci_old_categories.py" api:/tmp/davinci_old_categories.py >/dev/null \
+    && $COMPOSE cp "$ROOT/fixtures/DaVinci_categories.xlsx" api:/tmp/DaVinci_categories.xlsx >/dev/null \
+    && $COMPOSE exec -T api python /tmp/davinci_old_categories.py /tmp/DaVinci_categories.xlsx /tmp/old.xlsx \
+    && $COMPOSE cp api:/tmp/old.xlsx "$d1/DaVinci_categories.xlsx" >/dev/null) || die "could not build the older categories workbook"
+  cp "$ROOT/fixtures/DaVinci_categories.xlsx" "$d2/"
+  # a run that stopped between its two uploads leaves the server-wide ERn type under Equipment:
+  # import the current workbook first (the job's CLI, filed under the seed project), so this run's
+  # older upload has something to correct
+  if [ "$(server_sql "" "select category from library_type where project_id is null and deleted_at is null
+      and model = 'ERn2-W-120 Mk2';")" != "Equipment Panels" ]; then
+    say "the app library's ERn2-W-120 Mk2 is not under Equipment Panels (a run stopped half-way): importing the current workbook first"
+    (cd "$ROOT/server" && $COMPOSE cp "$OUT/sheets-0/davinci-library-sample.json" api:/tmp/rig-library.json >/dev/null \
+      && $COMPOSE exec -T api python -m app.jobs.davinci_library /tmp/rig-library.json --categories /tmp/DaVinci_categories.xlsx \
+        --project "$(server_sql "$SEED_PROJECT" "select id from project where name = :'name';")" >/dev/null) \
+      || die "could not import the current workbook to put the ERn type back"
+  fi
+  say "sheets on \"$PROJECT\": the older workbook (ERn → Equipment), an ERn device and P-NSPS-D's Neuron flag by hand; then the current one"
+  cmd_files A "$d1/DaVinci_categories.xlsx" "$d1/davinci-library-sample.json" "fixtures/Level_06M_-_Lighting_Composite_vector.pdf"
+  RIG_KEEP_FILES=1 USER_NAME=Ann cmd_flows --device A sheets-old.yaml
+  cmd_files A "$d2/DaVinci_categories.xlsx" "$d2/davinci-library-sample.json"
+  RIG_KEEP_FILES=1 USER_NAME=Ann cmd_flows --device A sheets-new.yaml
+  # the two uploads of this run: each corrected the ERn type (and its copies), neither a Neuron flag
+  rows="$(server_sql "$PROJECT" "select coalesce(b.stats->>'categories_corrected', '-'), coalesce(b.stats->>'neuron_flags_corrected', '-')
+    from import_batch b join project p on p.id = b.project_id
+    where p.name = :'name' and b.kind = 'davinci' order by b.created_at;" | tr '\n' ' ')"
+  say "server DaVinci batches on \"$PROJECT\" (categories corrected, Neuron flags corrected): $rows"
+  # (a project copy of the ERn type nobody edited counts too, on any project of the server)
+  echo "$rows" | awk 'NF == 4 && $1 >= 1 && $2 == 0 && $3 >= 1 && $4 == 0 { ok = 1 } END { exit !ok }' \
+    || die "expected two batches, each with a category corrected and no Neuron flag; got: $rows"
+  say "sheets: green"
+}
+
 log_since() {  # A|B, ISO time, regex -> the app's log lines at or after that time that match (T158)
   ( cmd_log "$1" >/dev/null ) || return 1
   cat "$OUT/log-$1"/*.log | awk -v t="$2" '$1 >= t' | grep -E "$3"
@@ -692,6 +743,7 @@ case "${1:-}" in
   photos) cmd_photos ;;
   ink) cmd_ink ;;
   lock) cmd_lock ;;
+  sheets) cmd_sheets ;;
   drafts) shift; cmd_drafts "$@" ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;

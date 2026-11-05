@@ -28,6 +28,10 @@ On the rig's pipeline project the riser's N run to `PARADIGM P-NSPS-DIN` lands o
 - [x] **Search and pick.** Change… on To, type `P-NSPS-D`: the 03 draft is listed once, as `◌ P-NSPS-D (draft, 03) … · riser: PARADIGM P-NSPS-DIN`; typing `DIN` finds it too. Pick it: the end line still reads `P-NSPS-D (draft, 03)`. → saw (Claude, rig, 2026-11-05, drafts.yaml): `P-NSPS-D` lists `◌ P-NSPS-D (draft, 02)  · 0.90  · riser: PARADIGM P-NSPS-DIN` above the other levels' NSPS drafts (`◌ P-NSPS-D (draft, 03)` …, no riser text); `DIN` lists the same row; picked → "Endpoint set", the end line unchanged.
 - [x] **Confirm.** Confirm endpoint ✓, then open the draft's history (or the Change Log): the reason reads `… → P-NSPS-D (draft, 03)`, not `PARADIGM P-NSPS-DIN`. → saw (Claude, rig, 2026-11-05, `rig.sh drafts`): Confirm endpoint ✓ → "Accepted — both ends are drafts: it waits for one of them to be placed", the row `… ✓ waits for placing`; the server holds applied ops with the reason `Draft review: endpoint confirmed N ERN4-RM-120 Equipment Rack 18U (draft, 01) → P-NSPS-D (draft, 02)`.
 
+### T130 — The DaVinci import corrects the NSPS / rack Neuron flag  ·  Needs: no new build (JS update; server deploy first)
+
+- [x] **Your own choice stands.** Set Neuron ID to Needed by hand on one NSPS type, re-upload the library again (a newer copy from DaVinci, since the same files are now skipped): that type still reads Needed and the Done line does not count it. → saw (Claude, rig, 2026-11-05, `rig.sh sheets`, twice): app library P-NSPS-D → Neuron ID **Needed** by hand, Save; a newer `library.json` (this run's timestamp) with the current workbook → Done line with no "Neuron flag corrected", the server batch `neuron_flags_corrected` 0; P-NSPS-D still reads Needed (then set back to By the wires).
+
 ## Claude ran (rig) 2026-11-04 — wave 4 of docs/rig-plan.md (T157), Mac rig Simulator, local e2e server
 
 Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.

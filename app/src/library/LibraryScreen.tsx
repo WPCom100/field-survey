@@ -445,7 +445,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
             <TextInput value={model} onChangeText={setModel} editable={!ro} style={styles.input} />
           </Field>
           <Field label="Category">
-            <Chips options={CATEGORIES} value={category} onPick={ro ? undefined : setCategory} />
+            <Chips options={CATEGORIES} value={category} onPick={ro ? undefined : setCategory} testID="library.category" />
           </Field>
           <Field label="Role" hint="What its devices are to the rules, the ID scheme, the Punch List Device text and the pin shape (T112). Category default = the role the category names, if any.">
             <View style={styles.wrap}>
@@ -471,15 +471,22 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
           {/* T146 (D245): what the type's devices need; null = by the wires they get (U → Neuron ID, N / NG → IP address, X → DMX address). */}
           {(
             [
-              ['Neuron ID', neuron, setNeuron, 'A Unison (U) run needs one; stations and sensors ride the bus; an NSPS or rack hosts it and needs none. Needed / Not needed overrides the wires: the card hides the section and the device leaves “Missing all Device Neuron IDs” and the dashboard count.'],
-              ['IP address', ip, setIp, 'A network (N, NG) run needs one. Needed / Not needed overrides the wires; the device leaves “Missing all Device IP addresses” when not needed.'],
-              ['DMX address', dmx, setDmx, 'A DMX (X) run needs one. Needed / Not needed overrides the wires; the device leaves “Missing all Device DMX addresses” when not needed.'],
+              ['Neuron ID', neuron, setNeuron, 'neuron', 'A Unison (U) run needs one; stations and sensors ride the bus; an NSPS or rack hosts it and needs none. Needed / Not needed overrides the wires: the card hides the section and the device leaves “Missing all Device Neuron IDs” and the dashboard count.'],
+              ['IP address', ip, setIp, 'ip', 'A network (N, NG) run needs one. Needed / Not needed overrides the wires; the device leaves “Missing all Device IP addresses” when not needed.'],
+              ['DMX address', dmx, setDmx, 'dmx', 'A DMX (X) run needs one. Needed / Not needed overrides the wires; the device leaves “Missing all Device DMX addresses” when not needed.'],
             ] as const
-          ).map(([label, value, set, hint]) => (
+          ).map(([label, value, set, key, hint]) => (
             <Field key={label} label={label} hint={hint}>
               <View style={styles.wrap}>
                 {([null, true, false] as const).map((v) => (
-                  <Pressable key={String(v)} disabled={ro} onPress={() => set(v)} style={[styles.chip, value === v && styles.chipOn]}>
+                  <Pressable
+                    key={String(v)}
+                    disabled={ro}
+                    onPress={() => set(v)}
+                    style={[styles.chip, value === v && styles.chipOn]}
+                    accessibilityState={{ selected: value === v }}
+                    testID={`library.${key}.${v === null ? 'wires' : v ? 'needed' : 'not'}`}
+                  >
                     <Text style={value === v ? styles.chipTextOn : styles.chipText}>{v === null ? 'By the wires' : v ? 'Needed' : 'Not needed'}</Text>
                   </Pressable>
                 ))}
@@ -644,11 +651,18 @@ function Field(props: { label: string; hint?: string; children: React.ReactNode 
   );
 }
 
-function Chips(props: { options: readonly string[]; value: string | null; onPick?: (v: string | null) => void }) {
+function Chips(props: { options: readonly string[]; value: string | null; onPick?: (v: string | null) => void; testID?: string }) {
   return (
     <View style={styles.wrap}>
       {props.options.map((o) => (
-        <Pressable key={o} disabled={!props.onPick} onPress={() => props.onPick?.(props.value === o ? null : o)} style={[styles.chip, props.value === o && styles.chipOn]}>
+        <Pressable
+          key={o}
+          disabled={!props.onPick}
+          onPress={() => props.onPick?.(props.value === o ? null : o)}
+          style={[styles.chip, props.value === o && styles.chipOn]}
+          accessibilityState={{ selected: props.value === o }}
+          testID={props.testID ? `${props.testID}.${o}` : undefined}
+        >
           <Text style={props.value === o ? styles.chipTextOn : styles.chipText}>{o}</Text>
         </Pressable>
       ))}

@@ -1,0 +1,18 @@
+# S3 (T158, rig plan wave 2) the Rules tab's rest, on A as Ann: a fresh copy of the master with two
+# rule-accepted Run items and an open Run draft (`_rules-setup`); an owner change on drafts vs
+# accepted items, the box with an untick and what is left, a rejected draft (`_rules-owner`); the
+# reword ruling, the rejected draft back in the new wording, the stored ruling (`_rules-reword`);
+# termination kits per code and per cable (`_rules-kits`); R3c's tables and owner, the Spot-check
+# owner (`_rules-r3c`); sync. `rig.sh lock` is the lock, the assignments and B's half.
+appId: productions.luminarytechnology.fieldsurvey
+name: Rules — owners, rewording, kits, R3c
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow: _rules-setup.yaml
+- runFlow: _rules-owner.yaml
+- runFlow: _rules-reword.yaml
+- runFlow: _rules-kits.yaml
+- runFlow: _rules-r3c.yaml
+- runFlow: _sync.yaml

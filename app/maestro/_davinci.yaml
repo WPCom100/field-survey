@@ -1,0 +1,41 @@
+# Setup → 3 Sources → DaVinci library: the first two files in "On My iPad" (by name:
+# DaVinci_categories.xlsx, davinci-library-sample.json) picked together, then the card's Done (or
+# Already imported) line (T151; split from _sources.yaml in T158 for `rig.sh sheets`). The picker
+# is another process: Maestro sees none of it, so it is tapped by position (iPad Pro 13" simulator,
+# portrait). Needs the worker (rig.sh server starts it). No Claude API.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+    optional: true          # already on Setup
+- tapOn:
+    id: setup.step.sources
+# DaVinci: multiple selection, then Open
+- tapOn:
+    id: sources.davinci
+- extendedWaitUntil:
+    visible: dismiss popup
+    timeout: 20000
+    optional: true
+- runFlow:                  # the first picker after a fresh launch did not open twice in five (T157)
+    when:
+      notVisible: dismiss popup
+    commands:
+      - tapOn:
+          id: sources.davinci
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 14%,46%          # sidebar: On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: 41%,35%          # 1st file: DaVinci_categories.xlsx
+- tapOn:
+    point: 53%,35%          # 2nd file: davinci-library-sample.json
+- tapOn:
+    point: 92%,28%          # Open
+# app-library drafts are server-wide: the first run imports, later runs find the same files
+- extendedWaitUntil:
+    visible:
+      id: sources.davinci.status
+      text: '(Done: .*|Already imported.*)'
+    timeout: 90000
