@@ -36,6 +36,10 @@ appId: productions.luminarytechnology.fieldsurvey
           timeout: 5000
 - tapOn:
     id: card.${KIND}.input
+- eraseText: 20            # Type… starts from the stored address (T157: changing 01-01's DMX)
+- tapOn:
+    id: card.${KIND}.input
+- eraseText: 20
 - inputText: ${VALUE}
 - pressKey: Enter
 - extendedWaitUntil:

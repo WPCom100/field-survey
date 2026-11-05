@@ -1,0 +1,153 @@
+# R3 step 1 (T157): the Dashboard on a fresh seed copy equals the master's Summary tab (T38, D181):
+# devices 70 · 50 · 77 · 13 · 0 = 210, punch 198 · 1 · 16 = 215 (EC 169, ETC 24, EC/ETC 22),
+# parts 81 · 0 · 2 · 2 = 85; the as-found line before anyone types an address (T147). Drill-downs
+# on a cell, a row Total, a column Total and the grand total; a row opens its card and Back keeps
+# the panel; the Levels and Owner filters (EC is not EC/ETC). Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.dashboard
+- extendedWaitUntil:
+    visible:
+      id: dash.cell.devices.total.total
+    timeout: 30000
+- assertVisible: '.*\(local data\)'
+- assertVisible: 'Search the project: ID, tag, room, item, notes, Neuron ID, IP, DMX'
+- assertVisible: Device status by floor
+- assertVisible: Outstanding items by floor
+- assertVisible: Outstanding items by owner
+- assertVisible: Missing parts by floor
+
+# the Summary's numbers
+- assertVisible: { id: 'dash.cell.devices.total.Installed, untested', text: '70' }
+- assertVisible: { id: dash.cell.devices.total.Issue, text: '50' }
+- assertVisible: { id: dash.cell.devices.total.Not installed, text: '77' }
+- assertVisible: { id: dash.cell.devices.total.No access, text: '13' }
+- assertVisible: { id: dash.cell.devices.total.Complete, text: '0' }
+- assertVisible: { id: dash.cell.devices.total.total, text: '210' }
+- assertVisible: { id: dash.cell.punchByFloor.total.Open, text: '198' }
+- assertVisible: { id: dash.cell.punchByFloor.total.In progress, text: '1' }
+- assertVisible: { id: dash.cell.punchByFloor.total.Closed, text: '16' }
+- assertVisible: { id: dash.cell.punchByFloor.total.total, text: '215' }
+- assertVisible: { id: dash.cell.punchByOwner.EC.total, text: '169' }
+- assertVisible: { id: dash.cell.punchByOwner.ETC.total, text: '24' }
+- assertVisible: { id: 'dash.cell.punchByOwner.EC/ETC.total', text: '22' }
+- scrollUntilVisible:
+    element:
+      id: dash.found.dmxMissing
+    direction: DOWN
+- assertVisible: { id: dash.cell.parts.total.Needed, text: '81' }
+- assertVisible: { id: dash.cell.parts.total.Ordered, text: '0' }
+- assertVisible: { id: dash.cell.parts.total.On site, text: '2' }
+- assertVisible: { id: dash.cell.parts.total.Installed, text: '2' }
+- assertVisible: { id: dash.cell.parts.total.total, text: '85' }
+# as found, before any address is typed (T146, T147)
+- assertVisible: { id: dash.found.fieldAdditions, text: field additions 0 }
+- assertVisible: { id: dash.found.neverFound, text: never found 0 }
+- assertVisible: { id: dash.found.neuronMissing, text: 'Neuron IDs captured 0/170' }   # a fresh copy of the master; the Tower reads n/169
+- assertVisible: { id: dash.found.ipMissing, text: IP addresses captured 0/9 }
+- assertVisible: { id: dash.found.dmxMissing, text: DMX addresses captured 0/16 }
+- swipe:                    # back to the top: a cell half under the header takes no tap
+    start: 30%,30%
+    end: 30%,90%
+    duration: 400
+- swipe:
+    start: 30%,30%
+    end: 30%,90%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# drill-down on one cell: the panel counts what the cell says; a row opens its card; Back keeps it
+- copyTextFrom:
+    id: dash.cell.devices.01.Issue
+- evalScript: ${output.n = maestro.copiedText}
+- tapOn:
+    id: dash.cell.devices.01.Issue
+- assertVisible:
+    id: dash.panel.title
+    text: Device status by floor · 01 · Issue \(${output.n}\)
+- tapOn:
+    id: dash.row
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: card.close
+    timeout: 15000
+- assertVisible:
+    id: plan.back
+    text: ◀ 01
+- tapOn:
+    id: plan.back
+- extendedWaitUntil:
+    visible:
+      id: dash.panel.title
+      text: Device status by floor · 01 · Issue \(${output.n}\)
+    timeout: 10000
+# a row Total, a column Total, the grand total (the open panel covers the Total column: close it first)
+- tapOn:
+    id: dash.close
+- copyTextFrom:
+    id: dash.cell.devices.01.total
+- evalScript: ${output.row01 = maestro.copiedText}
+- tapOn:
+    id: dash.cell.devices.01.total
+- assertVisible:
+    id: dash.panel.title
+    text: Device status by floor · 01 · Total \(${output.row01}\)
+- tapOn:
+    id: dash.close
+- tapOn:
+    id: dash.cell.devices.total.Issue
+- assertVisible:
+    id: dash.panel.title
+    text: Device status by floor · All · Issue \(50\)
+- tapOn:
+    id: dash.close
+- tapOn:
+    id: dash.cell.devices.total.total
+- assertVisible:
+    id: dash.panel.title
+    text: Device status by floor · All · Total \(210\)
+- tapOn:
+    id: dash.close
+- assertNotVisible:
+    id: dash.panel.title
+
+# Levels filter: every table shows that floor; Owner EC counts EC only (not EC/ETC); All clears
+- tapOn:
+    id: dash.level.01
+- assertVisible:
+    id: dash.cell.devices.total.total
+    text: ${output.row01}
+- assertNotVisible:
+    id: dash.cell.devices.02.total
+- tapOn:
+    id: dash.level.all
+- tapOn:
+    id: dash.owner.EC
+- assertVisible: { id: dash.cell.punchByOwner.total.total, text: '169' }
+- assertVisible: { id: dash.cell.punchByFloor.total.total, text: '169' }
+- assertVisible: { id: 'dash.cell.punchByOwner.EC/ETC.total', text: '0' }   # EC is not EC/ETC (D181)
+- assertVisible: { id: dash.cell.devices.total.total, text: '210' }
+- tapOn:
+    id: dash.owner.all
+- assertVisible: { id: dash.cell.punchByFloor.total.total, text: '215' }
+
+# Apply as ruling from a drill-down: Select → All → the ruling editor with the chosen records
+- tapOn:
+    id: dash.cell.punchByFloor.06M.Open
+- tapOn:
+    id: dash.select
+- tapOn:
+    id: dash.select.all
+- tapOn:
+    id: dash.select.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.editor.title
+      text: 'New ruling · from Dashboard: .*'
+    timeout: 10000
+- assertVisible: 'Only the \d+ chosen records?'
+- tapOn: Cancel
+- tapOn: ← Levels

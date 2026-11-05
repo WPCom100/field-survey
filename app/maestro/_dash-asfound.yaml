@@ -1,0 +1,18 @@
+# The Dashboard's as-found link KEY (env: fieldAdditions | neverFound | neuronMissing | ipMissing |
+# dmxMissing) tapped with no panel open: an open panel narrows the page and the line wraps out of
+# reach (T157). Leaves its panel open.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    when:
+      visible:
+        id: dash.close
+    commands:
+      - tapOn:
+          id: dash.close
+- scrollUntilVisible:
+    element:
+      id: dash.found.${KEY}
+    direction: DOWN
+- tapOn:
+    id: dash.found.${KEY}

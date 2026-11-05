@@ -1,0 +1,14 @@
+# R3 (T157, rig plan wave 4): the Dashboard on a fresh copy of the master. Its numbers equal the
+# master's Summary (210 devices, 215 punch items, 85 parts and their splits, T38, D181); drill-downs
+# on a cell, a row and column Total and the grand total, a row to its card and back; the Levels and
+# Owner filters; Apply as ruling from a drill-down; the as-found line and its drill-downs, counts that
+# follow a typed IP and DMX address, the Levels filter on them (T147); readiness setup → ready →
+# surveying; search by ID, note phrase, #n, c-nn, dmx, IP and DMX address (T148).
+appId: productions.luminarytechnology.fieldsurvey
+name: R3 — Dashboard
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow: _dash-counts.yaml
+- runFlow: _dash-found.yaml

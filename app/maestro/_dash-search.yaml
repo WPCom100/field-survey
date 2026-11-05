@@ -1,0 +1,17 @@
+# The Dashboard's search box: emptied, then TERM (env) typed; Return closes the keyboard (T157).
+# Two tap-and-erase passes, as in the plan's _search.yaml.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: dash.search
+- eraseText: 30
+- tapOn:
+    id: dash.search
+- eraseText: 30
+- inputText: ${TERM}
+- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      id: dash.panel.title
+      text: 'Search “.*'
+    timeout: 10000
