@@ -1,0 +1,110 @@
+# R2 step 1 (T157): a ruling built by hand on the seed copy (T37) — 0-10V ends whose To is not
+# "Fixtures" get "Fixtures". The red "missing" lines and a disabled Preview until it is filled;
+# Preview with one row unticked; Back keeps the editor; Apply; Preview again has nothing to change
+# and names the unticked record. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.rulings
+- extendedWaitUntil:
+    visible: 'Rulings \(1 standing · \d+ applied\)'
+    timeout: 20000
+- assertVisible: '● Unison bus placeholder is spelled .Stations & Sensors. \(D50\).*'
+
+# + New ruling: Preview waits until the reason and the values are filled
+- tapOn:
+    id: rulings.new
+- assertVisible:
+    id: rulings.editor.title
+    text: New ruling
+- assertVisible: '• .*'
+- assertVisible:
+    id: rulings.preview
+    enabled: false
+- tapOn:
+    id: rulings.reason
+- inputText: 0-10V rows read Fixtures
+- pressKey: Enter
+# Where Connection end (the default) · Cable = 0-10V AND To ≠ Fixtures
+- tapOn:
+    id: rulings.cond.value
+- inputText: 0-10V
+- pressKey: Enter
+- tapOn:
+    id: rulings.addCondition
+- tapOn:
+    id: rulings.cond.field.to_text
+    index: 1
+- tapOn:
+    id: rulings.cond.op.ne
+    index: 1
+- tapOn:
+    id: rulings.cond.value
+    index: 1
+- inputText: Fixtures
+- pressKey: Enter
+# Set field To = Fixtures, standing (the default)
+- tapOn:
+    id: rulings.actionField.to_text
+- tapOn:
+    id: rulings.value
+- inputText: Fixtures
+- pressKey: Enter
+- assertVisible: '☑ Standing: propose on future matches'
+- assertNotVisible: '• .*'
+- assertVisible:
+    id: rulings.preview
+    enabled: true
+
+# Preview: untick one row → "· 1 unticked", Apply one less; Back keeps the editor filled
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '\d+ changes? on \d+ levels?'
+    timeout: 15000
+- copyTextFrom:
+    id: rulings.preview.title
+- evalScript: ${output.changes = parseInt(maestro.copiedText.match(/^(\d+)/)[1])}
+- assertVisible: Apply ${output.changes}
+- tapOn:
+    id: rulings.preview.row
+    index: 0
+- assertVisible:
+    id: rulings.preview.title
+    text: '.* · 1 unticked'
+- assertVisible: Apply ${output.changes - 1}
+- tapOn:
+    id: rulings.back
+- assertVisible:
+    id: rulings.reason
+    text: 0-10V rows read Fixtures
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+    timeout: 15000
+- tapOn:
+    id: rulings.preview.row
+    index: 0
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied "0-10V rows read Fixtures": ${output.changes - 1} changes?, 1 unticked\.'
+    timeout: 15000
+- assertVisible: 'Rulings \(2 standing · \d+ applied\)'
+
+# Preview again: nothing left to change, the unticked record named in the footer
+- tapOn:
+    id: rulings.previewAgain
+- extendedWaitUntil:
+    visible: 'Nothing to change: every matching record is already right\.'
+    timeout: 15000
+- assertVisible: 1 record unticked in an earlier preview stays as it is.
+- tapOn:
+    id: rulings.back
+- tapOn: ← Levels

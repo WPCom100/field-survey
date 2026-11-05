@@ -1,0 +1,107 @@
+# R2 step 2 (T157): a standing ruling proposes on records that match later (T37). Device ·
+# Status = No access → Append note "Rig standing" (applied once; never appended twice). Then
+# 06M-03 set No access → "Proposed by this ruling (1)" → Accept; 06M-04 set No access → (1) →
+# Standing off withdraws it, on brings it back → Reject. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.rulings
+- tapOn:
+    id: rulings.new
+- tapOn:
+    id: rulings.reason
+- inputText: Rig standing ruling
+- pressKey: Enter
+- tapOn:
+    id: rulings.where.device
+- tapOn:
+    id: rulings.cond.field.status
+- tapOn: No access          # the Status chip (an enum: chips only)
+- tapOn:
+    id: rulings.action.append
+- tapOn:
+    id: rulings.append
+- inputText: Rig standing
+- pressKey: Enter
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+    timeout: 15000
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied "Rig standing ruling": .*'
+    timeout: 15000
+# Append note never twice
+- tapOn:
+    id: rulings.previewAgain
+- extendedWaitUntil:
+    visible: 'Nothing to change: every matching record is already right\.'
+    timeout: 15000
+- tapOn:
+    id: rulings.back
+- assertVisible: 'Proposed by this ruling \(0\)'
+- tapOn: ← Levels
+
+# a record that matches later: 06M-03 No access → one proposal → Accept
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-03
+- tapOn:
+    id: card.status.No access
+- assertVisible: ✓ No access
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-04
+- tapOn:
+    id: card.status.No access
+- assertVisible: ✓ No access
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.rulings
+- tapOn:
+    id: rulings.row
+    text: '● Rig standing ruling.*'
+- extendedWaitUntil:
+    visible: 'Proposed by this ruling \(2\)'
+    timeout: 20000
+- tapOn:
+    id: rulings.proposal.accept
+    index: 0
+- extendedWaitUntil:
+    visible: 'Proposed by this ruling \(1\)'
+    timeout: 15000
+- assertVisible:
+    id: rulings.note
+    text: Accepted 1 proposal.
+
+# Standing off withdraws the open proposal; on brings it back; Reject leaves it alone
+- tapOn:
+    id: rulings.detail.standing
+- extendedWaitUntil:
+    visible: 'Proposed by this ruling \(0\)'
+    timeout: 15000
+- assertVisible: 'Not standing: nothing is proposed\.'
+- tapOn:
+    id: rulings.detail.standing
+- extendedWaitUntil:
+    visible: 'Proposed by this ruling \(1\)'
+    timeout: 15000
+- tapOn:
+    id: rulings.proposal.reject
+- extendedWaitUntil:
+    visible: 'Proposed by this ruling \(0\)'
+    timeout: 15000
+- tapOn: ← Levels

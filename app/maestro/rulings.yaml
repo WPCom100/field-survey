@@ -1,0 +1,15 @@
+# R2 (T157, rig plan wave 4): Rulings on a fresh copy of the master (T37). The D50 standing ruling;
+# a hand-built "0-10V rows read Fixtures" (missing lines, Preview with an untick, Back, Apply,
+# Preview again empty and naming the unticked record); a standing Device ruling proposing on two
+# records set No access later (Accept; Standing off withdraws, on brings back; Reject); Fix all via
+# ruling from Lint applied; Select → Apply as ruling… from a plan list; Generate item once; Copy as
+# new; Delete… with a reason.
+appId: productions.luminarytechnology.fieldsurvey
+name: R2 — Rulings
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow: _rulings-build.yaml
+- runFlow: _rulings-standing.yaml
+- runFlow: _rulings-more.yaml

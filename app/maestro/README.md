@@ -24,6 +24,7 @@ team Ann / Bob), never to the Droplet.
 | `same-user-setup.yaml`, `same-user-peer.yaml`, `same-user-edit.yaml`, `same-user-check.yaml` | `rig.sh same-user` | O3 (T156): A and B both as Ann on a project with the 06M sheet, a station and Ann's ink layer; offline both set 06M-S1's status and draw a stroke; after A then B sync: no sync conflict, B's status (the last write) on both, and A's log reads `ink_merged` (both strokes kept, D133) |
 | `resume-setup.yaml`, `resume-edit.yaml`, `resume-check.yaml` | `rig.sh resume` | O4 (T156): offline a status, a note and a library photo on 06M-S1; a kill and relaunch loses nothing from the outbox (the count never drops), the photo still waits, the card unchanged; Re-sign in while offline; server back: sign in again, `Synced`, 0 photos waiting, the server holds the ops |
 | `lint.yaml` | `rig.sh flows lint.yaml` | R1 (T157): a fresh copy of the master; Drafts with no device: 01's two R3c drafts under the level filter, why?, Open level ▸, IP Accept and DMX Edit → Save & accept (owner EC/ETC), both last on 01's punch list after the Neuron item; B2's IP draft Rejected and still gone after a sync; none under Dismissed. Findings: `Cable with missing far end (12)`, a level chip, Group by Level and folding, 06M-03 Issue → its finding → Open card ▸ and back, Dismiss… disabled until a reason, Dismissed with the reason, resolved when the status leaves Issue and open again when it returns, Reopen, Fix all via ruling ▸ (EBDK) into the editor, Needs review → Lint tab → Open the Lint view ▸ |
+| `rulings.yaml` | `rig.sh flows rulings.yaml` | R2 (T157): a fresh copy of the master; the D50 ruling; "0-10V rows read Fixtures" built by hand (red missing lines, Preview disabled), Preview `11 changes`, one unticked, Back keeps the editor, Apply 10, Preview again empty naming the unticked record; a standing Device ruling (No access → Append note) proposes on 06M-03 and 06M-04 set later: Accept, Standing off withdraws, on brings back, Reject; Fix all via ruling on EBDK applied from Lint; Select → All → Apply as ruling… from 06M's Punch tab; Generate item once; Rename phrase "Install cover" with the vocabulary footer; Copy as new; Delete… with a reason |
 
 | Sub-flow | Walks |
 |---|---|
@@ -67,6 +68,7 @@ team Ann / Bob), never to the Droplet.
 | `_lint-open.yaml` | Sidebar → Lint, the title loaded, "Drafts with no device" folded (it comes back unfolded on every visit) |
 | `_lint-fold.yaml` | folds the Lint group `GROUP` (env) until its header reads ▸ (a tap while a long group renders is lost) |
 | `_lint-drafts.yaml`, `_lint-findings.yaml` | the steps of `lint.yaml` |
+| `_rulings-build.yaml`, `_rulings-standing.yaml`, `_rulings-more.yaml` | the steps of `rulings.yaml` |
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a
 regex on what is visible. A flow for a new screen gets its `testID`s in the same task.

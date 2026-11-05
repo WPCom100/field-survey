@@ -1,0 +1,195 @@
+# R2 step 3 (T157): the other ways in and the other actions (T37). From Lint: Fix all via ruling ▸
+# on "EBDK" → Preview → Apply → the value leaves the vocabulary findings. From a plan list: 06M's
+# Punch tab → Select → All → Apply as ruling… → `from Punch on 06M`, Cancel. Generate item on the
+# 0-10V ends, once (Preview again empty); Rename phrase on device notes; Copy as new; Delete… with a
+# reason. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+# from Lint
+- runFlow: _lint-open.yaml
+- runFlow:
+    when:
+      visible: '▸ Value outside vocabulary \(\d+\)'
+    commands:
+      - tapOn: '▸ Value outside vocabulary \(\d+\)'
+- tapOn:
+    id: lint.fixAll.EBDK
+- extendedWaitUntil:
+    visible:
+      id: rulings.editor.title
+      text: New ruling · from Lint
+    timeout: 10000
+- assertVisible: 'Only the 11 chosen records'
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '11 changes on \d+ levels'
+    timeout: 15000
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied .*: 11 changes\.'
+    timeout: 15000
+- tapOn: ← Levels
+- runFlow: _lint-open.yaml
+- runFlow:
+    when:
+      visible: '▸ Value outside vocabulary \(\d+\)'
+    commands:
+      - tapOn: '▸ Value outside vocabulary \(\d+\)'
+- assertVisible:
+    id: lint.fixAll.Relay panel
+- assertNotVisible:
+    id: lint.fixAll.EBDK
+- tapOn: ← Levels
+
+# from a plan list: Select → All → Apply as ruling…
+- runFlow:
+    file: _open-level.yaml
+    env:
+      LEVEL: 06M
+- tapOn:
+    id: plan.tab.punch
+- tapOn:
+    id: plan.select
+- tapOn:
+    id: plan.select.all
+- tapOn:
+    id: plan.select.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.editor.title
+      text: New ruling · from Punch on 06M
+    timeout: 10000
+- assertVisible: 'Only the \d+ chosen records'
+- tapOn: Cancel
+- tapOn: ← Levels
+
+# Generate item, once
+- tapOn:
+    id: nav.rulings
+- tapOn:
+    id: rulings.new
+- tapOn:
+    id: rulings.reason
+- inputText: Land the 0-10V wiring
+- pressKey: Enter
+- tapOn:
+    id: rulings.cond.value
+- inputText: 0-10V
+- pressKey: Enter
+- tapOn:
+    id: rulings.action.item
+- tapOn:
+    id: rulings.item
+- inputText: Land 0-10V control wiring
+- pressKey: Enter
+- tapOn: Wiring
+- tapOn:
+    text: EC
+    index: 0
+- tapOn:
+    id: rulings.standing          # one-off
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '\d+ changes? on \d+ levels?'
+    timeout: 15000
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied "Land the 0-10V wiring": .*'
+    timeout: 15000
+- tapOn:
+    id: rulings.previewAgain
+- extendedWaitUntil:
+    visible: 'Nothing to change: every matching record is already right\.'
+    timeout: 15000
+- tapOn:
+    id: rulings.back
+
+# Rename phrase: the vocabulary footer, only the phrase inside the item text changes
+- tapOn:
+    id: rulings.new
+- tapOn:
+    id: rulings.reason
+- inputText: Cover plates by name
+- pressKey: Enter
+- tapOn:
+    id: rulings.where.punch_item
+- tapOn:
+    id: rulings.cond.field.item
+- tapOn:
+    id: rulings.cond.op.has_phrase
+- tapOn:
+    id: rulings.cond.value
+- inputText: Install cover
+- pressKey: Enter
+- tapOn:
+    id: rulings.action.rename
+- tapOn:
+    id: rulings.actionField.item
+- tapOn:
+    id: rulings.rename.from
+- inputText: Install cover
+- pressKey: Enter
+- tapOn:
+    id: rulings.rename.to
+- inputText: Install cover plate
+- pressKey: Enter
+- tapOn:
+    id: rulings.standing          # one-off
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '11 changes on \d+ levels'
+    timeout: 15000
+- assertVisible:
+    id: rulings.preview.row
+    text: '.*Install cover plate.*'
+- assertVisible: 'Vocabulary .*"Install cover" becomes an old spelling of "Install cover plate"\.'
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied "Cover plates by name": 11 changes\.'
+    timeout: 15000
+
+# Copy as new, then Delete… with a reason
+- tapOn:
+    id: rulings.copy
+- assertVisible:
+    id: rulings.reason
+    text: Cover plates by name \(copy\)     # the ruling last applied is the one selected
+- tapOn: Cancel
+- tapOn:
+    id: rulings.row
+    text: '○ Land the 0-10V wiring.*'
+- tapOn:
+    id: rulings.delete
+- tapOn:
+    id: rulings.delete.reason
+- inputText: Rig - made to test
+- tapOn: 'Proposed by this ruling.*'   # closes the keyboard: the next tap would only do that
+- tapOn:
+    id: rulings.delete.ok
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Deleted "Land the 0-10V wiring"\. What it changed stays\.'
+    timeout: 10000
+- assertNotVisible:
+    id: rulings.row
+    text: '○ Land the 0-10V wiring.*'
+- tapOn: ← Levels
