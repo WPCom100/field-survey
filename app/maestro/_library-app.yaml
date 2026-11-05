@@ -1,0 +1,201 @@
+# S4 (T158) library step 3 (T48, T61): three cable-less types named for this run (the app library is
+# server-wide and new projects copy its accepted types, so nothing with cables goes there).
+# MAESTRO-R-<n>: Reject → `rejected` in the list, Back to draft → DRAFT. MAESTRO-P-<n>: Accept →
+# Promote to app library → "Promoted: …", `In the app library ✓`. MAESTRO-C-<n>: Accept. Then the
+# app library (Projects → Device-type library): MAESTRO-P accepted there; Copy from… this project →
+# tick MAESTRO-C → "Copied 1 type." and it arrives accepted; again → "already here: MAESTRO-C-<n>".
+# Both are rejected in the app library at the end (new projects copy nothing of the rig's).
+# Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- tapOn:
+    id: nav.library
+# reject and back
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: MAESTRO-R-${output.n}
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added MAESTRO-R-${output.n} as a draft.
+    timeout: 10000
+- tapOn:
+    id: library.reject
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Rejected: .*'
+    timeout: 10000
+- assertVisible:
+    id: library.type
+    text: rejected MAESTRO-R-${output.n}.*
+- tapOn:
+    id: library.reopen
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Back to draft.
+    timeout: 10000
+- assertVisible:
+    id: library.type
+    text: DRAFT MAESTRO-R-${output.n}.*
+# promote
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: MAESTRO-P-${output.n}
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added MAESTRO-P-${output.n} as a draft.
+    timeout: 10000
+- tapOn:
+    id: library.accept
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Accepted.
+    timeout: 10000
+- tapOn:
+    id: library.promote
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Promoted: MAESTRO-P-${output.n} is in the app library; new projects copy it.'
+    timeout: 10000
+- assertVisible: In the app library ✓
+# a third, accepted, to copy
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: MAESTRO-C-${output.n}
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added MAESTRO-C-${output.n} as a draft.
+    timeout: 10000
+- tapOn:
+    id: library.accept
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Accepted.
+    timeout: 10000
+- tapOn: ◀ Levels
+
+# the app library
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- assertVisible: 'App device-type library.*'
+- tapOn:
+    id: library.search
+- inputText: MAESTRO-P-${output.n}
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: MAESTRO-P-${output.n}.*
+- assertVisible: 0 devices · accepted
+- tapOn:
+    id: library.copy
+- tapOn:
+    id: library.copy.source.${PROJECT}
+- tapOn:
+    id: library.copy.type.MAESTRO-C-${output.n}
+- tapOn:
+    id: library.copy.go
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Copied 1 type.
+    timeout: 10000
+- tapOn:
+    id: library.copy
+- tapOn:
+    id: library.copy.source.${PROJECT}
+- tapOn:
+    id: library.copy.type.MAESTRO-C-${output.n}
+- tapOn:
+    id: library.copy.go
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Copied 0 types; already here: MAESTRO-C-${output.n}.'
+    timeout: 10000
+# MAESTRO-C arrived accepted; reject both so new projects copy neither
+- tapOn:
+    id: library.search
+- eraseText: 40
+- tapOn:
+    id: library.search
+- eraseText: 40
+- inputText: MAESTRO-C-${output.n}
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: MAESTRO-C-${output.n}.*
+- assertVisible: 0 devices · accepted
+- tapOn:
+    id: library.reopen
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Back to draft.
+    timeout: 10000
+- tapOn:
+    id: library.reject
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Rejected: .*'
+    timeout: 10000
+- tapOn:
+    id: library.search
+- eraseText: 40
+- tapOn:
+    id: library.search
+- eraseText: 40
+- inputText: MAESTRO-P-${output.n}
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: MAESTRO-P-${output.n}.*
+- tapOn:
+    id: library.reopen
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Back to draft.
+    timeout: 10000
+- tapOn:
+    id: library.reject
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Rejected: .*'
+    timeout: 10000
+- tapOn: ◀ Projects
+- scrollUntilVisible:
+    element:
+      id: projects.open.${PROJECT}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 30000

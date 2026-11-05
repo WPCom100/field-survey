@@ -1,0 +1,222 @@
+# S4 (T158) library step 2 (T48, T105, T68, T146) after `_library-type`: every NSPS of the master
+# already has its 120V row, so 04-05's (C-14) is deleted first to leave the type a run to offer.
+# Accept draft → "… offer its default cables to 4 devices as drafts", Neuron ID → Needed. On
+# 04-05's card: the Neuron ID section (the type overrides "an NSPS hosts the bus"), a `⚑ R2g`
+# draft `120V → P-NSPS-D Power Supply` whose why? names the type, `+ add N → switch` offered and
+# the optional second 120V not (defaults first). The type's To → `… Supply 1`, Neuron ID back to
+# By the wires: the open draft follows, the Neuron section goes. Accept → the connection, the
+# draft does not come back, and now `+ add 120V → P-NSPS-D Power Supply 2`; `+ add N → switch`
+# → a connection, the row gone; `+ add Back box` → `Back box expected 1`. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+# 04-05 without its 120V
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: '04'
+      DEVICE: 04-05
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-14
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-14
+- tapOn:
+    id: end.menu
+- tapOn:
+    id: end.menu.delete
+- tapOn:
+    id: end.reason
+- inputText: Rig - library type test
+- tapOn:
+    id: end.reason.ok
+- extendedWaitUntil:
+    visible: DELETED
+    timeout: 10000
+- tapOn:
+    id: end.back
+- assertNotVisible:
+    id: card.conn.C-14
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# accept the type; its Neuron ID → Needed
+- tapOn:
+    id: nav.library
+- tapOn:
+    id: library.type
+    text: '.*P-NSPS-D-KIT.*'
+- tapOn:
+    id: library.accept
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Accepted. The rules will offer its default cables to 4 devices as drafts.
+    timeout: 10000
+- assertVisible: 4 devices · accepted
+- scrollUntilVisible:
+    element:
+      id: library.neuron.needed
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.neuron.needed
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- tapOn: ◀ Levels
+
+# the card: Neuron ID shown, the R2g draft, the optional N offered, the second 120V not yet
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: '04'
+      DEVICE: 04-05
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.notes
+- assertVisible: Faceplate cracked      # the type's own chip, a draft, shows at once
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.neuron.type
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.offer.N → switch
+- assertNotVisible:
+    id: card.offer.120V → P-NSPS-D Power Supply 2
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.why.120V → P-NSPS-D Power Supply
+- assertVisible: ⚑ R2g
+- assertNotVisible: ⚑ R2d
+- tapOn:
+    id: proposal.why.120V → P-NSPS-D Power Supply
+- extendedWaitUntil:
+    visible: '.*is a P-NSPS-D-KIT \(library: 120V → P-NSPS-D Power Supply\).*'
+    timeout: 5000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# the type's To changes and its Neuron ID goes back to the wires
+- tapOn:
+    id: nav.library
+- tapOn:
+    id: library.type
+    text: '.*P-NSPS-D-KIT.*'
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.defaults.0.to
+      TEXT: P-NSPS-D Power Supply 1
+- scrollUntilVisible:
+    element:
+      id: library.neuron.wires
+    direction: UP
+    centerElement: true
+- tapOn:
+    id: library.neuron.wires
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: sugg.reject.Faceplate cracked
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: sugg.reject.Faceplate cracked
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Rejected: it leaves the chips.'
+    timeout: 10000
+- tapOn: ◀ Levels
+
+# the open draft follows; accept it; the optional rows
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: '04'
+      DEVICE: 04-05
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.accept.120V → P-NSPS-D Power Supply 1
+- assertNotVisible:
+    id: card.neuron.type
+- assertNotVisible:
+    id: proposal.accept.120V → P-NSPS-D Power Supply
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.notes
+- assertNotVisible: Faceplate cracked   # rejected: off the card
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.accept.120V → P-NSPS-D Power Supply 1
+- tapOn:
+    id: proposal.accept.120V → P-NSPS-D Power Supply 1
+- extendedWaitUntil:
+    notVisible:
+      id: proposal.accept.120V → P-NSPS-D Power Supply 1
+    timeout: 10000
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.section.connections
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.offer.120V → P-NSPS-D Power Supply 2
+- assertVisible: '.*120V → P-NSPS-D Power Supply 1.*'
+- tapOn:
+    id: card.offer.N → switch
+- extendedWaitUntil:
+    notVisible:
+      id: card.offer.N → switch
+    timeout: 10000
+- assertVisible: '.*N → switch.*'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.offer.Back box
+- assertVisible:
+    id: card.offer.Back box
+    text: '.*expected 1.*'
+- tapOn:
+    id: card.offer.Back box
+- extendedWaitUntil:
+    visible: Back box expected 1.*
+    timeout: 10000
+- assertNotVisible:
+    id: card.offer.Back box
+# nothing comes back after a rules run
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.punch
+- assertNotVisible:
+    id: 'proposal\.accept\.120V → .*'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

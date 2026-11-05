@@ -1,0 +1,19 @@
+# Type TEXT into the library editor's field ID (T158): scroll it to mid-screen, tap, clear it (two
+# passes: a tap lands mid-word and eraseText deletes only before the cursor), type, Return (closes
+# the keyboard, which covers the editor's Save footer).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- scrollUntilVisible:
+    element:
+      id: ${ID}
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: ${ID}
+- eraseText: 60
+- tapOn:
+    id: ${ID}
+- eraseText: 60
+- inputText: ${TEXT}
+- pressKey: Enter

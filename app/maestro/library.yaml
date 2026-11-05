@@ -1,0 +1,17 @@
+# S4 (T158, rig plan wave 2) the device-type library, on A as Ann: a fresh copy of the master;
+# + New type P-NSPS-D-KIT with every field of the editor, kept after leaving (`_library-type`);
+# accepting it offers its default cables (R2g) on an NSPS that lacks one, a template edit follows
+# the open draft, the optional runs and accessory on the card, the Neuron ID override
+# (`_library-card`); reject / back to draft, Promote, Copy from… into the app library
+# (`_library-app`); sync. Suggestions, vocabulary, device types, pin shapes and the rename ruling
+# are `chips.yaml` / `vocab.yaml`.
+appId: productions.luminarytechnology.fieldsurvey
+name: Library — types, R2g, optional runs, promote, copy
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow: _library-type.yaml
+- runFlow: _library-card.yaml
+- runFlow: _library-app.yaml
+- runFlow: _sync.yaml

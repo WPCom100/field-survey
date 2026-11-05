@@ -63,14 +63,14 @@ export function SuggestionList(props: {
         <View style={styles.group}>
           <View style={styles.wrap}>
             {targets.map(({ target: tg, label }) => (
-              <Pressable key={tg} onPress={() => setTarget(tg)} style={[styles.chip, target === tg && styles.chipOn]}>
+              <Pressable key={tg} onPress={() => setTarget(tg)} style={[styles.chip, target === tg && styles.chipOn]} accessibilityState={{ selected: target === tg }} testID={`sugg.target.${tg}`}>
                 <Text style={target === tg ? styles.chipTextOn : styles.chipText}>{label}</Text>
               </Pressable>
             ))}
           </View>
           <View style={styles.row}>
-            <TextInput value={text} onChangeText={setText} placeholder="Phrase, as the surveyor would type it" placeholderTextColor="#888" style={[styles.input, styles.grow]} onSubmitEditing={add} />
-            <Pressable disabled={!text.trim()} onPress={add} style={!text.trim() && styles.off}>
+            <TextInput value={text} onChangeText={setText} placeholder="Phrase, as the surveyor would type it" placeholderTextColor="#888" style={[styles.input, styles.grow]} onSubmitEditing={add} testID="sugg.input" />
+            <Pressable disabled={!text.trim()} onPress={add} style={!text.trim() && styles.off} testID="sugg.add">
               <Text style={styles.link}>+ add</Text>
             </Pressable>
           </View>
@@ -85,7 +85,7 @@ function ChipRow(props: { row: Suggestion; canEdit: boolean; run: RunFn; library
   const lib = props.libraryEditor;
   return (
     <View style={styles.row}>
-      <Text style={[styles.value, styles.grow, r.state === 'rejected' && styles.dim]}>
+      <Text style={[styles.value, styles.grow, r.state === 'rejected' && styles.dim]} testID={`sugg.row.${r.text}`}>
         {r.state === 'draft' ? <Text style={styles.draft}>DRAFT </Text> : null}
         {r.state === 'rejected' ? <Text style={styles.dim}>rejected </Text> : null}
         {r.text}
@@ -94,24 +94,24 @@ function ChipRow(props: { row: Suggestion; canEdit: boolean; run: RunFn; library
         <>
           {r.state === 'draft' ? (
             <>
-              <Pressable onPress={() => void props.run((e) => acceptSuggestion(e, r.id), 'Accepted.')} hitSlop={6}>
+              <Pressable onPress={() => void props.run((e) => acceptSuggestion(e, r.id), 'Accepted.')} hitSlop={6} testID={`sugg.accept.${r.text}`}>
                 <Text style={styles.ok}>Accept</Text>
               </Pressable>
-              <Pressable onPress={() => void props.run((e) => rejectSuggestion(e, r.id), 'Rejected: it leaves the chips.')} hitSlop={6}>
+              <Pressable onPress={() => void props.run((e) => rejectSuggestion(e, r.id), 'Rejected: it leaves the chips.')} hitSlop={6} testID={`sugg.reject.${r.text}`}>
                 <Text style={styles.danger}>Reject</Text>
               </Pressable>
             </>
           ) : r.state === 'rejected' ? (
-            <Pressable onPress={() => void props.run((e) => reopenSuggestion(e, r.id), 'Back to draft.')} hitSlop={6}>
+            <Pressable onPress={() => void props.run((e) => reopenSuggestion(e, r.id), 'Back to draft.')} hitSlop={6} testID={`sugg.reopen.${r.text}`}>
               <Text style={styles.link}>Back to draft</Text>
             </Pressable>
           ) : null}
           {r.projectId && r.state === 'accepted' && lib ? (
-            <Pressable onPress={() => void props.run((_e, s) => promoteSuggestion(lib, s, r.id), `Promoted: the app library offers "${r.text}".`)} hitSlop={6}>
+            <Pressable onPress={() => void props.run((_e, s) => promoteSuggestion(lib, s, r.id), `Promoted: the app library offers "${r.text}".`)} hitSlop={6} testID={`sugg.promote.${r.text}`}>
               <Text style={styles.link}>Promote</Text>
             </Pressable>
           ) : null}
-          <Pressable onPress={() => void props.run((e) => removeSuggestion(e, r.id), 'Removed.')} hitSlop={6}>
+          <Pressable onPress={() => void props.run((e) => removeSuggestion(e, r.id), 'Removed.')} hitSlop={6} testID={`sugg.remove.${r.text}`}>
             <Text style={styles.danger}>Remove</Text>
           </Pressable>
         </>
@@ -145,7 +145,8 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
                 void props.run(async (e, s) => {
                   n = await loadStandardSuggestions(e, s);
                 }, () => (n ? `Added ${n} standard suggestion${n === 1 ? '' : 's'} as drafts.` : 'The standard suggestions are all here already.'));
-              }}>
+              }}
+              testID="sugg.loadStandard">
               <Text style={styles.link}>Load standard suggestions</Text>
             </Pressable>
           ) : (
@@ -155,7 +156,8 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
                 void props.run(async (e, s) => {
                   n = await copyAppSuggestions(e, s, props.library!);
                 }, () => (n ? `Copied ${n} chip${n === 1 ? '' : 's'} from the app library.` : 'Nothing new in the app library (accepted category and code chips only).'));
-              }}>
+              }}
+              testID="sugg.copyApp">
               <Text style={styles.link}>Copy from app library</Text>
             </Pressable>
           )}
@@ -165,13 +167,13 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
       <Text style={styles.label}>Category</Text>
       <View style={styles.wrap}>
         {CATEGORIES.map((c) => (
-          <Pick key={c} on={pick.scope === 'category' && pick.ref === c} label={c} n={count('category', c)} onPress={() => setPick({ scope: 'category', ref: c })} />
+          <Pick key={c} on={pick.scope === 'category' && pick.ref === c} label={c} n={count('category', c)} onPress={() => setPick({ scope: 'category', ref: c })} testID={`sugg.category.${c}`} />
         ))}
       </View>
       <Text style={styles.label}>Cable code</Text>
       <View style={styles.wrap}>
         {props.codes.map((c) => (
-          <Pick key={c} on={pick.scope === 'code' && pick.ref === c} label={c} n={count('code', c)} onPress={() => setPick({ scope: 'code', ref: c })} />
+          <Pick key={c} on={pick.scope === 'code' && pick.ref === c} label={c} n={count('code', c)} onPress={() => setPick({ scope: 'code', ref: c })} testID={`sugg.code.${c}`} />
         ))}
       </View>
       <Text style={styles.heading}>{pick.scope === 'code' ? `Cable ${pick.ref}` : pick.ref}</Text>
@@ -180,9 +182,9 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
   );
 }
 
-function Pick(props: { on: boolean; label: string; n: number; onPress: () => void }) {
+function Pick(props: { on: boolean; label: string; n: number; onPress: () => void; testID: string }) {
   return (
-    <Pressable onPress={props.onPress} style={[styles.chip, props.on && styles.chipOn]}>
+    <Pressable onPress={props.onPress} style={[styles.chip, props.on && styles.chipOn]} accessibilityState={{ selected: props.on }} testID={props.testID}>
       <Text style={props.on ? styles.chipTextOn : styles.chipText}>
         {props.label}
         {props.n ? ` (${props.n})` : ''}

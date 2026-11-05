@@ -164,7 +164,7 @@ export default function VocabularyScreen() {
       </View>
       <View style={styles.tabs}>
         {(['project', 'app'] as const).map((s) => (
-          <Pressable key={s} onPress={() => setScope(s)} style={[styles.chip, scope === s && styles.chipOn]}>
+          <Pressable key={s} onPress={() => setScope(s)} style={[styles.chip, scope === s && styles.chipOn]} testID={`vocab.scope.${s}`}>
             <Text style={scope === s ? styles.chipTextOn : styles.chipText}>{s === 'project' ? 'This project' : 'App library'}</Text>
           </Pressable>
         ))}
@@ -174,7 +174,7 @@ export default function VocabularyScreen() {
       </View>
       <View style={styles.tabs}>
         {tabs.map((t) => (
-          <Pressable key={t} onPress={() => setTab(t)} style={[styles.tab, shown === t && styles.tabOn]}>
+          <Pressable key={t} onPress={() => setTab(t)} style={[styles.tab, shown === t && styles.tabOn]} testID={`vocab.tab.${t}`}>
             <Text style={shown === t ? styles.tabTextOn : styles.tabText}>{tabText(t)}</Text>
           </Pressable>
         ))}
@@ -207,8 +207,8 @@ function ValueRow(props: { e: VocabEntry; canEdit: boolean; run: RunFn; promote:
   if (editing !== null) {
     return (
       <View style={styles.row}>
-        <TextInput value={editing} onChangeText={setEditing} style={[styles.input, styles.grow]} autoFocus />
-        <Pressable onPress={async () => (await run((ed, s) => renameValue(ed, s, e.id, editing))) && setEditing(null)} style={styles.btn}>
+        <TextInput value={editing} onChangeText={setEditing} style={[styles.input, styles.grow]} autoFocus testID="vocab.rename.input" />
+        <Pressable onPress={async () => (await run((ed, s) => renameValue(ed, s, e.id, editing))) && setEditing(null)} style={styles.btn} testID="vocab.rename.save">
           <Text style={styles.btnText}>Save</Text>
         </Pressable>
         <Pressable onPress={() => setEditing(null)}>
@@ -219,7 +219,7 @@ function ValueRow(props: { e: VocabEntry; canEdit: boolean; run: RunFn; promote:
   }
   return (
     <View style={styles.row}>
-      <Text style={[styles.value, styles.grow]}>
+      <Text style={[styles.value, styles.grow]} testID={`vocab.value.${e.value}`}>
         {props.prefix ?? ''}
         {e.value}
         {e.draft ? <Text style={styles.draft}>  draft</Text> : null}
@@ -227,11 +227,11 @@ function ValueRow(props: { e: VocabEntry; canEdit: boolean; run: RunFn; promote:
       {props.canEdit ? (
         <>
           {e.draft ? (
-            <Pressable onPress={() => run((ed) => acceptValue(ed, e.id))}>
+            <Pressable onPress={() => run((ed) => acceptValue(ed, e.id))} testID={`vocab.accept.${e.value}`}>
               <Text style={styles.link}>Accept</Text>
             </Pressable>
           ) : null}
-          <Pressable onPress={() => setEditing(e.value)}>
+          <Pressable onPress={() => setEditing(e.value)} testID={`vocab.edit.${e.value}`}>
             <Text style={styles.link}>Edit</Text>
           </Pressable>
           {props.promote && !e.draft ? (
@@ -239,7 +239,7 @@ function ValueRow(props: { e: VocabEntry; canEdit: boolean; run: RunFn; promote:
               <Text style={styles.link}>Promote</Text>
             </Pressable>
           ) : null}
-          <Pressable onPress={() => run((ed, s) => removeValue(ed, e.id, s))}>
+          <Pressable onPress={() => run((ed, s) => removeValue(ed, e.id, s))} testID={`vocab.remove.${e.value}`}>
             <Text style={styles.danger}>Remove</Text>
           </Pressable>
         </>
@@ -262,11 +262,11 @@ function ListSection(props: { list: VocabListKey; title: string; hint: string; e
       ))}
       {props.canEdit ? (
         <View style={styles.row}>
-          <TextInput value={text} onChangeText={setText} placeholder="Add a value" placeholderTextColor="#888" style={[styles.input, styles.grow]} />
+          <TextInput value={text} onChangeText={setText} placeholder="Add a value" placeholderTextColor="#888" style={[styles.input, styles.grow]} testID={`vocab.add.${list}.input`} />
           <Pressable
             disabled={!text.trim()}
             onPress={async () => (await run((ed, s) => addValue(ed, s, list, text))) && setText('')}
-            style={[styles.btn, !text.trim() && styles.off]}>
+            style={[styles.btn, !text.trim() && styles.off]} testID={`vocab.add.${list}`}>
             <Text style={styles.btnText}>Add</Text>
           </Pressable>
         </View>
@@ -326,7 +326,7 @@ function PinShapes(props: { shapes: PinShapeMap | null; canEdit: boolean; run: R
       </Text>
       {ROLE.map((role: Role) => (
         <View key={role} style={styles.group}>
-          <Text style={styles.sectionTitle}>
+          <Text style={styles.sectionTitle} testID={`vocab.shape.${role}`}>
             {PIN_SHAPE_LABEL[shapes[role]!].glyph} {ROLE_LABEL[role]}
             {shared.has(role) ? <Text style={styles.draft}>  shares its shape with another role</Text> : null}
           </Text>
@@ -336,7 +336,7 @@ function PinShapes(props: { shapes: PinShapeMap | null; canEdit: boolean; run: R
                 key={name}
                 disabled={!props.canEdit}
                 onPress={() => props.run((e, s) => setPinShape(e, s, role, name))}
-                style={[styles.chip, shapes[role] === name && styles.chipOn]}>
+                style={[styles.chip, shapes[role] === name && styles.chipOn]} accessibilityState={{ selected: shapes[role] === name }} testID={`vocab.shape.${role}.${name}`}>
                 <Text style={shapes[role] === name ? styles.chipTextOn : styles.chipText}>
                   {PIN_SHAPE_LABEL[name].glyph} {PIN_SHAPE_LABEL[name].label}
                 </Text>

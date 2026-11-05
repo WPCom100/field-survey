@@ -1,0 +1,256 @@
+# S4 (T158) library step 1 (T48, T105): on a fresh seed copy, Library → + New type P-NSPS-D-KIT
+# under Equipment → a draft with `4 devices` (the master's four NSPS carry that Device text); the
+# same model again (other case) refused "already in the library". The editor: role NSPS, alias
+# P-NSPS-D, ID scheme Level-number, default cables 120V (From 120v Power, To P-NSPS-D Power
+# Supply, Far 120v Power, single row) and N, optional N → switch (Far Network switch) and a second
+# 120V, accessories P-NSPS-D Power Supply (the D52 offer) and Back box → Save → "Saved."; Levels
+# and back: every field kept, `Rules that reference this type: … R2g`. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.library
+- assertVisible: 'Device-type library.*'
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: P-NSPS-D-KIT
+- tapOn:
+    id: library.new.category.Equipment
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added P-NSPS-D-KIT as a draft.
+    timeout: 10000
+- assertVisible: 4 devices · draft
+# the same model again is refused
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: p-nsps-d-kit
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: '.*already in the library.*'
+    timeout: 10000
+- tapOn:
+    id: library.type
+    text: '.*P-NSPS-D-KIT.*'
+- tapOn:
+    id: library.role.nsps
+- assertVisible:
+    id: library.role.nsps
+    selected: true
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.aliases
+      TEXT: P-NSPS-D
+- tapOn:
+    id: library.scheme.level_number
+# default cables: 120V and N
+- scrollUntilVisible:
+    element:
+      id: library.defaults.add
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.defaults.add
+- tapOn:
+    id: library.defaults.0.code.120V
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.defaults.0.from
+      TEXT: 120v Power
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.defaults.0.to
+      TEXT: P-NSPS-D Power Supply
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.defaults.0.far
+      TEXT: 120v Power
+- tapOn:
+    id: library.defaults.0.single
+- scrollUntilVisible:
+    element:
+      id: library.defaults.add
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.defaults.add
+- scrollUntilVisible:
+    element:
+      id: library.defaults.1.code.N
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.defaults.1.code.N
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.defaults.1.to
+      TEXT: Network to equipment rack
+# optional cables: N → switch, then a second 120V
+- scrollUntilVisible:
+    element:
+      id: library.optional.add
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.optional.add
+- scrollUntilVisible:
+    element:
+      id: library.optional.0.code.N
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.optional.0.code.N
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.optional.0.to
+      TEXT: switch
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.optional.0.far
+      TEXT: Network switch
+- scrollUntilVisible:
+    element:
+      id: library.optional.add
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.optional.add
+- scrollUntilVisible:
+    element:
+      id: library.optional.1.code.120V
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.optional.1.code.120V
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.optional.1.to
+      TEXT: P-NSPS-D Power Supply 2
+# accessories: the D52 offer, then Back box (expected 1 by default)
+- scrollUntilVisible:
+    element:
+      id: library.acc.nsps
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.acc.nsps
+- extendedWaitUntil:      # its row moves "+ add" down; a tap before that missed it
+    visible:
+      id: library.acc.0.model
+      text: P-NSPS-D Power Supply
+    timeout: 5000
+# "+ add" then sits half under the fixed Save footer (Maestro counts it visible; the tap hits the
+# footer): the pane is pushed to its end first
+- swipe:
+    start: 66%,75%
+    end: 66%,40%
+    duration: 500
+- waitForAnimationToEnd
+- tapOn:
+    id: library.acc.add
+- extendedWaitUntil:
+    visible:
+      id: library.acc.1.model
+    timeout: 5000
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.acc.1.model
+      TEXT: Back box
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+# a type's own chip (T99): a draft for Device Notes, saved as it is added (Save remounts the
+# editor at its top, so the box is below)
+- scrollUntilVisible:
+    element:
+      id: sugg.input
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: sugg.target.device_note
+    selected: true
+- tapOn:
+    id: sugg.input
+- inputText: Faceplate cracked
+- pressKey: Enter          # onSubmitEditing adds it
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added "Faceplate cracked" as a draft.
+    timeout: 10000
+- assertVisible:
+    id: sugg.row.Faceplate cracked
+    text: DRAFT Faceplate cracked
+# leave and come back: everything kept
+- tapOn: ◀ Levels
+- tapOn:
+    id: nav.library
+- tapOn:
+    id: library.type
+    text: '.*P-NSPS-D-KIT.*'
+- assertVisible:
+    id: library.aliases
+    text: P-NSPS-D
+- assertVisible:
+    id: library.role.nsps
+    selected: true
+- assertVisible:
+    id: library.scheme.level_number
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: library.defaults.0.to
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: library.defaults.0.to
+    text: P-NSPS-D Power Supply
+- assertVisible:
+    id: library.defaults.0.code.120V
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: library.optional.0.far
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: library.optional.0.far
+    text: Network switch
+- scrollUntilVisible:
+    element:
+      id: library.acc.1.model
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: library.acc.0.model
+    text: P-NSPS-D Power Supply
+- assertVisible:
+    id: library.acc.1.model
+    text: Back box
+- scrollUntilVisible:
+    element:
+      text: 'Rules that reference this type: .*R2g.*'
+    direction: DOWN
+- tapOn: ◀ Levels

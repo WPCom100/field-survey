@@ -191,10 +191,10 @@ export function DeviceCard(props: DeviceCardProps) {
             <Text style={styles.headBtnText}>×</Text>
           </Pressable>
         </View>
-        <Text style={styles.headModel} numberOfLines={2}>
+        <Text style={styles.headModel} numberOfLines={2} testID="card.model">
           {[d.device, d.type].filter(Boolean).join(' ') || '(no model)'}
         </Text>
-        <Text style={styles.headSub} numberOfLines={2}>
+        <Text style={styles.headSub} numberOfLines={2} testID="card.sub">
           {[d.category, d.drawingPosition, d.room].filter(Boolean).join(' · ') || '—'}
         </Text>
         {d.isNew ? <Text style={styles.headNote}>NEW · ID assigned at sync</Text> : null}
@@ -552,8 +552,8 @@ function TypeSection({ card, readOnly, run }: { card: Card; readOnly: boolean; r
     <Section title="Type" marks={marks(card, 'type')} collapsed={!d.type && !card.typeChips.length}>
       {typing === null ? (
         <View style={styles.rowWrap}>
-          <Text style={[styles.flex, card.inReview.has('type') && styles.review]}>{d.type ?? '—'}</Text>
-          {readOnly ? null : <SmallButton label="Edit…" onPress={() => setTyping(d.type ?? '')} />}
+          <Text style={[styles.flex, card.inReview.has('type') && styles.review]} testID="card.type">{d.type ?? '—'}</Text>
+          {readOnly ? null : <SmallButton label="Edit…" onPress={() => setTyping(d.type ?? '')} testID="card.type.edit" />}
         </View>
       ) : (
         <>
@@ -563,6 +563,7 @@ function TypeSection({ card, readOnly, run }: { card: Card; readOnly: boolean; r
             onChangeText={setTyping}
             placeholder="Type (e.g. Echo relay panel)"
             placeholderTextColor="#888"
+            testID="card.type.input"
             autoFocus
             returnKeyType="done"
             onSubmitEditing={() => save(typing)}
@@ -579,7 +580,7 @@ function TypeSection({ card, readOnly, run }: { card: Card; readOnly: boolean; r
             </View>
           ) : null}
           <View style={styles.rowWrap}>
-            <SmallButton label="Save" onPress={() => save(typing)} />
+            <SmallButton label="Save" onPress={() => save(typing)} testID="card.type.save" />
             <SmallButton label="Cancel" onPress={() => setTyping(null)} />
           </View>
         </>
@@ -813,7 +814,7 @@ export function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardD
           <SmallButton label="Accept" disabled={!canAct} onPress={() => act({ kind: 'accept' })} testID={`proposal.accept.${draft.title}`} />
           <SmallButton label="Edit" disabled={!canAct || draft.editable.length === 0} onPress={startEdit} testID={`proposal.edit.${draft.title}`} />
           <SmallButton label="Reject" disabled={!canAct} onPress={() => act({ kind: 'reject' })} testID={`proposal.reject.${draft.title}`} />
-          <Pressable onPress={toggleWhy} hitSlop={6}>
+          <Pressable onPress={toggleWhy} hitSlop={6} testID={`proposal.why.${draft.title}`}>
             <Text style={styles.jumpText}>why? {why !== null ? '▴' : '▸'}</Text>
           </Pressable>
         </View>
@@ -967,7 +968,7 @@ function MenuButton({ label, onPress, danger, testID }: { label: string; onPress
 /** A greyed "+ add …" row: something the device's type offers but the device does not have yet (T105). */
 function OfferRow(props: { label: string; sub: string | null; disabled: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={props.onPress} disabled={props.disabled} style={[styles.item, styles.offer]} hitSlop={4}>
+    <Pressable onPress={props.onPress} disabled={props.disabled} style={[styles.item, styles.offer]} hitSlop={4} testID={`card.offer.${props.label.replace(/^\+ add /, '')}`}>
       <View style={styles.itemLine}>
         <Text style={styles.offerText} numberOfLines={2}>
           {props.label}
