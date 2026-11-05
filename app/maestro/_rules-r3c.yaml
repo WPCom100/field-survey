@@ -88,7 +88,8 @@ appId: productions.luminarytechnology.fieldsurvey
     element:
       id: 'rules\.E6\.owner\.EC'
     direction: DOWN
-    timeout: 60000           # the Rules tab is long; E6 sits too near its end to be centred
+    timeout: 180000          # the Rules tab is long; E6 sits too near its end to be centred, and
+                             # the swipes down to it took 60 s on 2026-11-05 (reached as it timed out)
 - tapOn:
     id: 'rules\.E6\.owner\.EC'
 - assertVisible:

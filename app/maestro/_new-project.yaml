@@ -16,6 +16,16 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: newProject.levelCode
 - inputText: 06M
+# iOS's "Save Password?" sheet for the token can come up late, after the name picker (B, T158):
+# Maestro sees neither it nor the app behind it, so a hidden button means the sheet is up —
+# its "Not Now" is tapped by position, as `_connect` does
+- runFlow:
+    when:
+      notVisible:
+        id: newProject.addLevel
+    commands:
+      - tapOn:
+          point: 43%,57%
 - tapOn:
     id: newProject.addLevel
 - assertVisible: 06M
