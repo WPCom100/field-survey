@@ -1,0 +1,155 @@
+# R4 step 2 (T157): delete a connection added in error (T138). On 06M-01: C-23 Not installed and its
+# Run item and kit accepted (`_ends-run`), then ⋯ → Delete connection… with a reason: gone from the
+# card's Connections and the Conns tab, no Run draft offered again, the accepted item flagged in
+# Lint ("Linked to a deleted device or connection"); History → Connection deleted → Restore… →
+# back with its status. Then a delete from the cable view: the panel says how to restore it.
+# Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-01
+- runFlow: _ends-run.yaml
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.conn.C-23
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-23
+- tapOn:
+    id: end.menu
+- tapOn:
+    id: end.menu.delete
+- assertVisible: 'Delete .* with both ends: why\?'
+- tapOn:
+    id: end.reason
+- inputText: Rig - added in error
+- tapOn:
+    id: end.reason.ok
+- extendedWaitUntil:
+    visible: DELETED
+    timeout: 10000
+- assertVisible: 'Deleted: Rig - added in error'
+- tapOn:
+    id: end.back
+- assertNotVisible:
+    id: card.conn.C-23
+- assertNotVisible:
+    id: proposal.accept.Run DMX to Level 11      # nothing re-proposed
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.history
+- tapOn:
+    id: card.section.history
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.history.restore
+- assertVisible: '.*Connection deleted.*'
+- assertVisible: '.*Rig - added in error.*'
+- tapOn:
+    id: card.close
+# the Conns tab has no C-23 either
+- tapOn:
+    id: plan.tab.connections
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: C-23
+- assertNotVisible:
+    id: plan.row.connections.C-23
+- runFlow: _search-clear.yaml
+- tapOn:
+    id: plan.back
+
+# the accepted Run item now points at a deleted connection
+- runFlow: _lint-open.yaml
+- runFlow:
+    file: _lint-fold.yaml
+    env:
+      GROUP: IP address item missing or not last
+- runFlow:
+    file: _lint-fold.yaml
+    env:
+      GROUP: DMX address item missing or not last
+- runFlow:
+    file: _lint-fold.yaml
+    env:
+      GROUP: Value outside vocabulary
+- runFlow:
+    file: _lint-fold.yaml
+    env:
+      GROUP: Cable with missing far end
+- assertVisible: '▾ Linked to a deleted device or connection \(1\)'
+- assertVisible: '.*Punch #\d+ Run DMX to Level 11.*'
+- tapOn: ← Levels
+
+# History → Restore… → C-23 is back with its end Not installed
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-01
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.history
+- tapOn:
+    id: card.section.history
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.history.restore
+- tapOn:
+    id: card.history.restore
+- tapOn:
+    id: card.reason
+- inputText: Rig - it was right
+- tapOn:
+    id: card.reason.ok
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.conn.C-23
+- assertVisible: '.*C-23, X → DMX to Level 11, Not installed.*'   # the row (its testID is on the label)
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# a delete from the cable view
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: Cable / riser \(80\)
+    timeout: 30000
+- tapOn:
+    id: cables.code.P
+- tapOn:
+    id: cables.row
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: end.back
+    timeout: 10000
+- tapOn:
+    id: end.menu
+- tapOn:
+    id: end.menu.delete
+- tapOn:
+    id: end.reason
+- inputText: Rig - from the cable view
+- tapOn:
+    id: end.reason.ok
+- extendedWaitUntil:
+    visible: This cable is deleted. Restore it from the History of a device at either end.
+    timeout: 10000
+- tapOn:
+    id: cables.code.all
+- assertVisible: Cable / riser \(79\)
+- tapOn: ← Levels

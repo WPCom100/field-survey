@@ -1,0 +1,12 @@
+# R4 (T157, rig plan wave 4): Cable / riser on a fresh copy of the master (T39): 80 cables, the
+# footer's 12 missing far ends and 80 unconfirmed endpoints, grouping, filters, the end editor in
+# the side panel, a far-end status moving the footer, Jump to, Confirm endpoint, the Needs review
+# link, Select → Apply as ruling; then delete a connection and restore it from History (T138).
+appId: productions.luminarytechnology.fieldsurvey
+name: R4 — Cable / riser
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow: _cables-view.yaml
+- runFlow: _cables-delete.yaml

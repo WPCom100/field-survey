@@ -1,0 +1,171 @@
+# R4 step 1 (T157): Cable / riser on the seed copy (T39). The title and the six footer counts of a
+# fresh import, Group by Vertical / Level / Code and folding, the row cells, the filters and the
+# footer filter, a row's end editor in the side panel (◀ Cables), a far-end status that moves the
+# row and the footer, Jump to …, Confirm endpoint, Open Needs review item ▸, Select → Apply as
+# ruling…. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: Cable / riser \(80\)
+    timeout: 30000
+- assertVisible: { id: cables.check.far_end, text: missing far end 12 }
+- assertVisible: { id: cables.check.code, text: code mismatch 0 }
+- assertVisible: { id: cables.check.status, text: status mismatch 0 }
+- assertVisible: { id: cables.check.riser, text: To ≠ riser 0 }
+- assertVisible: { id: cables.check.unconfirmed, text: unconfirmed endpoint 80 }
+- assertVisible: { id: cables.check.not_started, text: Not started on in-scope level 0 }
+
+# rows: an unsurveyed end, a missing end, a review mark
+- assertVisible:
+    id: cables.row
+    text: '.*Unsurveyed.*'
+
+# Group by: Vertical (the default) → Level → Code; a header folds
+- assertVisible: '▾ .* → X \(DMX\).*'
+- tapOn:
+    id: cables.groupBy.level
+- assertVisible: '▾ Level 06M \d+'
+- tapOn: '▾ Level 06M \d+'
+- assertVisible: '▸ Level 06M \d+'
+- tapOn: '▸ Level 06M \d+'
+- tapOn:
+    id: cables.groupBy.code
+- assertVisible: '▾ X \(DMX\) \d+'
+- tapOn:
+    id: cables.groupBy.vertical
+
+# filters: level, code, status, ☑ only, and the footer's count as a filter
+- tapOn:
+    id: cables.level.03
+- assertVisible: 'Cable / riser \(\d+ of 80\)'
+- tapOn:
+    id: cables.level.all
+- tapOn:
+    id: cables.code.X
+- assertVisible: 'Cable / riser \(\d+ of 80\)'
+- tapOn:
+    id: cables.code.all
+- tapOn:
+    id: cables.status.Unsurveyed
+- assertVisible: 'Cable / riser \(\d+ of 80\)'
+- tapOn:
+    id: cables.status.all
+- tapOn:
+    id: cables.checkOnly
+- assertVisible: 'Cable / riser \(80\)'     # every imported cable is unconfirmed (D6)
+- tapOn:
+    id: cables.checkOnly
+- tapOn:
+    id: cables.check.far_end
+- assertVisible: Cable / riser \(12 of 80\)
+- assertVisible:
+    id: cables.row
+    text: '.*⚠ missing end.*|.*⚠ no endpoint.*'
+- tapOn:
+    id: cables.check.far_end
+- assertVisible: Cable / riser \(80\)
+
+# Open Needs review item ▸ from a row with ⓡ (an Import pair item: one of the missing far ends)
+- tapOn:
+    id: cables.check.far_end
+- tapOn:
+    id: cables.row
+    text: '.*ⓡ.*'
+    index: 0
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: cables.openReview
+- tapOn:
+    id: cables.openReview
+- extendedWaitUntil:
+    visible: 'Needs review \(\d+\)'
+    timeout: 10000
+- assertVisible: 'Import pair.*'
+- tapOn: ← Levels
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: Cable / riser \(80\)
+    timeout: 30000
+
+# a row → the end editor in the side panel; the far end's status moves the row and the footer;
+# Confirm endpoint → one less unconfirmed
+- tapOn:
+    id: cables.code.N
+- tapOn:
+    id: cables.row
+    text: '.*06M-01 C-17 .*04-05 .*'      # both ends on a device (06M-01 ↔ 04-05)
+- extendedWaitUntil:
+    visible:
+      id: end.back
+      text: ◀ Cables
+    timeout: 10000
+- tapOn:
+    id: end.this.status.Installed, untested
+- tapOn:
+    id: end.other.status.Not installed
+- extendedWaitUntil:
+    visible:
+      id: cables.check.status
+      text: status mismatch 1
+    timeout: 20000
+- assertVisible:
+    id: cables.row
+    text: '.*Installed, untested.*Not installed.*'
+- tapOn:
+    id: end.other.status.Installed, untested
+- extendedWaitUntil:
+    visible:
+      id: cables.check.status
+      text: status mismatch 0
+    timeout: 20000
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: cables.confirm
+- tapOn:
+    id: cables.confirm
+- assertVisible:
+    id: cables.note
+    text: 'Endpoint confirmed: .*'
+- assertVisible: { id: cables.check.unconfirmed, text: unconfirmed endpoint 79 }
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: end.other.jump
+- tapOn:
+    id: end.other.jump
+- extendedWaitUntil:
+    visible:
+      id: plan.back
+    timeout: 15000
+- tapOn:
+    id: plan.back
+- extendedWaitUntil:
+    visible: 'Cable / riser \(.*'
+    timeout: 10000
+- tapOn:
+    id: cables.code.all
+
+# Select → two rows → Apply as ruling… → the editor with both ends of each
+- tapOn:
+    id: cables.select
+- tapOn:
+    id: cables.row
+    index: 0
+- tapOn:
+    id: cables.row
+    index: 1
+- tapOn:
+    id: cables.select.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.editor.title
+      text: New ruling · from Cable / riser
+    timeout: 10000
+- assertVisible: 'Only the [34] chosen records'
+- tapOn: Cancel
+- tapOn: ← Levels
