@@ -1,0 +1,96 @@
+# S4 (T158) chips step 2 (T99) after `_chips-app`: the station B2-S1's Notes offer "Stuck buttons"
+# (its category's chip), the relay panel 06M-02's do not; 06M-01's X end C-23 offers the X chips
+# and this run's `Maestro <n>`, not N's; its N end C-17 offers "Missing network termination" and not
+# the X chip; C-23 Not installed → the Run draft's Edit form offers the X punch chip "Missing DMX
+# termination kit", a tap puts it in the item box, Cancel leaves the draft as it was.
+# Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: B2
+      DEVICE: B2-S1
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.notes
+- assertVisible: Stuck buttons
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-02
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.notes
+- assertNotVisible: Stuck buttons
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.tab.devices
+- tapOn:
+    id: plan.device.06M-01
+# the X end
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-23
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-23
+- assertVisible:
+    id: end.this.note.chip.Maestro ${output.n}
+- assertVisible:
+    id: end.this.note.chip.Waiting on DMX Termination Kits
+- assertNotVisible:
+    id: end.this.note.chip.Missing network termination
+- tapOn:
+    id: end.this.status.Not installed
+- assertVisible: ✓ Not installed
+- tapOn:
+    id: end.back
+# the N end
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-17
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-17
+- assertVisible:
+    id: end.this.note.chip.Missing network termination
+- assertNotVisible:
+    id: end.this.note.chip.Maestro ${output.n}
+- tapOn:
+    id: end.back
+# the Run draft's Edit form: the X punch chip
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.edit.Run DMX to Level 11
+- tapOn:
+    id: proposal.edit.Run DMX to Level 11
+- extendedWaitUntil:
+    visible:
+      id: proposal.field.item
+    timeout: 5000
+- tapOn: Missing DMX termination kit
+- assertVisible:
+    id: proposal.field.item
+    text: Missing DMX termination kit
+- tapOn: Cancel
+- assertVisible:
+    id: proposal.accept.Run DMX to Level 11
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

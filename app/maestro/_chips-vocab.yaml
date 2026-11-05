@@ -1,0 +1,124 @@
+# S4 (T158) chips step 3 (T40): Vocabulary → Lists → Device notes: add "Stuck button" → `draft`
+# → it shows at once on a card's Notes chips; Accept → no tag; the same spelling in another case
+# refused; Edit → "Stuck button cover"; Remove → gone. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.vocabulary
+- tapOn:
+    id: vocab.tab.lists
+- scrollUntilVisible:
+    element:
+      id: vocab.add.device_note.input
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+# it can stop under the fixed tab row (counted visible; the tap switched to Placeholders): pull it down
+- swipe:
+    start: 50%,40%
+    end: 50%,55%
+    duration: 500
+- waitForAnimationToEnd
+- tapOn:
+    id: vocab.add.device_note.input
+- inputText: Stuck button
+- tapOn:
+    id: vocab.add.device_note
+- extendedWaitUntil:
+    visible:
+      id: vocab.value.Stuck button
+      text: Stuck button  draft
+    timeout: 10000
+- tapOn: ◀ Levels
+# a draft phrase is a chip at once
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-02
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.notes
+- runFlow:
+    when:
+      notVisible: Stuck button
+    commands:
+      - tapOn: 'more \(\d+\) ▾'
+- assertVisible: Stuck button
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+# accept, a repeat refused, rename, remove
+- tapOn:
+    id: nav.vocabulary
+- scrollUntilVisible:
+    element:
+      id: vocab.accept.Stuck button
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn:
+    id: vocab.accept.Stuck button
+- extendedWaitUntil:
+    visible:
+      id: vocab.value.Stuck button
+      text: Stuck button
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: vocab.add.device_note.input
+    direction: DOWN
+    centerElement: true
+# it can stop under the fixed tab row (counted visible; the tap switched to Placeholders): pull it down
+- swipe:
+    start: 50%,40%
+    end: 50%,55%
+    duration: 500
+- waitForAnimationToEnd
+- tapOn:
+    id: vocab.add.device_note.input
+- waitForAnimationToEnd     # typed before the focus landed once: the box stayed empty, Add disabled
+- inputText: STUCK BUTTON   # another case of the same spelling (capitals: iOS cannot re-case it)
+- assertVisible:
+    id: vocab.add.device_note.input
+    text: STUCK BUTTON
+- tapOn:
+    id: vocab.add.device_note
+- extendedWaitUntil:
+    visible:
+      id: vocab.note
+      text: '"STUCK BUTTON" is already in this list.'
+    timeout: 10000
+- tapOn:
+    id: vocab.add.device_note.input
+- eraseText: 30
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: vocab.edit.Stuck button
+    direction: UP
+    centerElement: true
+- tapOn:
+    id: vocab.edit.Stuck button
+- tapOn:
+    id: vocab.rename.input
+- eraseText: 30
+- tapOn:
+    id: vocab.rename.input
+- eraseText: 30
+- inputText: Stuck button cover
+- tapOn:
+    id: vocab.rename.save
+- extendedWaitUntil:
+    visible:
+      id: vocab.value.Stuck button cover
+    timeout: 10000
+- tapOn:
+    id: vocab.remove.Stuck button cover
+- extendedWaitUntil:
+    notVisible:
+      id: vocab.value.Stuck button cover
+    timeout: 10000
+- tapOn: ◀ Levels

@@ -1,0 +1,16 @@
+# S4 (T158, rig plan wave 2) suggestion chips and the vocabulary lists, on A as Ann: a fresh copy of
+# the master; the app library's standard suggestions, a run's own chip copied into the project
+# (`_chips-app`); the chips on a station / relay panel card, an X and an N end, a Run draft's Edit
+# form (`_chips-card`); a Device notes phrase added, a chip at once, accepted, a repeat refused,
+# renamed, removed (`_chips-vocab`); the run's app chip removed again; sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Chips — suggestions and vocabulary
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow: _chips-app.yaml
+- runFlow: _chips-card.yaml
+- runFlow: _chips-vocab.yaml
+- runFlow: _chips-cleanup.yaml
+- runFlow: _sync.yaml

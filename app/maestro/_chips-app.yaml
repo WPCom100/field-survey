@@ -1,0 +1,140 @@
+# S4 (T158) chips step 1 (T99): the app library's Suggestions… → Load standard suggestions ("Added
+# n …" on a fresh server, else "all here already"), a second tap "all here already"; the Station,
+# X and N chips the card checks need are accepted (once per server: later projects copy them at
+# creation); a chip named for this run (`Maestro <n>`, X end Note) added and accepted, so the
+# project's Copy from app library always has one to copy ("Copied n chips …", then "Nothing new").
+# Starts and ends on Levels of PROJECT. `_chips-cleanup` removes the run's chip.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- tapOn:
+    id: library.suggestions
+- tapOn:
+    id: sugg.loadStandard
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: '(Added \d+ standard suggestions as drafts\.|The standard suggestions are all here already\.)'
+    timeout: 15000
+- tapOn:
+    id: sugg.loadStandard
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: The standard suggestions are all here already.
+    timeout: 15000
+# Station: Stuck buttons accepted
+- tapOn:
+    id: sugg.category.Station
+- assertVisible:
+    id: sugg.row.Stuck buttons
+- runFlow:
+    when:
+      visible:
+        id: sugg.accept.Stuck buttons
+    commands:
+      - tapOn:
+          id: sugg.accept.Stuck buttons
+      - extendedWaitUntil:
+          visible:
+            id: library.note
+            text: Accepted.
+          timeout: 10000
+- assertVisible:
+    id: sugg.row.Stuck buttons
+    text: Stuck buttons
+# X: the end Note and the punch item chip; and this run's own chip
+- tapOn:
+    id: sugg.code.X
+- runFlow:
+    when:
+      visible:
+        id: sugg.accept.Waiting on DMX Termination Kits
+    commands:
+      - tapOn:
+          id: sugg.accept.Waiting on DMX Termination Kits
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: sugg.accept.Missing DMX termination kit
+    commands:
+      - tapOn:
+          id: sugg.accept.Missing DMX termination kit
+      - waitForAnimationToEnd
+- assertVisible:
+    id: sugg.target.connection_note
+    selected: true
+- tapOn:
+    id: sugg.input
+- inputText: Maestro ${output.n}
+- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added "Maestro ${output.n}" as a draft.
+    timeout: 10000
+- tapOn:
+    id: sugg.accept.Maestro ${output.n}
+- extendedWaitUntil:
+    visible:
+      id: sugg.row.Maestro ${output.n}
+      text: Maestro ${output.n}
+    timeout: 10000
+# N: Missing network termination (an end Note and a punch item, both)
+- tapOn:
+    id: sugg.code.N
+- repeat:
+    times: 3
+    while:
+      visible:
+        id: sugg.accept.Missing network termination
+    commands:
+      - tapOn:
+          id: sugg.accept.Missing network termination
+          index: 0
+      - waitForAnimationToEnd
+- assertNotVisible:
+    id: sugg.accept.Missing network termination
+- tapOn: ◀ Projects
+- scrollUntilVisible:
+    element:
+      id: projects.open.${PROJECT}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 30000
+# the project copies them
+- tapOn:
+    id: nav.library
+- tapOn:
+    id: library.suggestions
+- tapOn:
+    id: sugg.copyApp
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Copied \d+ chips? from the app library\.'
+    timeout: 15000
+- tapOn:
+    id: sugg.copyApp
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Nothing new in the app library \(accepted category and code chips only\)\.'
+    timeout: 15000
+- tapOn:
+    id: sugg.code.X
+- assertVisible:
+    id: sugg.row.Maestro ${output.n}
+    text: Maestro ${output.n}
+- tapOn: ◀ Levels

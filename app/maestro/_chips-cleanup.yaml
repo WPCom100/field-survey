@@ -1,0 +1,35 @@
+# S4 (T158) chips: the run's own app-library chip `Maestro <n>` rejected, so later projects do not
+# copy it at creation. Starts on Levels of PROJECT and ends there.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- tapOn:
+    id: library.suggestions
+- tapOn:
+    id: sugg.code.X
+- tapOn:
+    id: sugg.remove.Maestro ${output.n}
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Removed.
+    timeout: 10000
+- assertNotVisible:
+    id: sugg.row.Maestro ${output.n}
+- tapOn: ◀ Projects
+- scrollUntilVisible:
+    element:
+      id: projects.open.${PROJECT}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 30000
