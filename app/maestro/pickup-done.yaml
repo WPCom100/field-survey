@@ -1,0 +1,19 @@
+# O5 last step of `rig.sh pickup` (T159), on B on MAESTRO-PU-<n>'s form after the log checks: the
+# draft type rejected (the app library is server-wide; a rejected type leaves the pickers).
+appId: productions.luminarytechnology.fieldsurvey
+name: Pickup — B rejects the app type
+---
+- assertVisible: 0 devices · draft
+- tapOn:
+    id: library.reject
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Rejected: .*'
+    timeout: 10000
+- tapOn: ◀ Projects
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: '(?!.*pending).*Synced.*'
+    timeout: 20000

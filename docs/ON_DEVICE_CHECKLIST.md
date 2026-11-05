@@ -482,19 +482,13 @@ Decision D219: the Rules tab offers one reword ruling per field (not per new val
 
 Decision D220 (Landry, "One end, no split"): an item about two runs goes on one end you pick and keeps its number and text; the other run gets its own Run draft. → Recorded.
 
-## T125 — Library editor: wider, actions always visible, Save keeps the form  ·  Needs: no new build (JS update only)
-
-**Why it matters:** in the 2026-10-18 round the type editor was too narrow to read (A-2, B-5) and Save seemed to throw away what you had typed (A-3). Re-run A-2, A-3 and B-5 of the round sheet with these.
-
-- [ ] **A pull still refreshes it.** With the type open on iPad A and not edited, change its aliases on iPad B and sync both: A’s form shows B’s aliases. → saw:
-
 ## T131 — Slow to load during sync  ·  Needs: no new build (JS update only)
 
 **Why it matters:** with the DaVinci catalogue in the library every rules run scanned 1,132 types per device, freezing the app for seconds after each pull and each edit (`docs/perf/t131.md`). The PC numbers are in; these are the iPad's. Do this on the Pipeline project (the one with the BOM / riser drafts), dev build with Metro so the log lines are visible, store already synced once (warm).
 
 - [ ] **Launch to Levels.** Force-quit the app, open it, start a stopwatch at the icon tap: the Levels table is on screen and tappable within **3 s**. Metro shows `[store] open`, then one `[rules] run … "ms":n` per project — copy each line's `ms`. → saw:
 - [ ] **Quiet cycle.** Leave the app on Levels for a minute without touching anything. Sync → Connection: the timing line reads like `Last cycle 0.3 s · push 0.0 s · pull 0.2 s · apply 0.0 s · 0 pushed, 0 pulled · rules …`; the whole cycle is under **1 s** and the numbers barely change from cycle to cycle. Copy one line. → saw:
-- [ ] **No stall during a pull.** On iPad B (or the Library screen on the same iPad) change three aliases and Save; on iPad A stay on Levels and keep scrolling the table while the edits arrive (within ~5 s): the scroll never freezes; afterwards the timing line shows `3 pulled` and `apply` under 0.2 s, and Metro shows one `[rules] run` per project (not one for the library stream). → saw:
+- [ ] **No stall during a pull.** On iPad B (or the Library screen on the same iPad) change three aliases and Save; on iPad A stay on Levels and keep scrolling the table while the edits arrive (within ~5 s): the scroll never freezes; afterwards the timing line shows `3 pulled` and `apply` under 0.2 s, and Metro shows one `[rules] run` per project (not one for the library stream). → saw (Claude, rig, 2026-11-05, `rig.sh pickup`, twice, functional half — the feel of the scroll is still yours): A (Ann) swipes `Maestro master`'s Levels up and down for about a minute while B (Bob) saves three fields of an app-library type at once (aliases, ID scheme, DMX address); every swipe was answered, and A's log has one `[sync] synced` with `"pulled":3` inside the scroll (`apply_ms` 7–8, cycle 472–486 ms), followed by exactly one `[rules] run` per project on A (17 for 17, then 18 for 18; slowest 280–322 ms) and none for the library stream.
 - [ ] **Edit without a freeze.** Open a plan on the Pipeline project, change a device's status: the card answers at once; about half a second later Metro shows `[rules] run … "ms":n` with n well under 1,000 (copy it); pan the plan while it runs — no hitch longer than a blink. → saw:
 - [ ] **Log keeps growing.** Sync → Install → export the log: it contains today's `[sync] synced {… "ms":…, "push_ms":…, "pull_ms":…, "apply_ms":…}` lines and the earlier days' lines are still there (append, not rewrite). → saw:
 

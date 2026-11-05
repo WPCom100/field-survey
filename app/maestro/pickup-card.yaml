@@ -1,0 +1,30 @@
+# O5 step 3 of `rig.sh pickup` (T159), on A — no relaunch, no Sync now: the card pickup-setup.yaml
+# left open shows B's No access on its own (T67: the 5 s background pull, D130). Then the app
+# library's MAESTRO-PU-<n> form, opened and left unedited for B's change (pickup-alias.yaml).
+appId: productions.luminarytechnology.fieldsurvey
+name: Pickup — A's open card follows B
+---
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- extendedWaitUntil:
+    visible: ✓ No access
+    timeout: 20000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- tapOn:
+    id: library.search
+- inputText: MAESTRO-PU-${output.n}
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: '.*MAESTRO-PU-${output.n}.*'   # a draft's row reads "DRAFT MAESTRO-PU-<n>, 0 devices · …"
+- assertVisible: 0 devices · draft
+- assertNotVisible:
+    id: library.aliases
+    text: '.*PU-B.*'
+- assertNotVisible: 'Unsaved changes.*'

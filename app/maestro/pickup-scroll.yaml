@@ -1,0 +1,22 @@
+# O5 step 6 of `rig.sh pickup` (T159), on A while B saves three fields of the app type
+# (pickup-alias.yaml ROUND=3) at the same time: A stays on `Maestro master`'s Levels and keeps
+# scrolling for about a minute; every swipe is answered (the home stays on screen). `rig.sh` then
+# reads A's log: one pull of 3 ops during the scroll, then one `[rules] run` per project and none
+# for the library stream (T131 "No stall", functional half).
+appId: productions.luminarytechnology.fieldsurvey
+name: Pickup — A scrolls Levels while B's edits arrive
+---
+- repeat:
+    times: 25
+    commands:
+      - swipe:
+          start: 60%,70%
+          end: 60%,35%
+          duration: 600
+      - swipe:
+          start: 60%,35%
+          end: 60%,70%
+          duration: 600
+      - assertVisible:
+          id: level.06M
+- assertVisible: Field Survey

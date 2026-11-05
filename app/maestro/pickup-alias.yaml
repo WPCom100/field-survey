@@ -1,0 +1,65 @@
+# O5 steps 4 and 6 of `rig.sh pickup` (T159), on B (Bob), from B's Levels home or the type's form:
+# the app library's MAESTRO-PU-<n> changed and saved. ROUND=1: its aliases (A's open, unedited form
+# follows, T125). ROUND=3: three fields in one Save — aliases, ID scheme, DMX address Needed — so
+# B pushes three ops at once while A scrolls Levels (T131 "No stall"). B's own sync pushes them.
+appId: productions.luminarytechnology.fieldsurvey
+name: Pickup — B changes the app type
+---
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- runFlow:
+    when:
+      notVisible:
+        id: library.aliases
+    commands:
+      - tapOn:
+          id: nav.projects
+      - tapOn:
+          id: projects.library
+      - tapOn:
+          id: library.search
+      - inputText: MAESTRO-PU-${output.n}
+      - pressKey: Enter
+      - tapOn:
+          id: library.type
+          text: '.*MAESTRO-PU-${output.n}.*'   # "DRAFT MAESTRO-PU-<n>, 0 devices · …"
+- tapOn:
+    id: library.aliases
+- eraseText: 200
+- tapOn:
+    id: library.aliases
+- eraseText: 200
+- inputText: PU-B${ROUND} ${output.n}
+- tapOn: 'Aliases \(BOM\)'    # the label: closes the keyboard over the Save footer
+- runFlow:
+    when:
+      true: ${ROUND == '3'}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: library.scheme.level_tag
+          direction: DOWN
+          centerElement: true
+      - tapOn:
+          id: library.scheme.level_tag
+      - scrollUntilVisible:
+          element:
+            id: library.dmx.needed
+          direction: DOWN
+          centerElement: true
+      - tapOn:
+          id: library.dmx.needed
+      - assertVisible:
+          id: library.dmx.needed
+          selected: true
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- extendedWaitUntil:          # B's background sync (5 s) pushes it: nothing pending
+    visible:
+      id: status.bar
+      text: '(?!.*pending).*Synced.*'
+    timeout: 20000

@@ -97,6 +97,17 @@ usage: bash scripts/mac/rig.sh <command>
   sheets                S5 (T158): sheets-old.yaml on A with a generated older DaVinci_categories.xlsx (ERn →
                         Equipment), sheets-new.yaml with the current one; the server's two batches each
                         corrected the ERn category and no Neuron flag. Alone: the app library is server-wide
+  pickup                O5 (T159): pickup-setup.yaml on A (Ann: a card left open), pickup-peer.yaml on B (Bob
+                        sets its status), pickup-card.yaml on A (follows, no Sync now), pickup-alias.yaml on B
+                        (ROUND=1) and pickup-form.yaml on A (the open library form follows); then A scrolls
+                        Levels (pickup-scroll.yaml) while B saves three fields (ROUND=3): A's log has one
+                        3-op pull and one rules run per project after it, none for the library stream
+  scale-check           W5 (T159): scale.yaml (a fresh store on A downloads "$SCALE_PROJECT", the quiet timing
+                        line, its 06M plan) and scale-demo.yaml (500 pins); the log's numbers against
+                        scripts/mac/scale-ceilings.txt (docs/perf/rig.md). Run 'scale' first; reset after
+  restart               O6 (T159): with the api stopped A generates ~1,500 punch items on "$SCALE_PROJECT"
+                        (restart-edit.yaml); the api is started and restarted mid-push; then nothing refused
+                        (restart-check.yaml, the server's op states) and each numbering group continues
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
      RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
@@ -302,9 +313,13 @@ cmd_flows() {
   command -v maestro >/dev/null || export PATH="$HOME/.maestro/bin:$PATH"
   command -v java >/dev/null || die "Maestro needs Java 17+: brew install openjdk@17 and set JAVA_HOME (docs/ops.md §6.1)"
   say "maestro on $dev ($udid): ${flow:-smoke.yaml} against $SERVER_URL as $USER_NAME, project \"$PROJECT\""
+  # RIG_ENV="K=v K2=v2": extra flow variables for one run (T159: ROUND); values have no spaces
+  local extra=() kv
+  for kv in ${RIG_ENV:-}; do extra+=(-e "$kv"); done
   maestro --device "$udid" test \
     -e SERVER_URL="$SERVER_URL" -e TOKEN="$TOKEN" -e METRO_URL="$METRO_URL" -e USER="$USER_NAME" \
-    -e PROJECT="$PROJECT" -e SIDE="${SIDE:-$dev}" \
+    -e PROJECT="$PROJECT" -e SIDE="${SIDE:-$dev}" -e SEED="$SEED_PROJECT" -e SCALE="$SCALE_PROJECT" \
+    ${extra[@]+"${extra[@]}"} \
     --debug-output "$OUT/maestro" \
     "$ROOT/app/maestro/${flow:-smoke.yaml}"   # the folder would also run the _ sub-flows on their own (T151)
   say "screenshots of failures: $OUT/maestro and ~/.maestro/tests"
@@ -733,6 +748,125 @@ cmd_ink() {  # F6 (T158): Ann's stroke and the layer switch on A, B sees it and 
   say "ink: green"
 }
 
+cmd_pickup() {  # O5 (T159): B's edits reach A's open screens with no Sync now; a library pull while A scrolls
+  local t0 t1 t2 t3 pid
+  cmd_second
+  say "pickup on \"$PROJECT\": A (Ann) leaves a card open, B (Bob) sets its status; A's library form follows B; A scrolls while B saves three fields"
+  USER_NAME=Ann cmd_flows --device A pickup-setup.yaml
+  t0="$(date -u +%Y-%m-%dT%H:%M:%S)"
+  USER_NAME=Bob cmd_flows --device B pickup-peer.yaml
+  t1="$(date -u +%Y-%m-%dT%H:%M:%S)"
+  USER_NAME=Ann cmd_flows --device A pickup-card.yaml
+  sleep 3   # the logger flushes every 1.5 s
+  ( cmd_log A >/dev/null && cmd_log B >/dev/null ) || die "no app logs"
+  python3 "$ROOT/scripts/mac/applog.py" latency "$OUT/log-A" "$OUT/log-B" "$t0" "$t1" | tee "$OUT/pickup-latency.txt" \
+    || die "B's status never reached A's log"
+  awk '{ s = $(NF-1); if (s + 0 > 12) exit 1 }' "$OUT/pickup-latency.txt" \
+    || die "A pulled B's edit more than 12 s after B pushed it (the poll is 5 s, D130)"
+  RIG_ENV="ROUND=1" USER_NAME=Bob cmd_flows --device B pickup-alias.yaml
+  USER_NAME=Ann cmd_flows --device A pickup-form.yaml
+  # A scrolls (about a minute) while B, already on the type's form, saves three fields at once
+  t2="$(date -u +%Y-%m-%dT%H:%M:%S)"
+  USER_NAME=Ann cmd_flows --device A pickup-scroll.yaml > "$OUT/pickup-scroll.log" 2>&1 &
+  pid=$!
+  sleep 10
+  RIG_ENV="ROUND=3" USER_NAME=Bob cmd_flows --device B pickup-alias.yaml
+  wait "$pid" || { cat "$OUT/pickup-scroll.log"; die "pickup-scroll.yaml failed on A"; }
+  t3="$(date -u +%Y-%m-%dT%H:%M:%S)"
+  sleep 3
+  ( cmd_log A >/dev/null ) || die "no app log on A"
+  python3 "$ROOT/scripts/mac/applog.py" burst "$OUT/log-A" "$t2" "$t3" 3 || die "the three-op library pull on A did not check out"
+  USER_NAME=Bob cmd_flows --device B pickup-done.yaml
+  say "pickup: green"
+}
+
+cmd_restart() {  # O6 (T159): the api restarted in the middle of a large push; nothing refused, numbering continues
+  local stamp t0 want n q rows states
+  server_up
+  project_exists "$SCALE_PROJECT" || die "no \"$SCALE_PROJECT\" on the server: rig.sh scale, then rig.sh scale-check (A downloads it)"
+  stamp="$(date +%H%M%S)"
+  # what the ruling generates: one item per connection end whose cable is not U
+  want="$(server_sql "$SCALE_PROJECT" "select count(*) from cable_end ce join cable c on c.id = ce.cable_id
+    join project p on p.id = c.project_id
+    where p.name = :'name' and ce.deleted_at is null and c.deleted_at is null and c.cable is distinct from 'U';")"
+  q="select count(*) from punch_item pi join level l on l.id = pi.level_id join project p on p.id = l.project_id
+    where p.name = :'name' and pi.item = 'Restart check $stamp';"
+  say "restart on \"$SCALE_PROJECT\": $want punch items generated offline, the api restarted while they push"
+  t0="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  cmd_server stop
+  trap 'cmd_server start >/dev/null 2>&1 || true' EXIT
+  RIG_ENV="STAMP=$stamp" PROJECT="$SCALE_PROJECT" USER_NAME=Ann cmd_flows --device A restart-edit.yaml
+  cmd_server start
+  trap - EXIT
+  for _ in $(seq 1 600); do
+    n="$(server_sql "$SCALE_PROJECT" "$q" 2>/dev/null || echo 0)"
+    [ "${n:-0}" -gt 0 ] && break
+    sleep 0.2
+  done
+  [ "${n:-0}" -gt 0 ] || die "the push never reached the server"
+  [ "$n" -lt "$want" ] || die "the whole push ($n of $want) was in before the restart: not proven, make it larger"
+  (cd "$ROOT/server" && $COMPOSE restart api >/dev/null)
+  say "api restarted with $n of $want punch items on the server"
+  for _ in $(seq 1 60); do curl -fsS "$SERVER_URL/health" >/dev/null 2>&1 && break; sleep 1; done
+  server_up
+  for _ in $(seq 1 300); do
+    n="$(server_sql "$SCALE_PROJECT" "$q")"
+    [ "$n" -ge "$want" ] && break
+    sleep 1
+  done
+  say "after the restart: $n of $want punch items on the server"
+  [ "$n" -eq "$want" ] || die "expected $want punch items \"Restart check $stamp\", the server has $n"
+  PROJECT="$SCALE_PROJECT" USER_NAME=Ann cmd_flows --device A restart-check.yaml
+  # every op the iPad made since the stop was applied (none refused, none twice)
+  states="$(server_sql "$SCALE_PROJECT" "select o.state, count(*) from op o join project p on p.id = o.project_id
+    where p.name = :'name' and o.client_ts >= '$t0' group by 1 order by 1;")"
+  say "the server's ops since $t0 (state count): $(echo $states)"
+  printf '%s\n' "$states" | awk '$1 != "applied" { exit 1 }' || die "an op since the stop is not applied"
+  # per numbering group: the new items all numbered, distinct, contiguous, after every older number
+  rows="$(server_sql "$SCALE_PROJECT" "with x as (
+      select l.numbering_group_id g, pi.number, pi.item = 'Restart check $stamp' as new
+      from punch_item pi join level l on l.id = pi.level_id join project p on p.id = l.project_id
+      where p.name = :'name' and pi.deleted_at is null)
+    select count(*) filter (where new), count(number) filter (where new), min(number) filter (where new),
+      max(number) filter (where new), coalesce(max(number) filter (where not new), 0), count(number) - count(distinct number)
+    from x group by g order by 3;")"
+  say "numbering per group (new, numbered, first, last, older max, duplicates):"
+  printf '%s\n' "$rows" | sed 's/^/  /'
+  printf '%s\n' "$rows" | awk '$1 > 0 && ($2 != $1 || $4 - $3 + 1 != $1 || $3 <= $5 || $6 != 0) { exit 1 }' \
+    || die "numbering did not continue: a gap, a duplicate or a missing number"
+  say "restart: green"
+}
+
+SCALE_CEILINGS="$ROOT/scripts/mac/scale-ceilings.txt"   # `key ms` per line, set from the first green run (docs/perf/rig.md)
+
+cmd_scale_check() {  # W5 (T159): the scale project's timings on a fresh store, held to the ceilings
+  local t0 t1 pid res bad="" k c v
+  server_up
+  project_exists "$SCALE_PROJECT" || die "no \"$SCALE_PROJECT\" on the server: rig.sh scale first"
+  pid="$(server_sql "$SCALE_PROJECT" "select id from project where name = :'name';")"
+  say "scale-check: a fresh store on A downloads \"$SCALE_PROJECT\" (and every rig project), its 06M plan, the 500-pin demo"
+  t0="$(date -u +%Y-%m-%dT%H:%M:%S)"
+  USER_NAME=Ann cmd_flows --device A scale.yaml
+  t1="$(date -u +%Y-%m-%dT%H:%M:%S)"
+  USER_NAME=Ann cmd_flows --device A scale-demo.yaml
+  sleep 3   # the logger flushes every 1.5 s
+  ( cmd_log A >/dev/null ) || die "no app log on A"
+  res="$(python3 "$ROOT/scripts/mac/applog.py" scale "$OUT/log-A" "$t0" "$t1" "$pid")"
+  printf '%s\n' "$res" > "$OUT/scale-$(date +%m%d-%H%M%S).txt"
+  say "scale numbers (ms unless named):"
+  printf '%s\n' "$res" | sed 's/^/  /'
+  [ -f "$SCALE_CEILINGS" ] || { say "no ceilings yet ($SCALE_CEILINGS): set them from these numbers"; return; }
+  while read -r k c; do
+    case "$k" in ''|\#*) continue ;; esac
+    v="$(printf '%s\n' "$res" | awk -v k="$k" '$1 == k { print $2 }')"
+    if [ -z "$v" ]; then bad="$bad $k(not logged)"
+    elif [ "$v" -gt "$c" ]; then bad="$bad $k=$v>$c"
+    fi
+  done < "$SCALE_CEILINGS"
+  [ -z "$bad" ] || die "over the ceiling (scripts/mac/scale-ceilings.txt):$bad"
+  say "scale-check: green (every number under its ceiling)"
+}
+
 cmd_status() {
   say "simulators:"; xcrun simctl list devices | grep -E "$SIM_A|$SIM_B" || echo "  none"
   say "build: $(built_app || echo none)"
@@ -772,6 +906,9 @@ case "${1:-}" in
   library-two) cmd_library_two ;;
   sheets) cmd_sheets ;;
   drafts) shift; cmd_drafts "$@" ;;
+  pickup) cmd_pickup ;;
+  scale-check) cmd_scale_check ;;
+  restart) cmd_restart ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;
 esac

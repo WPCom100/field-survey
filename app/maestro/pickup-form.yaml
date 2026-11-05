@@ -1,0 +1,26 @@
+# O5 step 5 of `rig.sh pickup` (T159), on A — no relaunch, no touch: the app library form
+# pickup-card.yaml left open and unedited shows B's aliases (T125 "A pull still refreshes it").
+# Then Levels of `Maestro master` (eight levels) for the scroll step.
+appId: productions.luminarytechnology.fieldsurvey
+name: Pickup — A's open library form follows B
+---
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- extendedWaitUntil:
+    visible:
+      id: library.aliases
+      text: PU-B1 ${output.n}
+    timeout: 20000
+- assertNotVisible: 'Unsaved changes.*'
+- tapOn: ◀ Projects
+- scrollUntilVisible:
+    element:
+      id: projects.open.${SEED}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 60000
+- tapOn:
+    id: projects.open.${SEED}
+- extendedWaitUntil:
+    visible:
+      id: level.06M
+    timeout: 30000

@@ -2,6 +2,16 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## Claude ran (rig) 2026-11-05 — O5–O6 and wave 5 of docs/rig-plan.md (T159), Mac rig Simulator, local e2e server
+
+Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.
+
+### T125 — Library editor: wider, actions always visible, Save keeps the form  ·  Needs: no new build (JS update only)
+
+**Why it matters:** in the 2026-10-18 round the type editor was too narrow to read (A-2, B-5) and Save seemed to throw away what you had typed (A-3). Re-run A-2, A-3 and B-5 of the round sheet with these.
+
+- [x] **A pull still refreshes it.** With the type open on iPad A and not edited, change its aliases on iPad B and sync both: A’s form shows B’s aliases. → saw (Claude, rig, 2026-11-05, `rig.sh pickup`, twice): A (Ann) opens the app-library draft `MAESTRO-PU-<n>` (aliases empty, no "Unsaved changes") and is not touched again; B (Bob) sets its aliases to `PU-B1 <n>` and saves; within 20 s, with no tap and no Sync now on A, A's Aliases box reads `PU-B1 <n>` and still no "Unsaved changes".
+
 ## Claude ran (rig) 2026-11-05 — wave 2 of docs/rig-plan.md (T158), Mac rig Simulator, local e2e server
 
 Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.

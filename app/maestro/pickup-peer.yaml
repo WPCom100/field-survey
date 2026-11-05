@@ -1,0 +1,22 @@
+# O5 step 2 of `rig.sh pickup` (T159), on B (Bob): open A's project, set 06M-S1 to No access and
+# let B's sync push it (B may sync; A must not). Ends on B's Levels home.
+appId: productions.luminarytechnology.fieldsurvey
+name: Pickup — B sets the station's status
+---
+# keep the store (no clearState): a fresh one downloads every rig project first (T156)
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- runFlow: _sync.yaml
+- runFlow:
+    file: _open-card.yaml       # _open-level refreshes the Projects list for A's new project
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- tapOn:
+    id: card.status.No access
+- assertVisible: ✓ No access
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- runFlow: _sync.yaml

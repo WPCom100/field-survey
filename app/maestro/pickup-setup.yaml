@@ -1,0 +1,56 @@
+# O5 step 1 of `rig.sh pickup` (T159), on A (Ann): a new project PROJECT with the 06M sheet and a
+# station (06M-S1), an app-library draft type MAESTRO-PU-<n> for B to edit, synced; ends with
+# 06M-S1's card open and no status set, so the next A flow (pickup-card.yaml) watches it without a
+# relaunch or a Sync now.
+appId: productions.luminarytechnology.fieldsurvey
+name: Pickup — A's project, station and app type; the card left open
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- runFlow: _sheet-station.yaml
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: setup.home            # the plan was opened from Setup, which has no sidebar
+
+# the app library: a draft type B changes while A's form stays open (T125)
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.library
+- assertVisible: 'App device-type library.*'
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: MAESTRO-PU-${output.n}
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added MAESTRO-PU-${output.n} as a draft.
+    timeout: 10000
+- tapOn: ◀ Projects
+- scrollUntilVisible:          # the Projects screen has no sidebar: open PROJECT from its list
+    element:
+      id: projects.open.${PROJECT}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 90000
+- tapOn:
+    id: projects.open.${PROJECT}
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 30000
+- runFlow: _sync.yaml
+
+# 06M-S1's card, no status yet: B sets one, A never taps Sync now
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- assertNotVisible: '✓ No access'
