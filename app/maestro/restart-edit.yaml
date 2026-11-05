@@ -1,0 +1,62 @@
+# O6 step 1 of `rig.sh restart` (T159), on A with the server stopped: on the scale project (PROJECT
+# is SCALE here, already in A's store from `rig.sh scale-check`) a one-off ruling generates a
+# punch item "Restart check <STAMP>" on every connection end whose cable is not U (~1,500 creates
+# the server numbers, several 500-op batches). They wait in the outbox; `rig.sh` starts the api
+# and restarts it while the push runs.
+appId: productions.luminarytechnology.fieldsurvey
+name: Restart — a large push waits offline
+---
+- runFlow: _resume.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline.*'
+    timeout: 60000
+- runFlow: _open-project.yaml
+- tapOn:
+    id: nav.rulings
+- tapOn:
+    id: rulings.new
+- tapOn:
+    id: rulings.reason
+- inputText: O6 restart ${STAMP}
+- pressKey: Enter
+# Where Connection end (the default) · Cable ≠ U
+- tapOn:
+    id: rulings.cond.op.ne
+- tapOn:
+    id: rulings.cond.value
+- inputText: U
+- pressKey: Enter
+- tapOn:
+    id: rulings.action.item
+- tapOn:
+    id: rulings.item
+- inputText: Restart check ${STAMP}
+- pressKey: Enter
+- tapOn: Wiring
+- tapOn:
+    text: EC
+    index: 0
+- tapOn:
+    id: rulings.standing          # one-off
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '\d{4} changes on 8 levels'
+    timeout: 180000
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied "O6 restart ${STAMP}": \d\d\d\d changes\.'   # no {n} beside ${…}: Maestro reads up to its }
+    timeout: 300000
+- tapOn: ← Levels
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline · \d{4,} pending.*'
+    timeout: 60000

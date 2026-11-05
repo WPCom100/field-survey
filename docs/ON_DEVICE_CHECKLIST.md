@@ -97,7 +97,7 @@ Decision D164: answered 2026-10-14, **Approved**.
 
 ## T75 — A refused edit (only if one happens)  ·  Needs: no new build
 
-- [ ] **A refused edit shows and the rest goes.** A refused edit cannot be provoked from the iPad on purpose. If the status bar ever reads "· N need attention": the Sync screen lists each refused edit (what · when · tries · the server's error) with Retry refused edits, other edits made afterwards still reach the other iPad, and Retry sends the listed ones again. → saw:
+- [ ] **A refused edit shows and the rest goes.** A refused edit cannot be provoked from the iPad on purpose. If the status bar ever reads "· N need attention": the Sync screen lists each refused edit (what · when · tries · the server's error) with Retry refused edits, other edits made afterwards still reach the other iPad, and Retry sends the listed ones again. → saw (Claude, rig, 2026-11-05, `rig.sh restart`, twice, the "nothing refused" side only — a refusal cannot be provoked): with the api stopped a ruling generated 1,470 punch items on `Maestro scale`; the api was started and restarted with 499 of them in (the app logged `push_failed … The network connection was lost` and sent the rest after its backoff); afterwards the status bar read `Synced` with nothing pending and no "need attention", Sync's Pending edits `0` with no refused edit listed, the server held every op since the stop `applied` (4,411, then 2,941), and every numbering group's new items ran on from its last number with no gap or duplicate.
 
 Decision D145: answered 2026-10-14, **Approved**. Whether you want a **Discard** action for an edit the server will never accept is still open (DECISIONS.md, Open now).
 
