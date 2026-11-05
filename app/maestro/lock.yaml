@@ -1,0 +1,24 @@
+# S3 (T158, rig plan wave 2) step 1 of `rig.sh lock`, on A as Ann: a fresh copy of the master;
+# C-23's Run item accepted on 06M-01 (`_ends-run`, so the Rules tab has an accepted item to offer);
+# the Rules tab (`_lock-rules`: defaults, Only what is changed, an owner change with Reset, Review
+# accepted items ▸ → the reword ruling applied, a new signal code in every table); Lock 06M and
+# 06 × Ann assigned (`_lock-baseline`); sync. B then sees all three (lock-peer.yaml).
+appId: productions.luminarytechnology.fieldsurvey
+name: Lock — the Rules tab, a baseline lock, an assignment
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-01
+- runFlow: _ends-run.yaml
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- runFlow: _lock-rules.yaml
+- runFlow: _lock-baseline.yaml
+- runFlow: _sync.yaml

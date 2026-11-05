@@ -1,0 +1,38 @@
+# S3 (T47, T97): Setup → 6 Lock baseline → Lock 06M (the dialog; Lock anyway when it lists what
+# stays open) → `🔒 Locked`; Assignments → 06 × Ann ticked; the Levels home marks 06 with ● and
+# Assigned to me lists 06 alone.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+    optional: true          # already on Setup when it follows _lock-rules
+- tapOn:
+    id: setup.step.lock
+- tapOn: 'Lock 06M( ⚠)?'
+- tapOn:
+    id: lock.submit
+- extendedWaitUntil:
+    visible: '🔒 Locked \d{4}-\d\d-\d\d'
+    timeout: 10000
+- tapOn:
+    id: setup.step.assignments
+- tapOn:
+    id: 'assign.06.Ann.*'
+# the cell's state is not matchable (Maestro matches its label "06: Ann (you)"; the state is in its
+# value): the Levels home's ● proves it
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn:
+    id: setup.home
+- assertVisible: '06  ●, .*'          # the row is one element: "06  ●, Setup, Lock…, …"
+- assertNotVisible: 'B2  ●, .*'
+- tapOn:
+    id: home.mine
+- assertVisible:
+    id: level.06
+- assertNotVisible:
+    id: level.B2
+- tapOn:
+    id: home.mine
+- assertVisible:
+    id: level.B2

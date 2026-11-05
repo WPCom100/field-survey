@@ -145,7 +145,7 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
         </Link>
       ) : null}
       <View style={w.row}>
-        <Pressable onPress={() => setOnlySet((v) => !v)} style={styles.toggle} accessibilityRole="switch" accessibilityState={{ checked: onlySet }}>
+        <Pressable onPress={() => setOnlySet((v) => !v)} style={styles.toggle} accessibilityRole="switch" accessibilityState={{ checked: onlySet }} testID="rules.only">
           <View pointerEvents="none">
             <Switch value={onlySet} />
           </View>
@@ -160,7 +160,7 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
             Accepted items still read the old wording. Review accepted items ▸ opens a ruling over them, pre-filled; untick any in its preview.
           </Text>
           {retrofit.groups.slice(0, RETROFIT_SHOWN).map((g) => (
-            <Btn key={`${g.entity}|${g.field}`} title={`Review accepted items ▸  ${describeRetrofit(g)}`} small onPress={() => review(g, retrofit.reason, retrofit.before)} />
+            <Btn key={`${g.entity}|${g.field}`} title={`Review accepted items ▸  ${describeRetrofit(g)}`} small testID="rules.review" onPress={() => review(g, retrofit.reason, retrofit.before)} />
           ))}
           {retrofit.groups.length > RETROFIT_SHOWN ? (
             <Text style={styles.small}>
@@ -198,7 +198,7 @@ function ParamRow({
 }) {
   const { spec } = item;
   return (
-    <View style={[styles.param, item.set && styles.paramSet]}>
+    <View style={[styles.param, item.set && styles.paramSet]} testID={tid(spec)}>
       <View style={styles.paramHead}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.label}>
@@ -215,13 +215,16 @@ function ParamRow({
             <Btn title="Reject" small onPress={() => onDecide(item, 'rejected')} />
           </View>
         ) : null}
-        {item.set ? <Btn title="Reset to default" small onPress={() => onSet(item, null)} /> : null}
+        {item.set ? <Btn title="Reset to default" small testID={`${tid(spec)}.reset`} onPress={() => onSet(item, null)} /> : null}
       </View>
       <ParamControl item={item} onSet={onSet} />
       {item.set ? <Text style={styles.small}>Default: {describeValue(spec, spec.default)}</Text> : null}
     </View>
   );
 }
+
+/** A parameter's testID prefix (T158): `rules.<rule>.<key>`, e.g. `rules.R3a.run.owner`. */
+const tid = (spec: { rule: string; key: string }): string => `rules.${spec.rule}.${spec.key}`;
 
 /** Groups offered at once; a wording with the far end in it makes one group per item. */
 const RETROFIT_SHOWN = 8;
@@ -231,9 +234,10 @@ const STATUSES = vocab.CONNECTION_STATUS as readonly string[];
 
 function ParamControl({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, value: ParamValue | null) => void }) {
   const { spec, value } = item;
+  const id = tid(spec);
   switch (spec.kind) {
     case 'owner':
-      return <Chips options={OWNERS} value={value as string} onPick={(v) => onSet(item, v)} />;
+      return <Chips options={OWNERS} value={value as string} onPick={(v) => onSet(item, v)} testID={id} />;
     case 'side':
       return (
         <Chips
@@ -245,7 +249,7 @@ function ParamControl({ item, onSet }: { item: ParamItem; onSet: (item: ParamIte
       );
     case 'bool':
       return (
-        <Pressable onPress={() => onSet(item, !value)} style={styles.toggle} accessibilityRole="switch" accessibilityState={{ checked: value === true }}>
+        <Pressable onPress={() => onSet(item, !value)} style={styles.toggle} accessibilityRole="switch" accessibilityState={{ checked: value === true }} testID={id}>
           <View pointerEvents="none">
             <Switch value={value === true} />
           </View>
@@ -262,7 +266,7 @@ function ParamControl({ item, onSet }: { item: ParamItem; onSet: (item: ParamIte
         />
       );
     case 'text':
-      return <TextBox value={value as string} onCommit={(v) => onSet(item, v)} />;
+      return <TextBox value={value as string} onCommit={(v) => onSet(item, v)} testID={id} />;
     case 'owner_by_code':
     case 'text_by_code':
     case 'bool_by_code':
@@ -275,6 +279,7 @@ function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, 
   const owner = item.spec.kind === 'owner_by_code';
   const flag = item.spec.kind === 'bool_by_code';
   const signal = item.spec.rule === 'R3';
+  const id = tid(item.spec);
   const [newCode, setNewCode] = useState('');
   const [newWord, setNewWord] = useState('');
   return (
@@ -294,6 +299,7 @@ function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, 
                   accessibilityRole="switch"
                   accessibilityState={{ checked: value === true }}
                   accessibilityLabel={`${code === '*' ? 'Any other code' : code}: ${value === true ? 'on' : 'off'}`}
+                  testID={`${id}.${code}`}
                 >
                   <View pointerEvents="none">
                     <Switch value={value === true} />
@@ -301,9 +307,9 @@ function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, 
                   <Text style={styles.toggleText}>{value === true ? 'On' : 'Off'}</Text>
                 </Pressable>
               ) : owner ? (
-                <Chips options={OWNERS} value={String(value)} onPick={(v) => onSet(item, withCode(item, code, v))} />
+                <Chips options={OWNERS} value={String(value)} onPick={(v) => onSet(item, withCode(item, code, v))} testID={`${id}.${code}`} />
               ) : (
-                <TextBox value={String(value)} onCommit={(v) => onSet(item, withCode(item, code, v))} />
+                <TextBox value={String(value)} onCommit={(v) => onSet(item, withCode(item, code, v))} testID={`${id}.${code}`} />
               )}
             </View>
             {own && def !== value ? (
@@ -318,11 +324,12 @@ function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, 
       })}
       {signal ? (
         <View style={styles.codeRow}>
-          <TextInput style={[w.input, { width: 90 }]} value={newCode} onChangeText={setNewCode} placeholder="New code" autoCapitalize="characters" autoCorrect={false} />
-          <TextInput style={[w.input, { flex: 1 }]} value={newWord} onChangeText={setNewWord} placeholder="Word in item text" autoCorrect={false} />
+          <TextInput style={[w.input, { width: 90 }]} value={newCode} onChangeText={setNewCode} placeholder="New code" autoCapitalize="characters" autoCorrect={false} testID={`${id}.newCode`} />
+          <TextInput style={[w.input, { flex: 1 }]} value={newWord} onChangeText={setNewWord} placeholder="Word in item text" autoCorrect={false} testID={`${id}.newWord`} />
           <Btn
             title="Add"
             small
+            testID={`${id}.add`}
             disabled={!newCode.trim() || !newWord.trim()}
             onPress={() => {
               onSet(item, withCode(item, newCode.trim(), newWord.trim()));
@@ -336,11 +343,11 @@ function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, 
   );
 }
 
-function Chips({ options, value, onPick, labels }: { options: readonly string[]; value: string; onPick: (v: string) => void; labels?: Record<string, string> }) {
+function Chips({ options, value, onPick, labels, testID }: { options: readonly string[]; value: string; onPick: (v: string) => void; labels?: Record<string, string>; testID?: string }) {
   return (
     <View style={styles.chips}>
       {options.map((o) => (
-        <Pressable key={o} onPress={() => o !== value && onPick(o)} style={[styles.chip, o === value && styles.chipOn]} accessibilityRole="radio" accessibilityState={{ selected: o === value }}>
+        <Pressable key={o} onPress={() => o !== value && onPick(o)} style={[styles.chip, o === value && styles.chipOn]} accessibilityRole="radio" accessibilityState={{ selected: o === value }} testID={testID ? `${testID}.${o}` : undefined}>
           <Text style={[styles.chipText, o === value && styles.chipTextOn]}>{labels?.[o] ?? o}</Text>
         </Pressable>
       ))}
@@ -349,7 +356,7 @@ function Chips({ options, value, onPick, labels }: { options: readonly string[];
 }
 
 /** A text value that commits on blur / Return (D45: edits commit per field), not per keystroke. */
-function TextBox({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+function TextBox({ value, onCommit, testID }: { value: string; onCommit: (v: string) => void; testID?: string }) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
   const commit = () => {
@@ -366,6 +373,7 @@ function TextBox({ value, onCommit }: { value: string; onCommit: (v: string) => 
       autoCapitalize="none"
       autoCorrect={false}
       returnKeyType="done"
+      testID={testID}
     />
   );
 }

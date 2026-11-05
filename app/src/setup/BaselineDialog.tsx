@@ -72,6 +72,7 @@ export function BaselineDialog({
                 placeholder="Why unlock? (kept in the history)"
                 placeholderTextColor="#9aa0a8"
                 autoFocus
+                testID="lock.reason"
               />
             </>
           ) : (
@@ -87,6 +88,7 @@ export function BaselineDialog({
               title={unlocking ? 'Unlock' : warnings.length ? 'Lock anyway' : `Lock ${level.code}`}
               primary
               disabled={busy || (unlocking && !reason.trim())}
+              testID="lock.submit"
               onPress={() => void confirm()}
             />
           </View>

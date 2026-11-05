@@ -1,0 +1,99 @@
+# S3 (T102, T116, T120 in part): Setup → Rules on a seed copy whose C-23 Run item was accepted
+# (`_ends-run`). All on the defaults, Only what is changed lists nothing; R3a Run item owner (any
+# other code) → ETC: the row reads "changed" with Reset, and the box offers Review accepted items ▸
+# for the one accepted Run item still reading EC → Rulings with the reword ruling pre-filled →
+# Preview 1 change → Apply → back in Rules the box is gone. Reset to default. Signal words: a new
+# code ZZ appears in every per-code table (R3a Run item text has a ZZ row).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- assertVisible: '.*All on the built-in defaults\.'
+- tapOn:
+    id: rules.only
+- assertVisible: Nothing changed yet.
+- tapOn:
+    id: rules.only
+# a changed owner: the row, its Reset, and the review box for the accepted item
+- scrollUntilVisible:
+    element:
+      id: 'rules\.R3a\.run\.owner\.\*\.ETC'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'rules\.R3a\.run\.owner\.\*\.ETC'
+- assertVisible: 'Run item owner  changed'
+- assertVisible:
+    id: 'rules\.R3a\.run\.owner\.reset'
+- scrollUntilVisible:
+    element:
+      id: rules.only
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: rules.review
+      text: 'Review accepted items ▸  1 punch item: Owner → .ETC.'
+    timeout: 20000
+- tapOn:
+    id: rules.review
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview
+    timeout: 15000
+- assertVisible: '.*Reword from the rule.*'
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '1 change on 1 level'
+    timeout: 15000
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied .*: 1 change\.'
+    timeout: 15000
+- tapOn: ← Levels
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- assertVisible: '.*1 set away from the built-in defaults\.'
+- assertNotVisible:
+    id: rules.review
+# Reset to default
+- scrollUntilVisible:
+    element:
+      id: 'rules\.R3a\.run\.owner\.reset'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'rules\.R3a\.run\.owner\.reset'
+- assertNotVisible: 'Run item owner  changed'
+# a new signal word: a row in every per-code table
+- scrollUntilVisible:
+    element:
+      id: rules.R3.signal.newCode
+    direction: UP
+    centerElement: true
+- tapOn:
+    id: rules.R3.signal.newCode
+- inputText: ZZ
+- tapOn:
+    id: rules.R3.signal.newWord
+- inputText: test signal
+- tapOn: Signal word per cable code       # a plain label: closes the keyboard
+- tapOn:
+    id: rules.R3.signal.add
+- scrollUntilVisible:
+    element:
+      id: rules.R3a.run.item.ZZ
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      id: rules.R3a.run.owner.ZZ.EC
+    direction: DOWN

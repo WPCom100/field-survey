@@ -96,6 +96,7 @@ export function AssignmentsStep({ projectId, dataKey }: { projectId: string; dat
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: on }}
                   accessibilityLabel={`${l.code}: ${p.name}`}
+                  testID={`assign.${l.code}.${p.name}`}
                   onPress={() => void run((a) => a.set(l.id, p.id, !on))}
                 >
                   <Text style={styles.box}>{on ? '☑' : '☐'}</Text>

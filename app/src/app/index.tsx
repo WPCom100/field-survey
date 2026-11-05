@@ -196,7 +196,7 @@ export default function ProjectHomeScreen() {
             {notice ? <Text style={styles.notice}>{notice}</Text> : null}
             <View style={styles.filterRow}>
               <Text style={styles.filterLabel}>Assigned to me</Text>
-              <Switch value={mineOnly} onValueChange={setMineOnly} />
+              <Switch value={mineOnly} onValueChange={setMineOnly} testID="home.mine" />
             </View>
 
             <View style={[styles.tr, styles.th]}>
@@ -249,7 +249,7 @@ function LevelRow({ level: l, lock, onLock }: { level: HomeLevel; lock: LockLeve
         <Text style={styles.stateText}>{l.state === 'baseline_locked' ? '🔒 Locked' : 'Setup'}</Text>
         {/* Lock / Unlock (T47): its own touch target inside the row, which opens the plan. */}
         {lock && l.inScope ? (
-          <Pressable onPress={() => onLock(lock)} hitSlop={8} style={styles.lockBtn}>
+          <Pressable onPress={() => onLock(lock)} hitSlop={8} style={styles.lockBtn} testID={`home.lock.${l.code}`}>
             <Text style={styles.lockBtnText}>{lock.locked ? 'Unlock…' : 'Lock…'}</Text>
           </Pressable>
         ) : null}

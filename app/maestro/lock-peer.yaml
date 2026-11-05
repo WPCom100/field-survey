@@ -1,0 +1,36 @@
+# S3 step 2 of `rig.sh lock` (T158), on B as Bob after A's lock.yaml: a sync brings A's lock (06M
+# `🔒 Locked` on the Levels screen and in Setup), A's Rules change (the ZZ signal word: "1 set away",
+# a ZZ row in R3a's table) and A's assignment (06 × Ann ticked); Bob unticks it and syncs.
+appId: productions.luminarytechnology.fieldsurvey
+name: Lock — B sees the lock, the rule change and the assignment
+---
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- runFlow: _sync.yaml
+- runFlow: _open-project.yaml
+- assertVisible: '06M, 🔒 Locked, .*'     # the Levels row, one element
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.lock
+- assertVisible: '🔒 Locked \d{4}-\d\d-\d\d'
+- tapOn:
+    id: setup.step.rules
+- assertVisible: '.*1 set away from the built-in defaults\.'
+- scrollUntilVisible:
+    element:
+      id: rules.R3a.run.item.ZZ
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      id: setup.step.assignments
+    direction: UP
+- tapOn:
+    id: setup.step.assignments
+# the tap turns 06 × Ann off only if A's assignment arrived (the cell's state is not matchable:
+# Maestro matches its label); lock-check.yaml then finds no ● on A's 06
+- tapOn:
+    id: 'assign.06.Ann.*'
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml

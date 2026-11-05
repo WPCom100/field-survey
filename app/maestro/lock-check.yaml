@@ -1,0 +1,29 @@
+# S3 step 3 of `rig.sh lock` (T158), on A: after a sync Bob's untick has reached Ann (no ● on 06);
+# Unlock 06M asks why (Unlock disabled until a reason) and the level is back in Setup.
+appId: productions.luminarytechnology.fieldsurvey
+name: Lock — A follows B's untick; unlock with a reason
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml
+- runFlow: _open-project.yaml
+- assertNotVisible: '06  ●, .*'
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.lock
+- tapOn: 'Unlock…'
+- assertVisible: 'Unlock 06M\?'
+- assertVisible:
+    id: lock.submit
+    enabled: false
+- tapOn:
+    id: lock.reason
+- inputText: Maestro unlock
+- tapOn:
+    id: lock.submit
+- extendedWaitUntil:
+    notVisible: '🔒 Locked.*'
+    timeout: 10000
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml
