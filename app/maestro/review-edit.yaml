@@ -1,0 +1,24 @@
+# R5 step 3 of `rig.sh review` (T157), on A and on B with the server stopped: each types its own
+# note on 06M-S1 ("Note A" / "Note B"), a text field, so the conflict offers Combine (D37).
+appId: productions.luminarytechnology.fieldsurvey
+name: Needs review — two notes on one device, offline
+---
+- runFlow: _resume.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline.*'
+    timeout: 60000
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- tapOn:
+    id: card.notes
+- inputText: Note ${SIDE}
+- pressKey: Enter
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

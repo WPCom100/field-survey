@@ -81,6 +81,8 @@ usage: bash scripts/mac/rig.sh <command>
                         ink_merged (both strokes kept)
   resume                O4 (T156): media on A, then offline resume-setup.yaml resume-edit.yaml
                         resume-check.yaml (a kill and a re-sign-in before the sync keep the edits)
+  review                R5 (T157): station-setup.yaml on A, same-user-peer.yaml on B (Bob), then conflict
+                        review-edit.yaml review-check.yaml (two notes offline, Save combined on A)
   export                R6 (T157): offline station-setup.yaml export-edit.yaml export-check.yaml
                         device:status (the gate offline, then a workbook and a floor PDF to Ready)
   projects              R7 (T157): projects.yaml on A, then projects-offline.yaml with the server stopped
@@ -564,6 +566,15 @@ cmd_projects() {  # R7 (T157): projects.yaml on A, then projects-offline.yaml wi
   say "projects: green"
 }
 
+cmd_review() {  # R5 (T157): one station project on A and B, two notes offline, Save combined on A
+  cmd_second
+  say "review on \"$PROJECT\": A (Ann) makes it, B (Bob) opens it, both type a note on 06M-S1 offline, A combines them"
+  USER_NAME=Ann cmd_flows --device A station-setup.yaml
+  USER_NAME=Bob cmd_flows --device B same-user-peer.yaml
+  RIG_PROJECT="$PROJECT" cmd_conflict review-edit.yaml review-check.yaml
+  say "review: green"
+}
+
 cmd_export() {  # R6 (T157): the export gate offline, then a workbook and a floor PDF to Ready
   RIG_PROJECT="$PROJECT" cmd_offline station-setup.yaml export-edit.yaml export-check.yaml device:status
   say "export: green"
@@ -600,6 +611,7 @@ case "${1:-}" in
   same-user) cmd_same_user ;;
   resume) cmd_resume ;;
   projects) cmd_projects ;;
+  review) cmd_review ;;
   export) cmd_export ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;

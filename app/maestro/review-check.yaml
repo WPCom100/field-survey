@@ -1,0 +1,81 @@
+# R5 step 4 of `rig.sh review` (T157), on A then on B, after A then B synced. On A: Needs review →
+# Sync conflict 1 → 06M-S1 · Notes → Combine ▸ (pre-filled "A; B") → Save combined → sync; the
+# Extraction drafts line on "Maestro pipeline" opens Setup → Review drafts. On both: 06M-S1's
+# note reads both notes combined and nothing is in review.
+appId: productions.luminarytechnology.fieldsurvey
+name: Needs review — Save combined; the links
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml
+- runFlow:
+    when:
+      true: ${SIDE == 'A'}
+    commands:
+      - runFlow: _open-project.yaml
+      - tapOn:
+          id: nav.needs-review
+      - extendedWaitUntil:
+          visible: 'Needs review \(\d+\)'
+          timeout: 20000
+      - tapOn:
+          id: review.tab.sync_conflict
+          text: Sync conflict 1
+      - tapOn:
+          id: review.row
+          text: '.*06M-S1.* · Notes.*'
+      - assertVisible: A \(official now\)
+      - assertVisible: Note A
+      - assertVisible: Note B
+      - tapOn: Combine ▸
+      - assertVisible: 'Combined text \(pre-filled "A; B", A first — edit as needed\)'
+      - assertVisible: 'Note A; Note B|Note B; Note A'   # official first: whichever iPad's sync reached the server first
+      - tapOn: Save combined
+      - tapOn:
+          text: Resolve
+          optional: true          # the confirm alert, reason auto-filled
+      - extendedWaitUntil:
+          notVisible:
+            id: review.row
+            text: '.*06M-S1.* · Notes.*'
+          timeout: 10000
+      - assertVisible:
+          id: review.tab.sync_conflict
+          text: Sync conflict 0
+      - tapOn: ← Levels
+      - runFlow: _sync.yaml
+      # the Extraction drafts line (a project with BOM drafts) → Setup → Review drafts
+      - runFlow:
+          file: _open-project.yaml
+          env:
+            PROJECT: Maestro pipeline
+      - tapOn:
+          id: nav.needs-review
+      - extendedWaitUntil:
+          visible: 'Extraction drafts: \d+ devices? and \d+ cables? under 0\.7 or in conflict.*'   # one row with its link
+          timeout: 20000
+      - tapOn: 'Extraction drafts: .*Open Setup → Review drafts ▸'
+      - extendedWaitUntil:
+          visible:
+            id: drafts.tab.devices
+          timeout: 20000
+      - tapOn:
+          id: setup.home
+      - runFlow: _open-project.yaml    # back to this run's project (the home follows the last opened)
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-S1
+- extendedWaitUntil:
+    visible: '.*(Note A; Note B|Note B; Note A).*'
+    timeout: 20000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.needs-review
+- assertVisible:
+    id: review.tab.sync_conflict
+    text: Sync conflict 0
+- tapOn: ← Levels
