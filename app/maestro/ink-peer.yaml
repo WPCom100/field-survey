@@ -1,0 +1,28 @@
+# F6 step 2 of `rig.sh ink` (T158), on B as Bob: open the project's 06M plan after a sync — its ink
+# layers load (`rig.sh` then reads `ink_loaded … "others":1` in B's log: Ann's stroke is here) —
+# draw Bob's own stroke and sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Ink — B sees Ann's layer and draws its own
+---
+# keep the store (no clearState): a fresh one downloads every rig project first (T156)
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- runFlow: _sync.yaml
+- runFlow:
+    file: _open-level.yaml
+    env:
+      LEVEL: 06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 90000
+- runFlow:
+    file: _ink-stroke.yaml
+    env:
+      STROKE: B
+- tapOn:
+    id: plan.back
+- runFlow: _sync.yaml

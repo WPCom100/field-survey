@@ -1,0 +1,34 @@
+# F6 step 1 of `rig.sh ink` (T158), on A as Ann: a new project with the 06M sheet and a station,
+# one ink stroke on 06M (`Saved`), then Layers → Ink (all users) off and on again; sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Ink — Ann's stroke and the ink layer switch
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _sheet-station.yaml
+- runFlow:
+    file: _ink-stroke.yaml
+    env:
+      STROKE: setup
+- tapOn:
+    id: plan.layers
+- assertVisible:
+    id: layer.ink
+    text: '.*☑.*'
+- tapOn:
+    id: layer.ink
+- assertVisible:
+    id: layer.ink
+    text: '.*☐.*'
+- tapOn:
+    id: layer.ink
+- assertVisible:
+    id: layer.ink
+    text: '.*☑.*'
+- tapOn:
+    id: plan.layers          # closes the menu
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml

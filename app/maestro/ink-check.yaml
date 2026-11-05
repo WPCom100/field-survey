@@ -1,0 +1,21 @@
+# F6 step 3 of `rig.sh ink` (T158), on A: sync, open 06M — both layers load (`rig.sh` reads
+# `ink_loaded {"layers":2,"mine":1,"others":1}` in A's log: Bob's stroke arrived beside Ann's).
+appId: productions.luminarytechnology.fieldsurvey
+name: Ink — A sees Bob's layer beside its own
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml
+- runFlow:
+    file: _open-level.yaml
+    env:
+      LEVEL: 06M
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 60000
+- extendedWaitUntil:              # the layers load after the sheet: a pause for the log line
+    visible: 'zz-never-shown'
+    timeout: 4000
+    optional: true
+- tapOn:
+    id: plan.back

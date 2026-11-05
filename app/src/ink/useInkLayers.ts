@@ -162,6 +162,15 @@ export function useInkLayers(opts: {
       if (!active) return;
       setMissing(gone);
       publish();
+      // what the sheet shows, to the log file (`rig.sh log B ink_loaded`: B has A's strokes, T158)
+      let mine = 0;
+      let others = 0;
+      for (const l of layers.current.values()) {
+        const n = l.list?.strokes.length ?? 0;
+        if (l.userId === userId) mine += n;
+        else others += n;
+      }
+      logTo('plan', 'info', 'ink_loaded', { layers: rows.length, mine, others });
     })().catch((e: unknown) => active && setError(String(e)));
     return () => {
       active = false;
