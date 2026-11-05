@@ -81,6 +81,7 @@ usage: bash scripts/mac/rig.sh <command>
                         ink_merged (both strokes kept)
   resume                O4 (T156): media on A, then offline resume-setup.yaml resume-edit.yaml
                         resume-check.yaml (a kill and a re-sign-in before the sync keep the edits)
+  projects              R7 (T157): projects.yaml on A, then projects-offline.yaml with the server stopped
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
      RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
@@ -547,6 +548,20 @@ cmd_place_two() {  # F4 two-iPad half (T46): one pooled draft, one unit placed o
   say "place-two: green"
 }
 
+cmd_projects() {  # R7 (T157): projects.yaml on A, then projects-offline.yaml with the server stopped
+  server_up
+  made_once "$SEED_PROJECT" 8 || die "no \"$SEED_PROJECT\" on the server: rig.sh seed first"
+  say "projects on \"$PROJECT\": two projects on A, then a Create with the server stopped"
+  USER_NAME=Ann cmd_flows --device A projects.yaml
+  cmd_server stop
+  trap 'cmd_server start >/dev/null 2>&1 || true' EXIT
+  USER_NAME=Ann cmd_flows --device A projects-offline.yaml
+  cmd_server start
+  trap - EXIT
+  for _ in $(seq 1 30); do curl -fsS "$SERVER_URL/health" >/dev/null 2>&1 && break; sleep 1; done
+  say "projects: green"
+}
+
 cmd_status() {
   say "simulators:"; xcrun simctl list devices | grep -E "$SIM_A|$SIM_B" || echo "  none"
   say "build: $(built_app || echo none)"
@@ -577,6 +592,7 @@ case "${1:-}" in
   conflicts) cmd_conflicts ;;
   same-user) cmd_same_user ;;
   resume) cmd_resume ;;
+  projects) cmd_projects ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;
 esac

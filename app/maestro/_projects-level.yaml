@@ -1,0 +1,12 @@
+# The new-project form: level CODE (env) added with Return (the "+ Add level" button slides under
+# the keyboard as the table grows, T154), then the keyboard closed: the code field keeps focus and
+# the keyboard covered a numbering picker's list (T157).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: newProject.levelCode
+- inputText: ${CODE}
+- pressKey: Enter
+- assertVisible:
+    id: newProject.share.${CODE}
+- tapOn: Levels            # the section title: the first tap only closes the keyboard (hideKeyboard opened the help bubbles)

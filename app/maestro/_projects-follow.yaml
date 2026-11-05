@@ -1,0 +1,69 @@
+# R7 (T157): the Levels home's project chip CHIP (env) → its levels (HAS shown; HASNOT, unless
+# "none", not), and Lint, Cable / riser, Dashboard, Rulings and Export follow it (T83). Starts and
+# ends on the Levels home.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: home.project.${CHIP}  # the chips wrap (T157: past the width a chip was out of reach)
+- extendedWaitUntil:
+    visible:
+      id: level.${HAS}
+    timeout: 30000
+- runFlow:
+    when:
+      true: ${HASNOT !== 'none'}
+    commands:
+      - assertNotVisible:
+          id: level.${HASNOT}
+- tapOn:
+    id: nav.lint
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · .*'
+    timeout: 30000
+- runFlow:                    # the level chips are the levels with findings
+    when:
+      true: ${HASNOT === 'none'}
+    commands:
+      - assertVisible:
+          id: lint.level.${HAS}
+- runFlow:
+    when:
+      true: ${HASNOT !== 'none'}
+    commands:
+      - assertVisible: 'Lint \(0 open · 0 dismissed\)'   # a new, empty project
+      - assertNotVisible:
+          id: lint.level.${HASNOT}
+- tapOn: ← Levels
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: 'Cable / riser \(\d+.*\)'
+    timeout: 30000
+- runFlow:
+    when:
+      true: ${HASNOT !== 'none'}
+    commands:
+      - assertNotVisible:
+          id: cables.level.${HASNOT}
+- tapOn: ← Levels
+- tapOn:
+    id: nav.dashboard
+- extendedWaitUntil:
+    visible:
+      id: dash.level.${HAS}
+    timeout: 30000
+- runFlow:
+    when:
+      true: ${HASNOT !== 'none'}
+    commands:
+      - assertNotVisible:
+          id: dash.level.${HASNOT}
+- tapOn: ← Levels
+- tapOn:
+    id: nav.export
+- extendedWaitUntil:
+    visible: ${CHIP}
+    timeout: 15000
+- tapOn: ← Levels
+- assertVisible:
+    id: level.${HAS}

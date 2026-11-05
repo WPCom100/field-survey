@@ -27,6 +27,7 @@ team Ann / Bob), never to the Droplet.
 | `rulings.yaml` | `rig.sh flows rulings.yaml` | R2 (T157): a fresh copy of the master; the D50 ruling; "0-10V rows read Fixtures" built by hand (red missing lines, Preview disabled), Preview `11 changes`, one unticked, Back keeps the editor, Apply 10, Preview again empty naming the unticked record; a standing Device ruling (No access → Append note) proposes on 06M-03 and 06M-04 set later: Accept, Standing off withdraws, on brings back, Reject; Fix all via ruling on EBDK applied from Lint; Select → All → Apply as ruling… from 06M's Punch tab; Generate item once; Rename phrase "Install cover" with the vocabulary footer; Copy as new; Delete… with a reason |
 | `dashboard.yaml` | `rig.sh flows dashboard.yaml` | R3 (T157): a fresh copy of the master; the Summary's numbers (210 · 215 · 85 and their splits), drill-downs on a cell, a row and column Total and the grand total, a row to its card and back, the Levels and Owner filters (EC is not EC/ETC), Apply as ruling from a drill-down; the as-found line and its drill-downs, 01-06's IP and 01-01's DMX address moving the counts, Level 01 alone; readiness B2 setup → ready (locked) → surveying (an edit); search by ID, note phrase, #12, c-14, dmx, an IP whole and partial, a DMX address that changes |
 | `cables.yaml` | `rig.sh flows cables.yaml` | R4 (T157): a fresh copy of the master; `Cable / riser (80)` and the six footer counts, Group by Vertical / Level / Code and folding, the filters and the footer filter, Open Needs review item ▸, an N run's end editor in the side panel, a far-end status moving the row and `status mismatch`, Confirm endpoint, Jump to, Select → Apply as ruling…; C-23 deleted from 06M-01's card (Run item and kit accepted first): gone from Connections and Conns, nothing re-proposed, Lint `Linked to a deleted device or connection`, History → Restore… back Not installed; a P run deleted from the cable view |
+| `projects.yaml`, `projects-offline.yaml` | `rig.sh projects` | R7 (T157): a new project beside `Maestro master`; Refresh from server; the home's chips switch and Lint, Cable / riser, Dashboard and Export follow; the new-project form names a two-way numbering share and a chain and Create refuses both; ◀ Projects; Setup → Open the levels screen ▸; with the server stopped Create reads "the server is not reachable" |
 
 | Sub-flow | Walks |
 |---|---|
@@ -75,6 +76,8 @@ team Ann / Bob), never to the Droplet.
 | `_dash-counts.yaml`, `_dash-found.yaml` | the steps of `dashboard.yaml` |
 | `_dash-asfound.yaml` | the Dashboard's as-found link `KEY` (env) with no panel open (an open panel wraps the line out of reach) |
 | `_dash-search.yaml` | the Dashboard's search box: `TERM` (env) typed, Return |
+| `_projects-follow.yaml` | the home's project chip `CHIP` (env) → its levels; Lint, Cable / riser, Dashboard and Export follow (`HAS`, `HASNOT` level codes) |
+| `_projects-level.yaml` | the new-project form: level `CODE` (env) added with Return, the keyboard closed |
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a
 regex on what is visible. A flow for a new screen gets its `testID`s in the same task.

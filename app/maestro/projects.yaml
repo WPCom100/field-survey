@@ -1,0 +1,99 @@
+# R7 step 1 of `rig.sh projects` (T157, rig plan wave 4): two projects on one iPad (T83, T142).
+# A new project PROJECT (06M only) beside "Maestro master" (the seed, B2 … 06): Refresh from server;
+# the home's project chips switch, and Lint, Cable / riser, Dashboard, Rulings and Export follow the
+# chosen project; the new-project form names a two-way numbering share and a chain and Create
+# refuses both; ◀ Projects; Setup's "Open the levels screen ▸".
+appId: productions.luminarytechnology.fieldsurvey
+name: R7 — Projects
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _new-project.yaml
+
+# Refresh from server: everything the server lists is (or comes) on this iPad
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.refresh
+- extendedWaitUntil:
+    visible: '(Server lists \d+ projects?; all are on this iPad\.|\d+ projects? not yet on this iPad: downloading now\.)'
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: projects.open.Maestro master
+    direction: DOWN
+    timeout: 120000
+- tapOn: ◀ Levels
+
+# the home's chips switch the project; every sidebar screen follows
+- runFlow:
+    file: _projects-follow.yaml
+    env:
+      CHIP: Maestro master
+      HAS: B2
+      HASNOT: none
+- runFlow:
+    file: _projects-follow.yaml
+    env:
+      CHIP: ${PROJECT}
+      HAS: 06M
+      HASNOT: B2
+
+# the new-project form: a two-way share and a chain are named, and Create refuses them
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.new
+- tapOn:
+    id: newProject.name
+- inputText: ${PROJECT} refused
+- runFlow:
+    file: _projects-level.yaml
+    env:
+      CODE: '06'
+- runFlow:
+    file: _projects-level.yaml
+    env:
+      CODE: 06M
+- tapOn:
+    id: newProject.share.06
+- tapOn:
+    id: newProject.share.06.06M
+- tapOn:
+    id: newProject.share.06M
+- tapOn:
+    id: newProject.share.06M.06
+- assertVisible: 'Levels 06 and 06M share numbering with each other\. .*'
+- tapOn:
+    id: newProject.create
+- assertVisible: 'Levels 06 and 06M share numbering with each other\. .*'
+- assertVisible:
+    id: newProject.create
+    text: Create project
+# a chain: 06M → 06 → 07
+- runFlow:
+    file: _projects-level.yaml
+    env:
+      CODE: '07'
+- tapOn:
+    id: newProject.share.06
+- tapOn:
+    id: newProject.share.06.07
+- assertVisible: 'Level 06M shares with 06, which itself shares with 07\. .*'
+- tapOn:
+    id: newProject.create
+- assertVisible: 'Level 06M shares with 06, which itself shares with 07\. .*'
+- tapOn: ◀ Projects
+- assertVisible: '\+ New project'
+- assertNotVisible:
+    id: projects.open.${PROJECT} refused
+
+# Setup's way back to the levels
+- tapOn:
+    text: Setup ▸
+    index: 0
+- tapOn: Open the levels screen ▸
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 10000

@@ -1,0 +1,31 @@
+# R7 step 2 of `rig.sh projects` (T157, T142): with the server stopped, Create reads why it failed
+# ("not reachable") and the form keeps what was typed.
+appId: productions.luminarytechnology.fieldsurvey
+name: R7 — a refusal while the server is stopped
+---
+- runFlow: _resume.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline.*'
+    timeout: 60000
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.new
+- tapOn:
+    id: newProject.name
+- inputText: ${PROJECT} offline
+- runFlow:
+    file: _projects-level.yaml
+    env:
+      CODE: 06M
+- tapOn:
+    id: newProject.create
+- extendedWaitUntil:
+    visible: 'Could not create the project: the server is not reachable \(no connection\?\)\.'
+    timeout: 30000
+- assertVisible:
+    id: newProject.name
+    text: ${PROJECT} offline
+- tapOn: ◀ Projects

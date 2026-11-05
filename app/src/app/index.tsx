@@ -171,7 +171,7 @@ export default function ProjectHomeScreen() {
         {projects.length > 1 ? (
           <View style={styles.chips}>
             {projects.map((p) => (
-              <Pressable key={p.id} onPress={() => setProjectId(p.id)} style={[styles.chip, p.id === projectId && styles.chipOn]}>
+              <Pressable key={p.id} onPress={() => setProjectId(p.id)} style={[styles.chip, p.id === projectId && styles.chipOn]} testID={`home.project.${p.name}`}>
                 <Text style={p.id === projectId ? styles.chipTextOn : styles.chipText}>{p.name}</Text>
               </Pressable>
             ))}
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   sub: { fontSize: 15, color: '#555' },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 },
   filterLabel: { fontSize: 15 },
-  chips: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }, // wraps: past the width a chip was out of reach (T157)
   chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
   chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
   chipText: { color: '#111' },
