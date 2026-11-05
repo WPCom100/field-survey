@@ -1,0 +1,137 @@
+# R1 step 1 (T157): Lint's "Drafts with no device" on a fresh seed copy (T100, T146). The seed has
+# Neuron items on every group but no IP or DMX item, so R3c drafts one of each per numbering group
+# (B1 has no IP need). Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.lint
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · 0 dismissed · \d+ drafts\)'
+    timeout: 60000
+- assertVisible: '▾ Drafts with no device \(\d+\)'
+- assertVisible: Missing all Device IP addresses
+- assertVisible: Missing all Device DMX addresses
+
+# the level filter: 01's two drafts only
+- tapOn:
+    id: lint.level.01
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · 0 dismissed · 2 drafts\)'
+    timeout: 10000
+- assertVisible: '▾ Drafts with no device \(2\)'
+- assertNotVisible: Levels B2
+- assertVisible: 'Information · ETC · Open'      # the IP item's owner
+- assertVisible: 'Information · EC · Open'       # the DMX item's owner
+
+# why? names the rule; Open level ▸ opens the plan and comes back
+- tapOn:
+    text: 'why\? ▸'
+    index: 0
+- assertVisible: 'R3c — Missing all Device .*'
+- tapOn: 'why\? ▴'
+- assertNotVisible: 'R3c — Missing all Device .*'
+- tapOn:
+    text: Open level ▸
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: plan.back
+      text: ◀ 01
+    timeout: 15000
+- tapOn:
+    id: plan.back
+- extendedWaitUntil:
+    visible: 'Lint \(.*'
+    timeout: 10000
+
+# Accept the IP item; Edit the DMX item's owner → Save & accept
+- tapOn:
+    id: lint.level.01
+- tapOn:
+    id: proposal.accept.Missing all Device IP addresses
+- extendedWaitUntil:
+    notVisible:
+      id: proposal.accept.Missing all Device IP addresses
+    timeout: 10000
+- tapOn:
+    id: proposal.edit.Missing all Device DMX addresses
+- tapOn:
+    id: proposal.field.owner
+- eraseText: 10
+- inputText: EC/ETC
+- pressKey: Enter          # closes the keyboard: else the Save tap only dismisses it
+- tapOn:
+    id: proposal.save.Missing all Device DMX addresses
+- extendedWaitUntil:
+    notVisible:
+      id: proposal.save.Missing all Device DMX addresses
+    timeout: 10000
+- assertNotVisible: 'Drafts with no device.*'
+# their findings close once the rules have run on the new items
+- extendedWaitUntil:
+    notVisible: '.*Level 01: no "Missing all Device IP addresses" item.*'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: '.*Level 01: no "Missing all Device DMX addresses" item.*'
+    timeout: 20000
+
+# Reject B2's IP draft: it leaves the list
+- tapOn:
+    id: lint.level.B2
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · 0 dismissed · 2 drafts\)'
+    timeout: 10000
+- tapOn:
+    id: proposal.reject.Missing all Device IP addresses
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · 0 dismissed · 1 draft\)'
+    timeout: 10000
+- assertNotVisible:
+    id: proposal.accept.Missing all Device IP addresses
+
+# Dismissed lists no drafts
+- tapOn:
+    id: lint.show.dismissed
+- assertNotVisible: 'Drafts with no device.*'
+- assertVisible: Nothing dismissed.
+- tapOn:
+    id: lint.show.open
+- tapOn:
+    id: lint.level.all
+- tapOn: ← Levels
+
+# after a sync: 01's punch list ends Neuron, IP, DMX, numbered in that order; B2's rejected draft
+# has not come back
+- runFlow: _sync.yaml
+- tapOn:
+    id: level.01
+- tapOn:
+    id: plan.tab.punch
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: Missing all Device
+- extendedWaitUntil:
+    visible: '.*Missing all Device DMX addresses.*EC/ETC.*'
+    timeout: 15000
+- assertVisible:
+    text: '.*Missing all Device IP addresses.*'
+    below: '.*Missing all Device Neuron IDs.*'
+- assertVisible:
+    text: '.*Missing all Device DMX addresses.*'
+    below: '.*Missing all Device IP addresses.*'
+- runFlow: _search-clear.yaml
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.lint
+- tapOn:
+    id: lint.level.B2
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · \d+ dismissed · 1 draft\)'
+    timeout: 15000
+- assertNotVisible:
+    id: proposal.accept.Missing all Device IP addresses
+- tapOn:
+    id: lint.level.all
+- tapOn: ← Levels

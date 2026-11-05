@@ -1487,7 +1487,7 @@ export function PlanScreen(props: PlanScreenProps) {
               <Text style={styles.sideNote} numberOfLines={1}>
                 {picked.size} chosen
               </Text>
-              <Pressable onPress={() => setPicked(new Set(tabData.filter((r) => !('tab' in r ? r.badges.deleted : r.deleted)).map((r) => r.id)))} hitSlop={8}>
+              <Pressable onPress={() => setPicked(new Set(tabData.filter((r) => !('tab' in r ? r.badges.deleted : r.deleted)).map((r) => r.id)))} hitSlop={8} testID="plan.select.all">
                 <Text style={styles.sideLink}>All {tabData.length}</Text>
               </Pressable>
               <Pressable
@@ -1498,10 +1498,11 @@ export function PlanScreen(props: PlanScreenProps) {
                   setPicked(null);
                 }}
                 hitSlop={8}
+                testID="plan.select.apply"
               >
                 <Text style={[styles.sideLink, !picked.size && styles.sideOff]}>Apply as ruling…</Text>
               </Pressable>
-              <Pressable onPress={() => setPicked(null)} hitSlop={8}>
+              <Pressable onPress={() => setPicked(null)} hitSlop={8} testID="plan.select.cancel">
                 <Text style={styles.sideLink}>Cancel</Text>
               </Pressable>
             </View>
@@ -1518,7 +1519,7 @@ export function PlanScreen(props: PlanScreenProps) {
                 </Pressable>
               ) : null}
               {props.onApplyAsRuling && userId ? (
-                <Pressable onPress={() => setPicked(new Set())} hitSlop={8}>
+                <Pressable onPress={() => setPicked(new Set())} hitSlop={8} testID="plan.select">
                   <Text style={styles.sideLink}>Select</Text>
                 </Pressable>
               ) : null}

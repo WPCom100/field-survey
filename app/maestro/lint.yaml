@@ -1,0 +1,15 @@
+# R1 (T157, rig plan wave 4): the Lint view on a fresh copy of the master.
+# Drafts with no device (T100): the R3c IP and DMX drafts listed per numbering group, why?, Open
+# level ▸, the level filter, Accept and Edit → Save & accept on 01 (both then last on 01's punch
+# list after the Neuron item, T146), Reject on B2 (gone, and still gone after a sync), none under
+# Dismissed. Findings (T36): `Cable with missing far end (12)`, a level chip, Group by → Level and
+# folding, Open card ▸ and back, Dismiss… disabled until a reason, the finding back once its facts
+# change, Reopen, Fix all via ruling ▸ into the ruling editor, Needs review's link into Lint.
+appId: productions.luminarytechnology.fieldsurvey
+name: R1 — Lint
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow: _lint-drafts.yaml
+- runFlow: _lint-findings.yaml

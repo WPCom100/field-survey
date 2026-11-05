@@ -141,13 +141,13 @@ export default function LintScreen() {
       </View>
       <View style={styles.filters}>
         <Text style={styles.filterLabel}>Level</Text>
-        <Chip label="All" on={!levelId} onPress={() => setLevelId(null)} />
+        <Chip label="All" on={!levelId} onPress={() => setLevelId(null)} testID="lint.level.all" />
         {view?.levels.map((l) => (
-          <Chip key={l.id} label={l.code} on={levelId === l.id} onPress={() => setLevelId(l.id)} />
+          <Chip key={l.id} label={l.code} on={levelId === l.id} onPress={() => setLevelId(l.id)} testID={`lint.level.${l.code}`} />
         ))}
         <Text style={[styles.filterLabel, styles.gap]}>Group by</Text>
-        <Chip label="Check" on={groupBy === 'check'} onPress={() => setGroupBy('check')} />
-        <Chip label="Level" on={groupBy === 'level'} onPress={() => setGroupBy('level')} />
+        <Chip label="Check" on={groupBy === 'check'} onPress={() => setGroupBy('check')} testID="lint.groupBy.check" />
+        <Chip label="Level" on={groupBy === 'level'} onPress={() => setGroupBy('level')} testID="lint.groupBy.level" />
         <Text style={[styles.filterLabel, styles.gap]}>Show</Text>
         <Chip label="Open" on={!dismissed} onPress={() => setDismissed(false)} testID="lint.show.open" />
         <Chip label={`Dismissed ${view?.dismissed ?? 0}`} on={dismissed} onPress={() => setDismissed(true)} testID="lint.show.dismissed" />
@@ -183,7 +183,7 @@ export default function LintScreen() {
                       &quot;{s.from}&quot; ×{s.recordIds.length}
                       {s.to ? ` → "${s.to}"` : ''}
                     </Text>
-                    <Pressable onPress={() => fixAll(item.group, i)} accessibilityRole="button">
+                    <Pressable onPress={() => fixAll(item.group, i)} accessibilityRole="button" testID={`lint.fixAll.${s.from}`}>
                       <Text style={styles.link}>Fix all via ruling ▸</Text>
                     </Pressable>
                   </View>
@@ -292,7 +292,7 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
       {r.hint ? <Text style={styles.hint}>Suggested: {r.hint}</Text> : null}
       {r.state === 'dismissed' ? <Text style={styles.sub}>Dismissed: {r.dismissedReason ?? '(no reason)'}</Text> : null}
       <View style={styles.btnRow}>
-        {r.levelId ? <Btn label={r.deviceId ? 'Open card ▸' : 'Open level ▸'} onPress={openCard} /> : null}
+        {r.levelId ? <Btn label={r.deviceId ? 'Open card ▸' : 'Open level ▸'} onPress={openCard} testID="lint.openCard" /> : null}
         {r.state === 'open' ? (
           <Btn label="Dismiss…" onPress={() => setDismissing(true)} disabled={!canEdit || dismissing} testID="lint.dismiss" />
         ) : (

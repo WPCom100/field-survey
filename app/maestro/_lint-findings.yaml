@@ -1,0 +1,218 @@
+# R1 step 2 (T157): Lint's findings (T36) on the seed copy. 06M-03 (an EBDK with no open punch
+# item) set Issue raises "Issue device without open punch item"; dismissed, it resolves when the
+# status leaves Issue and is raised again when it comes back (D178). Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow: _lint-open.yaml
+- assertVisible: 'Lint \(\d+ open · 0 dismissed.*\)'
+- runFlow:
+    file: _lint-fold.yaml
+    env:
+      GROUP: IP address item missing or not last
+- runFlow:
+    file: _lint-fold.yaml
+    env:
+      GROUP: DMX address item missing or not last
+- runFlow:
+    file: _lint-fold.yaml
+    env:
+      GROUP: Value outside vocabulary
+# the 12 far ends the import could not pair (the same 12 as Cable / riser's footer)
+- assertVisible: '▾ Cable with missing far end \(12\)'
+
+# a level chip keeps that level's findings only
+- tapOn:
+    id: lint.level.03
+- assertVisible: '03 C-01, 03 · .*'
+- assertNotVisible: '01 C-05, 01 · .*'
+- tapOn:
+    id: lint.level.all
+- assertVisible: '01 C-05, 01 · .*'
+
+# Group by → Level: one group per level, rows name their check; a header folds and unfolds
+- tapOn:
+    id: lint.groupBy.level
+- assertVisible: '▾ Level 06M \(\d+\)'
+- assertVisible: '.*06M · Value outside vocabulary · .*'
+- tapOn: '▾ Level 06M \(\d+\)'
+- assertVisible: '▸ Level 06M \(\d+\)'
+- assertNotVisible: '.*06M · Value outside vocabulary · .*'
+- tapOn: '▸ Level 06M \(\d+\)'
+- assertVisible: '▾ Level 06M \(\d+\)'
+- tapOn:
+    id: lint.groupBy.check
+- tapOn: ← Levels
+
+# 06M-03 Issue → its finding; Open card ▸ and back
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-03
+- tapOn:
+    id: card.status.Issue
+- assertVisible: ✓ Issue
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- runFlow: _lint-open.yaml
+- extendedWaitUntil:
+    visible: '▾ Issue device without open punch item \(1\)'
+    timeout: 20000
+- tapOn: '06M-03 .*Issue device with no open punch item'
+- tapOn:
+    id: lint.openCard
+- extendedWaitUntil:
+    visible:
+      id: card.close
+    timeout: 15000
+- assertVisible:
+    id: plan.back
+    text: ◀ 06M
+- assertVisible: '06M-03.*'
+- tapOn:
+    id: plan.back
+- extendedWaitUntil:
+    visible: 'Lint \(.*'
+    timeout: 10000
+
+# Dismiss… waits for a reason; dismissed, the row leaves Open and Dismissed lists it with the reason
+- tapOn: '06M-03 .*Issue device with no open punch item'
+- tapOn:
+    id: lint.dismiss
+- assertVisible:
+    id: lint.dismiss.ok
+    enabled: false
+- tapOn: 'Checked on site: correct as is'
+- assertVisible:
+    id: lint.dismiss.ok
+    enabled: true
+- tapOn:
+    id: lint.dismiss.ok
+- assertVisible:
+    id: lint.note
+    text: 'Dismissed: 06M-03.*'
+- assertVisible: 'Lint \(\d+ open · 1 dismissed.*\)'
+- assertVisible:
+    id: lint.show.dismissed
+    text: Dismissed 1
+- assertNotVisible: '.*Issue device without open punch item.*'
+- tapOn:
+    id: lint.show.dismissed
+- tapOn: '06M-03 .*Issue device with no open punch item'
+- assertVisible: 'Dismissed: Checked on site: correct as is'
+
+# the facts change: away from Issue, the finding resolves (Dismissed 0); back to Issue, it is open again
+- tapOn:
+    id: lint.openCard
+- extendedWaitUntil:
+    visible:
+      id: card.status.Not installed
+    timeout: 15000
+- tapOn:
+    id: card.status.Not installed
+- assertVisible: ✓ Not installed
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- extendedWaitUntil:
+    visible:
+      id: lint.show.dismissed
+      text: Dismissed 0
+    timeout: 20000
+- tapOn: ← Levels
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-03
+- tapOn:
+    id: card.status.Issue
+- assertVisible: ✓ Issue
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- runFlow: _lint-open.yaml
+- extendedWaitUntil:
+    visible: '▾ Issue device without open punch item \(1\)'
+    timeout: 20000
+
+# Reopen: dismiss it again, then Reopen from Dismissed → back under Open
+- tapOn: '06M-03 .*Issue device with no open punch item'
+- tapOn:
+    id: lint.dismiss
+- tapOn: 'Known; handled outside the app'
+- tapOn:
+    id: lint.dismiss.ok
+- assertVisible:
+    id: lint.show.dismissed
+    text: Dismissed 1
+- tapOn:
+    id: lint.show.dismissed
+- tapOn: '06M-03 .*Issue device with no open punch item'
+- assertVisible: 'Dismissed: Known; handled outside the app'
+- tapOn:
+    id: lint.reopen
+- assertVisible:
+    id: lint.note
+    text: 'Reopened: 06M-03.*'
+- assertVisible:
+    id: lint.show.dismissed
+    text: Dismissed 0
+- tapOn:
+    id: lint.show.open
+- runFlow:
+    when:
+      visible: '▾ Drafts with no device \(\d+\)'   # back from Dismissed it heads the list unfolded
+    commands:
+      - tapOn: '▾ Drafts with no device \(\d+\)'
+- assertVisible: '.*Issue device without open punch item \(1\)'
+
+# Fix all via ruling ▸ opens the ruling editor pre-filled; nothing changes before a preview is applied
+- runFlow:
+    when:
+      visible: '▸ Value outside vocabulary \(\d+\)'   # folded unless the screen was mounted again
+    commands:
+      - tapOn: '▸ Value outside vocabulary \(\d+\)'
+- tapOn:
+    id: lint.fixAll.EBDK
+- extendedWaitUntil:
+    visible: New ruling · from Lint
+    timeout: 10000
+- assertVisible: 'Rulings \(\d+ standing · \d+ applied\)'
+- tapOn: ← Levels
+
+# Needs review → Lint tab → the link into Lint
+- tapOn:
+    id: nav.needs-review
+- extendedWaitUntil:
+    visible: 'Needs review \(\d+\)'
+    timeout: 20000
+- tapOn:
+    id: review.tab.lint
+# the link heads the findings, in the list's footer under the review items that carry a lint
+- repeat:                   # swipe the list (left column): scrollUntilVisible swipes the panel
+    times: 20
+    while:
+      notVisible:
+        id: review.openLint
+    commands:
+      - swipe:
+          start: 20%,85%
+          end: 20%,20%
+          duration: 400
+- swipe:                    # …then back down a little: it can count as visible under the fixed header
+    start: 20%,40%
+    end: 20%,60%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: review.openLint
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · \d+ dismissed.*\)'
+    timeout: 10000
+- tapOn: ← Levels

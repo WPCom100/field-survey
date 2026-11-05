@@ -113,7 +113,7 @@ export function EndEditor(props: EndEditorProps) {
           {view.deleted ? <Text style={[chipStyles.badge, chipStyles.badgeDeleted]}>DELETED</Text> : null}
           <View style={styles.flex} />
           {editor ? (
-            <Pressable onPress={() => setMenu((m) => !m)} hitSlop={8} style={styles.headBtn} accessibilityLabel="Connection menu">
+            <Pressable onPress={() => setMenu((m) => !m)} hitSlop={8} style={styles.headBtn} accessibilityLabel="Connection menu" testID="end.menu">
               <Text style={styles.headBtnText}>⋯</Text>
             </Pressable>
           ) : null}
@@ -122,7 +122,7 @@ export function EndEditor(props: EndEditorProps) {
       </View>
       {menu ? (
         <View style={styles.menu}>
-          <Pressable style={styles.menuItem} onPress={() => (setMenu(false), setPending({ kind: view.deleted ? 'restore' : 'delete', reason: '' }))}>
+          <Pressable style={styles.menuItem} onPress={() => (setMenu(false), setPending({ kind: view.deleted ? 'restore' : 'delete', reason: '' }))} testID="end.menu.delete">
             <Text style={[styles.menuText, !view.deleted && styles.danger]}>{view.deleted ? 'Restore connection…' : 'Delete connection…'}</Text>
           </Pressable>
         </View>
@@ -141,12 +141,13 @@ export function EndEditor(props: EndEditorProps) {
             autoFocus
             returnKeyType="done"
             onSubmitEditing={confirmPending}
+            testID="end.reason"
           />
           <View style={styles.rowWrap}>
             <Pressable
               disabled={!pending.reason.trim()}
               onPress={confirmPending}
-              style={[styles.btn, pending.kind === 'delete' && styles.btnDanger, !pending.reason.trim() && styles.off]}>
+              style={[styles.btn, pending.kind === 'delete' && styles.btnDanger, !pending.reason.trim() && styles.off]} testID="end.reason.ok">
               <Text style={[styles.btnText, pending.kind === 'delete' && styles.danger]}>{pending.kind === 'delete' ? 'Delete' : 'Restore'}</Text>
             </Pressable>
             <Pressable onPress={() => setPending(null)} style={styles.btn}>
@@ -159,7 +160,7 @@ export function EndEditor(props: EndEditorProps) {
         <View style={styles.deleted}>
           <Text style={styles.deletedText}>Deleted{view.deleteReason ? `: ${view.deleteReason}` : ''}</Text>
           {editor && !pending ? (
-            <Pressable onPress={() => setPending({ kind: 'restore', reason: '' })} style={styles.btn}>
+            <Pressable onPress={() => setPending({ kind: 'restore', reason: '' })} style={styles.btn} testID="end.restore">
               <Text style={styles.btnText}>Restore…</Text>
             </Pressable>
           ) : null}

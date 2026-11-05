@@ -141,18 +141,19 @@ export default function DashboardScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           clearButtonMode="while-editing"
+          testID="dash.search"
         />
       </View>
       <View style={styles.filters}>
         <Text style={styles.filterLabel}>Levels</Text>
-        <Chip label="All" on={!filter.levelId} onPress={() => setFilter((f) => ({ ...f, levelId: null }))} />
+        <Chip label="All" on={!filter.levelId} onPress={() => setFilter((f) => ({ ...f, levelId: null }))} testID="dash.level.all" />
         {data?.levels.map((l) => (
-          <Chip key={l.id} label={l.code} on={filter.levelId === l.id} onPress={() => setFilter((f) => ({ ...f, levelId: l.id }))} />
+          <Chip key={l.id} label={l.code} on={filter.levelId === l.id} onPress={() => setFilter((f) => ({ ...f, levelId: l.id }))} testID={`dash.level.${l.code}`} />
         ))}
         <Text style={[styles.filterLabel, styles.gap]}>Owner</Text>
-        <Chip label="All" on={!filter.owner} onPress={() => setFilter((f) => ({ ...f, owner: null }))} />
+        <Chip label="All" on={!filter.owner} onPress={() => setFilter((f) => ({ ...f, owner: null }))} testID="dash.owner.all" />
         {vocab.OWNER.map((o) => (
-          <Chip key={o} label={o} on={filter.owner === o} onPress={() => setFilter((f) => ({ ...f, owner: o }))} />
+          <Chip key={o} label={o} on={filter.owner === o} onPress={() => setFilter((f) => ({ ...f, owner: o }))} testID={`dash.owner.${o}`} />
         ))}
       </View>
 
@@ -172,15 +173,15 @@ export default function DashboardScreen() {
           {found ? (
             <View style={styles.line}>
               <Text style={styles.lineLabel}>As-found:</Text>
-              <CountLink text={`field additions ${found.fieldAdditions}`} on={drill?.table === 'asFound' && drill.key === 'fieldAdditions'} onPress={() => open({ table: 'asFound', key: 'fieldAdditions', status: null })} />
+              <CountLink text={`field additions ${found.fieldAdditions}`} on={drill?.table === 'asFound' && drill.key === 'fieldAdditions'} onPress={() => open({ table: 'asFound', key: 'fieldAdditions', status: null })} testID="dash.found.fieldAdditions" />
               <Text style={styles.muted}>·</Text>
-              <CountLink text={`never found ${found.neverFound}`} on={drill?.table === 'asFound' && drill.key === 'neverFound'} onPress={() => open({ table: 'asFound', key: 'neverFound', status: null })} />
+              <CountLink text={`never found ${found.neverFound}`} on={drill?.table === 'asFound' && drill.key === 'neverFound'} onPress={() => open({ table: 'asFound', key: 'neverFound', status: null })} testID="dash.found.neverFound" />
               <Text style={styles.muted}>·</Text>
-              <CountLink text={`Neuron IDs captured ${found.neuronCaptured}/${found.neuronDevices}`} on={drill?.table === 'asFound' && drill.key === 'neuronMissing'} onPress={() => open({ table: 'asFound', key: 'neuronMissing', status: null })} />
+              <CountLink text={`Neuron IDs captured ${found.neuronCaptured}/${found.neuronDevices}`} on={drill?.table === 'asFound' && drill.key === 'neuronMissing'} onPress={() => open({ table: 'asFound', key: 'neuronMissing', status: null })} testID="dash.found.neuronMissing" />
               <Text style={styles.muted}>·</Text>
-              <CountLink text={`IP addresses captured ${found.ipCaptured}/${found.ipDevices}`} on={drill?.table === 'asFound' && drill.key === 'ipMissing'} onPress={() => open({ table: 'asFound', key: 'ipMissing', status: null })} />
+              <CountLink text={`IP addresses captured ${found.ipCaptured}/${found.ipDevices}`} on={drill?.table === 'asFound' && drill.key === 'ipMissing'} onPress={() => open({ table: 'asFound', key: 'ipMissing', status: null })} testID="dash.found.ipMissing" />
               <Text style={styles.muted}>·</Text>
-              <CountLink text={`DMX addresses captured ${found.dmxCaptured}/${found.dmxDevices}`} on={drill?.table === 'asFound' && drill.key === 'dmxMissing'} onPress={() => open({ table: 'asFound', key: 'dmxMissing', status: null })} />
+              <CountLink text={`DMX addresses captured ${found.dmxCaptured}/${found.dmxDevices}`} on={drill?.table === 'asFound' && drill.key === 'dmxMissing'} onPress={() => open({ table: 'asFound', key: 'dmxMissing', status: null })} testID="dash.found.dmxMissing" />
             </View>
           ) : null}
           {data ? (
@@ -194,7 +195,7 @@ export default function DashboardScreen() {
                     <Pressable
                       onPress={() =>
                         r.toReview && projectId ? router.push({ pathname: '/review', params: { project: projectId } }) : router.push({ pathname: '/plan/[levelId]', params: { levelId: r.levelId } })
-                      }>
+                      } testID={`dash.ready.${r.code}`}>
                       <Text style={[styles.lineText, r.state === 'surveying' ? styles.surveying : r.state === 'ready' ? styles.ready : styles.setup]}>
                         {r.code} {r.state}
                         {r.toReview ? ` (${r.toReview} review)` : ''}
@@ -210,23 +211,24 @@ export default function DashboardScreen() {
         {panel ? (
           <View style={styles.panel}>
             <View style={styles.panelHead}>
-              <Text style={styles.panelTitle} numberOfLines={2}>
+              <Text style={styles.panelTitle} numberOfLines={2} testID="dash.panel.title">
                 {panel.kind === 'drill' ? `${drillTitle(panel.drill)} (${rows.length})` : `Search “${query.trim()}” (${(results ?? []).reduce((n, g) => n + g.results.length, 0)})`}
               </Text>
               {panel.kind === 'drill' && rows.length ? (
                 picked ? (
                   <>
-                    <Btn label={`All ${rows.length}`} onPress={() => setPicked(new Set(rows.map((r) => r.id)))} />
-                    <Btn label={`Apply as ruling… (${picked.size})`} disabled={!picked.size} onPress={applyAsRuling} />
-                    <Btn label="Cancel" plain onPress={() => setPicked(null)} />
+                    <Btn label={`All ${rows.length}`} onPress={() => setPicked(new Set(rows.map((r) => r.id)))} testID="dash.select.all" />
+                    <Btn label={`Apply as ruling… (${picked.size})`} disabled={!picked.size} onPress={applyAsRuling} testID="dash.select.apply" />
+                    <Btn label="Cancel" plain onPress={() => setPicked(null)} testID="dash.select.cancel" />
                   </>
                 ) : (
-                  <Btn label="Select" plain onPress={() => setPicked(new Set())} />
+                  <Btn label="Select" plain onPress={() => setPicked(new Set())} testID="dash.select" />
                 )
               ) : null}
               <Btn
                 label="Close"
                 plain
+                testID="dash.close"
                 onPress={() => {
                   setPanel(null);
                   setPicked(null);
@@ -279,7 +281,7 @@ export default function DashboardScreen() {
 function SummaryGrid({ table: t, drill, onPress }: { table: SummaryTable; drill: Drill | null; onPress: (d: Drill) => void }) {
   const isOn = (key: string | null, status: string | null) => drill?.table === t.id && drill.key === key && drill.status === status;
   const cell = (n: number, key: string | null, status: string | null, bold = false) => (
-    <Pressable key={`${key}|${status}`} style={[styles.cell, isOn(key, status) && styles.cellOn]} onPress={() => onPress({ table: t.id, key, status })}>
+    <Pressable key={`${key}|${status}`} style={[styles.cell, isOn(key, status) && styles.cellOn]} onPress={() => onPress({ table: t.id, key, status })} testID={`dash.cell.${t.id}.${key ?? 'total'}.${status ?? 'total'}`}>
       <Text style={[styles.cellText, bold && styles.bold, !n && styles.zero, isOn(key, status) && styles.cellTextOn]}>{n}</Text>
     </Pressable>
   );
@@ -330,7 +332,7 @@ function SummaryGrid({ table: t, drill, onPress }: { table: SummaryTable; drill:
 
 function DrillLine({ row: r, picked, onPress }: { row: DashRow; picked: boolean | null; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={styles.listRow}>
+    <Pressable onPress={onPress} style={styles.listRow} testID="dash.row">
       {picked != null ? <Text style={styles.tick}>{picked ? '☑' : '☐'}</Text> : null}
       <Text style={styles.listLevel}>{r.levelCode}</Text>
       <Text style={styles.listLabel} numberOfLines={1}>
@@ -347,7 +349,7 @@ function DrillLine({ row: r, picked, onPress }: { row: DashRow; picked: boolean 
 
 function SearchLine({ r, onPress }: { r: SearchResult; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={styles.listRow} disabled={!r.levelId}>
+    <Pressable onPress={onPress} style={styles.listRow} disabled={!r.levelId} testID="dash.search.row">
       <Text style={styles.listLevel}>{r.levelCode}</Text>
       <Text style={styles.listLabel} numberOfLines={1}>
         {r.label}
@@ -360,25 +362,25 @@ function SearchLine({ r, onPress }: { r: SearchResult; onPress: () => void }) {
   );
 }
 
-function CountLink({ text, on, onPress }: { text: string; on: boolean; onPress: () => void }) {
+function CountLink({ text, on, onPress, testID }: { text: string; on: boolean; onPress: () => void; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.countLink, on && styles.cellOn]}>
+    <Pressable onPress={onPress} style={[styles.countLink, on && styles.cellOn]} testID={testID}>
       <Text style={[styles.lineText, styles.linkText, on && styles.cellTextOn]}>{text}</Text>
     </Pressable>
   );
 }
 
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
+    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
       <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
     </Pressable>
   );
 }
 
-function Btn({ label, onPress, disabled, plain }: { label: string; onPress: () => void; disabled?: boolean; plain?: boolean }) {
+function Btn({ label, onPress, disabled, plain, testID }: { label: string; onPress: () => void; disabled?: boolean; plain?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, plain && styles.btnPlain, disabled && styles.off]} accessibilityRole="button">
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, plain && styles.btnPlain, disabled && styles.off]} accessibilityRole="button" testID={testID}>
       <Text style={[styles.btnText, plain && styles.btnTextPlain]}>{label}</Text>
     </Pressable>
   );

@@ -1,0 +1,13 @@
+# Folds the Lint group GROUP (env: its title, a regex) until its header reads ▸: a tap while a
+# long group (the vocabulary's 232 rows) is still rendering can be lost (T157).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- repeat:
+    times: 4
+    while:
+      visible: '▾ ${GROUP} \(\d+\)'
+    commands:
+      - tapOn: '▾ ${GROUP} \(\d+\)'
+      - waitForAnimationToEnd:
+          timeout: 3000
+- assertVisible: '▸ ${GROUP} \(\d+\)'

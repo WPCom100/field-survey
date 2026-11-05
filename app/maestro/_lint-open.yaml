@@ -1,0 +1,14 @@
+# Sidebar → Lint, title loaded, "Drafts with no device" folded when it heads the list: it opens
+# unfolded on every visit and can fill the screen (T157).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.lint
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · \d+ dismissed.*\)'
+    timeout: 30000
+- runFlow:
+    when:
+      visible: '▾ Drafts with no device \(\d+\)'
+    commands:
+      - tapOn: '▾ Drafts with no device \(\d+\)'

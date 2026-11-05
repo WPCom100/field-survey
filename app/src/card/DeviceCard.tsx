@@ -790,6 +790,7 @@ export function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardD
                 multiline={k === 'notes' || k === 'item'}
                 autoCapitalize="none"
                 autoCorrect={false}
+                testID={`proposal.field.${k}`}
               />
               {draft.chips?.[k]?.length ? (
                 <View style={styles.rowWrap}>
@@ -923,7 +924,7 @@ function HistoryLine({ h, names, onRestore }: { h: HistoryEntry; names: Readonly
       </Text>
       {onRestore ? (
         <View style={styles.rowWrap}>
-          <SmallButton label="Restore…" onPress={onRestore} />
+          <SmallButton label="Restore…" onPress={onRestore} testID="card.history.restore" />
         </View>
       ) : null}
     </View>

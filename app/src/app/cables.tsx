@@ -137,38 +137,38 @@ export default function CablesScreen() {
         <View style={styles.flex} />
         {picked ? (
           <>
-            <Btn label={`All ${shown.length}`} onPress={() => setPicked(new Set(shown.map((r) => r.id)))} />
-            <Btn label={`Apply as ruling… (${picked.size})`} disabled={!picked.size} onPress={applyAsRuling} />
-            <Btn label="Cancel" plain onPress={() => setPicked(null)} />
+            <Btn label={`All ${shown.length}`} onPress={() => setPicked(new Set(shown.map((r) => r.id)))} testID="cables.select.all" />
+            <Btn label={`Apply as ruling… (${picked.size})`} disabled={!picked.size} onPress={applyAsRuling} testID="cables.select.apply" />
+            <Btn label="Cancel" plain onPress={() => setPicked(null)} testID="cables.select.cancel" />
           </>
         ) : (
-          <Btn label="Select" plain onPress={() => setPicked(new Set())} />
+          <Btn label="Select" plain onPress={() => setPicked(new Set())} testID="cables.select" />
         )}
       </View>
       <View style={styles.filters}>
         <Text style={styles.filterLabel}>Group by</Text>
-        <Chip label="Vertical" on={groupBy === 'vertical'} onPress={() => setGroupBy('vertical')} />
-        <Chip label="Level" on={groupBy === 'level'} onPress={() => setGroupBy('level')} />
-        <Chip label="Code" on={groupBy === 'code'} onPress={() => setGroupBy('code')} />
+        <Chip label="Vertical" on={groupBy === 'vertical'} onPress={() => setGroupBy('vertical')} testID="cables.groupBy.vertical" />
+        <Chip label="Level" on={groupBy === 'level'} onPress={() => setGroupBy('level')} testID="cables.groupBy.level" />
+        <Chip label="Code" on={groupBy === 'code'} onPress={() => setGroupBy('code')} testID="cables.groupBy.code" />
         <Text style={[styles.filterLabel, styles.gap]}>Level</Text>
-        <Chip label="All" on={!filter.levelId} onPress={() => set({ levelId: null })} />
+        <Chip label="All" on={!filter.levelId} onPress={() => set({ levelId: null })} testID="cables.level.all" />
         {data?.levels.map((l) => (
-          <Chip key={l.id} label={l.code} on={filter.levelId === l.id} onPress={() => set({ levelId: l.id })} />
+          <Chip key={l.id} label={l.code} on={filter.levelId === l.id} onPress={() => set({ levelId: l.id })} testID={`cables.level.${l.code}`} />
         ))}
       </View>
       <View style={styles.filters}>
         <Text style={styles.filterLabel}>Code</Text>
-        <Chip label="All" on={!filter.code} onPress={() => set({ code: null })} />
+        <Chip label="All" on={!filter.code} onPress={() => set({ code: null })} testID="cables.code.all" />
         {presentCodes.map((c) => (
-          <Chip key={c} label={c} on={filter.code === c} onPress={() => set({ code: c })} />
+          <Chip key={c} label={c} on={filter.code === c} onPress={() => set({ code: c })} testID={`cables.code.${c}`} />
         ))}
         <Text style={[styles.filterLabel, styles.gap]}>Status</Text>
-        <Chip label="All" on={!filter.status} onPress={() => set({ status: null })} />
+        <Chip label="All" on={!filter.status} onPress={() => set({ status: null })} testID="cables.status.all" />
         {STATUSES.map((s) => (
-          <Chip key={s} label={s} on={filter.status === s} onPress={() => set({ status: s })} />
+          <Chip key={s} label={s} on={filter.status === s} onPress={() => set({ status: s })} testID={`cables.status.${s}`} />
         ))}
         <Text style={[styles.filterLabel, styles.gap]}>Checks</Text>
-        <Chip label="☑ only" on={!!filter.check} onPress={() => set({ check: filter.check ? null : 'any' })} />
+        <Chip label="☑ only" on={!!filter.check} onPress={() => set({ check: filter.check ? null : 'any' })} testID="cables.checkOnly" />
       </View>
 
       <View style={styles.body}>
@@ -262,7 +262,7 @@ export default function CablesScreen() {
       <View style={styles.footer}>
         <Text style={styles.footerLabel}>Consistency checks (project)</Text>
         {CABLE_CHECKS.map((k) => (
-          <Pressable key={k.id} onPress={() => set({ check: filter.check === k.id ? null : k.id })} style={[styles.count, filter.check === k.id && styles.countOn]}>
+          <Pressable key={k.id} onPress={() => set({ check: filter.check === k.id ? null : k.id })} style={[styles.count, filter.check === k.id && styles.countOn]} testID={`cables.check.${k.id}`}>
             <Text style={[styles.countText, filter.check === k.id && styles.countTextOn, !!data?.totals[k.id] && filter.check !== k.id && styles.countWarn]}>
               {k.title} {data?.totals[k.id] ?? '…'}
             </Text>
@@ -327,15 +327,15 @@ function CableChecks({ row: r, names, canEdit, onConfirm, projectId }: { row: Ca
       {r.checks.length ? <Text style={styles.muted}>{[...new Set(r.checks.map((k) => CABLE_CHECKS.find((c) => c.id === k.id)!.hint))].join(' ')}</Text> : null}
       <View style={styles.btnRow}>
         {!r.endpointConfirmed ? <Btn label="Confirm endpoint" small disabled={!canEdit} onPress={onConfirm} testID="cables.confirm" /> : <Text style={styles.muted}>Endpoint confirmed{r.origin ? ` · origin ${r.origin}` : ''}</Text>}
-        {r.reviewItemId && projectId ? <Btn label="Open Needs review item ▸" small plain onPress={() => router.push({ pathname: '/review', params: { project: projectId, item: r.reviewItemId! } })} /> : null}
+        {r.reviewItemId && projectId ? <Btn label="Open Needs review item ▸" small plain onPress={() => router.push({ pathname: '/review', params: { project: projectId, item: r.reviewItemId! } })} testID="cables.openReview" /> : null}
       </View>
     </View>
   );
 }
 
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
+    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
       <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
     </Pressable>
   );

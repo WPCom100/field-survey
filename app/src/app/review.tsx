@@ -276,7 +276,7 @@ export default function NeedsReviewScreen() {
             kind === 'lint' && list?.findings.length ? (
               <View>
                 <Text style={styles.sectionHead}>Lint findings ({list.findings.length})</Text>
-                <Pressable onPress={() => router.push({ pathname: '/lint', params: projectId ? { project: projectId } : {} })} style={styles.row}>
+                <Pressable onPress={() => router.push({ pathname: '/lint', params: projectId ? { project: projectId } : {} })} style={styles.row} testID="review.openLint">
                   <Text style={styles.link}>Open the Lint view to dismiss or fix them ▸</Text>
                 </Pressable>
                 {list.findings.map((f) => (

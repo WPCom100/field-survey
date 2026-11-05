@@ -165,7 +165,7 @@ export default function RulingsScreen() {
           data={view?.rows ?? []}
           keyExtractor={(r) => r.id}
           renderItem={({ item }) => (
-            <Pressable onPress={() => setMode({ kind: 'detail', id: item.id })} style={[styles.row, mode.kind === 'detail' && mode.id === item.id && styles.rowOn]}>
+            <Pressable onPress={() => setMode({ kind: 'detail', id: item.id })} style={[styles.row, mode.kind === 'detail' && mode.id === item.id && styles.rowOn]} testID="rulings.row">
               <Text style={styles.rowTitle} numberOfLines={2}>
                 {item.standing ? '● ' : '○ '}
                 {item.text}
@@ -292,7 +292,7 @@ function EditorPanel({
   const setAction = (patch: Record<string, unknown>) => onChange({ ...d, action: { ...a, ...patch } as RulingDraft['action'] });
   return (
     <>
-      <Text style={styles.panelTitle}>New ruling{source ? ` · from ${source}` : ''}</Text>
+      <Text style={styles.panelTitle} testID="rulings.editor.title">New ruling{source ? ` · from ${source}` : ''}</Text>
       <Label text="Reason" />
       <TextInput style={styles.input} value={d.text} onChangeText={(text) => onChange({ ...d, text })} placeholder="0-10V rows read Fixtures (the Change Log's Reason)" testID="rulings.reason" />
 
@@ -323,7 +323,7 @@ function EditorPanel({
       {d.filter.where.map((c, i) => (
         <ConditionRow key={i} entity={entity} c={c} cables={cables} first={i === 0} onChange={(p) => onChange(withCondition(d, i, p))} onRemove={() => onChange(removeCondition(d, i))} />
       ))}
-      <Pressable onPress={() => onChange(addCondition(d))}>
+      <Pressable onPress={() => onChange(addCondition(d))} testID="rulings.addCondition">
         <Text style={styles.link}>+ condition</Text>
       </Pressable>
 
@@ -335,7 +335,7 @@ function EditorPanel({
       </View>
       {a.kind === 'item' ? (
         <View style={styles.block}>
-          <TextInput style={styles.input} value={a.item} onChangeText={(item) => setAction({ item })} placeholder="Item text (short; qualifiers go in Notes)" />
+          <TextInput style={styles.input} value={a.item} onChangeText={(item) => setAction({ item })} placeholder="Item text (short; qualifiers go in Notes)" testID="rulings.item" />
           <View style={styles.wrap}>
             {vocab.PUNCH_TYPE.map((t) => (
               <Chip key={t} label={t} on={a.type === t} onPress={() => setAction({ type: t })} />
@@ -355,8 +355,8 @@ function EditorPanel({
             <ValueInput field={fieldOf(entity, a.field, cables ?? undefined)} value={a.value} onChange={(value) => setAction({ value })} placeholder="New value" testID="rulings.value" />
           ) : a.kind === 'rename' ? (
             <>
-              <TextInput style={styles.input} value={a.from} onChangeText={(from) => setAction({ from })} placeholder="Old phrase (the whole value or one ; phrase)" />
-              <TextInput style={styles.input} value={a.to} onChangeText={(to) => setAction({ to })} placeholder="New phrase" />
+              <TextInput style={styles.input} value={a.from} onChangeText={(from) => setAction({ from })} placeholder="Old phrase (the whole value or one ; phrase)" testID="rulings.rename.from" />
+              <TextInput style={styles.input} value={a.to} onChangeText={(to) => setAction({ to })} placeholder="New phrase" testID="rulings.rename.to" />
             </>
           ) : a.kind === 'reword' ? (
             <Text style={styles.sub}>
@@ -369,7 +369,7 @@ function EditorPanel({
       )}
 
       {a.kind === 'reword' ? null : (
-        <Chip label={`${d.standing ? '☑' : '☐'} Standing: propose on future matches`} on={d.standing} onPress={() => onChange({ ...d, standing: !d.standing })} />
+        <Chip label={`${d.standing ? '☑' : '☐'} Standing: propose on future matches`} on={d.standing} onPress={() => onChange({ ...d, standing: !d.standing })} testID="rulings.standing" />
       )}
       {problems.length ? (
         <View style={styles.problems}>
@@ -483,11 +483,11 @@ function PreviewPanel({
     <View style={styles.previewRoot}>
       <Text style={styles.panelTitle}>{mode.draft.text.trim()}</Text>
       <View style={styles.btnRow}>
-        <Text style={styles.value}>{previewTitle(p, ticked)}</Text>
+        <Text style={styles.value} testID="rulings.preview.title">{previewTitle(p, ticked)}</Text>
         <View style={{ flex: 1 }} />
         <Btn label={ticked === p.rows.length ? 'Untick all' : 'Tick all'} onPress={() => onAll(ticked !== p.rows.length)} secondary disabled={!p.rows.length} />
         <Btn label={busy ? 'Applying…' : `Apply ${ticked}`} onPress={onApply} disabled={busy || (!ticked && !!mode.draft.id) || (!ticked && !mode.draft.standing)} testID="rulings.apply" />
-        <Btn label="Back" onPress={onBack} secondary />
+        <Btn label="Back" onPress={onBack} secondary testID="rulings.back" />
       </View>
       <View style={[styles.tr, styles.th]}>
         <Text style={styles.cTick}> </Text>
@@ -504,7 +504,7 @@ function PreviewPanel({
         renderItem={({ item }) => {
           const on = !mode.skip.has(item.key);
           return (
-            <Pressable onPress={() => onToggle(item.key)} style={[styles.tr, !on && styles.trOff]} accessibilityRole="checkbox" accessibilityState={{ checked: on }}>
+            <Pressable onPress={() => onToggle(item.key)} style={[styles.tr, !on && styles.trOff]} accessibilityRole="checkbox" accessibilityState={{ checked: on }} testID="rulings.preview.row">
               <Text style={styles.cTick}>{on ? '☑' : '☐'}</Text>
               <Text style={styles.cLvl}>{item.levelCode ?? '—'}</Text>
               <Text style={styles.cRef} numberOfLines={1}>
@@ -587,18 +587,18 @@ function DetailPanel({
         {r.createdBy ? ` · by ${r.createdBy}` : ''}
       </Text>
       {r.draft?.action.kind === 'reword' ? null : (
-        <Chip label={`${r.standing ? '☑' : '☐'} Standing: propose on future matches`} on={r.standing} onPress={() => onStanding(!r.standing)} />
+        <Chip label={`${r.standing ? '☑' : '☐'} Standing: propose on future matches`} on={r.standing} onPress={() => onStanding(!r.standing)} testID="rulings.detail.standing" />
       )}
       <View style={styles.btnRow}>
-        <Btn label="Preview again ▸" onPress={onPreview} disabled={!r.draft} />
-        <Btn label="Copy as new" onPress={onCopy} disabled={!r.draft} secondary />
-        <Btn label="Delete…" onPress={() => setDeleting(true)} secondary disabled={deleting} />
+        <Btn label="Preview again ▸" onPress={onPreview} disabled={!r.draft} testID="rulings.previewAgain" />
+        <Btn label="Copy as new" onPress={onCopy} disabled={!r.draft} secondary testID="rulings.copy" />
+        <Btn label="Delete…" onPress={() => setDeleting(true)} secondary disabled={deleting} testID="rulings.delete" />
       </View>
       {deleting ? (
         <View style={styles.block}>
-          <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="Why delete it? (what it changed stays)" />
+          <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="Why delete it? (what it changed stays)" testID="rulings.delete.reason" />
           <View style={styles.btnRow}>
-            <Btn label="Delete" onPress={() => onDelete(reason)} disabled={!reason.trim()} />
+            <Btn label="Delete" onPress={() => onDelete(reason)} disabled={!reason.trim()} testID="rulings.delete.ok" />
             <Btn label="Cancel" onPress={() => setDeleting(false)} secondary />
           </View>
         </View>
@@ -618,8 +618,8 @@ function DetailPanel({
           </Text>
           <Text style={styles.rowSub}>{p.why ?? p.change}</Text>
           <View style={styles.btnRow}>
-            <Btn label="Accept" onPress={() => onDecide([p.id], 'accept')} small />
-            <Btn label="Reject" onPress={() => onDecide([p.id], 'reject')} small secondary />
+            <Btn label="Accept" onPress={() => onDecide([p.id], 'accept')} small testID="rulings.proposal.accept" />
+            <Btn label="Reject" onPress={() => onDecide([p.id], 'reject')} small secondary testID="rulings.proposal.reject" />
             {p.levelId ? (
               <Pressable onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: p.levelId!, ...(p.deviceId ? { device: p.deviceId } : {}) } })}>
                 <Text style={styles.link}>Open card ▸</Text>

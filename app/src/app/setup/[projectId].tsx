@@ -417,7 +417,7 @@ function LevelsStep({
 }
 
 /** One `YYYY-MM-DD` input, saved on blur; an invalid date is refused and the saved value comes back. */
-function DateCell({ value, onSave }: { value: string | null; onSave: (text: string) => () => Promise<void> }) {
+function DateCell({ value, onSave, testID }: { value: string | null; onSave: (text: string) => () => Promise<void>; testID?: string }) {
   const [text, setText] = useState(value ?? '');
   const [bad, setBad] = useState(false);
   useEffect(() => setText(value ?? ''), [value]);
@@ -439,6 +439,7 @@ function DateCell({ value, onSave }: { value: string | null; onSave: (text: stri
       autoCorrect={false}
       autoCapitalize="none"
       keyboardType="numbers-and-punctuation"
+      testID={testID}
     />
   );
 }
@@ -499,8 +500,8 @@ function LevelRow({
       <View style={styles.cPick}>
         <ChipPicker value={l.splitOfId} options={others} onPick={(id) => void run((a) => a.setSplitOf(l.id, id))()} />
       </View>
-      <DateCell value={l.surveyed} onSave={(t) => run((a) => a.setLevelDate(l.id, 'surveyed', t))} />
-      <DateCell value={l.updated} onSave={(t) => run((a) => a.setLevelDate(l.id, 'updated', t))} />
+      <DateCell value={l.surveyed} onSave={(t) => run((a) => a.setLevelDate(l.id, 'surveyed', t))} testID={`setup.level.${l.code}.surveyed`} />
+      <DateCell value={l.updated} onSave={(t) => run((a) => a.setLevelDate(l.id, 'updated', t))} testID={`setup.level.${l.code}.updated`} />
       <Text style={styles.cSheet}>{l.sheet ?? '(none yet)'}</Text>
       <View style={[styles.cActions, styles.actions]}>
         {lock ? <LockButton level={lock} onLock={onLock} /> : null}

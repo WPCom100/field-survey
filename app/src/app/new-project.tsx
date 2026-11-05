@@ -192,10 +192,10 @@ export default function NewProjectScreen() {
                 <ScopeSwitch value={l.inScope} onChange={(v) => update(i, { inScope: v })} />
               </View>
               <View style={styles.cPick}>
-                <ChipPicker value={l.shareWith} options={codes.filter((c) => c.id !== l.code)} onPick={(v) => update(i, { shareWith: v })} none="own group" />
+                <ChipPicker value={l.shareWith} options={codes.filter((c) => c.id !== l.code)} onPick={(v) => update(i, { shareWith: v })} none="own group" testID={`newProject.share.${l.code}`} />
               </View>
               <View style={styles.cPick}>
-                <ChipPicker value={l.splitOf} options={codes.filter((c) => c.id !== l.code)} onPick={(v) => update(i, { splitOf: v })} />
+                <ChipPicker value={l.splitOf} options={codes.filter((c) => c.id !== l.code)} onPick={(v) => update(i, { splitOf: v })} testID={`newProject.split.${l.code}`} />
               </View>
               <View style={[styles.cActions, styles.actions]}>
                 <Btn title="↑" small onPress={() => move(i, -1)} disabled={i === 0} />

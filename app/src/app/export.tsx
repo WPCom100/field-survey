@@ -257,7 +257,7 @@ export default function ExportScreen() {
         <Text style={styles.brand}>Export</Text>
         <Text style={styles.project}>{projectName}</Text>
         {(['workbook', 'pdf', 'history'] as Pane[]).map((p) => (
-          <Pressable key={p} onPress={() => setPane(p)} style={[styles.navItem, pane === p && styles.navActive]}>
+          <Pressable key={p} onPress={() => setPane(p)} style={[styles.navItem, pane === p && styles.navActive]} testID={`export.pane.${p}`}>
             <Text style={styles.navText}>{p === 'workbook' ? KIND_LABEL.xlsx : p === 'pdf' ? KIND_LABEL.floor_pdf : 'History'}</Text>
           </Pressable>
         ))}
@@ -269,7 +269,7 @@ export default function ExportScreen() {
 
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
         <View style={styles.statusRow}>
-          <Text style={styles.status}>{describeSync(sync)}</Text>
+          <Text style={styles.status} testID="export.sync">{describeSync(sync)}</Text>
           <Text style={styles.statusHint}>Exports run on the server and need a connection; edits never do.</Text>
         </View>
         {!projectId ? <Text style={styles.hint}>No project on this iPad yet.</Text> : null}
@@ -301,15 +301,15 @@ export default function ExportScreen() {
             <Text style={styles.label}>Pre-flight</Text>
             <Text style={styles.value}>{pre ? preflightLine(pre, sync.pendingOps, blobs.photosWaiting) : '…'}</Text>
             {!!pre?.lint && !!projectId ? (
-              <Link href={{ pathname: '/lint', params: { project: projectId } }} style={styles.back}>
+              <Link href={{ pathname: '/lint', params: { project: projectId } }} style={styles.back} testID="export.lint">
                 See the {pre.lint} lint finding{pre.lint === 1 ? '' : 's'} ▸
               </Link>
             ) : null}
-            <Text style={[styles.gate, gateOk(xlsxJob) ? styles.gateOk : styles.gateNo]}>{gateLine(xlsxJob)}</Text>
+            <Text style={[styles.gate, gateOk(xlsxJob) ? styles.gateOk : styles.gateNo]} testID="export.gate">{gateLine(xlsxJob)}</Text>
 
             <View style={styles.row}>
-              <Btn title="Sync first" onPress={syncFirst} disabled={sync.state === 'syncing'} />
-              <Btn title="Generate workbook" primary onPress={() => void generate()} disabled={!canGenerate} />
+              <Btn title="Sync first" onPress={syncFirst} disabled={sync.state === 'syncing'} testID="export.syncFirst" />
+              <Btn title="Generate workbook" primary onPress={() => void generate()} disabled={!canGenerate} testID="export.generate" />
             </View>
             {busy ? <Text style={styles.hint}>{busy}</Text> : null}
             <Notice text={error} error />
@@ -323,7 +323,7 @@ export default function ExportScreen() {
             <Text style={styles.label}>Level</Text>
             <View style={styles.chips}>
               {pre?.levels.map((l) => (
-                <Chip key={l.id} label={l.code} on={floor?.code === l.code} onPress={() => setFloorLevel(l.code)} />
+                <Chip key={l.id} label={l.code} on={floor?.code === l.code} onPress={() => setFloorLevel(l.code)} testID={`export.pdf.level.${l.code}`} />
               ))}
             </View>
             <Text style={styles.label}>Include</Text>
@@ -332,20 +332,20 @@ export default function ExportScreen() {
                 <Check key={s.key} label={s.label} value={sections.includes(s.key)} onChange={() => toggleSection(s.key)} />
               ))}
             </View>
-            <Text style={styles.hint}>Header: "{floorHeader(floor)}" — the survey date only, no company name.</Text>
+            <Text style={styles.hint} testID="export.pdf.header">Header: "{floorHeader(floor)}" — the survey date only, no company name.</Text>
             <Text style={styles.hint}>Findings are the devices whose status is not Installed, untested, several per page with a plan crop and photos. Everyone's ink is drawn on the plan.</Text>
 
             <Text style={styles.label}>Pre-flight</Text>
             <Text style={styles.value}>{pre ? preflightLine(pre, sync.pendingOps, blobs.photosWaiting) : '…'}</Text>
             {!!pre?.lint && !!projectId ? (
-              <Link href={{ pathname: '/lint', params: { project: projectId } }} style={styles.back}>
+              <Link href={{ pathname: '/lint', params: { project: projectId } }} style={styles.back} testID="export.lint">
                 See the {pre.lint} lint finding{pre.lint === 1 ? '' : 's'} ▸
               </Link>
             ) : null}
-            <Text style={[styles.gate, gateOk(pdfJob) ? styles.gateOk : styles.gateNo]}>{gateLine(pdfJob)}</Text>
+            <Text style={[styles.gate, gateOk(pdfJob) ? styles.gateOk : styles.gateNo]} testID="export.pdf.gate">{gateLine(pdfJob)}</Text>
             <View style={styles.row}>
-              <Btn title="Sync first" onPress={syncFirst} disabled={sync.state === 'syncing'} />
-              <Btn title="Generate PDF" primary onPress={() => void generatePdf()} disabled={!canGeneratePdf} />
+              <Btn title="Sync first" onPress={syncFirst} disabled={sync.state === 'syncing'} testID="export.pdf.syncFirst" />
+              <Btn title="Generate PDF" primary onPress={() => void generatePdf()} disabled={!canGeneratePdf} testID="export.generatePdf" />
             </View>
             {busy ? <Text style={styles.hint}>{busy}</Text> : null}
             <Notice text={error} error />
@@ -356,7 +356,7 @@ export default function ExportScreen() {
         {projectId && pane === 'history' ? (
           <Section title="History">
             <View style={styles.row}>
-              <Btn title="Refresh" small onPress={() => void refreshHistory().catch(fail)} />
+              <Btn title="Refresh" small onPress={() => void refreshHistory().catch(fail)} testID="export.history.refresh" />
             </View>
             <Notice text={historyNote} />
             {busy ? <Text style={styles.hint}>{busy}</Text> : null}
@@ -372,9 +372,9 @@ export default function ExportScreen() {
   );
 }
 
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
+    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
       <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
     </Pressable>
   );
@@ -400,7 +400,7 @@ function JobCard({
   const detail = diffDetail(e);
   const progress = progressLine(e, now);
   return (
-    <View style={styles.card}>
+    <View style={styles.card} testID="export.card">
       <Text style={styles.cardTime}>
         {exportTime(e.created_at)} · {KIND_LABEL[e.kind] ?? e.kind}
       </Text>
@@ -408,13 +408,13 @@ function JobCard({
       <Text style={styles.cardLine}>{scopeLine(e)}</Text>
       {e.created_by ? <Text style={styles.cardLine}>Started by {startedBy(e)}</Text> : null}
       {progress ? (
-        <Text style={styles.progress}>{progress}</Text>
+        <Text style={styles.progress} testID="export.card.progress">{progress}</Text>
       ) : (
-        <Text style={[styles.cardLine, e.job_state === 'failed' && styles.failed]}>{jobLine(e)}</Text>
+        <Text style={[styles.cardLine, e.job_state === 'failed' && styles.failed]} testID="export.card.state">{jobLine(e)}</Text>
       )}
       {isActive(e) && !e.cancel_requested_at ? (
         <View style={styles.row}>
-          <Btn title="Cancel export" small onPress={() => onCancel(e)} />
+          <Btn title="Cancel export" small onPress={() => onCancel(e)} testID="export.card.cancel" />
         </View>
       ) : null}
       {diff ? (
