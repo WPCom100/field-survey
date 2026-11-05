@@ -1,0 +1,47 @@
+# S4 (T158) one old category spelling OLD: Lint → Value outside vocabulary → Fix all via ruling ▸
+# OLD → the editor "from Lint" → Preview (n changes) → Apply → "Applied …: n changes." → Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow: _lint-open.yaml
+- runFlow:
+    when:
+      visible: '▸ Value outside vocabulary \(\d+\)'
+    commands:
+      - tapOn: '▸ Value outside vocabulary \(\d+\)'
+# the findings are a list on the left ~46 % of the screen (a centre swipe moves the detail pane);
+# the group sorts by count, so a rare spelling (Equipment rack, 2) sits well down it
+- repeat:
+    times: 40
+    while:
+      notVisible:
+        id: lint.fixAll.${OLD}
+    commands:
+      - swipe:
+          start: 25%,80%
+          end: 25%,45%
+          duration: 600
+      - waitForAnimationToEnd:
+          timeout: 2000
+- tapOn:
+    id: lint.fixAll.${OLD}
+- extendedWaitUntil:
+    visible:
+      id: rulings.editor.title
+      text: New ruling · from Lint
+    timeout: 10000
+- assertVisible: 'Only the \d+ chosen records'
+- tapOn:
+    id: rulings.preview
+- extendedWaitUntil:
+    visible:
+      id: rulings.preview.title
+      text: '\d+ changes? on \d+ levels?'
+    timeout: 15000
+- tapOn:
+    id: rulings.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.note
+      text: 'Applied .*: \d+ changes?\.'
+    timeout: 15000
+- tapOn: ← Levels

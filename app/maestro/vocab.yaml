@@ -1,0 +1,14 @@
+# S4 (T158, rig plan wave 2) vocabulary follow-ups and roles, on A as Ann: a fresh copy of the
+# master; a Device types value on a card's Type (`_vocab-types`); a pin shape changed and put back
+# (`_vocab-shapes`, app-wide); the five old category spellings renamed through Lint's Fix all via
+# ruling, roles surviving (`_vocab-rename`); sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Vocabulary — device types, pin shapes, the rename ruling
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _seed-copy.yaml
+- runFlow: _vocab-types.yaml
+- runFlow: _vocab-shapes.yaml
+- runFlow: _vocab-rename.yaml
+- runFlow: _sync.yaml

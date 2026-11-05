@@ -1,0 +1,76 @@
+# S4 (T158) vocab step 3 (T112 "The rename ruling", "Roles survive"): after the seed copy's Load
+# standard lists, Lint's "Value outside vocabulary" offers Fix all via ruling on each of the
+# master's five old category spellings; each is renamed by its own ruling (Relay panel first).
+# Afterwards none is offered; the NSPS B2-03 reads `Equipment`; the rack 06M-01 reads `Equipment
+# Panels` and still has no Neuron ID section (its role through the new category, no type needed). Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    file: _vocab-rename-one.yaml
+    env:
+      OLD: Relay panel
+- runFlow:
+    file: _vocab-rename-one.yaml
+    env:
+      OLD: Foundry panel
+- runFlow:
+    file: _vocab-rename-one.yaml
+    env:
+      OLD: EBDK
+- runFlow:
+    file: _vocab-rename-one.yaml
+    env:
+      OLD: NSPS
+- runFlow:
+    file: _vocab-rename-one.yaml
+    env:
+      OLD: Equipment rack
+- runFlow: _lint-open.yaml
+- runFlow:
+    when:
+      visible: '▸ Value outside vocabulary \(\d+\)'
+    commands:
+      - tapOn: '▸ Value outside vocabulary \(\d+\)'
+- assertNotVisible:
+    id: lint.fixAll.Relay panel
+- assertNotVisible:
+    id: lint.fixAll.Foundry panel
+- assertNotVisible:
+    id: lint.fixAll.EBDK
+- assertNotVisible:
+    id: lint.fixAll.NSPS
+- assertNotVisible:
+    id: lint.fixAll.Equipment rack
+- tapOn: ← Levels
+# roles survive
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: B2
+      DEVICE: B2-03
+- assertVisible:
+    id: card.sub
+    text: 'Equipment( · .*)?'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+# the rack keeps its role through its new category (no type needed): still no Neuron ID section
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-01
+- assertVisible:
+    id: card.sub
+    text: 'Equipment Panels( · .*)?'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.connections
+- assertNotVisible:
+    id: card.neuron.type
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

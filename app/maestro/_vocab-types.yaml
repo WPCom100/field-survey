@@ -1,0 +1,91 @@
+# S4 (T158) vocab step 1 (T104 "Device types and the card"): Vocabulary → Lists → Device types:
+# `Echo relay panel` added, Accepted; the relay panel 06M-02's card → Type → Edit…: the chip under
+# the box, tap, Save → the Type line and the header (`CT06LCPB Echo relay panel`) read it, History
+# has a Field survey change of Type. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.vocabulary
+- tapOn:
+    id: vocab.tab.lists
+- scrollUntilVisible:
+    element:
+      id: vocab.add.type.input
+    direction: DOWN
+    centerElement: true
+    timeout: 90000
+# it can stop under the fixed tab row (counted visible; a tap there switches tabs): pull it down
+- swipe:
+    start: 50%,40%
+    end: 50%,55%
+    duration: 500
+- waitForAnimationToEnd
+- tapOn:
+    id: vocab.add.type.input
+- waitForAnimationToEnd
+- inputText: Echo relay panel
+- pressKey: Enter          # closes the keyboard: it can cover the Add button beside the box
+- assertVisible:
+    id: vocab.add.type.input
+    text: Echo relay panel
+- tapOn:
+    id: vocab.add.type
+- extendedWaitUntil:
+    visible:
+      id: vocab.value.Echo relay panel
+      text: Echo relay panel  draft
+    timeout: 10000
+- tapOn:
+    id: vocab.accept.Echo relay panel
+- extendedWaitUntil:
+    visible:
+      id: vocab.value.Echo relay panel
+      text: Echo relay panel
+    timeout: 10000
+- tapOn: ◀ Levels
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-02
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.type.edit
+- tapOn:
+    id: card.type.edit
+- tapOn: Echo relay panel           # the chip under the box
+- assertVisible:
+    id: card.type.input
+    text: Echo relay panel
+- tapOn:
+    id: card.type.save
+- extendedWaitUntil:
+    visible:
+      id: card.type
+      text: Echo relay panel
+    timeout: 10000
+- runFlow:
+    file: _side-up.yaml
+    env:
+      ID: card.model
+- assertVisible:
+    id: card.model
+    text: CT06LCPB Echo relay panel
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.history
+- tapOn:
+    id: card.section.history
+- swipe:                     # the newest entry (this one) opens first under the header
+    start: 86%,70%
+    end: 86%,45%
+    duration: 500
+- waitForAnimationToEnd
+- assertVisible: '.* → Echo relay panel'
+- assertVisible: 'Field survey'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back

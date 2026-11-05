@@ -1,0 +1,38 @@
+# S4 (T158) vocab step 2 (T104 "Pin shapes"): Vocabulary → Pin shapes: nine roles; Station →
+# Square → Station and Relay panel both read "shares its shape with another role"; back to Circle →
+# neither does. The setting is app-wide (every project, both simulators), so it is put back in the
+# same flow. The pins' look stays a screenshot check. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.vocabulary
+- tapOn:
+    id: vocab.tab.shapes
+- assertVisible:
+    id: vocab.shape.station.circle
+    selected: true
+- assertVisible:
+    id: vocab.shape.relay_panel.square
+    selected: true
+- tapOn:
+    id: vocab.shape.station.square
+- extendedWaitUntil:
+    visible:
+      id: vocab.shape.station.square
+      selected: true
+    timeout: 10000
+- assertVisible:
+    id: vocab.shape.station
+    text: '.*Station.*shares its shape with another role'
+- assertVisible:
+    id: vocab.shape.relay_panel
+    text: '.*Relay panel.*shares its shape with another role'
+- tapOn:
+    id: vocab.shape.station.circle
+- extendedWaitUntil:
+    visible:
+      id: vocab.shape.station.circle
+      selected: true
+    timeout: 10000
+- assertNotVisible: '.*shares its shape with another role'
+- tapOn: ◀ Levels
