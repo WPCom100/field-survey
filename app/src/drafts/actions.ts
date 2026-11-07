@@ -369,6 +369,12 @@ const SIGNAL_TO: Readonly<Record<string, string>> = {
 };
 const SINGLE_ROW = new Set(['P', '0-10V', '120V']);
 
+/** The master's To template (D32): `<signal> to [Level nn ]<far end>`, the far end's level only when it is on another floor; a panic run reads "EBDK panic wire". */
+export function toText(code: string, farLevelCode: string | null, farText: string): string {
+  if (code === 'P') return 'EBDK panic wire';
+  return `${SIGNAL_TO[code] ?? code} to ${farLevelCode ? `Level ${farLevelCode} ` : ''}${farText}`;
+}
+
 /**
  * An endpoint as a record: a device or a placeholder, with the From text it reads as — or (`draft`,
  * D235) an unplaced draft device the end will name until it is placed.
@@ -465,11 +471,8 @@ export function cablePayload(
   opts: { confirm: boolean; riserBlob?: string | null },
 ): { cable: Record<string, unknown>; ends: Record<string, unknown>[] } {
   const code = c.code!;
-  const far = (from: RealEnd, to: RealEnd) => {
-    if (code === 'P') return 'EBDK panic wire';
-    const where = to.kind !== 'placeholder' && to.levelId && to.levelId !== from.levelId && to.levelCode ? `Level ${to.levelCode} ` : '';
-    return `${SIGNAL_TO[code] ?? code} to ${where}${to.text}`;
-  };
+  const far = (from: RealEnd, to: RealEnd) =>
+    toText(code, to.kind !== 'placeholder' && to.levelId && to.levelId !== from.levelId ? to.levelCode : null, to.text);
   const end = (side: 'A' | 'B', me: RealEnd, other: RealEnd, fallbackLevel: string | null): Record<string, unknown> =>
     me.kind === 'device'
       ? { side, endpoint_kind: 'device', device_id: me.id, level_id: me.levelId ?? fallbackLevel, from_text: me.text, to_text: far(me, other) }
@@ -684,25 +687,73 @@ export async function draftEndsToLink(
 }
 
 /**
+ * The To texts of the cables these links touch, regenerated for the ends' floors after the links
+ * (T167, D260): an end's To names its far end's level when the two are on different floors (D32's
+ * template, `toText`). Only a To still as its cable was made — its field head is the `create`
+ * (D81) — and still in the template's form (`<signal> to [Level nn ]…`, the far end's text kept as
+ * written) is rewritten; an edited one, a panic run's, and one naming a placeholder are left alone.
+ * Returns the ends whose text changes.
+ */
+export async function toTextsToRegenerate(
+  store: Store,
+  data: DraftReviewData,
+  links: readonly { endId: string; levelId: string | null }[],
+): Promise<{ endId: string; toText: string }[]> {
+  if (!links.length) return [];
+  const moved = new Map(links.map((l) => [l.endId, l.levelId]));
+  const ids = [...moved.keys()];
+  const rows = await store.db.query<{ id: string; cable_id: string; level_id: string | null; placeholder_id: string | null; to_text: string | null; code: string; head: string | null }>(
+    `SELECT e.id, e.cable_id, e.level_id, e.placeholder_id, e.to_text, c.cable AS code,
+       (SELECT o.kind FROM field_head h JOIN op o ON o.op_id = h.op_id WHERE h.entity_id = e.id AND h.field = 'to_text') AS head
+     FROM cable_end e JOIN cable c ON c.id = e.cable_id
+     WHERE e.deleted_at IS NULL AND c.deleted_at IS NULL
+       AND e.cable_id IN (SELECT cable_id FROM cable_end WHERE id IN (${ids.map(() => '?').join(', ')}))
+     ORDER BY e.cable_id, e.side`,
+    ids,
+  );
+  const codeOf = new Map(data.levels.filter((l) => l.levelId).map((l) => [l.levelId!, l.code]));
+  const levelPrefixes = [...new Set(codeOf.values())].map((c) => `Level ${c} `);
+  const levelOf = (r: (typeof rows)[number]) => moved.get(r.id) ?? r.level_id;
+  const out: { endId: string; toText: string }[] = [];
+  for (const me of rows) {
+    const far = rows.find((r) => r.cable_id === me.cable_id && r.id !== me.id);
+    if (!far || far.placeholder_id || me.to_text == null || me.code === 'P' || me.head !== 'create') continue;
+    const signal = toText(me.code, null, '');
+    if (!me.to_text.startsWith(signal)) continue;
+    let rest = me.to_text.slice(signal.length);
+    const stale = levelPrefixes.find((p) => rest.startsWith(p));
+    if (stale) rest = rest.slice(stale.length);
+    const farLevel = levelOf(far);
+    const now = toText(me.code, farLevel && farLevel !== levelOf(me) ? (codeOf.get(farLevel) ?? null) : null, rest);
+    if (now !== me.to_text) out.push({ endId: me.id, toText: now });
+  }
+  return out;
+}
+
+/**
  * After devices are placed (T46 calls this; the review screen offers it as "Make n waiting
  * cables"): link each end that named a draft now placed to its device — one `device_id` op, never
  * a second cable (D235), plus a `level_id` op when the device is on another level than the end was
  * made with (T145), so the end moves to that floor's rows — and make the cables of accepted drafts
  * that were waiting (both ends drafts then, or accepted before D235) once one end is real. One
- * group. Returns how many cables were made or linked. The other end's stored To text, which names
- * the old floor (D32: "DMX to Level 02 UFMP4"), is left as written; it is edited by hand like any
- * To. Across numbering groups the server gives the moved end a new `C-nn` (D250).
+ * group. Returns how many cables were made or linked. A linked cable's To texts that nobody has
+ * edited are brought up to its ends' floors in the same group (`toTextsToRegenerate`, T167): the
+ * other end's "DMX to Level 02 UFMP4" reads "DMX to Level 01 UFMP4" once the UFMP4 is placed on
+ * 01; an edited To is left as written. Across numbering groups the server gives the moved end a
+ * new `C-nn` (D250).
  */
 export async function commitWaitingCables(editor: Editor, store: Store, projectId: string, opts: { riserBlob?: string | null } = {}): Promise<number> {
   const data = await loadDraftReview(store, projectId);
   const links = await draftEndsToLink(store, data, projectId);
   const ready = readyCables(data);
   if (!ready.length && !links.length) return 0;
+  const texts = await toTextsToRegenerate(store, data, links);
   await editor.group(ctx('Draft review: cables of accepted drafts, endpoints now placed'), async (g) => {
     for (const l of links) {
       await g.setField('cable_end', l.endId, 'device_id', l.deviceId);
       if (l.levelId) await g.setField('cable_end', l.endId, 'level_id', l.levelId);
     }
+    for (const t of texts) await g.setField('cable_end', t.endId, 'to_text', t.toText);
     for (const { c, a, b } of ready) await writeCable(g, store, projectId, c, a, b, { confirm: c.confirmed, riserBlob: opts.riserBlob });
   });
   return ready.length + links.length;

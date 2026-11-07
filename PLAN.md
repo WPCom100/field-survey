@@ -98,7 +98,7 @@ Bold = master column (name kept verbatim for export). `*` = server-assigned.
 |---|---|---|---|
 | `id` | global | client | never changes |
 | Device **ID** | level code | **server, on first receipt of the create op** (D93, D118); a create that already carries an ID (seed import, setup placement from a drawing tag) keeps it | `<level>-<nn>` = highest ever used on that level code + 1 for panels/equipment; `<level>-S<n>` / `-D<n>` for stations/sensors = highest ever used for that letter + 1, no padding (D118); never reused; client shows `<level>-?` + `NEW` until assigned, the iPad never asks for a tag; unique per project (a duplicate is a lint, D76) |
-| Punch **#**, part **#**, photo number, `C-nn` | numbering group | **server, on first receipt of the create op** | monotonic, gaps allowed, never reused; client shows `NEW` until assigned; a cable end whose `level_id` moves to a level of another group (a waiting end linked to its device on another floor, T145) gets that group's next `C-nn` and its old number stays retired (D250) |
+| Punch **#**, part **#**, photo number, `C-nn` | numbering group | **server, on first receipt of the create op** | monotonic, gaps allowed, never reused; client shows `NEW` until assigned; a cable end whose `level_id` moves to a level of another group (a waiting end linked to its device on another floor, T145) gets that group's next `C-nn` and its old number stays retired (D250); the cable's To texts nobody edited are regenerated for the new floors in the same group (D260) |
 | Neuron ID item | numbering group | normal number | `sort_last=true`; exports order by (`sort_last`, #) |
 | `server_seq` | project | server | total order of ops |
 

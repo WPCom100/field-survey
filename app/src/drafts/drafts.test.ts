@@ -506,14 +506,48 @@ describe('cable drafts (T44, D6, D191)', () => {
     ]);
     expect(new Set(linkOps.map((o) => o.group_id)).size).toBe(1);
     expect(await store.get<Record<string, unknown>>('cable_end', farEnd.id as string)).toMatchObject({ device_id: ufmp, level_id: ids.l01, to_text: 'DMX to Level 06M CT06LCPA' });
-    // the 06M end's stored To text is not regenerated (D32, D250 (5)): it still names 02 as written
+    // the 06M end's To, never edited, now names 01 — in the link's group (T167, D260)
     const nearEnd = (await store.list<Record<string, unknown>>('cable_end', { where: 'cable_id = ? AND side = ?', params: [res.cableId, 'A'] }))[0]!;
-    expect(nearEnd).toMatchObject({ level_id: ids.l06m, to_text: 'DMX to Level 02 UFMP4' });
+    expect(nearEnd).toMatchObject({ level_id: ids.l06m, to_text: 'DMX to Level 01 UFMP4' });
+    const textOp = (await store.opsFor(nearEnd.id as string)).at(-1)!;
+    expect([textOp.kind, textOp.field, textOp.was, textOp.now, textOp.group_id]).toEqual(['set', 'to_text', 'DMX to Level 02 UFMP4', 'DMX to Level 01 UFMP4', linkOps[0]!.group_id]);
     // the 01 Connections list has it now, the 02 one no longer
     const on01 = (await loadLevelLists(store, PROJECT, ids.l01, '01', [])).connections.map((r) => r.title);
     const on02 = (await loadLevelLists(store, PROJECT, ids.l02, '02', [])).connections.map((r) => r.title);
     expect(on01).toContain('X → DMX to Level 06M CT06LCPA');
     expect(on02).not.toContain('X → DMX to Level 06M CT06LCPA');
+  });
+
+  it('a linked end that moved floors: an edited To stays, a move onto the far end\'s floor drops "Level nn" (T167)', async () => {
+    // 06M panel → the 02 UFMP4 draft (waiting on 02); `move` puts the draft on another floor and places its unit there
+    const accepted = async () => {
+      const s = await setup();
+      const data = await loadDraftReview(s.store, PROJECT);
+      const res = await acceptCable(s.editor, s.store, data, row(data.cables, s.ids.c1), { confirm: true });
+      const end = async (side: 'A' | 'B') => (await s.store.list<Record<string, unknown>>('cable_end', { where: 'cable_id = ? AND side = ?', params: [res.cableId, side] }))[0]!;
+      const move = async (levelId: string) => {
+        await s.editor.setField('draft_device', s.ids.dE, 'level_id', levelId, { change_type: 'Master edit', reason: 'Place devices: moved' });
+        await s.editor.create('device', { level_id: levelId, category: 'Foundry panel', device: 'UFMP4', baseline_ref_id: s.ids.dE, origin: 'baseline' }, { change_type: 'Master edit', reason: 'Place' });
+        expect(await commitWaitingCables(s.editor, s.store, PROJECT)).toBe(1);
+      };
+      return { ...s, end, move };
+    };
+
+    // moved onto 06M, the panel's own floor: both To texts lose their "Level nn"
+    const same = await accepted();
+    expect([(await same.end('A')).to_text, (await same.end('B')).to_text]).toEqual(['DMX to Level 02 UFMP4', 'DMX to Level 06M CT06LCPA']);
+    await same.move(same.ids.l06m);
+    expect([(await same.end('A')).to_text, (await same.end('B')).to_text]).toEqual(['DMX to UFMP4', 'DMX to CT06LCPA']);
+
+    // a To edited by hand is left as written; the moved end's own To still names 06M and is unchanged
+    const edited = await accepted();
+    const a = await edited.end('A');
+    await edited.editor.setField('cable_end', a.id as string, 'to_text', 'DMX to Level 02 UFMP4 (north wall)', { change_type: 'Field survey', reason: 'End editor' });
+    const before = (await edited.store.opsFor(a.id as string)).length;
+    await edited.move(edited.ids.l01);
+    expect((await edited.end('A')).to_text).toBe('DMX to Level 02 UFMP4 (north wall)');
+    expect(await edited.store.opsFor(a.id as string)).toHaveLength(before);
+    expect(await edited.end('B')).toMatchObject({ level_id: edited.ids.l01, to_text: 'DMX to Level 06M CT06LCPA' });
   });
 
   it('endOrDraft: a placed draft is its device, an unplaced one the draft with the text its device will read as', async () => {
