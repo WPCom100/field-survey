@@ -1,0 +1,73 @@
+# T49 stage 5: Setup → 4 Review drafts. 06M: the BOM's rack (ERN4-RM-120, "Level 5") accepted.
+# 06: the riser's three panels (UFMP8 CT06LCPA, ERP24-FT-241P CT06LCPB, EBDK) each carry "06 or
+# 06M?" (the master keeps panels on the mezzanine) → ○ 06M → Accept. Pool: the 17-unit PI1002 line
+# accepted (its units are placed from any level's plan). Each accept leaves the Open filter.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: setup.step.drafts
+- tapOn:
+    id: drafts.level.06M
+- tapOn:
+    id: drafts.tab.devices
+- tapOn:
+    id: drafts.device.ERN4-RM-120
+- tapOn:
+    id: draft.accept
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Accepted
+    timeout: 10000
+# the three 06 panels onto 06M
+- tapOn:
+    id: drafts.level.06
+- runFlow:
+    file: _e2e-review-panel.yaml
+    env:
+      MODEL: UFMP8
+- runFlow:
+    file: _e2e-review-panel.yaml
+    env:
+      MODEL: ERP24-FT-241P
+- runFlow:
+    file: _e2e-review-panel.yaml
+    env:
+      MODEL: EBDK
+# 06M now lists nothing open; its accepted drafts are four
+- tapOn:
+    id: drafts.level.06M
+- assertNotVisible:
+    id: 'drafts\.device\..*'
+- tapOn:
+    id: drafts.filter.all
+- assertVisible:
+    id: drafts.device.UFMP8
+- assertVisible:
+    id: drafts.device.ERP24-FT-241P
+- assertVisible:
+    id: drafts.device.EBDK
+- assertVisible:
+    id: drafts.device.ERN4-RM-120
+- tapOn:
+    id: drafts.filter.open
+# one pooled station line
+- tapOn:
+    id: drafts.level.Pool
+# two PI1002 lines (17 "Level 16, 22", 11 "Link to P-CCS …") in no fixed order: the 17 by its text
+- scrollUntilVisible:
+    element:
+      id: drafts.device.PI1002
+      text: '.*PI1002, .*Station, 17, .*'
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: drafts.device.PI1002
+    text: '.*PI1002, .*Station, 17, .*'
+- tapOn:
+    id: draft.accept
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Accepted
+    timeout: 10000

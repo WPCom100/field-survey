@@ -1,0 +1,18 @@
+# T49: in the open place panel, tap the dashed proposal at AT → the selected item reads ITEM (a
+# regex) → Place ✓ → "Placed 06M-? …".
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    point: ${AT}
+- extendedWaitUntil:
+    visible:
+      id: place.selected
+      text: ${ITEM}
+    timeout: 10000
+- tapOn:
+    id: place.confirm
+- extendedWaitUntil:
+    visible:
+      id: place.last
+      text: 'Placed 06M-\? .*'
+    timeout: 15000

@@ -1,0 +1,15 @@
+# T49: on Review drafts' 06 devices, the draft MODEL (env) → Level ○ 06M → Accept.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: drafts.device.${MODEL}
+- assertVisible: '.*06 or 06M\?.*'
+- tapOn: '○ 06M'
+- assertVisible: '◉ 06M'
+- tapOn:
+    id: draft.accept
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Accepted
+    timeout: 10000

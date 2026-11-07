@@ -1,0 +1,20 @@
+# T49 stage 2: Setup → 3 Sources → BOM: BOM.pdf (1st file) → the server's extraction done.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.sources
+- tapOn:
+    id: sources.bom
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: ${PICK_SIDE}          # On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: ${PICK_1}             # BOM.pdf
+- extendedWaitUntil:
+    visible:
+      id: sources.bom.status
+      text: 'Done: \d+ device drafts, \d+ excluded lines, \d+ flagged'
+    timeout: 600000

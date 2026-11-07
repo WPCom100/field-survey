@@ -1,0 +1,31 @@
+# T49 stage 8: Place devices reads 06M done (0 not on plan, 0 from drafts: its button is "Open
+# plan ▸", loadPlacementProgress) and 07 done with its pooled station; the pool line keeps 16 units.
+# Then 6 Lock baseline → "Lock 06M" with no ⚠ (nothing left open) → the dialog's Lock 06M →
+# `🔒 Locked <date>`, and the Levels home shows it.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: setup.step.place
+- assertVisible:
+    id: setup.place.06M
+    text: 'Open plan ▸'
+- assertVisible:
+    id: setup.place.07
+    text: 'Open plan ▸'
+- assertVisible: '4/4 ✓'
+- assertVisible: '.*Pool \(drafts with no level\): 16 units to place.*'
+- tapOn:
+    id: setup.step.lock
+- assertNotVisible: 'Lock 06M ⚠'
+- tapOn: 'Lock 06M'
+- assertVisible:
+    id: lock.submit
+    text: 'Lock 06M'
+- tapOn:
+    id: lock.submit
+- extendedWaitUntil:
+    visible: '🔒 Locked \d\d\d\d-\d\d-\d\d'
+    timeout: 10000
+- tapOn:
+    id: setup.home
+- assertVisible: '06M.*🔒.*'

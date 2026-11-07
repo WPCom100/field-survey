@@ -128,6 +128,10 @@ usage: bash scripts/mac/rig.sh <command>
                         api stopped riser-offline.yaml (a cached crop, a cable accepted with Confirm
                         endpoint → "could not … load" + Try again); riser-online.yaml (found by file name
                         after a sync); riser-peer.yaml on B (the draft states, each cable once)
+  e2e [--device A|B]    T49: e2e-setup.yaml on a new "Maestro e2e <time>" (RIG_PROJECT overrides):
+                        B2-06M + 07, BOM + riser extracted, the 06M sheet on 06M and 07, drafts
+                        reviewed, 06M placed from the dashed proposals, a pooled station on 07, 06M
+                        locked; prints each stage's time (stages.py) to $OUT/e2e-<time>.md
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
      RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT RIG_EXPORT_CPUS RIG_SHEET_CPUS
@@ -1106,6 +1110,33 @@ cmd_assigned() {  # T166: assignments decide which sheets a second iPad fetches;
   say "assigned: green"
 }
 
+cmd_e2e() {  # T49: setup end to end on the fixtures, timed per stage (e2e-setup.yaml, docs/test/setup-e2e.md)
+  local dev name pid times
+  dev="$(device_arg "$@")"
+  server_up
+  name="${RIG_PROJECT:-Maestro e2e $(date +%H%M%S)}"
+  # e2e-setup.yaml taps them by position: BOM.pdf, Level_06M_…, riser.pdf (name order)
+  cmd_files "$dev" fixtures/BOM.pdf "fixtures/Level_06M_-_Lighting_Composite_vector.pdf" fixtures/riser.pdf
+  say "e2e on $dev: \"$name\" from nothing to 06M locked"
+  PROJECT="$name" RIG_KEEP_FILES=1 cmd_flows --device "$dev" e2e-setup.yaml || {
+    python3 "$ROOT/scripts/mac/stages.py" "$OUT/maestro" "E2E" || true
+    die "e2e: the flow failed (the stages above ran; screenshots under $OUT/maestro)"
+  }
+  times="$OUT/e2e-$(date +%Y%m%d-%H%M%S).md"
+  python3 "$ROOT/scripts/mac/stages.py" "$OUT/maestro" "E2E" | tee "$times"
+  # the server's side: 06M locked, the project's levels and what the run left there
+  pid="$(api GET /projects | python3 -c '
+import json, sys
+print(next(p["id"] for p in json.load(sys.stdin) if p["name"] == sys.argv[1]))' "$name")"
+  api GET /projects | python3 -c '
+import json, sys
+p = next(p for p in json.load(sys.stdin) if p["id"] == sys.argv[1])
+print("levels: " + ", ".join("%s %s" % (l["level"], l["state"]) for l in p["levels"]))
+locked = [l for l in p["levels"] if l["level"] == "06M" and l["state"] != "setup"]
+sys.exit(0 if locked else 1)' "$pid" | tee -a "$times" || die "e2e: the server does not hold 06M locked"
+  say "e2e: green — stage times in $times"
+}
+
 cmd_riser() {  # T166: riser crops cached and offline (T106), the draft states on a second iPad (T44)
   local rows
   server_up
@@ -1181,6 +1212,7 @@ case "${1:-}" in
   stranger) cmd_stranger ;;
   assigned) cmd_assigned ;;
   riser) cmd_riser ;;
+  e2e) shift; cmd_e2e "$@" ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;
 esac

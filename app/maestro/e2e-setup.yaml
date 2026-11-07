@@ -1,0 +1,42 @@
+# T49: Setup end to end on the fixtures, timed per stage (`rig.sh e2e`, docs/test/setup-e2e.md).
+# A new project PROJECT with B2, B1, 01–04, 06, 06M and 07 → BOM.pdf and riser.pdf extracted →
+# the 06M composite as 06M's display sheet, and again as 07's (the fixtures hold no 07 sheet) →
+# Review drafts: the 06M rack accepted, the riser's three 06 panels accepted onto 06M (their
+# "06 or 06M?" choice), one pooled PI1002 accepted → Place devices: the 06M rack and panels from the
+# sheet's dashed proposals, a pooled station on 07 → Place devices reads 06M done (0 not on plan,
+# 0 from drafts) → Lock 06M with nothing left open → a sync. `rig.sh e2e` stages BOM.pdf, the 06M
+# composite and riser.pdf (name order: PICK_1, PICK_2, PICK_3) and reads each `e2e:` stage's time
+# from Maestro's commands.json (scripts/mac/stages.py). The rig has no Claude key, so the riser's
+# far ends stay unresolved; with the key the same steps run on the iPad (on-device checklist, T49).
+appId: productions.luminarytechnology.fieldsurvey
+name: E2E — setup on the fixtures, timed
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow:
+    label: 'e2e: create project'
+    file: _e2e-create.yaml
+- runFlow:
+    label: 'e2e: BOM extraction'
+    file: _e2e-bom.yaml
+- runFlow:
+    label: 'e2e: riser extraction'
+    file: _e2e-riser.yaml
+- runFlow:
+    label: 'e2e: plan sheets 06M + 07'
+    file: _e2e-sheets.yaml
+- runFlow:
+    label: 'e2e: review drafts'
+    file: _e2e-review.yaml
+- runFlow:
+    label: 'e2e: place 06M'
+    file: _e2e-place.yaml
+- runFlow:
+    label: 'e2e: pooled station on 07'
+    file: _e2e-pool.yaml
+- runFlow:
+    label: 'e2e: lock 06M'
+    file: _e2e-lock.yaml
+- runFlow:
+    label: 'e2e: sync'
+    file: _sync.yaml

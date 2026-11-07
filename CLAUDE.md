@@ -124,6 +124,7 @@ bash scripts/mac/rig.sh flows setup.yaml   # Sources (Files picker) → drafts �
 bash scripts/mac/rig.sh two         # setup on A (Ann), peer on B (Bob), peer-back on A: one edit each way
 bash scripts/mac/rig.sh seed        # "Maestro master" from the master workbook, once per server lifetime (T154)
 bash scripts/mac/rig.sh pipeline    # "Maestro pipeline" (B2–06M, BOM + riser + 06M sheet), once per server lifetime
+bash scripts/mac/rig.sh e2e         # T49: setup from nothing to 06M locked on the fixtures, timed per stage (docs/test/setup-e2e.md)
 bash scripts/mac/rig.sh log A '<regex>'    # the app's log lines; also media, scale, conflict (docs/ops.md §6.2)
 cd app && npx expo start --dev-client     # iPad with the dev build installed loads over Wi-Fi
 eas build --profile development --platform ios   # only when a native module changes

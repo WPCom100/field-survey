@@ -1,0 +1,38 @@
+# T49 stage 4: Sources → Floor plans: the 06M composite (2nd file) as 06M's display sheet, then the
+# same file as 07's (the fixtures hold no 07 sheet; the pooled station needs a plan on 07). Each
+# waits for its sheet job and the synced sheet.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- scrollUntilVisible:
+    element:
+      id: plans.display.06M
+    direction: DOWN
+- tapOn:
+    id: plans.display.06M
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: ${PICK_SIDE}          # On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: ${PICK_2}             # the 06M composite
+- extendedWaitUntil:
+    visible:
+      id: plans.open.06M
+    timeout: 180000
+- scrollUntilVisible:
+    element:
+      id: plans.display.07
+    direction: DOWN
+- tapOn:
+    id: plans.display.07
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: ${PICK_SIDE}
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: ${PICK_2}
+- extendedWaitUntil:
+    visible:
+      id: plans.open.07
+    timeout: 180000
+- runFlow: _logbox.yaml

@@ -1,0 +1,17 @@
+# T49 stage 3: Sources → Riser: riser.pdf (3rd file) → extracted and merged into the BOM's drafts.
+# The rig has no Claude key: far ends come back to pick (the iPad against the Droplet resolves them).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: sources.riser
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: ${PICK_SIDE}          # On My iPad
+- runFlow: _pick-wait.yaml
+- tapOn:
+    point: ${PICK_3}             # riser.pdf
+- extendedWaitUntil:
+    visible:
+      id: sources.riser.status
+      text: 'Done: \d+ device drafts \(\d+ merged into the BOM.s\), \d+ cable drafts, \d+ far ends to pick'
+    timeout: 600000

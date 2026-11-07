@@ -1,0 +1,48 @@
+# T49 stage 6: Setup → 5 Place devices → 06M. The sheet prints CT06LCPA and CT06LCPB: two dashed
+# proposals at their tags, and a faint guess by type for the EBDK beside CT06LCPB (D234); the rack
+# has none (the master: "Stair A Vestibule", left of CT06LCPB) and is placed from the list. The
+# proposal spots are whole percentages on the rig's "Field Survey iPad" at fit, portrait (read off a
+# screenshot, T49): a tap that lands elsewhere fails the place.selected assertion, not silently.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: setup.step.place
+- tapOn:
+    id: setup.place.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: place.item
+    timeout: 60000
+- assertVisible: '3 dashed pins where the sheet prints the type or tag.*'
+- runFlow:
+    file: _e2e-place-proposal.yaml
+    env:
+      AT: 28%,51%
+      ITEM: 'CT06LCPA \(UFMP8\).*'
+- runFlow:
+    file: _e2e-place-proposal.yaml
+    env:
+      AT: 23%,43%
+      ITEM: 'CT06LCPB \(ERP24-FT-241P\).*'
+- runFlow:
+    file: _e2e-place-proposal.yaml
+    env:
+      AT: 25%,43%
+      ITEM: 'EBDK .*'
+# the rack from the list, left of CT06LCPB
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '.*ERN4-RM-120.*'
+      AT: 20%,45%
+      PLACED: 'Placed 06M-\? .*'
+- assertVisible: 'Placed 4 of 4.*'
+- assertNotVisible:
+    id: place.item
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.back

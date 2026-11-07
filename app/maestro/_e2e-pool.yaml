@@ -1,0 +1,25 @@
+# T49 stage 7: Place devices → 07 → the Pool scope → the accepted PI1002 line (17 units, "Level 16,
+# 22") → a spot → Place ✓: one unit becomes a 07 station, the pool keeps 16.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: setup.place.07
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: place.scope.pool
+    timeout: 60000
+- tapOn:
+    id: place.scope.pool
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '.*PI1002.*'
+      AT: 40%,60%
+      PLACED: 'Placed 07-\? .*'
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.back

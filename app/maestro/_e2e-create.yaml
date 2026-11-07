@@ -1,0 +1,67 @@
+# T49 stage 1: Projects → New project PROJECT with B2, B1, 01–04, 06, 06M, 07 (one level per
+# Return, as pipeline.yaml: the field keeps focus, so it is tapped once) → Create → the Levels home.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.projects
+- tapOn:
+    id: projects.new
+- assertVisible: New project
+- tapOn:
+    id: newProject.name
+- inputText: ${PROJECT}
+- tapOn:
+    id: newProject.levelCode
+- inputText: B2
+- pressKey: Enter
+- inputText: B1
+- pressKey: Enter
+- inputText: '01'
+- pressKey: Enter
+- inputText: '02'
+- pressKey: Enter
+- inputText: '03'
+- pressKey: Enter
+- inputText: '04'
+- pressKey: Enter
+- inputText: '06'
+- pressKey: Enter
+- inputText: 06M
+- pressKey: Enter
+- inputText: '07'
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: Levels                 # closes the keyboard over Create
+- assertNotVisible: own group    # no numbering picker open
+# 06M shares 06's numbering group and is a split of 06, as the Tower (D33): Review drafts offers
+# the riser's "06 or 06M?" choice only for a split (T49 found it warns with no choice otherwise)
+- scrollUntilVisible:
+    element:
+      id: newProject.share.06M
+    direction: DOWN
+- tapOn:
+    id: newProject.share.06M
+- tapOn:
+    id: newProject.share.06M.06
+- tapOn:
+    id: newProject.split.06M
+- tapOn:
+    id: newProject.split.06M.06
+- assertVisible:
+    id: newProject.split.06M
+    text: '06 ▾'
+- scrollUntilVisible:
+    element:
+      id: newProject.create
+    direction: DOWN
+- tapOn:
+    id: newProject.create
+- extendedWaitUntil:
+    visible:
+      id: level.07
+    timeout: 120000
+- assertVisible:
+    id: level.06M
+- assertVisible:
+    id: level.B2
