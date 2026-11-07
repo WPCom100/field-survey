@@ -1,0 +1,31 @@
+# T160 step 4 of `rig.sh stranger`, the api back: the push is refused "unknown user"; the Sync
+# screen says the server's reason on the refused rows, says USER is not on the server and offers
+# Re-sign in. Signing in as USER again (a new id) carries the queued edits over and they sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Stranger — the Sync screen names the lost user; Re-sign in sends the edits
+---
+- runFlow: _resume.yaml
+- runFlow: _logbox.yaml
+- tapOn:
+    id: nav.sync
+- tapOn:
+    id: sync.now
+- extendedWaitUntil:
+    visible:
+      id: sync.unknownUser
+      text: "The server has no record of this iPad's user, ${USER} .*"
+    timeout: 30000
+- assertVisible:
+    id: sync.refused
+    text: '.*POST /ops → 422: unknown user .*'
+- tapOn:
+    id: sync.unknownUser.resign
+- tapOn:
+    text: Re-sign in
+    rightOf: Cancel
+- extendedWaitUntil:
+    visible: Connect to server
+    timeout: 10000
+- runFlow: _connect.yaml
+# fails on "need attention": the carried-over edits were refused again
+- runFlow: _sync.yaml

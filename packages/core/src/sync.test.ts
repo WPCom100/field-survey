@@ -4,7 +4,7 @@ import { uuidv7 } from './ids';
 import { BetterSqliteDriver } from './node';
 import type { Op } from './op';
 import { Store } from './store';
-import { SyncEngine, TransportError, knownProjects, rememberProjects, type SyncStatus } from './sync';
+import { SyncEngine, TransportError, knownProjects, refusalText, rememberProjects, unknownUserOf, type SyncStatus } from './sync';
 import { FakeServer } from './testing/fake-server';
 import { LIBRARY_STREAM } from './library-stream';
 
@@ -366,6 +366,64 @@ describe('quarantine (T75, D145)', () => {
     // Order was kept: the six accepted creates arrived in client_ts order.
     const applied = server.ops(PROJECT).filter((o) => o.kind === 'create' && o.entity_kind === 'device').map((o) => o.entity_id);
     expect(applied).toEqual(ids.filter((id) => id !== culprit.entity_id));
+  });
+
+  it('keeps the server\'s reason with a refused edit (T160)', async () => {
+    const a = await client(server, ANN, 'ipad-a');
+    await newDevice(a);
+    const [op] = await a.store.outbox(PROJECT);
+    server.poisonOp(op!.op_id, 422);
+    await a.engine.sync();
+    expect((await a.store.quarantined())[0]!.error).toBe('push → 422: bad op (test poison)');
+  });
+
+  it('an unknown user is named; re-attributing to the same person\'s new id sends the edits (T160)', async () => {
+    const a = await client(server, ANN, 'ipad-a');
+    const d = await newDevice(a);
+    await a.editor.setField('device', d, 'notes', 'one', CTX);
+    server.forgetUser(ANN); // the server was restored from a backup without Ann's app_user row
+    await a.engine.sync();
+    let q = await a.store.quarantined(PROJECT);
+    // The 422 names the first op; every op of that user in the batch is held with it.
+    expect(q).toHaveLength(2);
+    expect(q[1]!.error).toBe(`POST /ops → 422: unknown user ${ANN}`);
+    expect(unknownUserOf(q[0]!.error)).toBe(ANN);
+    expect(await a.store.outboxCount()).toBe(2);
+
+    // Bob's edit on the same iPad is not Ann's and stays as written.
+    const bobEditor = new Editor(a.store, { projectId: PROJECT, userId: BOB, now: tsNext });
+    const bobOp = await bobEditor.setField('device', d, 'status', 'Issue', CTX);
+
+    // Ann re-signs in under her name and the server gives her a new id.
+    const ann2 = uuidv7();
+    expect(await a.engine.reattribute(ANN, ann2)).toBe(2);
+    expect(await a.store.quarantined(PROJECT)).toEqual([]); // back to pending, sent next cycle
+    await a.engine.sync();
+    q = await a.store.quarantined(PROJECT);
+    expect(q).toEqual([]);
+    expect(await a.store.outboxCount()).toBe(0);
+    const sent = server.ops(PROJECT).filter((o) => o.entity_id === d);
+    expect(sent.map((o) => [o.kind, o.field ?? null, o.user_id])).toEqual([
+      ['create', null, ann2],
+      ['set', 'notes', ann2],
+      ['set', 'status', BOB],
+    ]);
+    expect((await a.store.getOp(bobOp!.op_id))!.user_id).toBe(BOB);
+    // Nothing left to re-attribute; an applied op is never rewritten.
+    expect(await a.engine.reattribute(ANN, ann2)).toBe(0);
+    expect(await a.engine.reattribute(ann2, uuidv7())).toBe(0);
+  });
+
+  it('refusalText reads each FastAPI body shape', () => {
+    const t = (detail: unknown) => refusalText(new TransportError('rejected', 'POST /ops → 422', 422, detail));
+    expect(t({ detail: { index: 0, op_id: 'x', error: 'unknown user 1' } })).toBe('POST /ops → 422: unknown user 1');
+    expect(t({ detail: { error: 'integrity', detail: 'duplicate key' } })).toBe('POST /ops → 422: integrity: duplicate key');
+    expect(t({ detail: 'numbering sharing loops at level 06' })).toBe('POST /ops → 422: numbering sharing loops at level 06');
+    expect(t({ detail: [{ msg: 'field required' }, { msg: 'bad uuid' }] })).toBe('POST /ops → 422: field required; bad uuid');
+    expect(t(null)).toBe('POST /ops → 422');
+    expect(t({ detail: {} })).toBe('POST /ops → 422');
+    expect(unknownUserOf('POST /ops → 422 (narrowed)')).toBeNull();
+    expect(unknownUserOf(null)).toBeNull();
   });
 
   it('5xx and 401 still retry with backoff, nothing is quarantined', async () => {

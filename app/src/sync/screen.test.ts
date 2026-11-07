@@ -5,7 +5,17 @@ import { describe, expect, it } from 'vitest';
 import { formatLine, rotationNames } from '../log/format';
 import { listProjects } from '../home/data';
 import { ensureDemoLevel } from '../plan/demo';
-import { describeCycle, formatBytes, freeUploadedPhotos, loadServerVersion, loadSyncScreen, retryFailedUploads } from './screen';
+import {
+  carryOver,
+  describeCycle,
+  formatBytes,
+  freeUploadedPhotos,
+  loadServerVersion,
+  loadSyncScreen,
+  retryFailedUploads,
+  unknownUserNotice,
+  type QuarantinedEdit,
+} from './screen';
 
 async function open() {
   return Store.open(new BetterSqliteDriver(), { installId: 'i', search: 'like' });
@@ -69,6 +79,8 @@ describe('loadSyncScreen', () => {
     expect(d.outbox.quarantined).toEqual([
       { opId: bad!.op_id, what: 'device notes', at: '2026-01-02T00:00:00Z', attempts: 1, error: 'POST /ops → 422' },
     ]);
+    // every project's refused edits are listed, as the status bar counts them (T160)
+    expect((await loadSyncScreen(store, null)).outbox.quarantined.map((q) => q.opId)).toEqual([bad!.op_id]);
     expect(await store.requeueQuarantined(project!.id)).toBe(1);
     expect((await loadSyncScreen(store, project!.id)).outbox.quarantined).toEqual([]);
   });
@@ -156,5 +168,42 @@ describe('describeCycle (T131)', () => {
     expect(describeCycle({ ...cycle, failed: true, pulled: 0 }, null)).toBe('Last cycle 0.4 s (failed) · push 0.1 s · pull 0.2 s · apply 0.1 s · 3 pushed, 0 pulled');
     expect(describeCycle(null, { projects: 1, ms: 1200, ops: 1 })).toBe('No cycle yet · rules 1.2 s (1 project, 1 write)');
     expect(describeCycle(null, null)).toBe('No cycle yet');
+  });
+});
+
+describe('a user the server does not know (T160)', () => {
+  const ANN = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
+  const OTHER = '0190a1b2-c3d4-7e5f-8a9b-00000099aa01';
+  const refused = (error: string | null): QuarantinedEdit => ({ opId: 'o', what: 'device notes', at: '2026-11-06T00:00:00Z', attempts: 1, error });
+
+  it('says the iPad\'s user is not on the server and to re-sign in under the same name', () => {
+    const q = [refused(`POST /ops → 422: unknown user ${ANN}`), refused(`POST /ops → 422: unknown user ${ANN}`)];
+    expect(unknownUserNotice(q, { id: ANN, name: 'Ann' })).toBe(
+      "The server has no record of this iPad's user, Ann (as after a restore from an old backup), so it refuses their edits. " +
+        'Re-sign in and pick Ann again: the 2 refused edits are then sent as Ann.',
+    );
+  });
+
+  it('names another user by the end of their id, and says nothing for other refusals', () => {
+    expect(unknownUserNotice([refused(`POST /ops → 422: unknown user ${OTHER}`), refused('POST /ops → 409: integrity')], { id: ANN, name: 'Ann' })).toBe(
+      "The server has no record of the user who made 1 refused edit (user …99aa01). Re-sign in under that person's name to send them as that person.",
+    );
+    expect(unknownUserNotice([refused('POST /ops → 422: bad op'), refused(null)], { id: ANN, name: 'Ann' })).toBeNull();
+    expect(unknownUserNotice([], { id: ANN, name: 'Ann' })).toBeNull();
+  });
+
+  it('carryOver: the same name on the same server with a new id carries the old ids over', () => {
+    const srv = 'https://survey.example.com';
+    const seen = [
+      { serverUrl: srv, id: ANN, name: 'Ann' },
+      { serverUrl: srv, id: 'bob-1', name: 'Bob' },
+      { serverUrl: 'http://127.0.0.1:8010', id: 'ann-rig', name: 'Ann' },
+    ];
+    const r = carryOver(seen, { serverUrl: `${srv}/`, id: 'ann-2', name: ' ann ' });
+    expect(r.from).toEqual([ANN]); // never the rig server's Ann, never Bob
+    expect(r.seen).toEqual([seen[1], seen[2], { serverUrl: `${srv}/`, id: 'ann-2', name: ' ann ' }]);
+    // Signing in again as the same user carries nothing; a first sign-in carries nothing.
+    expect(carryOver(r.seen, { serverUrl: srv, id: 'ann-2', name: 'Ann' }).from).toEqual([]);
+    expect(carryOver([], { serverUrl: srv, id: ANN, name: 'Ann' })).toEqual({ from: [], seen: [{ serverUrl: srv, id: ANN, name: 'Ann' }] });
   });
 });

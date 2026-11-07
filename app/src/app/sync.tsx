@@ -13,7 +13,16 @@ import { exportLog } from '../log';
 import { lastRulesPass } from '../rules/engine';
 import { getSyncEngine } from '../sync/engine';
 import { loadInstallLabels, saveInstallLabel } from '../sync/install';
-import { describeCycle, formatBytes, freeUploadedPhotos, loadServerVersion, loadSyncScreen, retryFailedUploads, type SyncScreenData } from '../sync/screen';
+import {
+  describeCycle,
+  formatBytes,
+  freeUploadedPhotos,
+  loadServerVersion,
+  loadSyncScreen,
+  retryFailedUploads,
+  unknownUserNotice,
+  type SyncScreenData,
+} from '../sync/screen';
 import { checkAndFetch, runningInfo, useUpdateCheckState } from '../sync/useAppUpdates';
 import { describeCheck, describeRunning } from '../sync/updates';
 import { describeSync, useSyncStatus } from '../sync/useSyncStatus';
@@ -75,6 +84,12 @@ export default function SyncScreen() {
   const online = sync.state === 'idle' || sync.state === 'syncing';
   const build = Constants.platform?.ios?.buildNumber ?? '—';
   const version = Constants.expoConfig?.version ?? '—';
+  const stranger = data ? unknownUserNotice(data.outbox.quarantined, identity.user) : null;
+  const confirmResign = () =>
+    Alert.alert('Re-sign in?', 'You will enter the server and token again. Edits on this iPad are kept and still sync afterwards.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Re-sign in', onPress: () => void signOut() },
+    ]);
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
@@ -128,18 +143,28 @@ export default function SyncScreen() {
             <Text style={styles.warn}>
               {data.outbox.quarantined.length} edit{data.outbox.quarantined.length === 1 ? '' : 's'} the server refused. The other edits keep syncing; these wait here until Retry.
             </Text>
-            {data.outbox.quarantined.map((q) => (
-              <Text key={q.opId} style={styles.sub}>
-                {q.what} · {time(q.at)} · {q.attempts} {q.attempts === 1 ? 'try' : 'tries'}: {q.error ?? 'unknown error'}
-              </Text>
-            ))}
+            {/* the notice and the buttons before the rows: a lost user refuses hundreds of edits (T160) */}
+            {stranger ? (
+              <>
+                <Text style={styles.warn} testID="sync.unknownUser">
+                  {stranger}
+                </Text>
+                <Btn label="Re-sign in" testID="sync.unknownUser.resign" onPress={confirmResign} />
+              </>
+            ) : null}
             <Btn
               label="Retry refused edits"
+              testID="sync.retryRefused"
               onPress={run(async () => {
                 const n = await (await getSyncEngine()).retryQuarantined();
                 return `${n} edit${n === 1 ? '' : 's'} sent again.`;
               })}
             />
+            {data.outbox.quarantined.map((q) => (
+              <Text key={q.opId} style={styles.sub} testID="sync.refused">
+                {q.what} · {time(q.at)} · {q.attempts} {q.attempts === 1 ? 'try' : 'tries'}: {q.error ?? 'unknown error'}
+              </Text>
+            ))}
           </>
         ) : null}
       </Section>
@@ -261,12 +286,7 @@ export default function SyncScreen() {
           <Btn
             label="Re-sign in"
             testID="sync.resign"
-            onPress={() =>
-              Alert.alert('Re-sign in?', 'You will enter the server and token again. Edits on this iPad are kept and still sync afterwards.', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Re-sign in', onPress: () => void signOut() },
-              ])
-            }
+            onPress={confirmResign}
           />
           <Btn
             label="Check for update"

@@ -695,6 +695,26 @@ export class Store {
     return n;
   }
 
+  /**
+   * T160: stamp `toUserId` on the outbox ops (pending or quarantined) that carry `fromUserId` and
+   * put the quarantined ones back to `pending`. Only ops the server has not accepted
+   * (`server_seq` null) — what the server never saw is still this iPad's to say. The payload is
+   * left as written. Returns how many ops changed.
+   */
+  async reattributeOutbox(fromUserId: string, toUserId: string): Promise<number> {
+    if (fromUserId === toUserId) return 0;
+    const mine = `SELECT o.op_id FROM op o JOIN outbox x ON x.op_id = o.op_id WHERE o.user_id = ? AND o.server_seq IS NULL`;
+    let n = 0;
+    await this.db.transaction(async (tx) => {
+      const rows = await tx.query<{ n: number }>(`SELECT count(*) AS n FROM (${mine})`, [fromUserId]);
+      n = rows[0]?.n ?? 0;
+      if (n === 0) return;
+      await tx.exec(`UPDATE outbox SET state = 'pending', last_error = NULL WHERE op_id IN (${mine})`, [fromUserId]);
+      await tx.exec(`UPDATE op SET user_id = ? WHERE op_id IN (${mine})`, [toUserId, fromUserId]);
+    });
+    return n;
+  }
+
   async fieldHead(entityId: string, field: string): Promise<string | null> {
     const rows = await this.db.query<{ op_id: string }>(
       `SELECT op_id FROM field_head WHERE entity_id = ? AND field = ?`,

@@ -42,6 +42,8 @@ export class FakeServer implements SyncTransport {
   private faults: Fault[] = [];
   /** Ops the server refuses for good (T75): a push containing one fails whole, as the real server rolls back. */
   private readonly poison = new Map<string, { status: number; named: boolean }>();
+  /** User ids the server has no `app_user` row for (T160): a push carrying one is refused with 422. */
+  private readonly unknownUsers = new Set<string>();
   private clock = 1_760_000_000_000;
 
   /** Queue failures; each is consumed by the next matching call. */
@@ -59,6 +61,12 @@ export class FakeServer implements SyncTransport {
 
   curePoison(opId: string): void {
     this.poison.delete(opId);
+  }
+
+  /** Lose the `app_user` row of `userId` (T160: a restore from an old backup), or know it again. */
+  forgetUser(userId: string, forget = true): void {
+    if (forget) this.unknownUsers.add(userId);
+    else this.unknownUsers.delete(userId);
   }
 
   get serverSeq(): number {
@@ -96,6 +104,11 @@ export class FakeServer implements SyncTransport {
         ? { detail: { index: bad, op_id: body.ops[bad]!.op_id, error: 'bad op (test poison)' } }
         : { detail: { error: 'integrity', detail: 'test poison' } };
       throw new TransportError('rejected', `push → ${status}`, status, detail);
+    }
+    const stranger = body.ops.findIndex((o) => this.unknownUsers.has(o.user_id));
+    if (stranger >= 0) {
+      const o = body.ops[stranger]!;
+      throw new TransportError('rejected', 'POST /ops → 422', 422, { detail: { index: stranger, op_id: o.op_id, error: `unknown user ${o.user_id}` } });
     }
     this.pushes.push(body);
     const results: PushAck[] = [];

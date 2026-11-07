@@ -1,0 +1,8 @@
+# T160 step 2 of `rig.sh stranger`, online: A, signed in as Ann after station-setup, re-signs in as
+# USER (a fresh name per run), so the server makes that name's `app_user` row. No Sync now: the
+# name must write nothing, or the rig cannot delete its row (every record keys to app_user).
+appId: productions.luminarytechnology.fieldsurvey
+name: Stranger — sign in under a fresh name
+---
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml

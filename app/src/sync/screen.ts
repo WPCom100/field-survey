@@ -4,7 +4,7 @@
  * store, so the screen works offline.
  */
 
-import type { BlobFiles, CycleTiming, Store } from '@field-survey/core';
+import { unknownUserOf, type BlobFiles, type CycleTiming, type Store } from '@field-survey/core';
 
 export type OutboxSummary = {
   /** Every op still in the outbox, quarantined ones included. */
@@ -14,7 +14,7 @@ export type OutboxSummary = {
   /** Ops still pending that failed to send at least once, with the last error seen. */
   failing: number;
   lastError: string | null;
-  /** Ops the server refused (409/422), parked until Retry (T75, D145). */
+  /** Ops the server refused (409/422), parked until Retry (T75, D145); every project's (T160). */
   quarantined: QuarantinedEdit[];
 };
 
@@ -51,7 +51,9 @@ export async function loadSyncScreen(store: Store, projectId: string | null): Pr
      FROM outbox ${projectId ? 'WHERE project_id = ?' : ''}`,
     projectId ? [projectId] : [],
   );
-  const quarantined = (await store.quarantined(projectId ?? undefined)).map((q) => ({
+  // every project's, as the status bar counts them and Retry sends them (T160: a lost user's edits
+  // in a project the home is not on were counted "need attention" and listed nowhere)
+  const quarantined = (await store.quarantined()).map((q) => ({
     opId: q.op.op_id,
     what: `${q.op.entity_kind} ${q.op.field ?? q.op.kind}`,
     at: q.op.client_ts,
@@ -186,4 +188,41 @@ export function describeCycle(
     parts.push(`rules ${s(rules.ms)} (${rules.projects} project${rules.projects === 1 ? '' : 's'}, ${rules.ops} write${rules.ops === 1 ? '' : 's'})`);
   }
   return parts.join(' · ');
+}
+
+/** A user signed in on this iPad against one server (T160; kept in the keychain by `identity/api.ts`). */
+export type SignedUser = { serverUrl: string; id: string; name: string };
+
+const sameServer = (a: string, b: string) => a.replace(/\/+$/, '').toLowerCase() === b.replace(/\/+$/, '').toLowerCase();
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * T160 (D252): on sign-in as `now`, the earlier ids of the same name on the same server. The
+ * server keys interim users by name (`upsert_user`), so a name with a new id means it lost the
+ * old `app_user` row; that person's queued edits are re-attributed to the new id (`from`). `seen`
+ * is the list to keep: the same-name entries replaced by `now`.
+ */
+export function carryOver(seen: readonly SignedUser[], now: SignedUser): { from: string[]; seen: SignedUser[] } {
+  const same = (u: SignedUser) => sameServer(u.serverUrl, now.serverUrl) && sameName(u.name, now.name);
+  const from = [...new Set(seen.filter((u) => same(u) && u.id !== now.id).map((u) => u.id))];
+  return { from, seen: [...seen.filter((u) => !same(u)), now] };
+}
+
+/**
+ * T160: what the Sync screen says when the server refused edits because it has no record of their
+ * user ("unknown user …", e.g. after a restore from an old backup). Null when no refusal says so.
+ */
+export function unknownUserNotice(quarantined: readonly QuarantinedEdit[], me: { id: string; name: string }): string | null {
+  const ids = new Set(quarantined.map((q) => unknownUserOf(q.error)).filter((x): x is string => x !== null));
+  if (ids.size === 0) return null;
+  const n = quarantined.filter((q) => unknownUserOf(q.error) !== null).length;
+  const edits = `${n} refused edit${n === 1 ? '' : 's'}`;
+  if (ids.has(me.id.toLowerCase())) {
+    return (
+      `The server has no record of this iPad's user, ${me.name} (as after a restore from an old backup), so it refuses their edits. ` +
+      `Re-sign in and pick ${me.name} again: the ${edits} are then sent as ${me.name}.`
+    );
+  }
+  const who = [...ids].map((id) => `user …${id.slice(-6)}`).join(', ');
+  return `The server has no record of the user who made ${edits} (${who}). Re-sign in under that person's name to send them as that person.`;
 }

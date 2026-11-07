@@ -1,5 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
+import type { SignedUser } from '../sync/screen';
+
 // Interim identity (D69): a shared server token plus the name picked on this iPad.
 // Both live in expo-secure-store; AUTH_MODE=entra (T04) replaces them with the Entra session.
 const USER_KEY = 'survey.user';
@@ -54,4 +56,23 @@ export async function addTeamMember(identity: Identity, name: string): Promise<T
 /** Forget the server, token and user on this iPad (local data stays); the connect flow runs again. */
 export async function clearIdentity(): Promise<void> {
   await Promise.all([SERVER_KEY, TOKEN_KEY, USER_KEY].map((k) => SecureStore.deleteItemAsync(k)));
+}
+
+// T160: the users signed in on this iPad, per server, so a sign-in under a name the server now
+// gives a new id can carry that name's queued edits over (`carryOver` in `sync/screen.ts`).
+const SIGNED_USERS_KEY = 'survey.signedUsers';
+
+export async function loadSignedUsers(): Promise<SignedUser[]> {
+  const raw = await SecureStore.getItemAsync(SIGNED_USERS_KEY);
+  if (!raw) return [];
+  try {
+    const list = JSON.parse(raw) as unknown;
+    return Array.isArray(list) ? (list as SignedUser[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveSignedUsers(list: SignedUser[]): Promise<void> {
+  await SecureStore.setItemAsync(SIGNED_USERS_KEY, JSON.stringify(list));
 }

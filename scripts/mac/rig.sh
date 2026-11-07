@@ -108,6 +108,10 @@ usage: bash scripts/mac/rig.sh <command>
   restart               O6 (T159): with the api stopped A generates ~1,500 punch items on "$SCALE_PROJECT"
                         (restart-edit.yaml); the api is started and restarted mid-push; then nothing refused
                         (restart-check.yaml, the server's op states) and each numbering group continues
+  stranger              T160: smoke.yaml on A (Ann), stranger-signin.yaml (a fresh name); with the api
+                        stopped that name's app_user row is deleted (an old backup) and stranger-edit.yaml
+                        queues an edit; stranger-check.yaml: the Sync screen names the lost user, Re-sign in
+                        carries the edit over to the name's new id, and the server has it under that name
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
      RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
@@ -839,6 +843,35 @@ cmd_restart() {  # O6 (T159): the api restarted in the middle of a large push; n
 
 SCALE_CEILINGS="$ROOT/scripts/mac/scale-ceilings.txt"   # `key ms` per line, set from the first green run (docs/perf/rig.md)
 
+cmd_stranger() {  # T160: the server loses a user's app_user row; the Sync screen says so, Re-sign in sends the edits
+  local who t0 t1 gone n
+  who="Zed$(date +%H%M%S)"   # a fresh name: its row must hold nothing for the delete to go through
+  server_up
+  say "stranger on \"$PROJECT\": A (Ann) makes it, signs in as $who, the server loses $who while A edits offline"
+  USER_NAME=Ann cmd_flows --device A smoke.yaml   # no Files picker (T168)
+  USER_NAME="$who" cmd_flows --device A stranger-signin.yaml
+  cmd_server stop
+  trap 'cmd_server start >/dev/null 2>&1 || true' EXIT
+  gone="$(server_sql "$who" "delete from app_user where name = :'name' returning id;" | head -n1)" \
+    || die "$who's app_user row could not be deleted: the sign-in already wrote something under it"
+  [ -n "$gone" ] || die "no app_user named $who on the server: the sign-in did not reach it"
+  say "deleted $who ($gone) from app_user, as a restore from an old backup would"
+  t0="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  USER_NAME="$who" cmd_flows --device A stranger-edit.yaml
+  t1="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  cmd_server start
+  trap - EXIT
+  for _ in $(seq 1 30); do curl -fsS "$SERVER_URL/health" >/dev/null 2>&1 && break; sleep 1; done
+  server_up
+  USER_NAME="$who" cmd_flows --device A stranger-check.yaml
+  n="$(server_sql "$PROJECT" "select count(*) from op o join project p on p.id = o.project_id join app_user u on u.id = o.user_id
+    where p.name = :'name' and o.entity_kind = 'level' and o.field = 'surveyed' and o.state = 'applied'
+      and o.client_ts >= '$t0' and o.client_ts <= '$t1' and u.name = '$who' and u.id <> '$gone';")"
+  [ "$n" -ge 1 ] || die "the offline surveyed-date edit is not on the server under $who's new id"
+  ( cmd_log A 'reattributed' ) || die "no reattributed line in A's log"
+  say "stranger: green ($n surveyed-date edit made under the lost id applied as $who's new id)"
+}
+
 cmd_scale_check() {  # W5 (T159): the scale project's timings on a fresh store, held to the ceilings
   local t0 t1 pid res bad="" k c v
   server_up
@@ -909,6 +942,7 @@ case "${1:-}" in
   pickup) cmd_pickup ;;
   scale-check) cmd_scale_check ;;
   restart) cmd_restart ;;
+  stranger) cmd_stranger ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;
 esac

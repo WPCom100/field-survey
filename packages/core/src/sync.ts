@@ -309,6 +309,19 @@ export class SyncEngine {
     return n;
   }
 
+  /**
+   * T160: the server lost this person's `app_user` row (a restore from an old backup), so it
+   * refuses their queued edits as "unknown user"; they re-signed in under the same name and got a
+   * new id. Their own edits still in the outbox are stamped with the new id and go with the next
+   * cycle (the caller starts or requests it). The caller decides it is the same person (same
+   * name); this never touches an op the server has.
+   */
+  async reattribute(fromUserId: string, toUserId: string): Promise<number> {
+    const n = await this.store.reattributeOutbox(fromUserId, toUserId);
+    if (n > 0) this.opts.log('warn', 'reattributed', { from: fromUserId, to: toUserId, ops: n });
+    return n;
+  }
+
   /** Local pending ops the server will review, for the "will be reviewed" badge. */
   async willBeReviewed(projectId: string): Promise<ReviewMark[]> {
     return Object.values(await this.marks(projectId));
@@ -519,15 +532,22 @@ export class SyncEngine {
     const culprit = named ? batch.find((o) => o.op_id === named) : undefined;
     const units = groupUnits(batch);
     let quarantine: StoredOp[] | null = null;
-    if (culprit) {
+    const stranger = unknownUserOf((e.detail as { detail?: { error?: unknown } } | null | undefined)?.detail?.error as string | undefined);
+    if (culprit && stranger) {
+      // T160: the server refuses every op of a user it has no row for, so all of that user's
+      // groups in the batch go at once, not one push per group.
+      quarantine = units.filter((u) => u.some((o) => o.user_id.toLowerCase() === stranger)).flat();
+      if (!quarantine.includes(culprit)) quarantine.push(culprit);
+    } else if (culprit) {
       quarantine = units.find((u) => u.includes(culprit)) ?? [culprit];
     } else if (units.length === 1) {
       quarantine = batch;
     }
     if (quarantine) {
       const ids = quarantine.map((o) => o.op_id);
-      await this.store.quarantine(ids, e.message + (named ? '' : ' (narrowed)'));
-      this.opts.log('warn', 'quarantined', { project, ops: ids, error: e.message, status: e.status ?? null });
+      const text = refusalText(e);
+      await this.store.quarantine(ids, text + (named ? '' : ' (narrowed)'));
+      this.opts.log('warn', 'quarantined', { project, ops: ids, error: text, status: e.status ?? null });
       return 0;
     }
     // No op named and more than one group: try each half alone.
@@ -698,6 +718,37 @@ function groupUnits(batch: StoredOp[]): StoredOp[][] {
     else units.push([op]);
   }
   return units;
+}
+
+/**
+ * What a refusal says on the Sync screen (T160): the request and status, then the server's reason
+ * from the FastAPI body — `{"detail": "…"}`, `{"detail": {"error", "detail"?}}` or a validation
+ * list's `msg`s — so "POST /ops → 422" becomes "POST /ops → 422: unknown user 0190…".
+ */
+export function refusalText(e: TransportError): string {
+  const reason = refusalReason(e.detail);
+  return reason ? `${e.message}: ${reason}` : e.message;
+}
+
+function refusalReason(body: unknown): string | null {
+  const d = (body as { detail?: unknown } | null | undefined)?.detail;
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d)) {
+    const msgs = d.map((x) => (x as { msg?: unknown } | null)?.msg).filter((m): m is string => typeof m === 'string');
+    return msgs.length ? msgs.join('; ') : null;
+  }
+  const inner = (d ?? null) as { error?: unknown; detail?: unknown } | null;
+  const parts = [inner?.error, inner?.detail].filter((x): x is string => typeof x === 'string' && x !== '');
+  return parts.length ? parts.join(': ') : null;
+}
+
+/**
+ * The user id in a refusal the server gave because it has no `app_user` row for the op's user
+ * (`server/app/sync.py`: "unknown user <uuid>"; T160), read from a quarantined op's stored error.
+ */
+export function unknownUserOf(error: string | null | undefined): string | null {
+  const m = /\bunknown user ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i.exec(error ?? '');
+  return m ? m[1]!.toLowerCase() : null;
 }
 
 /** The `op_id` a FastAPI 422 names (`{"detail": {"index", "op_id", "error"}}`), if any. */

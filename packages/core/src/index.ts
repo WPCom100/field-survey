@@ -110,6 +110,8 @@ export {
 export {
   SyncEngine,
   rejectedOpId,
+  refusalText,
+  unknownUserOf,
   TransportError,
   KNOWN_PROJECTS_KEY,
   knownProjects,

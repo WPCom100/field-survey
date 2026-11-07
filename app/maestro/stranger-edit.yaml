@@ -1,0 +1,30 @@
+# T160 step 3 of `rig.sh stranger`, with the api stopped and USER's `app_user` row deleted (as a
+# restore from an old backup would): USER sets level 06M's surveyed date in Setup → Levels; it
+# waits in the outbox under USER's old id. (A setup field, not a device: the Files picker the
+# station flows tap by position moved on the iOS 26 Simulator, T168.)
+appId: productions.luminarytechnology.fieldsurvey
+name: Stranger — an edit under the lost id
+---
+- runFlow: _resume.yaml
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline.*'
+    timeout: 60000
+- runFlow: _open-project.yaml
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.levels
+- tapOn:
+    id: setup.level.06M.surveyed
+- eraseText: 12
+- inputText: 2026-11-06
+- pressKey: Enter
+- tapOn:
+    id: setup.home
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: 'Offline · [1-9]\d* pending.*'
+    timeout: 30000
