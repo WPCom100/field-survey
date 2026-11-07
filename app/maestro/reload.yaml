@@ -1,0 +1,27 @@
+# T153: the dev client reloads its JS twice on a loaded store and stays up. Re-opening the
+# dev-client link on a running app reloads the JS; the old runtime's expo-sqlite module closes the
+# database on its way out (OnDestroy → closeDatabase). With expo-sqlite's default
+# `finalizeUnusedStatementsBeforeClosing` that finalized FTS5's own statements first, and
+# `sqlite3_close` then finalized them again in FTS5's teardown: SIGSEGV in `exsqlite3_finalize` ←
+# `sqlite3Fts5IndexClose` (T151). The store opens with it off (app/src/db/expo-sqlite-driver.ts).
+# A new project, a Dashboard search (`search_fts MATCH`), then two reloads, each followed by the
+# same search and a sync: the app is still there and the store still answers.
+appId: productions.luminarytechnology.fieldsurvey
+name: Reload — the dev client reloads its JS twice and stays up
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _new-project.yaml
+- runFlow: _sync.yaml
+- runFlow: _reload-search.yaml
+- repeat:
+    times: 2
+    commands:
+      - runFlow: _devclient.yaml   # openLink on the running app + Open: the JS reloads
+      - extendedWaitUntil:
+          visible: 'Connect to server|Who is surveying\?|Signed in as .*'
+          timeout: 90000
+      - runFlow: _connect.yaml
+      - runFlow: _open-project.yaml
+      - runFlow: _reload-search.yaml
+      - runFlow: _sync.yaml

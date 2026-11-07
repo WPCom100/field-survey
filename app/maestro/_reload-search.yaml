@@ -1,0 +1,19 @@
+# reload.yaml's store check (T153): Dashboard → a search through FTS5 ("06M": a fresh project has
+# nothing to find, so "No matches.") → back to Levels. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.dashboard
+- extendedWaitUntil:
+    visible:
+      id: dash.search
+    timeout: 30000
+- runFlow:
+    file: _dash-search.yaml
+    env:
+      TERM: 06M
+- extendedWaitUntil:
+    visible: No matches\.
+    timeout: 10000
+- tapOn: ← Levels
+- assertVisible: Field Survey

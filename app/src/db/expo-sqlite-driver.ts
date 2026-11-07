@@ -43,9 +43,19 @@ export class ExpoSqliteDriver implements SqlDriver {
     this.conn = new Connection(db);
   }
 
-  /** Open (or create) the database file in the app sandbox and set the pragmas we rely on. */
+  /**
+   * Open (or create) the database file in the app sandbox and set the pragmas we rely on.
+   *
+   * `finalizeUnusedStatementsBeforeClosing: false` (T153, D251): on close (ours, or the native
+   * module's teardown on a JS reload) expo-sqlite would otherwise walk `sqlite3_next_stmt` and
+   * finalize every statement on the connection, FTS5's own included; `sqlite3_close` then
+   * disconnects `search_fts`, whose teardown finalizes those statements again — SIGSEGV in
+   * `exsqlite3_finalize` ← `sqlite3Fts5IndexClose`. SQLite's close disconnects virtual tables
+   * before it checks for open statements, so FTS5 cleans up after itself; our own statements are
+   * all finalized already (`getAllAsync` / `runAsync` / `execAsync` finalize their own).
+   */
   static async open(name = 'field-survey.db'): Promise<ExpoSqliteDriver> {
-    const db = await SQLite.openDatabaseAsync(name);
+    const db = await SQLite.openDatabaseAsync(name, { finalizeUnusedStatementsBeforeClosing: false });
     await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = OFF;');
     return new ExpoSqliteDriver(db);
   }

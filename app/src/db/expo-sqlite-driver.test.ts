@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 // expo-sqlite is native; the driver only needs a database object with the four async calls.
 vi.mock('expo-sqlite', () => ({ openDatabaseAsync: vi.fn(), deleteDatabaseAsync: vi.fn() }));
 
-import type * as SQLite from 'expo-sqlite';
+import * as SQLite from 'expo-sqlite';
 
 import { ExpoSqliteDriver } from './expo-sqlite-driver';
 
@@ -65,5 +65,15 @@ describe('ExpoSqliteDriver (D102: one connection, one queue)', () => {
     expect(log).toEqual(['A', 'B', 'C']);
     await expect(d.transaction((t) => t.transaction(async () => 1))).rejects.toThrow('do not nest');
     expect(log.slice(-2)).toEqual(['BEGIN IMMEDIATE', 'ROLLBACK']);
+  });
+});
+
+describe('ExpoSqliteDriver.open (T153, D251)', () => {
+  it("opens without expo-sqlite's finalize-all on close, which double-finalizes FTS5's statements", async () => {
+    const { db, log } = fakeDb();
+    vi.mocked(SQLite.openDatabaseAsync).mockResolvedValue(db);
+    await ExpoSqliteDriver.open('t.db');
+    expect(SQLite.openDatabaseAsync).toHaveBeenCalledWith('t.db', { finalizeUnusedStatementsBeforeClosing: false });
+    expect(log).toEqual(['PRAGMA journal_mode = WAL; PRAGMA foreign_keys = OFF;']);
   });
 });

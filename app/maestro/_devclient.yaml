@@ -39,8 +39,8 @@ appId: productions.luminarytechnology.fieldsurvey
                 point: 92%,43%
       # A second "Open in Field Survey?" can be stacked behind the first (a `rig.sh open` whose
       # alert was never answered, T151 on simulator B); Maestro sees no app behind it. Cancel it:
-      # answering Open re-opens the link, reloads the running JS, and the dev client crashes in
-      # expo-sqlite's FTS5 teardown (T151).
+      # answering Open re-opens the link and reloads the running JS mid-flow (until T153 that
+      # also crashed the dev client in expo-sqlite's FTS5 teardown, D251; reload.yaml).
       - runFlow:
           when:
             visible: 'Open in .Field Survey.\?'
