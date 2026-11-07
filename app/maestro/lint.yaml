@@ -5,6 +5,7 @@
 # Dismissed. Findings (T36): `Cable with missing far end (12)`, a level chip, Group by → Level and
 # folding, Open card ▸ and back, Dismiss… disabled until a reason, the finding back once its facts
 # change, Reopen, Fix all via ruling ▸ into the ruling editor, Needs review's link into Lint.
+# No "This iPad: not numbered by the server" footer on the seed copy (T164).
 appId: productions.luminarytechnology.fieldsurvey
 name: R1 — Lint
 ---
@@ -13,3 +14,4 @@ name: R1 — Lint
 - runFlow: _seed-copy.yaml
 - runFlow: _lint-drafts.yaml
 - runFlow: _lint-findings.yaml
+- runFlow: _lint-local.yaml

@@ -137,8 +137,9 @@ export class FakeServer implements SyncTransport {
         this.created.add(op.entity_id);
         for (const f of Object.keys(op.payload ?? {})) if (f !== 'id') this.setHead(op.entity_id, f, stored);
         const field = NUMBERED[op.entity_kind];
-        // Like the server, a create without a level stays unnumbered (`assign_skipped`, D84).
-        if (field && (op.payload ?? {}).level_id) {
+        // Like the server, a create without a level stays unnumbered (`assign_skipped`, D84), and
+        // so does side B of a single-row cable (`P`, `0-10V`, `120V`: never a Connections row).
+        if (field && (op.payload ?? {}).level_id && !this.singleRowFarEnd(op)) {
           const key = `${this.groupOf(op)}|${op.entity_kind}`;
           const n = (this.counters.get(key) ?? 0) + 1;
           this.counters.set(key, n);
@@ -240,6 +241,15 @@ export class FakeServer implements SyncTransport {
    * `level_number`; a `level_tag` one is refused with 422 (thrown after storing: the fake does
    * not roll back, so tests that hit it start a fresh server).
    */
+  /** Side B of a cable whose head `single_row` is true (server `sync.py` `assign`). */
+  private singleRowFarEnd(op: Op): boolean {
+    const p = op.payload ?? {};
+    if (op.entity_kind !== 'cable_end' || p.side !== 'B' || typeof p.cable_id !== 'string') return false;
+    const head = this.head(p.cable_id, 'single_row');
+    const v = head ? (head.kind === 'create' ? (head.payload ?? {}).single_row : head.now) : null;
+    return v === true || v === 1;
+  }
+
   private assignDevice(create: Op): Op | null {
     const payload = create.payload ?? {};
     if (payload.display_id != null) return null;

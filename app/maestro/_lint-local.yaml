@@ -1,0 +1,30 @@
+# T164: on a fresh seed copy Lint has no "This iPad: not numbered by the server" footer. The far
+# ends the import made for runs the master gave no row (single-row P / 0-10V / 120V, placeholders,
+# unpaired ends) have no C-nn by design and are not listed (core `unnumbered()` → `no_row`).
+# Every group is folded, then the list (left column) is swiped to its end. Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow: _lint-open.yaml
+- repeat:                   # fold every open group; a tap while a long group renders can be lost
+    times: 20
+    while:
+      visible: '▾ .* \(\d+\)'
+    commands:
+      - tapOn: '▾ .* \(\d+\)'
+      - waitForAnimationToEnd:
+          timeout: 3000
+- assertNotVisible: '▾ .* \(\d+\)'
+- repeat:                   # swipe the list (left column): scrollUntilVisible swipes the panel
+    times: 6
+    commands:
+      - swipe:
+          start: 20%,85%
+          end: 20%,20%
+          duration: 400
+- waitForAnimationToEnd:
+    timeout: 2000
+# the footer's rows: with 53 of them the swipes end among them, past the footer's title
+- assertNotVisible: 'NEW .* · (unnumbered|refused)'
+- assertNotVisible:
+    id: lint.local
+- tapOn: ← Levels

@@ -85,4 +85,24 @@ describe('Lint view', () => {
     const v = await loadLintView(store, PROJECT);
     expect(v.local).toEqual([{ id: expect.any(String), kind: 'punch item', levelCode: '03', reason: 'unnumbered', text: expect.stringMatching(/no number/) }]);
   });
+
+  it('leaves out the far ends a seed copy imports without a C-nn (T164)', async () => {
+    const { store, ids } = await setup();
+    let seq = 100;
+    const create = (entity_kind: string, payload: Record<string, unknown>) =>
+      store.applyRemote({
+        op_id: uuidv7(), project_id: PROJECT, user_id: ME, install_id: 'seed', client_ts: now(),
+        entity_kind, entity_id: payload.id as string, kind: 'create', payload,
+        change_type: 'Master edit', server_seq: seq++, server_ts: now(), state: 'applied',
+      } as Op);
+    const p = uuidv7();
+    const x = uuidv7();
+    await create('cable', { id: p, project_id: PROJECT, cable: 'P', qty: 1, single_row: true });
+    await create('cable_end', { id: uuidv7(), cable_id: p, side: 'A', level_id: ids.l03, display_id: 'C-01' });
+    await create('cable_end', { id: uuidv7(), cable_id: p, side: 'B', level_id: ids.l03, endpoint_kind: 'device', device_id: ids.a });
+    await create('cable', { id: x, project_id: PROJECT, cable: 'X', qty: 1, single_row: false });
+    await create('cable_end', { id: uuidv7(), cable_id: x, side: 'A', level_id: ids.l03, display_id: 'C-02' });
+    await create('cable_end', { id: uuidv7(), cable_id: x, side: 'B' }); // unpaired: no level
+    expect((await loadLintView(store, PROJECT)).local).toEqual([]);
+  });
 });

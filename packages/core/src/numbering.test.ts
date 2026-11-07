@@ -103,22 +103,33 @@ describe('NEW state', () => {
     const { id: refused } = await a.editor.create('punch_item', PAYLOAD.punch_item(L06), CTX);
     server.fail({ on: 'push', failure: 'rejected', status: 409 });
     await sync(a);
-    const { id: orphan } = await b.editor.create('cable_end', { cable_id: uuidv7(), side: 'A' }, CTX); // no level
+    const { id: farEnd } = await b.editor.create('cable_end', { cable_id: uuidv7(), side: 'B' }, CTX); // no level: by design (T164)
     const { id: offline } = await b.editor.create('photo', PAYLOAD.photo(L07), CTX);
     await b.store.noteOutboxFailure(
       (await b.store.outbox()).filter((o) => o.entity_id === offline).map((o) => o.op_id),
       'Network request failed',
     );
     await b.engine.sync(); // pushes both; photo gets a number, the cable end does not
+    // A create the server accepted without an assign (a level with no numbering group, D84).
+    const orphan = uuidv7();
+    await b.store.applyRemote({
+      op_id: uuidv7(), project_id: PROJECT, user_id: ANN, install_id: 'ipad-ann', client_ts: tsNext(),
+      entity_kind: 'punch_item', entity_id: orphan, kind: 'create', payload: PAYLOAD.punch_item(L07),
+      change_type: 'Field survey', server_seq: 999, server_ts: tsNext(), state: 'applied',
+    } as Op);
 
     expect(await unnumbered(a.store, PROJECT)).toMatchObject([
       { id: refused, reason: 'refused', attempts: 1, last_error: expect.stringMatching(/409/) },
     ]);
-    expect(await unnumbered(b.store, PROJECT)).toMatchObject([{ id: orphan, reason: 'unnumbered', attempts: 0 }]);
+    expect(await unnumbered(b.store, PROJECT)).toMatchObject([
+      { entity_kind: 'cable_end', id: farEnd, reason: 'no_row', attempts: 0 },
+      { entity_kind: 'punch_item', id: orphan, reason: 'unnumbered', attempts: 0 },
+    ]);
     expect((await b.store.get('photo', offline))!.number).toBe(1);
 
     // Deleted records are not reported.
-    await b.editor.delete('cable_end', orphan, CTX);
+    await b.editor.delete('cable_end', farEnd, CTX);
+    await b.editor.delete('punch_item', orphan, CTX);
     expect(await unnumbered(b.store, PROJECT)).toEqual([]);
   });
 
@@ -213,5 +224,50 @@ describe('device IDs are NEW until the server assigns them (D93, T63)', () => {
     expect(displayNumber('device', row)).toBe('06M-S15');
     await sync(a);
     expect(server.ops(PROJECT).filter((o) => o.kind === 'assign')).toEqual([]);
+  });
+});
+
+describe('T164: the far ends the server never numbers are not stuck', () => {
+  /** A cable with its two ends as the seed import makes them (`seed_import.py` `far_end_create`). */
+  async function cable(c: Client, code: string, singleRow: boolean, a: Record<string, unknown>, b: Record<string, unknown>) {
+    const { id: cable_id } = await c.editor.create('cable', { project_id: PROJECT, cable: code, qty: 1, single_row: singleRow }, CTX);
+    const { id: endA } = await c.editor.create('cable_end', { cable_id, side: 'A', ...a }, CTX);
+    const { id: endB } = await c.editor.create('cable_end', { cable_id, side: 'B', ...b }, CTX);
+    return { endA, endB };
+  }
+
+  it('a seed copy\'s single-row, placeholder and unpaired far ends read no_row, never unnumbered', async () => {
+    const fixtures = (await a.editor.create('placeholder', { project_id: PROJECT, label: 'Fixtures', kind: 'fixtures' }, CTX)).id;
+    const ebdk = (await a.editor.create('device', { level_id: L06, category: 'Emergency Equipment', status: 'Not installed' }, CTX)).id;
+    // P: side B is the panel's EBDK on the same level, but a single-row run has no far row.
+    const p = await cable(a, 'P', true, { level_id: L06 }, { level_id: L06, endpoint_kind: 'device', device_id: ebdk });
+    // 0-10V / 120V: side B is a placeholder with no level.
+    const dim = await cable(a, '0-10V', true, { level_id: L06 }, { endpoint_kind: 'placeholder', placeholder_id: fixtures });
+    // DMX whose far end the master gave no row (unpaired: an import_pair item is open).
+    const dmx = await cable(a, 'X', false, { level_id: L06M }, {});
+    // Network to a far end on a level that is out of scope (a placeholder, no level).
+    const net = await cable(a, 'N', false, { level_id: L07 }, { endpoint_kind: 'placeholder', placeholder_id: fixtures });
+    await sync(a, b);
+
+    for (const c of [a, b]) {
+      const list = await unnumbered(c.store, PROJECT);
+      expect(list.map((u) => u.id).sort()).toEqual([p.endB, dim.endB, dmx.endB, net.endB].sort());
+      expect(new Set(list.map((u) => u.reason))).toEqual(new Set(['no_row']));
+      // What Lint's footer shows (refused / unnumbered): nothing on a fresh seed copy.
+      expect(list.filter((u) => u.reason === 'refused' || u.reason === 'unnumbered')).toEqual([]);
+      // The near ends are numbered as usual.
+      for (const id of [p.endA, dim.endA, dmx.endA, net.endA]) expect(displayNumber('cable_end', (await c.store.get('cable_end', id))!)).toMatch(/^C-\d\d$/);
+    }
+  });
+
+  it('side B of a paired cable on a level is numbered; a level-less end still waits while in the outbox', async () => {
+    const paired = await cable(a, 'X', false, { level_id: L06 }, { level_id: L07 });
+    const far = await cable(a, '120V', true, { level_id: L06 }, {});
+    expect((await unnumbered(a.store, PROJECT)).map((u) => [u.id, u.reason])).toEqual(
+      expect.arrayContaining([[far.endB, 'waiting'], [paired.endB, 'waiting']]),
+    );
+    await sync(a);
+    expect(displayNumber('cable_end', (await a.store.get('cable_end', paired.endB))!)).toBe('C-01');
+    expect(await unnumbered(a.store, PROJECT)).toMatchObject([{ id: far.endB, reason: 'no_row' }]);
   });
 });

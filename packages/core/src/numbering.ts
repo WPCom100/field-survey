@@ -75,9 +75,19 @@ export function displayNumber(kind: PendingKind, row: Record<string, unknown>, l
  *   help, the data has to change;
  * - `unnumbered`: the server accepted the create but assigned nothing (no level, a level
  *   without a numbering group, or a device level with no code — logged `assign_skipped`);
+ * - `no_row`: a cable end the server accepted and leaves without a `C-nn` by design (T164): it
+ *   has no level (a placeholder or out-of-scope far end, the far end the seed import made for a
+ *   run the master gave no row, an end waiting for its device) or it is side B of a single-row
+ *   cable (`P`, `0-10V`, `120V`: never a Connections row, PLAN §6 R2) — the server's expected
+ *   skips (`server/app/sync.py` `assign`). Nothing is wrong with it, so Lint leaves it out;
  * - `no_create`: the row exists without a create op in the local log (should not happen).
  */
-export type UnnumberedReason = 'waiting' | 'refused' | 'unnumbered' | 'no_create';
+export type UnnumberedReason = 'waiting' | 'refused' | 'unnumbered' | 'no_row' | 'no_create';
+
+/** T164: a server-accepted cable end the server never numbers (see `no_row`). */
+function endWithoutRow(r: SqlRow): boolean {
+  return r.level_id == null || (r.side === 'B' && Number(r.single_row ?? 0) === 1);
+}
 
 /** Failure messages carry the status (`POST /ops → 409` from `failureOf`). */
 const REFUSED = /\b(409|422)\b/;
@@ -102,13 +112,16 @@ export async function unnumbered(store: Store, projectId: string): Promise<Unnum
   for (const kind of PENDING_KINDS) {
     const spec = ENTITIES[kind];
     const field = SERVER_ASSIGNED[kind];
+    const end = kind === 'cable_end';
     const rows = await store.db.query<SqlRow>(
       `SELECT t.id AS id, t.level_id AS level_id, o.op_id AS op_id, o.state AS state,
               o.server_seq AS server_seq, o.client_ts AS client_ts,
               x.op_id AS outbox_op, x.attempts AS attempts, x.last_error AS last_error
+              ${end ? ', t.side AS side, c.single_row AS single_row' : ''}
          FROM ${spec.table} t
          LEFT JOIN op o ON o.entity_id = t.id AND o.kind = 'create'
          LEFT JOIN outbox x ON x.op_id = o.op_id
+         ${end ? 'LEFT JOIN cable c ON c.id = t.cable_id' : ''}
         WHERE t.${field} IS NULL AND t.deleted_at IS NULL
           AND (o.project_id = ? OR o.op_id IS NULL)`,
       [projectId],
@@ -118,7 +131,8 @@ export async function unnumbered(store: Store, projectId: string): Promise<Unnum
       let reason: UnnumberedReason;
       if (r.op_id == null) reason = 'no_create';
       else if (r.outbox_op != null) reason = lastError && REFUSED.test(lastError) ? 'refused' : 'waiting';
-      else reason = r.server_seq != null ? 'unnumbered' : 'waiting';
+      else if (r.server_seq == null) reason = 'waiting';
+      else reason = end && endWithoutRow(r) ? 'no_row' : 'unnumbered';
       out.push({
         entity_kind: kind,
         id: r.id as string,

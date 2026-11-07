@@ -206,7 +206,7 @@ export default function LintScreen() {
           ListFooterComponent={
             view?.local.length && !dismissed ? (
               <View>
-                <Text style={styles.groupTitleLocal}>This iPad: not numbered by the server ({view.local.length})</Text>
+                <Text style={styles.groupTitleLocal} testID="lint.local">This iPad: not numbered by the server ({view.local.length})</Text>
                 {view.local.map((l) => (
                   <View key={l.id} style={styles.row}>
                     <Text style={styles.rowTitle}>
