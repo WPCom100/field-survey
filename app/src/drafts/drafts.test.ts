@@ -486,6 +486,36 @@ describe('cable drafts (T44, D6, D191)', () => {
     expect(row((await loadDraftReview(store, PROJECT)).cables, ids.c1)).toMatchObject({ waiting: false, committed: true });
   });
 
+  it('a waiting end takes the level of the device it is linked to (T145)', async () => {
+    const { store, editor, ids } = await setup();
+    const data = await loadDraftReview(store, PROJECT);
+    // 06M panel → the 02 UFMP4 draft: the far end waits on 02
+    const res = await acceptCable(editor, store, data, row(data.cables, ids.c1), { confirm: true });
+    const farEnd = (await store.list<Record<string, unknown>>('cable_end', { where: 'cable_id = ? AND side = ?', params: [res.cableId, 'B'] }))[0]!;
+    expect(farEnd).toMatchObject({ level_id: ids.l02, draft_device_id: ids.dE, device_id: null });
+
+    // the draft is moved to 01 (T143) and its unit placed there: the end follows, in the link's group
+    await editor.setField('draft_device', ids.dE, 'level_id', ids.l01, { change_type: 'Master edit', reason: 'Place devices: moved to 01' });
+    const { id: ufmp } = await editor.create('device', { level_id: ids.l01, category: 'Foundry panel', device: 'UFMP4', baseline_ref_id: ids.dE, origin: 'baseline' }, { change_type: 'Master edit', reason: 'Place' });
+    const before = (await store.opsFor(farEnd.id as string)).length;
+    expect(await commitWaitingCables(editor, store, PROJECT)).toBe(1);
+    const linkOps = (await store.opsFor(farEnd.id as string)).slice(before);
+    expect(linkOps.map((o) => [o.kind, o.field, o.now])).toEqual([
+      ['set', 'device_id', ufmp],
+      ['set', 'level_id', ids.l01],
+    ]);
+    expect(new Set(linkOps.map((o) => o.group_id)).size).toBe(1);
+    expect(await store.get<Record<string, unknown>>('cable_end', farEnd.id as string)).toMatchObject({ device_id: ufmp, level_id: ids.l01, to_text: 'DMX to Level 06M CT06LCPA' });
+    // the 06M end's stored To text is not regenerated (D32, D250 (5)): it still names 02 as written
+    const nearEnd = (await store.list<Record<string, unknown>>('cable_end', { where: 'cable_id = ? AND side = ?', params: [res.cableId, 'A'] }))[0]!;
+    expect(nearEnd).toMatchObject({ level_id: ids.l06m, to_text: 'DMX to Level 02 UFMP4' });
+    // the 01 Connections list has it now, the 02 one no longer
+    const on01 = (await loadLevelLists(store, PROJECT, ids.l01, '01', [])).connections.map((r) => r.title);
+    const on02 = (await loadLevelLists(store, PROJECT, ids.l02, '02', [])).connections.map((r) => r.title);
+    expect(on01).toContain('X → DMX to Level 06M CT06LCPA');
+    expect(on02).not.toContain('X → DMX to Level 06M CT06LCPA');
+  });
+
   it('endOrDraft: a placed draft is its device, an unplaced one the draft with the text its device will read as', async () => {
     const { store, ids } = await setup();
     const data = await loadDraftReview(store, PROJECT);

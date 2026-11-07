@@ -491,9 +491,16 @@ class Push:
                 return OpResult(op_id=row.op_id, outcome="applied", server_seq=row.server_seq)
             if row.kind == "create":
                 self.load_heads(row.entity_id)  # one query for every field of the new record
+            moved_from = (
+                self.head_value(row.entity_id, "level_id")
+                if row.kind == "set" and row.entity_kind == "cable_end" and row.field == "level_id"
+                else None
+            )
             self.set_heads([(row.entity_id, f, row.op_id) for f in d.heads])
             if row.kind == "create":
                 self.assign(row)
+            elif row.kind == "set" and row.entity_kind == "cable_end" and row.field == "level_id":
+                self.assign_moved_end(row, moved_from)
             return OpResult(op_id=row.op_id, outcome="applied", server_seq=row.server_seq)
         if d.outcome == "superseded":
             self.store(row, "superseded")
@@ -911,6 +918,41 @@ class Push:
             reason=f"Numbered from group {assigned.label}",
         )
         self.set_head(create.entity_id, field, op.op_id)
+
+    def assign_moved_end(self, op: Op, moved_from: Any) -> None:
+        """D250 (T145): a cable end moved to a level of another numbering group — a waiting end
+        linked to its device placed on another floor — gets the next `C-nn` of the new group (an
+        `assign` op), so it never repeats a number already on that floor; its old number stays
+        retired in the old group (D25: no number is reused). An end that had no number (made
+        with no level, or on a level without a group) gets one the same way. Within one group
+        (06 / 06M, D33) the number stands. The far end of a single-row cable stays unnumbered."""
+        if not op.now:
+            return
+        new_group = self.numbering.group(uuid.UUID(str(op.now)))
+        if new_group is None:
+            return
+        _, field = NUMBERED["cable_end"]
+        numbered = self.head_value(op.entity_id, field) is not None
+        old_group = self.numbering.group(uuid.UUID(str(moved_from))) if moved_from else None
+        if numbered and old_group is not None and old_group.id == new_group.id:
+            return
+        if self.head_value(op.entity_id, "side") == "B":
+            cable_id = self.head_value(op.entity_id, "cable_id")
+            if cable_id and self.head_value(uuid.UUID(str(cable_id)), "single_row"):
+                return
+        assigned = self.numbering.next_number("cable_end", uuid.UUID(str(op.now)))
+        if assigned is None:
+            return
+        server = self.server_op(
+            op,
+            entity_kind="cable_end",
+            entity_id=op.entity_id,
+            kind="assign",
+            field=field,
+            now=assigned.value,
+            reason=f"Numbered from group {assigned.label}: moved from another floor (D250)",
+        )
+        self.set_head(op.entity_id, field, server.op_id)
 
     def assign_device(self, create: Op) -> None:
         """D93/D118: a device created without `display_id` gets its ID from the server as an

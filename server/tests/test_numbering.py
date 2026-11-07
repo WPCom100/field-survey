@@ -132,6 +132,63 @@ def test_a_new_project_starts_numbering_over(client, w):
     assert got == {p["entity_id"]: 1, e["entity_id"]: "C-01"}
 
 
+def test_a_cable_end_moved_to_another_group_is_numbered_there(client, w):
+    """D250 (T145): a waiting end linked to its device on another floor moves its `level_id`;
+    across numbering groups it gets the new group's next `C-nn` and its old number stays
+    retired; within one group (06 → 06M, D33) it keeps its number; an end made with no level
+    gets its first number when it gets one; a single-row far end stays unnumbered."""
+    on07 = w.create(w.ann, "cable_end", {"level_id": str(w.l07.id)})  # 07 → C-01
+    waiting = w.create(w.ann, "cable_end")  # 06 → C-01
+    sibling = w.create(w.ann, "cable_end")  # 06 → C-02
+    nolevel = w.create(w.ann, "cable_end", {"level_id": None})  # no level → no number
+    res = w.push(client, [on07, waiting, sibling, nolevel])
+    assert [
+        numbers(res, "display_id").get(o["entity_id"]) for o in (on07, waiting, sibling, nolevel)
+    ] == [
+        "C-01",
+        "C-01",
+        "C-02",
+        None,
+    ]
+
+    # The 06 end moves to 07: C-02 of 07, never 07's C-01 again; nothing else moves.
+    move = w.set(
+        w.ann, "cable_end", waiting["entity_id"], "level_id", str(w.l07.id), waiting["op_id"]
+    )
+    res = w.push(client, [move])
+    assert outcomes(res) == ["applied"]
+    assert numbers(res, "display_id") == {waiting["entity_id"]: "C-02"}
+    assign = next(o for o in res["server_ops"] if o["kind"] == "assign")
+    assert "moved from another floor" in assign["reason"]
+
+    # Within one group (06 → 06M) the number stands.
+    same = w.set(
+        w.ann, "cable_end", sibling["entity_id"], "level_id", str(w.l06m.id), sibling["op_id"]
+    )
+    res = w.push(client, [same])
+    assert outcomes(res) == ["applied"] and res["server_ops"] == []
+
+    # An end with no number gets the next of its new group (06/06M had C-01, C-02 → C-03).
+    first = w.set(
+        w.ann, "cable_end", nolevel["entity_id"], "level_id", str(w.l06.id), nolevel["op_id"]
+    )
+    assert numbers(w.push(client, [first]), "display_id") == {nolevel["entity_id"]: "C-03"}
+
+    # A single-row cable's far end is never a Connections row: no number on a move either.
+    cable = w.create(w.ann, "cable", {"cable": "120V", "single_row": True})
+    far = w.create(
+        w.ann, "cable_end", {"cable_id": cable["entity_id"], "side": "B", "level_id": None}
+    )
+    w.push(client, [cable, far])
+    moved = w.set(w.ann, "cable_end", far["entity_id"], "level_id", str(w.l07.id), far["op_id"])
+    res = w.push(client, [moved])
+    assert outcomes(res) == ["applied"] and res["server_ops"] == []
+
+    w.session.expire_all()
+    assert w.session.get(NumberingGroup, w.group.id).counter_cable == 3
+    assert w.session.get(NumberingGroup, w.group07.id).counter_cable == 2
+
+
 # --------------------------------------------------------- device IDs (D93, T63)
 
 

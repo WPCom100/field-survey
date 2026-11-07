@@ -661,11 +661,16 @@ export function readyCables(data: DraftReviewData): { c: CableDraftRow; a: RealE
 
 /**
  * Cable ends that name a draft device (D235) whose device now exists — placed from it (T46), or
- * plainly the same device on its level (`deviceForDraft`) — with that device's id.
+ * plainly the same device on its level (`deviceForDraft`) — with that device's id, and its level
+ * when the end was made on another (T145: the draft was moved, T143, or a pooled unit was placed).
  */
-export async function draftEndsToLink(store: Store, data: DraftReviewData, projectId: string): Promise<{ endId: string; deviceId: string }[]> {
-  const rows = await store.db.query<{ id: string; draft_device_id: string }>(
-    `SELECT e.id, e.draft_device_id FROM cable_end e JOIN cable c ON c.id = e.cable_id
+export async function draftEndsToLink(
+  store: Store,
+  data: DraftReviewData,
+  projectId: string,
+): Promise<{ endId: string; deviceId: string; levelId: string | null }[]> {
+  const rows = await store.db.query<{ id: string; draft_device_id: string; level_id: string | null }>(
+    `SELECT e.id, e.draft_device_id, e.level_id FROM cable_end e JOIN cable c ON c.id = e.cable_id
      WHERE c.project_id = ? AND e.draft_device_id IS NOT NULL AND e.device_id IS NULL AND e.placeholder_id IS NULL
        AND e.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY e.id`,
     [projectId],
@@ -674,16 +679,19 @@ export async function draftEndsToLink(store: Store, data: DraftReviewData, proje
   return rows.flatMap((r) => {
     const dd = draftById.get(r.draft_device_id);
     const dev = dd ? deviceForDraft(data, dd) : null;
-    return dev ? [{ endId: r.id, deviceId: dev.id }] : [];
+    return dev ? [{ endId: r.id, deviceId: dev.id, levelId: dev.levelId !== r.level_id ? dev.levelId : null }] : [];
   });
 }
 
 /**
  * After devices are placed (T46 calls this; the review screen offers it as "Make n waiting
  * cables"): link each end that named a draft now placed to its device — one `device_id` op, never
- * a second cable (D235) — and make the cables of accepted drafts that were waiting (both ends
- * drafts then, or accepted before D235) once one end is real. One group. Returns how many cables
- * were made or linked.
+ * a second cable (D235), plus a `level_id` op when the device is on another level than the end was
+ * made with (T145), so the end moves to that floor's rows — and make the cables of accepted drafts
+ * that were waiting (both ends drafts then, or accepted before D235) once one end is real. One
+ * group. Returns how many cables were made or linked. The other end's stored To text, which names
+ * the old floor (D32: "DMX to Level 02 UFMP4"), is left as written; it is edited by hand like any
+ * To. Across numbering groups the server gives the moved end a new `C-nn` (D250).
  */
 export async function commitWaitingCables(editor: Editor, store: Store, projectId: string, opts: { riserBlob?: string | null } = {}): Promise<number> {
   const data = await loadDraftReview(store, projectId);
@@ -691,7 +699,10 @@ export async function commitWaitingCables(editor: Editor, store: Store, projectI
   const ready = readyCables(data);
   if (!ready.length && !links.length) return 0;
   await editor.group(ctx('Draft review: cables of accepted drafts, endpoints now placed'), async (g) => {
-    for (const l of links) await g.setField('cable_end', l.endId, 'device_id', l.deviceId);
+    for (const l of links) {
+      await g.setField('cable_end', l.endId, 'device_id', l.deviceId);
+      if (l.levelId) await g.setField('cable_end', l.endId, 'level_id', l.levelId);
+    }
     for (const { c, a, b } of ready) await writeCable(g, store, projectId, c, a, b, { confirm: c.confirmed, riserBlob: opts.riserBlob });
   });
   return ready.length + links.length;
