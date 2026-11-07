@@ -686,6 +686,19 @@ Every check ran on the Mac rig (dashboard.yaml; [on-device-log](on-device-log.md
 
 Decision D249 (Proposed): `eas.json` is not edited for the rig; the `simulator` profile waits for the next build cycle (T150) because any `eas.json` edit changes the runtime fingerprint and would cut the iPads off from updates. → Approve / change:
 
+## T162 — Edit a punch item's Tracking status and a part's Part status  ·  Needs: no new build (JS update only)
+
+**Why it matters:** until now nobody in the field could close a punch item or mark a part Ordered / On site / Installed; the export's Tracking status, Date closed and Part status columns only changed by a ruling. The rig proved the taps (a punch row opens the editor, Closed stamps Date closed, owner chip, History, a part Needed → Ordered, the R3c item read-only with its device links); these checks are what only the iPads and the export can show.
+
+- [ ] **Close an item from the card.** Open a device with an open punch item, tap the item under Punch items: the editor opens with `◀ <device>`. Tap Closed: the button turns green with ✓ and "Date closed <today>" appears (today's date on the iPad, also late in the evening). ◀ returns to the card, where the item reads Closed. → saw:
+- [ ] **From the Punch / Parts tab.** On the plan's Punch tab tap a row: the editor opens with `◀ Punch` and the device's pin is lit; its device button opens the card. On the Parts tab, set a part to Ordered, then On site: the row follows each time. → saw:
+- [ ] **The other iPad follows.** After a sync, the second iPad shows the item Closed with the same Date closed and the part's new status; its History names who changed it. → saw:
+- [ ] **Export.** Export the workbook after closing an item and changing a part: the Punch List row has `Closed` and the date in Date closed; the Missing Parts row has the new Part status; reopening the item (Open) and exporting again clears Date closed. → saw:
+- [ ] **Notes chips.** The Notes chips are the project's Punch notes / Part notes (Vocabulary); a chip adds its phrase with "; " and free typing still works. → saw:
+- [ ] **The rules' address items.** Open "Missing all Device Neuron IDs" on a level: its status buttons are greyed with the "Kept by the rules (R3c)" line, and under "Waiting on" the devices are listed by floor; one tap opens that device's card (a device on another floor opens that floor). Type that device's Neuron ID and come back: it has left the list. → saw:
+
+Decision D254 (Claude's readings of your answers): Date closed is the iPad's own date, set by Closed and cleared by reopening, never typed; Item / Part text and Type are not edited here; on an R3c item Owner and Notes stay editable though the rules rewrite the Notes. Your "some / all per floor" wording is task T169. → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

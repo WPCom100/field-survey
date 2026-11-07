@@ -76,6 +76,8 @@ export type DeviceCardProps = {
   onOpenPhoto?: (photoId: string) => void;
   /** Open a connection end in the end editor (T22). */
   onOpenEnd?: (endId: string) => void;
+  /** Open a punch item or missing part in the item editor (T162). */
+  onOpenItem?: (kind: 'punch' | 'part', id: string) => void;
 };
 
 type Pending =
@@ -392,17 +394,23 @@ export function DeviceCard(props: DeviceCardProps) {
         <Section title={`Punch items (${card.punch.length})${card.drafts.length ? ` + proposals (${card.drafts.length})` : ''}`} marks="" testID="card.section.punch">
           {card.punch.length === 0 && card.drafts.length === 0 ? <Text style={styles.muted}>None.</Text> : null}
           {card.punch.map((p) => (
-            <View key={p.id} style={[styles.item, !p.open && styles.closed]} testID={`card.punch.${p.item}`}>
+            <Pressable
+              key={p.id}
+              style={[styles.item, !p.open && styles.closed]}
+              onPress={() => props.onOpenItem?.('punch', p.id)}
+              disabled={!props.onOpenItem}
+              testID={`card.punch.${p.item}`}>
               <View style={styles.itemLine}>
                 <Text style={styles.itemId}>{p.label === 'NEW' ? 'NEW' : `#${p.label}`}</Text>
                 <Text style={styles.itemText} numberOfLines={2}>
                   {p.item}
                 </Text>
+                {props.onOpenItem ? <Text style={styles.chev}>›</Text> : null}
               </View>
               <Text style={styles.itemSub} numberOfLines={2}>
                 {[p.deviceText, p.type, p.owner, p.tracking, p.notes].filter(Boolean).join(' · ')}
               </Text>
-            </View>
+            </Pressable>
           ))}
           {card.drafts.map((dr) => (
             <DraftRow key={dr.id} draft={dr} decider={props.decider} readOnly={readOnly} onDecided={onEdited} />
@@ -412,18 +420,24 @@ export function DeviceCard(props: DeviceCardProps) {
         <Section title={`Missing parts (${card.parts.length})`} marks="" testID="card.section.parts">
           {card.parts.length === 0 ? <Text style={styles.muted}>None.</Text> : null}
           {card.parts.map((m) => (
-            <View key={m.id} style={[styles.item, m.partStatus === 'Installed' && styles.closed]} testID={`card.part.${m.part}`}>
+            <Pressable
+              key={m.id}
+              style={[styles.item, m.partStatus === 'Installed' && styles.closed]}
+              onPress={() => props.onOpenItem?.('part', m.id)}
+              disabled={!props.onOpenItem}
+              testID={`card.part.${m.part}`}>
               <View style={styles.itemLine}>
                 <Text style={styles.itemId}>{m.label === 'NEW' ? 'NEW' : `#${m.label}`}</Text>
                 <Text style={styles.itemText} numberOfLines={2}>
                   {m.part}
                   {m.qty != null ? ` ×${m.qty}` : ''}
                 </Text>
+                {props.onOpenItem ? <Text style={styles.chev}>›</Text> : null}
               </View>
               <Text style={styles.itemSub} numberOfLines={2}>
                 {[m.partStatus, m.owner, m.sources.length ? `src ${m.sources.join(', ')}` : null, m.notes].filter(Boolean).join(' · ')}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </Section>
 

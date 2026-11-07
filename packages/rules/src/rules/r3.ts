@@ -181,12 +181,23 @@ export function addressKindOf(discriminator: string | null | undefined): Address
  * the project's `R3c.*.item`, or the built-in default (the master's Neuron rows).
  */
 export function isAddressItem(ctx: RuleContext, kind: AddressKind, p: PunchItemRow): boolean {
-  const proposal = p.proposal_id ? ctx.index.proposal.get(p.proposal_id) : null;
-  if (proposal?.rule_id === 'R3c') return addressKindOf(proposal.discriminator) === kind;
-  if (p.item === addressItemText(ctx, kind) || p.item === DEFAULT_ITEM[kind]) return true;
-  if (p.rule_id !== 'R3c' || kind !== 'neuron') return false;
+  return addressItemKind(ctx.params, p, p.proposal_id ? (ctx.index.proposal.get(p.proposal_id) ?? null) : null) === kind;
+}
+
+/**
+ * Which kind of R3c item a punch item is, or null: `isAddressItem` without a rule context, for
+ * screens that read one item (the punch item editor, T162). `proposal` is the item's proposal row.
+ */
+export function addressItemKind(
+  params: RuleContext['params'],
+  p: { item: string | null; rule_id: string | null },
+  proposal: { rule_id: string; discriminator: string | null } | null,
+): AddressKind | null {
+  if (proposal?.rule_id === 'R3c') return addressKindOf(proposal.discriminator);
+  const text = ADDRESS_KINDS.find((k) => p.item === textParam(params, 'R3c', ITEM_KEY[k].item) || p.item === DEFAULT_ITEM[k]);
+  if (text) return text;
   // an R3c item whose proposal is gone and whose text matches no kind: the Neuron item under another wording
-  return !ADDRESS_KINDS.some((k) => k !== 'neuron' && (p.item === addressItemText(ctx, k) || p.item === DEFAULT_ITEM[k]));
+  return p.rule_id === 'R3c' ? 'neuron' : null;
 }
 
 /** The R3c items of one kind among a group's levels, the rule's own first, then `sort_last`, then by number. */

@@ -15,6 +15,8 @@
  * - A connection (card row or Conns tab row) opens the end editor in the same panel (T22, Phase 3
  *   §4.5); "Jump to" a far end on another level opens that level (`onOpenLevel`), where a sheet that
  *   is not downloaded leaves the list and the card usable ("plan not downloaded").
+ * - A punch item or missing part (card row, or Punch / Parts tab row) opens the item editor in the
+ *   same panel (T162, D254): status, Owner, Notes; ◀ goes back to where it was opened.
  * - The photo flow (T21) is a full-screen modal over all of it.
  * - Long-press on the sheet (T23, Phase 3 §4.6) opens the add-here menu: + Device (field
  *   addition, form in the side panel, a grey "+" pin marks the spot), + Note here, + Photo here,
@@ -83,6 +85,8 @@ import { useSharedValue } from 'react-native-reanimated';
 import { movePin } from '../card/actions';
 import { DeviceCard } from '../card/DeviceCard';
 import { EndEditor } from '../ends/EndEditor';
+import type { ItemKind } from '../items/actions';
+import { ItemEditor } from '../items/ItemEditor';
 import { AddDevicePanel } from '../additions/AddDevicePanel';
 import { PlacePanel } from '../placement/PlacePanel';
 import { loadUnplaced, tagProposals, type LevelUnplaced, type Proposal } from '../placement/model';
@@ -254,8 +258,11 @@ export function PlanScreen(props: PlanScreenProps) {
   const [moveError, setMoveError] = useState<string | null>(null);
   /** The photo flow (camera, library or an existing photo) over the whole screen. */
   const [photoReq, setPhotoReq] = useState<PhotoRequest | null>(null);
-  /** The end editor in the side panel, opened from the card or from the Conns tab. */
-  const [endView, setEndView] = useState<{ endId: string; from: 'card' | 'list' } | null>(null);
+  /** The side panel's editor over the card / lists: a connection end (T22) or a punch item / part (T162), opened from the card or a tab. */
+  const [detail, setDetail] = useState<{ kind: 'end' | ItemKind; id: string; from: 'card' | 'list' } | null>(null);
+  const endView = detail?.kind === 'end' ? { endId: detail.id, from: detail.from } : null;
+  /** The punch item / part editor (T162), opened from the card or from the Punch / Parts tab. */
+  const itemView = detail && detail.kind !== 'end' ? { kind: detail.kind, id: detail.id, from: detail.from } : null;
   /** "Download plan" for a sheet that is not on this iPad: null, busy, or the failure. */
   const [sheetFetch, setSheetFetch] = useState<'busy' | string | null>(null);
   const [sheetTick, setSheetTick] = useState(0);
@@ -377,7 +384,7 @@ export function PlanScreen(props: PlanScreenProps) {
     setPlacing(true);
     setGridOpen(false);
     setCardOpen(false);
-    setEndView(null);
+    setDetail(null);
     setAdding(null);
     setMoving(null);
     setPress(null);
@@ -677,7 +684,7 @@ export function PlanScreen(props: PlanScreenProps) {
     (id: string | null, from: 'plan' | 'list') => {
       setSelectedId(id);
       setCardOpen(!!id);
-      setEndView(null);
+      setDetail(null);
       setAdding(null);
       if (id) setGridOpen(false);
       if (!id) return;
@@ -767,7 +774,7 @@ export function PlanScreen(props: PlanScreenProps) {
         if (adding) return; // the form stays open; Cancel closes it
         setSelectedId(null);
         setCardOpen(false);
-        setEndView(null);
+        setDetail(null);
       } else if (hit.kind === 'pin') {
         const id = renderPins[hit.index]!.id;
         if (id === NEW_PIN_ID) return;
@@ -1188,7 +1195,7 @@ export function PlanScreen(props: PlanScreenProps) {
                     setPress(null);
                     setSelectedId(null);
                     setCardOpen(false);
-                    setEndView(null);
+                    setDetail(null);
                     setAdding({ at: press.sheet, category: null });
                   }}
                   onPhoto={() => {
@@ -1276,7 +1283,7 @@ export function PlanScreen(props: PlanScreenProps) {
                       if (gridOpen) return closeGrid();
                       setGridOpen(true);
                       setCardOpen(false);
-                      setEndView(null);
+                      setDetail(null);
                       setAdding(null);
                     }}>
                     <Text style={styles.toolText}>⌗ Grid</Text>
@@ -1415,7 +1422,7 @@ export function PlanScreen(props: PlanScreenProps) {
               backLabel={endView.from === 'card' && selectedId ? (deviceById.get(selectedId)?.label ?? 'Device') : 'Connections'}
               onBack={() => {
                 if (endView.from === 'list') setCardOpen(false);
-                setEndView(null);
+                setDetail(null);
               }}
               onEdited={onEdited}
               onJump={onJump}
@@ -1432,6 +1439,27 @@ export function PlanScreen(props: PlanScreenProps) {
               }
               resolveBlobUri={props.resolveBlobUri ?? noBlob}
               onOpenPhoto={props.blobs ? (photoId, title) => setPhotoReq({ kind: 'open', photoId, title }) : undefined}
+            />
+          ) : itemView ? (
+            <ItemEditor
+              key={`${itemView.kind}:${itemView.id}`}
+              store={store}
+              editor={editor}
+              kind={itemView.kind}
+              id={itemView.id}
+              levelId={levelId}
+              reloadKey={`${String(reloadKey)}|${edits}|${rulesVersion}`}
+              names={props.names ?? NO_NAMES}
+              backLabel={
+                itemView.from === 'card' && selectedId ? (deviceById.get(selectedId)?.label ?? 'Device') : itemView.kind === 'punch' ? 'Punch' : 'Parts'
+              }
+              onBack={() => {
+                if (itemView.from === 'list') setCardOpen(false);
+                setDetail(null);
+              }}
+              onEdited={onEdited}
+              onJump={onJump}
+              canOpenLevels={!!onOpenLevel}
             />
           ) : cardOpen && selectedId ? (
             <DeviceCard
@@ -1465,11 +1493,12 @@ export function PlanScreen(props: PlanScreenProps) {
                   : undefined
               }
               onOpenPhoto={props.blobs ? (photoId) => setPhotoReq({ kind: 'open', photoId, title: deviceById.get(selectedId)?.label ?? 'Photo' }) : undefined}
-              onOpenEnd={(endId) => setEndView({ endId, from: 'card' })}
+              onOpenEnd={(endId) => setDetail({ kind: 'end', id: endId, from: 'card' })}
+              onOpenItem={(kind, id) => setDetail({ kind, id, from: 'card' })}
             />
           ) : null}
           {/* The lists stay mounted under an open card, so their scroll position survives. */}
-          <View style={[styles.lists, (placing && plan?.sheet && sheetUri) || adding || endView || gridOpen || (cardOpen && selectedId) ? styles.hidden : null]}>
+          <View style={[styles.lists, (placing && plan?.sheet && sheetUri) || adding || detail || gridOpen || (cardOpen && selectedId) ? styles.hidden : null]}>
           <View style={styles.tabs}>
             {TABS.map((t) => {
               const n = t === 'devices' ? visible.length : rowsByTab[t].length;
@@ -1550,8 +1579,12 @@ export function PlanScreen(props: PlanScreenProps) {
                     if (item.tab === 'connections') {
                       // a connection opens its end editor; its device's pin is lit behind it
                       if (item.deviceId) select(item.deviceId, 'list');
-                      setEndView({ endId: item.id, from: 'list' });
-                    } else if (item.deviceId) select(item.deviceId, 'list'); // the list is hidden under an open card: a tap always opens it (T155)
+                      setDetail({ kind: 'end', id: item.id, from: 'list' });
+                    } else {
+                      // a punch item or part opens its editor (T162), its device's pin lit behind it
+                      if (item.deviceId) select(item.deviceId, 'list');
+                      setDetail({ kind: item.tab === 'punch' ? 'punch' : 'part', id: item.id, from: 'list' });
+                    }
                   }}
                 />
               ) : (

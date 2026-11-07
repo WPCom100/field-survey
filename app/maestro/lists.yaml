@@ -3,7 +3,8 @@
 # device only; B1's Punch list shows #8's Device text from its device and follows a Relocated
 # room at once (T81); typing a Neuron ID takes the station off B2's "Missing all Device Neuron
 # IDs" item (T34 upkeep, D170); a rack's card asks for no Neuron ID (T68).
-# Not here: Tracking status and Part status — no screen edits them yet (blocked: T162).
+# The item editor (T162): a Punch row opens it, Tracking status Open → Closed stamps Date closed, an
+# owner chip, a part Needed → Ordered; the rules' Neuron ID item is read-only and links B2-D1.
 appId: productions.luminarytechnology.fieldsurvey
 name: F2 — punch, parts and Conns lists
 ---

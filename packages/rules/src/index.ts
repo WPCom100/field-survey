@@ -80,6 +80,7 @@ export {
   takesKits,
   kitNote,
   isAddressItem,
+  addressItemKind,
   addressItemText,
   addressKindOf,
   actionableEnds,

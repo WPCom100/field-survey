@@ -1,4 +1,4 @@
-# F2 on B1 and B2 (T81, T34, T68): the Punch list's Device text, a Relocated that it follows at
+# F2 on B1 and B2 (T81, T34, T68, T162): the Punch list's Device text, a Relocated that it follows at
 # once, and the Neuron ID item's Notes. Starts on Levels.
 appId: productions.luminarytechnology.fieldsurvey
 ---
@@ -10,8 +10,16 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: plan.row.punch.8
     text: '.*Install cover.*B1-S3 · .*Corridor XXB1-C005, north.*'
+# a Punch row opens the item editor (T162); its device button opens the card
 - tapOn:
     id: plan.row.punch.8
+- extendedWaitUntil:
+    visible:
+      id: item.title
+      text: '.*Install cover.*'
+    timeout: 5000
+- tapOn:
+    id: item.device
 - extendedWaitUntil:
     visible:
       id: card.close
@@ -37,6 +45,63 @@ appId: productions.luminarytechnology.fieldsurvey
       id: plan.row.punch.8
       text: '.*B1-S3 · .*Corridor XXB1-C006; moved from Corridor XXB1-C005, north.*'
     timeout: 10000
+# T162: Tracking status Open → Closed stamps Date closed; an owner chip; ◀ back to the list
+- tapOn:
+    id: plan.row.punch.8
+- extendedWaitUntil:
+    visible:
+      id: item.status.Open
+      text: ✓ Open
+    timeout: 5000
+- tapOn:
+    id: item.status.Closed
+- extendedWaitUntil:
+    visible:
+      id: item.dateClosed
+      text: 'Date closed \d{4}-\d\d-\d\d.*'
+    timeout: 5000
+- assertVisible:
+    id: item.status.Closed
+    text: ✓ Closed
+- tapOn:
+    id: item.owner.EC/ETC
+- extendedWaitUntil:
+    visible:
+      id: item.owner.EC/ETC
+      text: ✓ EC/ETC
+    timeout: 5000
+- tapOn:
+    id: item.history
+- assertVisible: '.*Tracking status.*'
+- assertVisible: 'Open → Closed'
+- tapOn:
+    id: item.back
+- extendedWaitUntil:
+    visible:
+      id: plan.row.punch.8
+      text: '.*EC/ETC · Closed.*'
+    timeout: 10000
+# Parts: Needed → Ordered on the level's first part
+- tapOn:
+    id: plan.tab.parts
+- tapOn:
+    id: 'plan\.row\.parts\..*'
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: item.status.Needed
+      text: ✓ Needed
+    timeout: 5000
+- tapOn:
+    id: item.status.Ordered
+- extendedWaitUntil:
+    visible:
+      id: item.status.Ordered
+      text: ✓ Ordered
+    timeout: 5000
+- tapOn:
+    id: item.back
+- assertVisible: '.*· Ordered'
 - tapOn:
     id: plan.back
 # B2: "Missing all Device Neuron IDs" (#9) names B2-D1 and B2-S1
@@ -80,6 +145,29 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: plan.row.punch.9
     text: '.*Missing all Device Neuron IDs.*'
+# T162: the rules keep this item; its status is read-only and B2-D1 is a link to its card
+- tapOn:
+    id: plan.row.punch.9
+- extendedWaitUntil:
+    visible:
+      id: item.rule
+    timeout: 5000
+- assertVisible:
+    id: item.status.Closed
+    enabled: false
+- assertVisible:
+    id: item.missing.B2-D1
+- assertNotVisible:
+    id: item.missing.B2-S1
+- tapOn:
+    id: item.missing.B2-D1
+- extendedWaitUntil:
+    visible:
+      id: card.close
+    timeout: 5000
+- assertVisible: B2-D1
+- tapOn:
+    id: card.close
 - runFlow: _search-clear.yaml
 # T68: a rack or NSPS hosts the Unison bus and is asked for no Neuron ID; the station is
 - tapOn:
