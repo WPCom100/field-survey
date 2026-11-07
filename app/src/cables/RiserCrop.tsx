@@ -115,8 +115,8 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
   else if (source && 'problem' in source)
     body = (
       <View style={styles.gap}>
-        <Text style={styles.error}>{source.problem}</Text>
-        <Pressable style={styles.btn} onPress={() => setTick((n) => n + 1)}>
+        <Text style={styles.error} testID="riser.problem">{source.problem}</Text>
+        <Pressable style={styles.btn} onPress={() => setTick((n) => n + 1)} testID="riser.retry">
           <Text style={styles.btnText}>Try again</Text>
         </Pressable>
       </View>
@@ -125,9 +125,9 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
   else if (!uri)
     body = (
       <View style={styles.gap}>
-        <Text style={styles.muted}>Riser not downloaded.</Text>
+        <Text style={styles.muted} testID="riser.missing">Riser not downloaded.</Text>
         {blobs && source.blob ? (
-          <Pressable style={styles.btn} onPress={download} disabled={fetching === 'busy'}>
+          <Pressable style={styles.btn} onPress={download} disabled={fetching === 'busy'} testID="riser.download">
             <Text style={styles.btnText}>{fetching === 'busy' ? 'Downloading…' : fetching ? '⤓ Try again' : '⤓ Download riser'}</Text>
           </Pressable>
         ) : null}
@@ -144,7 +144,7 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
             <RiserPdf uri={uri} page={source.page} riser={riser} onError={onPdfError} />
           </View>
         )}
-        <Pressable style={styles.btn} onPress={() => setBig(true)}>
+        <Pressable style={styles.btn} onPress={() => setBig(true)} testID="riser.enlarge">
           <Text style={styles.btnText}>⤢ Enlarge</Text>
         </Pressable>
       </View>
@@ -162,7 +162,7 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
                 Riser crop{source.title ? ` · ${source.title}` : ''}
               </Text>
               <Text style={styles.muted}>Pinch to zoom · drag to pan</Text>
-              <Pressable style={[styles.btn, styles.push]} onPress={() => setBig(false)}>
+              <Pressable style={[styles.btn, styles.push]} onPress={() => setBig(false)} testID="riser.close">
                 <Text style={styles.btnText}>Close</Text>
               </Pressable>
             </View>

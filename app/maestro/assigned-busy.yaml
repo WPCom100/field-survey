@@ -1,0 +1,17 @@
+# Step 3 of `rig.sh assigned` (T166, T124 "Everything else keeps working"), on B as Bob: rig.sh has
+# just posted the 14 MB `Level 02 Concourse` PDF as 02's display sheet (the worker held to a share
+# of a CPU so the job runs for minutes). Meanwhile B syncs and opens 06M's plan: both finish
+# without waiting for the upload; rig.sh then checks the job is still running.
+appId: productions.luminarytechnology.fieldsurvey
+name: Assigned — B syncs and opens a plan while a large sheet is processed
+---
+- runFlow: _sync.yaml
+- tapOn:
+    id: level.06M
+- extendedWaitUntil:
+    visible:
+      id: plan.place               # shown once the sheet is drawn
+    timeout: 30000
+- assertNotVisible: 'Plan not downloaded.*'
+- tapOn:
+    id: plan.back

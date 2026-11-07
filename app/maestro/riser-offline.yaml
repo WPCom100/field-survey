@@ -1,0 +1,70 @@
+# Step 2 of `rig.sh riser` (T166), on A as Ann with the api stopped: the B3B run's crop still opens
+# (cached, T106 "Cached"). Review drafts opened now cannot list the imports ("Excluded BOM lines:
+# needs a connection"), so 06's X run to "B7 Stair A fixture" accepted with Confirm endpoint is
+# made without the riser's blob, by file name only (D195). In Cable / riser, still offline, its crop
+# says the riser upload list did not load, with Try again (T106 "Accepted offline").
+appId: productions.luminarytechnology.fieldsurvey
+name: Riser — a cached crop offline; a riser cable accepted offline
+---
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: 'Cable / riser \(2\)'
+    timeout: 30000
+- tapOn:
+    id: cables.row
+    text: '.*B3B Elev Core C fixture.*'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: riser.enlarge
+- assertNotVisible:
+    id: riser.download
+- tapOn: ← Levels
+
+# accepted offline
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.drafts
+- tapOn:
+    id: drafts.level.06
+- tapOn:
+    id: drafts.tab.devices
+- extendedWaitUntil:
+    visible: 'Excluded BOM lines: needs a connection to the server\.'
+    timeout: 30000
+- tapOn:
+    id: drafts.tab.cables
+- tapOn: '.*X, .*, B7 Stair A fixture, .*'
+- tapOn:
+    id: draft.cable.confirm
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: 'Accepted — the cable is made'
+    timeout: 10000
+- tapOn:
+    id: setup.home
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: 'Cable / riser \(3\)'
+    timeout: 30000
+- tapOn:
+    id: cables.row
+    text: '.*B7 Stair A fixture.*'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: riser.retry
+- assertVisible:
+    id: riser.problem
+    text: 'The riser upload list \(to find riser\.pdf\) did not load: the server is not reachable.*'
+- tapOn:
+    id: riser.retry
+- extendedWaitUntil:
+    visible:
+      id: riser.problem
+    timeout: 30000
+- tapOn: ← Levels

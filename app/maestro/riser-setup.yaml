@@ -1,0 +1,142 @@
+# Step 1 of `rig.sh riser` (T166), on A as Ann: a fresh pipeline project (pipeline.yaml makes
+# PROJECT). The 06M rack draft (ERN4-RM-120) accepted and placed; online, Confirm endpoint on two
+# riser cables from it: 01's F run (made on the placed end, its far end waiting for the 01 draft) and
+# 06's X run to the placeholder "B3B Elev Core C fixture" (made). 06's F run to Level 28 rejected
+# (a state B must see). Cable / riser: the F run's crop needs ⤓ Download riser once; the B3B run
+# then opens its crop straight away, no download (T106 "Cached"); enlarged and closed. Sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Riser — two riser cables on the placed rack, the riser downloaded once
+---
+- runFlow: pipeline.yaml
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.drafts
+
+# the 06M rack: accept, place
+- tapOn:
+    id: drafts.level.06M
+- tapOn:
+    id: drafts.tab.devices
+- tapOn: '.*ERN4-RM-120, Equipment Rack 18U, Equipment Panels, 1, .*'
+- tapOn:
+    id: draft.accept
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: Accepted
+    timeout: 10000
+- tapOn:
+    id: setup.step.place
+- tapOn:
+    id: setup.place.06M
+- tapOn:
+    text: '⤓ Download plan now'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: place.item
+    timeout: 60000
+- runFlow:
+    file: _place-one.yaml
+    env:
+      ROW: '.*ERN4-RM-120.*'
+      AT: 40%,50%
+      PLACED: 'Placed 06M-\? Equipment Rack 18U\.'
+- tapOn:
+    id: place.done
+- tapOn:
+    id: plan.back
+
+# online: 01's F run to it (made on the placed end), 06's X run to a placeholder (made)
+- tapOn:
+    id: setup.step.drafts
+- tapOn:
+    id: drafts.level.01
+- tapOn:
+    id: drafts.tab.cables
+- tapOn: '.*F, ERN4-RM-120 Equipment Rack 18U \(draft, 01\), .*'
+- tapOn:
+    id: draft.cable.confirm
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: 'Accepted — the cable is made on the placed end; its far end follows when that draft is placed'
+    timeout: 10000
+- tapOn:
+    id: drafts.level.06
+- tapOn:
+    id: drafts.tab.cables
+- tapOn: '.*X, .*, B3B Elev Core C fixture, .*'
+- tapOn:
+    id: draft.cable.confirm
+- extendedWaitUntil:
+    visible:
+      id: drafts.notice
+      text: 'Accepted — the cable is made'
+    timeout: 10000
+- tapOn: '.*F, .*, Level 28, .*'
+- tapOn:
+    id: draft.reject
+- tapOn:
+    id: draft.reject.reason
+- inputText: maestro
+- pressKey: Enter             # the first tap after typing only closes the keyboard
+- tapOn:
+    id: draft.reject.submit
+- extendedWaitUntil:
+    notVisible:
+      id: draft.reject.submit
+    timeout: 10000
+
+# Cable / riser: the riser downloaded once, the second cable's crop cached
+- tapOn:
+    id: setup.home
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: 'Cable / riser \(2\)'
+    timeout: 30000
+- tapOn:
+    id: cables.row
+    text: '.*\(draft on 01, not placed yet\).*'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: riser.download
+- assertVisible:
+    id: riser.missing
+- tapOn:
+    id: riser.download
+- extendedWaitUntil:
+    notVisible:
+      id: riser.download
+    timeout: 60000
+- runFlow:                     # the crop is taller than the button was: Enlarge sits under it
+    file: _side-down.yaml
+    env:
+      ID: riser.enlarge
+- assertVisible: 'Riser crop · riser\.pdf p\.\d+'
+- tapOn:
+    id: cables.row
+    text: '.*B3B Elev Core C fixture.*'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: riser.enlarge
+- assertNotVisible:
+    id: riser.missing
+- assertNotVisible:
+    id: riser.download
+- tapOn:
+    id: riser.enlarge
+- extendedWaitUntil:
+    visible: 'Pinch to zoom · drag to pan'
+    timeout: 15000
+- tapOn:
+    id: riser.close
+- extendedWaitUntil:
+    notVisible: 'Pinch to zoom · drag to pan'
+    timeout: 10000
+- tapOn: ← Levels
+- runFlow: _sync.yaml

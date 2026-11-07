@@ -1,0 +1,23 @@
+# Step 3 of `rig.sh riser` (T166, T106 "Accepted offline"), on A as Ann once the api is back: after
+# a sync the B7 run's crop finds the riser by its file name (the import list) and opens it from the
+# cache; rig.sh then checks the server's cable still has no blob in its riser_ref (nothing written back).
+appId: productions.luminarytechnology.fieldsurvey
+name: Riser — the cable accepted offline finds its riser after the sync
+---
+- runFlow: _sync.yaml
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: 'Cable / riser \(3\)'
+    timeout: 30000
+- tapOn:
+    id: cables.row
+    text: '.*B7 Stair A fixture.*'
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: riser.enlarge
+- assertNotVisible:
+    id: riser.problem
+- assertVisible: 'Riser crop · riser\.pdf p\.\d+'
+- tapOn: ← Levels

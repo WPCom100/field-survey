@@ -1,0 +1,23 @@
+# Step 4 of `rig.sh assigned` (T166, T25 "Download assigned levels"), on B as Bob once 02's sheet
+# job is done: after a sync Cached levels lists 02 too, not fetched (⬇) like 03, and 06M ✓. Download
+# assigned levels queues nothing ("Nothing to download: every plan for your levels is already on
+# this iPad."), and 02 / 03 stay ⬇.
+appId: productions.luminarytechnology.fieldsurvey
+name: Assigned — Download assigned levels fetches only 06M
+---
+- runFlow: _sync.yaml
+- tapOn:
+    id: nav.sync
+- extendedWaitUntil:
+    visible: 02 ⬇
+    timeout: 30000
+- assertVisible: 03 ⬇
+- assertVisible: 06M ✓
+- tapOn: Download assigned levels
+- extendedWaitUntil:
+    visible: 'Nothing to download: every plan for your levels is already on this iPad\.'
+    timeout: 15000
+- assertVisible: 02 ⬇
+- assertVisible: 03 ⬇
+- assertVisible: 06M ✓
+- tapOn: ← Levels

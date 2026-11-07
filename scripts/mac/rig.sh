@@ -118,9 +118,19 @@ usage: bash scripts/mac/rig.sh <command>
                         stopped that name's app_user row is deleted (an old backup) and stranger-edit.yaml
                         queues an edit; stranger-check.yaml: the Sync screen names the lost user, Re-sign in
                         carries the edit over to the name's new id, and the server has it under that name
+  assigned              T166: a copy of the master by curl with the 06M and 03 sheets; assigned.yaml on A
+                        (Ann: 06M × Bob, the network-kit Lint flag, R3a owner → ETC), assigned-peer.yaml on
+                        B (Bob: only 06M's sheet fetched, his draft reads ETC); the 02 Concourse PDF posted
+                        with the worker at RIG_SHEET_CPUS (0.3) CPU while B syncs and opens a plan
+                        (assigned-busy.yaml, the job still running after); assigned-after.yaml (02 ⬇)
+  riser                 T166: riser-setup.yaml on A (its own pipeline project: two riser cables made on
+                        the placed 06M rack, the riser downloaded once, the second opens cached); with the
+                        api stopped riser-offline.yaml (a cached crop, a cable accepted with Confirm
+                        endpoint → "could not … load" + Try again); riser-online.yaml (found by file name
+                        after a sync); riser-peer.yaml on B (the draft states, each cable once)
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
-     RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT RIG_EXPORT_CPUS
+     RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT RIG_EXPORT_CPUS RIG_SHEET_CPUS
      RIG_PICKER=old|new (the Files picker's tap spots; default by the simulator's iOS: 26+ new)
 EOF
 }
@@ -1012,6 +1022,119 @@ cmd_scale_check() {  # W5 (T159): the scale project's timings on a fresh store, 
   say "scale-check: green (every number under its ceiling)"
 }
 
+api() {  # METHOD path [curl args...] -> the server's answer, as Ann (setup by curl, T166)
+  local m="$1" p="$2"
+  shift 2
+  curl -fsS -X "$m" -H "Authorization: Bearer $TOKEN" -H "X-Survey-User: Ann" "$@" "$SERVER_URL$p"
+}
+
+json_field() {  # key -> that field of the JSON object on stdin
+  python3 -c 'import json, sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"
+}
+
+level_id() {  # project id, level code -> the level's id
+  api GET /projects | python3 -c '
+import json, sys
+p = [p for p in json.load(sys.stdin) if p["id"] == sys.argv[1]][0]
+print([l["id"] for l in p["levels"] if l["level"] == sys.argv[2]][0])
+' "$1" "$2"
+}
+
+post_import() {  # project id, kind, file [level id] -> the new batch's id (a plan sheet with a level id is its display sheet)
+  local args=(-F "project_id=$1" -F "kind=$2" -F "file=@$ROOT/$3")
+  [ -n "${4:-}" ] && args+=(-F "level_id=$4" -F sheet_kind=display)
+  api POST /imports "${args[@]}" | json_field id
+}
+
+batch_state() {  # batch id -> its job_state
+  api GET "/imports/$1" | json_field job_state
+}
+
+wait_batch() {  # batch id, seconds -> returns once done; dies when it failed or ran out of time
+  local st=""
+  for _ in $(seq 1 "$(($2 / 2))"); do
+    st="$(batch_state "$1")"
+    case "$st" in done) return ;; failed) die "import batch $1 failed: $(api GET "/imports/$1")" ;; esac
+    sleep 2
+  done
+  die "import batch $1 still $st after $2 s"
+}
+
+seed_copy_curl() {  # name -> the new project's id, the master imported into it (no Files picker; T164, T166)
+  local pid
+  pid="$(api POST /projects -H "Content-Type: application/json" \
+    -d "$(python3 -c 'import json, sys; print(json.dumps({"name": sys.argv[1], "levels": [{"level": "06M"}]}))' "$1")" | json_field id)"
+  wait_batch "$(post_import "$pid" master_xlsx fixtures/Lighting_Control_Survey_Master_B2-06_4.xlsx)" 300
+  echo "$pid"
+}
+
+cmd_assigned() {  # T166: assignments decide which sheets a second iPad fetches; the api answers while a large sheet is processed
+  local pid bid st worker all cpus="${RIG_SHEET_CPUS:-0.3}" t0
+  server_up
+  cmd_second
+  say "assigned on \"$PROJECT\": a copy of the master with the 06M and 03 sheets, made by curl"
+  pid="$(seed_copy_curl "$PROJECT")"
+  wait_batch "$(post_import "$pid" plans fixtures/Level_06M_-_Lighting_Composite_vector.pdf "$(level_id "$pid" 06M)")" 300
+  wait_batch "$(post_import "$pid" plans fixtures/Level_03_-_Lighting_Composite_vector.pdf "$(level_id "$pid" 03)")" 300
+  USER_NAME=Ann cmd_flows --device A assigned.yaml
+  USER_NAME=Bob cmd_flows --device B assigned-peer.yaml
+  # T124: the 14 MB Concourse sheet (54 s at full speed on the rig, too short to look at) with the
+  # worker held to a share of a CPU, so it is still being processed when B has synced and opened a plan
+  worker="$(cd "$ROOT/server" && $COMPOSE ps -q worker)"
+  [ -n "$worker" ] || die "the worker is not running: rig.sh server"
+  all="$(docker info --format '{{.NCPU}}')"   # `docker update --cpus 0` does not lift a limit (T165)
+  trap 'docker update --cpus "$all" "$worker" >/dev/null 2>&1 || true' EXIT
+  docker update --cpus "$cpus" "$worker" >/dev/null
+  bid="$(post_import "$pid" plans "fixtures/Level 02 Concourse - Composite (vector).pdf" "$(level_id "$pid" 02)")"
+  t0="$(date +%s)"
+  say "02 Concourse posted (batch $bid, worker at $cpus CPU): B syncs and opens 06M meanwhile"
+  USER_NAME=Bob cmd_flows --device B assigned-busy.yaml
+  st="$(batch_state "$bid")"
+  say "the Concourse job $(($(date +%s) - t0)) s after it was posted, B's sync and plan done: $st"
+  case "$st" in queued|running) ;; *) die "the Concourse job was already $st: B's flow did not overlap it (lower RIG_SHEET_CPUS)" ;; esac
+  docker update --cpus "$all" "$worker" >/dev/null
+  trap - EXIT
+  wait_batch "$bid" 600
+  say "the Concourse job done $(($(date +%s) - t0)) s after it was posted"
+  USER_NAME=Bob cmd_flows --device B assigned-after.yaml
+  # A's Lint raised R4d on the network kit part while N was off, and resolved it when N came back
+  st="$(server_sql "$PROJECT" "select f.state || ' ' || f.message from finding f join project p on p.id = f.project_id
+    where p.name = :'name' and f.lint_id = 'R4d' and f.deleted_at is null;")"
+  say "the server's R4d findings on \"$PROJECT\": $st"
+  case "$st" in 'resolved Network termination kits are not parts: "Network termination kit - '*' run"') ;;
+    *) die "expected one resolved R4d finding on the network kit part" ;; esac
+  say "assigned: green"
+}
+
+cmd_riser() {  # T166: riser crops cached and offline (T106), the draft states on a second iPad (T44)
+  local rows
+  server_up
+  cmd_second
+  say "riser on \"$PROJECT\": A (Ann) makes a pipeline project, two riser cables online, one offline; B (Bob) sees them"
+  USER_NAME=Ann cmd_flows --device A riser-setup.yaml
+  cmd_server stop
+  trap 'cmd_server start >/dev/null 2>&1 || true' EXIT
+  USER_NAME=Ann cmd_flows --device A riser-offline.yaml
+  cmd_server start
+  trap - EXIT
+  for _ in $(seq 1 30); do curl -fsS "$SERVER_URL/health" >/dev/null 2>&1 && break; sleep 1; done
+  server_up
+  USER_NAME=Ann cmd_flows --device A riser-online.yaml
+  USER_NAME=Bob cmd_flows --device B riser-peer.yaml
+  # the cables on the server: the two accepted online carry the riser's blob; the one accepted
+  # offline only its file name, and nothing wrote a blob back (D195)
+  rows="$(server_sql "$PROJECT" "select coalesce(dc.to_label, '?') = 'B7 Stair A fixture',
+      c.riser_ref->>'file', (c.riser_ref->>'blob') is not null, c.endpoint_confirmed
+    from cable c join project p on p.id = c.project_id
+    left join draft_cable dc on dc.id::text = c.riser_ref->>'draft'
+    where p.name = :'name' and c.deleted_at is null order by 1, 3;")"
+  say "the server's cables on \"$PROJECT\" (B7 run, riser file, has the blob, confirmed):"
+  printf '%s\n' "$rows" | sed 's/^/  /'
+  [ "$(printf '%s\n' "$rows" | tr '\n' '|')" = "f riser.pdf t t|f riser.pdf t t|t riser.pdf f t|" ] \
+    || die "expected two cables with the riser's blob and the B7 run with its file name only, all confirmed"
+  say "riser: green"
+}
+
 cmd_status() {
   say "simulators:"; xcrun simctl list devices | grep -E "$SIM_A|$SIM_B" || echo "  none"
   say "build: $(built_app || echo none)"
@@ -1056,6 +1179,8 @@ case "${1:-}" in
   restart) cmd_restart ;;
   long-export) cmd_long_export ;;
   stranger) cmd_stranger ;;
+  assigned) cmd_assigned ;;
+  riser) cmd_riser ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;
 esac

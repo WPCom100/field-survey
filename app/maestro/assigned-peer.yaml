@@ -1,0 +1,50 @@
+# Step 2 of `rig.sh assigned` (T166), on B as Bob after A's assigned.yaml: PROJECT arrives with A's
+# assignment (the Levels home's 06M carries ●) and both display sheets (06M, 03). Sync → Cached
+# levels: 06M's sheet is fetched (✓) and 03's is not (⬇) — only the assigned level (T25, D97).
+# T102 "Second iPad": 06M-04's open "Run DMX to … CT04LCPA" draft reads ETC on B, after B's own
+# rules run with A's changed Run item owner; the Rules tab reads "1 set away".
+appId: productions.luminarytechnology.fieldsurvey
+name: Assigned — B fetches the assigned level's sheet only; B's draft follows A's rule change
+---
+- runFlow: _launch.yaml          # a cleared store: one left from an older server lifetime fails every pull (404)
+- runFlow: _connect.yaml
+- runFlow: _open-project.yaml
+- runFlow: _sync.yaml
+- extendedWaitUntil:
+    visible: '06M  ●, .*'          # the Levels row is one element
+    timeout: 30000
+- assertNotVisible: '03  ●, .*'
+
+# only 06M's sheet comes down
+- tapOn:
+    id: nav.sync
+- extendedWaitUntil:
+    visible: 06M ✓
+    timeout: 120000
+- assertVisible: 03 ⬇
+- tapOn: ← Levels
+
+# B's draft follows the owner A set
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-04
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.reject\.Run DMX to .*CT04LCPA'
+- extendedWaitUntil:
+    visible: 'Cable not run · ETC'
+    timeout: 20000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- assertVisible: '.*1 set away from the built-in defaults\.'
+- tapOn:
+    id: setup.home

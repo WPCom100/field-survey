@@ -1,0 +1,178 @@
+# Step 1 of `rig.sh assigned` (T166), on A as Ann: PROJECT is a copy of the master that rig.sh made
+# by curl with two display sheets, 06M and 03. Setup → Assignments: 06M × Bob (so Bob's iPad fetches
+# 06M's sheet only, T25). T103 "Per code": 06M-01's N run C-17 (to 04-05) Not installed → its Run
+# draft and this end's network kit accepted → R4b N off → Lint flags the kit part "Network
+# termination kits are not parts" → N on → the finding goes. T102 "Second iPad": 06M-04's C-13 Not
+# installed (an open "Run DMX to …" draft) and R3a Run item owner (any other code) → ETC, left set
+# for B. Sync.
+appId: productions.luminarytechnology.fieldsurvey
+name: Assigned — 06M to Bob, the network-kit flag, an owner change for B
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow: _open-project.yaml
+
+# 06M × Bob
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.assignments
+- tapOn:
+    id: assign.06M.Bob
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn:
+    id: setup.home
+
+# T103: a network kit part on 06M-01
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-01
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-17
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-17
+- tapOn:
+    id: end.this.status.Not installed
+- assertVisible: ✓ Not installed
+- tapOn:
+    id: end.back
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.accept\.Run network to .*'
+- tapOn:
+    id: 'proposal\.accept\.Run network to .*'
+- extendedWaitUntil:
+    notVisible:
+      id: 'proposal\.accept\.Run network to .*'
+    timeout: 10000
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.accept\.Network termination kit - .* run'
+- tapOn:
+    id: 'proposal\.accept\.Network termination kit - .* run'
+- extendedWaitUntil:
+    notVisible:
+      id: 'proposal\.accept\.Network termination kit - .* run'
+    timeout: 10000
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.section.parts
+- assertVisible: '.*Network termination kit - .* run.*'
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# R4b N off → Lint flags the part
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- scrollUntilVisible:
+    element:
+      id: rules.R4b.kit.NG
+    direction: DOWN
+    centerElement: true
+    timeout: 60000           # the Rules tab is long
+- tapOn:
+    id: rules.R4b.kit.N
+- extendedWaitUntil:
+    visible:
+      id: rules.R4b.kit.N
+      text: 'N: off'
+    timeout: 10000
+- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- tapOn:
+    id: setup.home
+- runFlow: _lint-open.yaml
+- tapOn:
+    id: lint.level.06M
+- runFlow:
+    file: _lint-find.yaml
+    env:
+      TEXT: '.*Network termination kits are not parts: "Network termination kit - .* run".*'
+- tapOn: ← Levels
+
+# N on again → the finding goes
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- tapOn:
+    id: rules.only            # only the changed rows: no long scroll (T158)
+- tapOn:
+    id: rules.R4b.kit.N
+- extendedWaitUntil:
+    visible: Nothing changed yet.
+    timeout: 10000
+- pressKey: Enter
+- tapOn:
+    id: setup.home
+- runFlow: _lint-open.yaml
+- tapOn:
+    id: lint.level.06M
+- extendedWaitUntil:
+    notVisible: '.*Network termination kits are not parts.*'
+    timeout: 15000
+- tapOn: ← Levels
+
+# T102: an open Run draft on 06M-04, then the owner change B will follow
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: 06M
+      DEVICE: 06M-04
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.conn.C-13
+- runFlow:
+    file: _open-end.yaml
+    env:
+      CONN: C-13
+- tapOn:
+    id: end.this.status.Not installed
+- assertVisible: ✓ Not installed
+- tapOn:
+    id: end.back
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: 'proposal\.reject\.Run DMX to .*CT04LCPA'
+- extendedWaitUntil:
+    visible: 'Cable not run · EC'
+    timeout: 10000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.rules
+- scrollUntilVisible:
+    element:
+      id: 'rules\.R3a\.run\.owner\.\*\.ETC'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'rules\.R3a\.run\.owner\.\*\.ETC'
+- assertVisible: 'Run item owner  changed'
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: setup.home
+    direction: UP
+- tapOn:
+    id: setup.home
+- runFlow: _sync.yaml

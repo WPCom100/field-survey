@@ -4,6 +4,8 @@ stored import PDF around a draft's `source_ref.bbox` with the bbox outlined in r
 
 import io
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import pytest
 from conftest import HDR
@@ -111,3 +113,22 @@ def test_crop_route(client, session, store):
     store.objects.clear()
     gone = client.get(url, headers=HDR, params={"page": 1, "bbox": "1,1,5,5"})
     assert gone.status_code == 404
+
+
+RISER = Path(__file__).resolve().parents[2] / "fixtures" / "riser.pdf"
+
+
+def test_crops_rendered_at_once_from_several_threads_all_succeed():
+    """The api renders crops from FastAPI's thread pool and PDFium is not thread-safe: two crops at
+    once (the review panel's From and To) failed "Data format error" until a lock (T166)."""
+    if not RISER.exists():
+        pytest.skip(f"golden fixture missing: {RISER} (CLAUDE.md §6)")
+    data = RISER.read_bytes()
+    boxes = [(1322.7, 1889.3, 20.6, 9.6), (1360.7, 1146.5, 20.2, 9.6), (1310.5, 2003.5, 91.7, 46.4)]
+
+    def one(i: int) -> bytes:
+        return crops.render_crop(data, 1, boxes[i % len(boxes)], pad=120, px=800)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        pngs = list(pool.map(one, range(24)))
+    assert all(p.startswith(b"\x89PNG") for p in pngs)

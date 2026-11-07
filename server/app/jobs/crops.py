@@ -7,9 +7,15 @@ that region with some page around it and the region itself outlined in red — t
 riser symbol, or the wire bubble whose endpoints are being confirmed (D6).
 
 Pure: bytes in, PNG bytes out. No database, no network.
+
+PDFium is not thread-safe, and the api serves this route from FastAPI's thread pool: the review
+panel asks for two crops at once (its From and To sources), and unlocked those requests failed
+"Failed to load document (PDFium: Data format error)" — 9 of 15 on the rig (T166). One lock
+around every PDFium call; the PNG encoding stays outside it.
 """
 
 import io
+import threading
 
 import pypdfium2 as pdfium
 from PIL import Image, ImageDraw
@@ -18,6 +24,8 @@ MAX_PX = 2000
 MIN_PX = 200
 MAX_SCALE = 6.0
 MARK = (211, 47, 47)
+_PDFIUM = threading.Lock()
+"""Held around every PDFium call in this process (PDFium is not thread-safe, T166)."""
 
 
 class CropError(ValueError):
@@ -51,27 +59,30 @@ def render_crop(
     the page, rendered so its long edge is about `px` pixels, as PNG; with `mark`, the bbox
     itself outlined in red."""
     px = max(MIN_PX, min(MAX_PX, int(px)))
-    doc = pdfium.PdfDocument(pdf)
-    try:
-        if page < 1 or page > len(doc):
-            raise CropError(f"page {page} is not in this PDF ({len(doc)} pages)")
-        p = doc[page - 1]
+    x, y, w, h = bbox
+    with _PDFIUM:
+        doc = pdfium.PdfDocument(pdf)
         try:
-            pw, ph = p.get_size()
-            x, y, w, h = bbox
-            x0, top = max(0.0, x - pad), max(0.0, y - pad)
-            x1, bottom = min(pw, x + w + pad), min(ph, y + h + pad)
-            if x1 - x0 < 1 or bottom - top < 1:
-                raise CropError("bbox is outside the page")
-            scale = min(MAX_SCALE, px / max(x1 - x0, bottom - top))
-            # pdfium crops are (left, bottom, right, top) margins from the page edges
-            img = (
-                p.render(scale=scale, crop=(x0, ph - bottom, pw - x1, top)).to_pil().convert("RGB")
-            )
+            if page < 1 or page > len(doc):
+                raise CropError(f"page {page} is not in this PDF ({len(doc)} pages)")
+            p = doc[page - 1]
+            try:
+                pw, ph = p.get_size()
+                x0, top = max(0.0, x - pad), max(0.0, y - pad)
+                x1, bottom = min(pw, x + w + pad), min(ph, y + h + pad)
+                if x1 - x0 < 1 or bottom - top < 1:
+                    raise CropError("bbox is outside the page")
+                scale = min(MAX_SCALE, px / max(x1 - x0, bottom - top))
+                # pdfium crops are (left, bottom, right, top) margins from the page edges
+                img = (
+                    p.render(scale=scale, crop=(x0, ph - bottom, pw - x1, top))
+                    .to_pil()
+                    .convert("RGB")
+                )
+            finally:
+                p.close()
         finally:
-            p.close()
-    finally:
-        doc.close()
+            doc.close()
     if mark:
         draw = ImageDraw.Draw(img)
         line = max(2, round(scale * 1.2))

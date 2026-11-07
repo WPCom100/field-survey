@@ -1,0 +1,66 @@
+# Step 4 of `rig.sh riser` (T166, T44 "Second iPad"), on B as Bob: after a sync Review drafts shows
+# A's states — the 06M rack accepted, 01's F run and 06's B3B and B7 runs accepted, 06's Level 28
+# run rejected — and Cable / riser holds the three cables made from them, each once.
+appId: productions.luminarytechnology.fieldsurvey
+name: Riser — B sees the draft states and each accepted cable once
+---
+- runFlow: _launch.yaml          # a cleared store: one left from an older server lifetime fails every pull (404)
+- runFlow: _connect.yaml
+- runFlow: _open-project.yaml
+- runFlow: _sync.yaml
+
+# Cable / riser: three cables, each once
+- tapOn:
+    id: nav.cable-riser
+- extendedWaitUntil:
+    visible: 'Cable / riser \(3\)'
+    timeout: 60000
+- assertVisible:
+    id: cables.row
+    text: '.*\(draft on 01, not placed yet\).*'
+- assertVisible:
+    id: cables.row
+    text: '.*B3B Elev Core C fixture.*'
+- assertVisible:
+    id: cables.row
+    text: '.*B7 Stair A fixture.*'
+- assertNotVisible:
+    id: cables.row
+    text: '.*B3B Elev Core C fixture.*'
+    index: 1
+- assertNotVisible:
+    id: cables.row
+    text: '.*B7 Stair A fixture.*'
+    index: 1
+- tapOn: ← Levels
+
+# Review drafts: the same states as on A
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.drafts
+- tapOn:
+    id: drafts.level.06M
+- tapOn:
+    id: drafts.tab.devices
+- tapOn:
+    id: drafts.filter.all
+- assertVisible: '.*ERN4-RM-120, Equipment Rack 18U, Equipment Panels, 1, .*✓ accepted.*'
+- tapOn:
+    id: drafts.level.01
+- tapOn:
+    id: drafts.tab.cables
+- tapOn:
+    id: drafts.filter.all
+- assertVisible: '.*F, ERN4-RM-120 Equipment Rack 18U \(draft, 01\), .*✓ accepted.*'
+- tapOn:
+    id: drafts.level.06
+- tapOn:
+    id: drafts.filter.all
+- assertVisible: '.*X, .*, B3B Elev Core C fixture, .*✓ accepted.*'
+- assertVisible: '.*X, .*, B7 Stair A fixture, .*✓ accepted.*'
+- assertVisible: '.*F, .*, Level 28, .*✗ rejected.*'
+- tapOn:
+    id: drafts.filter.open
+- tapOn:
+    id: setup.home

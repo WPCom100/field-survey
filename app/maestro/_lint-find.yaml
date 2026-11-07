@@ -1,0 +1,17 @@
+# Lint's findings list (the left ~46 % of the screen) scrolled down until TEXT (a regex on a row)
+# is on screen: scrollUntilVisible swipes the middle of the screen and never moves it (T158). The
+# caller passes TEXT in env; Lint is open.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- repeat:
+    times: 30
+    while:
+      notVisible: ${TEXT}
+    commands:
+      - swipe:
+          start: 25%,80%
+          end: 25%,40%
+          duration: 500
+      - waitForAnimationToEnd:
+          timeout: 2000
+- assertVisible: ${TEXT}
