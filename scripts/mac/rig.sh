@@ -196,7 +196,7 @@ cmd_setup() {
   command -v pod >/dev/null || { say "installing CocoaPods"; brew install cocoapods; }
   command -v maestro >/dev/null || { say "installing Maestro"; curl -Ls "https://get.maestro.mobile.dev" | bash; export PATH="$HOME/.maestro/bin:$PATH"; }
   command -v maestro >/dev/null || die "Maestro installed but not on PATH: add \$HOME/.maestro/bin to PATH and rerun"
-  docker info >/dev/null 2>&1 || say "warning: Docker is not running (Docker Desktop or OrbStack); 'rig.sh server' needs it"
+  docker info >/dev/null 2>&1 || say "warning: Docker is not running (colima start, Docker Desktop or OrbStack); 'rig.sh server' needs it"
   say "pnpm install"
   (cd "$ROOT" && pnpm install --frozen-lockfile)
   ensure_sim "$SIM_A" >/dev/null

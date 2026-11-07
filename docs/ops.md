@@ -305,32 +305,51 @@ Log every published update as an update row in §5.4.
 
 ## 6. The Mac test rig (T149, D248)
 
-One Mac on the office Wi-Fi runs the **iOS Simulator**; Claude drives it with **Maestro** flows (`app/maestro/`) against a **local copy of the server** in Docker. It takes the functional half of the on-device checks (taps, screens, labels, sync between two simulators, offline against a stopped server). What stays on a real iPad: Pencil, camera, true airplane mode, TestFlight and dev builds and their updates, performance on the hardware, and every check of whether the *information* is right (CLAUDE.md §7 5a).
+One Mac runs the **iOS Simulator** (since 2026-11-06 a Mac mini M4 rented from Rent-a-Mac, §6.1; before that Zach's Mac on the office Wi-Fi); Claude drives it with **Maestro** flows (`app/maestro/`) against a **local copy of the server** in Docker. It takes the functional half of the on-device checks (taps, screens, labels, sync between two simulators, offline against a stopped server). What stays on a real iPad: Pencil, camera, true airplane mode, TestFlight and dev builds and their updates, performance on the hardware, and every check of whether the *information* is right (CLAUDE.md §7 5a).
 
 Nothing on the Mac ships. The iPads only ever get EAS builds (§5), and `eas.json` is **not** edited for the rig: it is hashed into the runtime fingerprint, and a `simulator` profile moves the runtime from `24fe50c2` to `bd041b87` (measured 2026-11-03), after which the next CI update would reach no installed build. The profile waits for the next build cycle (T150, D249). Until then the rig builds its own Simulator app locally.
 
 ### 6.1 Once: the Mac
 
-Any Apple-silicon Mac; a base Mac mini is enough. On it:
+Any Apple-silicon Mac with 16 GB or more; a base Mac mini is enough.
 
-1. **Xcode** from the App Store (only for the Simulator and the local build). Open it once, install the iOS platform when it asks, then `sudo xcodebuild -license accept`.
-2. **Homebrew**, **Node 24** (`brew install node@24`), **Docker** (Docker Desktop or OrbStack), **Git**, **Java 17** (`brew install openjdk@17`; Maestro runs on the JVM and `rig.sh flows` stops without it). Clone the repo; the `fixtures/` folder is private and comes from the PC.
-3. **SSH in from the PC** (System Settings → General → Sharing → Remote Login), so Claude Code on Windows runs `ssh mac 'cd field-survey && bash scripts/mac/rig.sh …'` and pulls screenshots back with `scp`. Claude Code can also run on the Mac itself. `ssh mac "…"` starts a non-login shell that reads only `~/.zshenv`, so brew, Docker, Maestro and Java must be on the path there (first run, T151):
+**The rig today (2026-11-06):** a dedicated Mac mini **M4, 16 GB, 256 GB**, macOS 26.7.2, rented monthly from **Rent-a-Mac** (rentamac.io), user `rentamac` (admin). On the PC, `~/.ssh/config` has:
+
+```
+Host mac
+  HostName gate1.rentamac.io
+  Port 27848
+  User rentamac
+  IdentityFile ~/.ssh/field_survey_mac
+  IdentitiesOnly yes
+  HostKeyAlgorithms ssh-ed25519        # SHA256:BgMqpYWRC9PVXdrt3MfbbjQ3sTujO7sUeWlrfn10yxg, from Rent-a-Mac
+  ServerAliveInterval 30
+  ServerAliveCountMax 4
+```
+
+Login is by key only (`field_survey_mac.pub` is in the Mac's `~/.ssh/authorized_keys`); the account password is in the Rent-a-Mac portal and is needed only for `sudo`. **Never shut down or restart the rented Mac** (no `shutdown`, `reboot`, or a macOS update that restarts): it is a physical machine, and Rent-a-Mac's staff take up to one business day to power it back on. Colima is a `brew services` agent, so Docker comes back by itself after any restart they do. The previous rig (Zach's Mac, behind a WireGuard tunnel since it left the office) is `Host mac-zach`.
+
+Setting up a Mac from scratch (how the rented one was done):
+
+1. **Xcode** (only for the Simulator and the local build). Rent-a-Mac preinstalls it; otherwise the App Store, opened once. Then the simulator runtime: `xcodebuild -downloadPlatform iOS` (about 8.5 GB). If `xcode-select -p` shows `/Library/Developer/CommandLineTools`, which Homebrew's installer leaves behind, point it back: `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
+2. **Homebrew** (its installer needs `sudo`; over SSH run it with `NONINTERACTIVE=1` and a `SUDO_ASKPASS` helper you delete afterwards), then `brew install node@24 openjdk@17 cocoapods colima docker docker-compose` and Maestro from its tap (`brew tap mobile-dev-inc/tap && brew install mobile-dev-inc/tap/maestro`; `rig.sh setup` would otherwise use the `curl | bash` installer). Then `npm install -g pnpm`.
+3. **Docker in Colima**, headless (Docker Desktop needs a click-through at the screen on first launch): `colima start --vm-type vz --mount-type virtiofs --cpu 4 --memory 4 --disk 40`, `brew services start colima`, `docker context use colima`, and point Compose at brew's plugin: `~/.docker/config.json` = `{"cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]}`. `rig.sh server` then works unchanged.
+4. **The repo.** The rented Mac has no GitHub credentials: it was cloned from a `git bundle` of `main` made on the PC, with `fixtures/` (private) sent as a tar over `ssh`; day-to-day changes arrive the same way (tar of the changed files). `origin` points at GitHub for when a read-only deploy key is added.
+5. **SSH from the PC**, so Claude Code on Windows runs `ssh mac 'cd field-survey && bash scripts/mac/rig.sh …'` and pulls screenshots back with `scp` (on a Mac of your own: System Settings → General → Sharing → Remote Login). `ssh mac "…"` starts a non-login shell that reads only `~/.zshenv`, so brew, Node, Maestro and Java must be on the path there:
 
    ```
-   # field-survey rig (T149): ssh mac "..." needs these without a login shell
-   [ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
-   export PATH="$HOME/.maestro/bin:$PATH"
+   # field-survey rig (T149; docs/ops.md §6.1): ssh mac "..." needs these without a login shell
+   [ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv zsh)"
+   export PATH="/opt/homebrew/opt/node@24/bin:$HOME/.maestro/bin:$PATH"
    export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8          # CocoaPods fails without a UTF-8 locale
-   # Docker Desktop's CLI
-   export PATH="/usr/local/bin:$HOME/.docker/bin:$PATH"
-   # Java 17 for Maestro (Homebrew's openjdk@17 is keg-only)
+   # Java 17 for Maestro (Homebrew openjdk@17 is keg-only)
    export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
    export PATH="$JAVA_HOME/bin:$PATH"
+   # Docker: Colima (headless; rented Mac, 2026-11-06), its docker context is active
    ```
 
-   The Mac also sleeps after a minute idle and the SSH session then times out. Run long commands under `caffeinate -i` (`ssh mac 'cd field-survey && caffeinate -i bash scripts/mac/rig.sh flows'`), or set System Settings → Energy → *Prevent automatic sleeping when the display is off* on the rig.
-4. In the repo: `bash scripts/mac/rig.sh setup`. It checks the Xcode command-line tools, installs **Maestro** (the official script, into `~/.maestro/bin`) and **CocoaPods**, runs `pnpm install`, and creates and boots the simulator **Field Survey iPad** (the newest iPad Pro device type on the newest iOS runtime). It ends with `rig: ready`.
+   Run long commands under `caffeinate -i` (`ssh mac 'cd field-survey && caffeinate -i bash scripts/mac/rig.sh flows'`) so the Mac does not sleep mid-run, and start very long ones (the first `build`) with `nohup … > ~/rig-build.log 2>&1 &` so a dropped connection does not kill them.
+6. In the repo: `bash scripts/mac/rig.sh setup`. It checks the Xcode command-line tools, installs Maestro and CocoaPods if they are missing, runs `pnpm install`, and creates and boots the simulator **Field Survey iPad** (the newest iPad Pro device type on the newest iOS runtime). It ends with `rig: ready`. Then `server`, `build`, `metro` and `flows` as in §6.2. On the rented Mac the first `build` took about 15 minutes with Xcode 26.6 and the iOS 26.5 runtime; over SSH it ends with an `osascript … System Events` error after installing the app, which is harmless (Expo tries to bring the Simulator window forward). The very first flow after a fresh Metro can fail in `_launch` because the cold bundle is slow and the dev client's onboarding *Continue* appears late: run it again. Smoke ran green twice in a row on 2026-11-06.
 
 ### 6.2 Each session
 
