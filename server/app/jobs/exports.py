@@ -58,6 +58,8 @@ ACTIVE = ("queued", "running")  # at most one per project and kind (D166)
 EXPORT_USER_NAME = "export"  # the daily backup's system user
 DAILY_GAP = timedelta(hours=20)  # D149: a restart never doubles the day's backup
 DATA_TABS = ("Devices", "Connections", "Punch List", "Missing Parts", "Photo Log")
+COMPARING = "Comparing with the last export"
+COMPARE_EVERY = 500  # rows between the compare's progress reports (Cancel lands there, T170)
 
 
 def _event(event: str, **data: Any) -> None:
@@ -213,18 +215,6 @@ def build(
     except LookupError as e:
         raise ExportError(str(e)) from e
     sha = hashlib.sha256(data_bytes).hexdigest()
-    progress("Saving the file")
-    if session.get(Blob, sha) is None:
-        store.put_file(object_key(sha), io.BytesIO(data_bytes), XLSX_MIME)
-        session.add(
-            Blob(
-                sha256=sha,
-                size=len(data_bytes),
-                mime=XLSX_MIME,
-                upload_state="complete",
-                chunks_received=[],
-            )
-        )
     n = session.scalar(
         select(func.count())
         .select_from(Export)
@@ -242,10 +232,24 @@ def build(
         )
         .order_by(Export.created_at.desc())
     ).first()
-    row.blob = sha
+    # Compared before it is saved (T170, D261): the compare reports progress, so a Cancel during
+    # it stops the job with nothing stored; after "Saving the file" the job only finishes.
     if previous:
-        progress("Comparing with the last export")
-    row.diff_summary = diff_summary(store, previous, data) if previous else None
+        progress(COMPARING)
+    row.diff_summary = diff_summary(store, previous, data, progress) if previous else None
+    progress("Saving the file")
+    if session.get(Blob, sha) is None:
+        store.put_file(object_key(sha), io.BytesIO(data_bytes), XLSX_MIME)
+        session.add(
+            Blob(
+                sha256=sha,
+                size=len(data_bytes),
+                mime=XLSX_MIME,
+                upload_state="complete",
+                chunks_received=[],
+            )
+        )
+    row.blob = sha
     stats = {
         **data.stats,
         "filename": filename_for(data.levels, (n or 0) + 1),
@@ -337,10 +341,13 @@ def build_floor_pdf(
     return stats
 
 
-def _rows_by_key(ws) -> dict[tuple, tuple]:
-    """Data rows of a tab keyed by (Level, ID | #); the Image column is never compared."""
+def _rows_by_key(ws, tick: Callable[[], None] = lambda: None) -> dict[tuple, tuple]:
+    """Data rows of a tab keyed by (Level, ID | #); the Image column is never compared. `tick`
+    runs every `COMPARE_EVERY` rows (the job's progress report, where Cancel lands — T170)."""
     out: dict[tuple, tuple] = {}
     for r in range(4, ws.max_row + 1):
+        if (r - 4) % COMPARE_EVERY == COMPARE_EVERY - 1:
+            tick()
         values = [ws.cell(r, c).value for c in range(1, ws.max_column + 1)]
         if all(v is None for v in values):
             continue
@@ -350,9 +357,14 @@ def _rows_by_key(ws) -> dict[tuple, tuple]:
 
 
 def diff_summary(
-    store: ObjectStore, previous: Export, data: export_xlsx.ExportData
+    store: ObjectStore,
+    previous: Export,
+    data: export_xlsx.ExportData,
+    progress: export_xlsx.ProgressFn = export_xlsx.no_progress,
 ) -> dict[str, Any]:
-    """Rows added / removed / changed per tab against the previous xlsx export."""
+    """Rows added / removed / changed per tab against the previous xlsx export. Reports
+    `Comparing with the last export n / N tabs` at each tab and every `COMPARE_EVERY` rows, so
+    Cancel stops it (T170, D261); reading the previous file is one step and reports nothing."""
     out: dict[str, Any] = {"previous": str(previous.id), "tabs": {}}
     if not previous.blob:
         out["note"] = "previous export has no file"
@@ -365,15 +377,19 @@ def diff_summary(
         out["note"] = f"previous export unreadable: {type(e).__name__}"
         return out
     exported = set(data.stats.get("tabs") or DATA_TABS)
-    for tab in DATA_TABS:
-        # compare only tabs both files have (an export may leave tabs out, D141)
-        if tab not in exported or tab not in old.sheetnames:
-            continue
+    # compare only tabs both files have (an export may leave tabs out, D141)
+    tabs = [t for t in DATA_TABS if t in exported and t in old.sheetnames]
+    for i, tab in enumerate(tabs):
+
+        def tick(i: int = i) -> None:
+            progress(COMPARING, i, len(tabs), "tabs")
+
+        tick()
         new_rows = {
             (r[0], r[1]): tuple(v.isoformat() if hasattr(v, "isoformat") else v for v in r)
             for r in data.rows.get(tab, [])
         }
-        old_rows = _rows_by_key(old[tab]) if tab in old.sheetnames else {}
+        old_rows = _rows_by_key(old[tab], tick)
         added = [k for k in new_rows if k not in old_rows]
         removed = [k for k in old_rows if k not in new_rows]
         changed = [

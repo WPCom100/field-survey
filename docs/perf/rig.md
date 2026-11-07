@@ -67,8 +67,9 @@ regression number beside T94's Droplet one (`docs/perf/tp3.md`), not a substitut
 | worker at 0.1 CPU (`RIG_EXPORT_CPUS`, D259; cancelled in Photo Log) | 12–18 s | ~22 pictures/s | — | — | ~9 min (estimated) |
 
 "Comparing with the last export" (the diff against the previous workbook) now costs more than the
-rest of the job together on this project, and it reports no progress, so Cancel does not stop it
-(T170).
+rest of the job together on this project. Since T170 it reports progress per tab and every 500
+rows and runs before "Saving the file", so Cancel stops it; reading the previous workbook is still
+one step that reports nothing (T171 measures how much of the stage it is).
 
 ## Keeping it useful
 

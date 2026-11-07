@@ -124,6 +124,65 @@ def test_cancel_stops_a_running_export(session, store, factory, monkeypatch):
     assert row.stats["started_at"] and row.stats["finished_at"]
 
 
+def test_cancel_during_the_compare_stops_the_export(session, store, factory, monkeypatch):
+    """T170: "Comparing with the last export" reports progress (per tab and every
+    `COMPARE_EVERY` rows), so a Cancel pressed during it ends `cancelled`, before anything is
+    saved; it used to finish `done`."""
+    user = upsert_user(session, "Landry")
+    out = projects.create_project(
+        session, projects.ProjectIn(name="Compare", levels=[projects.LevelIn(level="06")]), user
+    )
+    project_id = uuid.UUID(out.id)
+    add_photos(session, project_id, 3)
+    first_id = exports.create_export(session, project_id=project_id, user=user).id
+    assert exports.run_export(factory, store, first_id) == "done"
+    export_id = exports.create_export(session, project_id=project_id, user=user).id
+
+    seen = []
+    real_call = exports.Progress.__call__
+
+    def watch(self, stage, done=None, total=None, unit=None):
+        self.every = 0  # every report is written and reads Cancel, as a slow compare's would
+        seen.append((stage, done, total, unit))
+        real_call(self, stage, done, total, unit)
+
+    real_rows = exports._rows_by_key
+
+    def press_cancel_in_the_photo_log(ws, tick=lambda: None):
+        if ws.title == "Photo Log":  # the last tab: only the compare's row reports can catch it
+            with factory() as s:
+                assert exports.cancel_export(s, export_id, upsert_user(s, "Wiley")).job_state == (
+                    "running"
+                )
+        return real_rows(ws, tick)
+
+    monkeypatch.setattr(exports.Progress, "__call__", watch)
+    monkeypatch.setattr(exports, "_rows_by_key", press_cancel_in_the_photo_log)
+    monkeypatch.setattr(exports, "COMPARE_EVERY", 1)
+    assert exports.run_export(factory, store, export_id) == "cancelled"
+
+    row = fresh(session, export_id)
+    assert row.job_state == "cancelled" and row.blob is None and row.diff_summary is None
+    assert exports.export_out(row)["cancelled_by"] == "Wiley"
+    # it stopped inside the compare: "Saving the file" never started
+    assert exports.COMPARING in row.stats["stage_seconds"]
+    assert "Saving the file" not in row.stats["stage_seconds"]
+    tabs = [s for s in seen if s[0] == exports.COMPARING and s[3] == "tabs"]
+    assert tabs[0] == (exports.COMPARING, 0, len(exports.DATA_TABS), "tabs")
+    assert tabs[-1][1] == len(exports.DATA_TABS) - 1  # the Photo Log, its first row
+
+    # the next export compares to the first one and finishes; Saving now comes after the compare
+    monkeypatch.setattr(exports, "_rows_by_key", real_rows)
+    seen.clear()
+    again_id = exports.create_export(session, project_id=project_id, user=user).id
+    assert exports.run_export(factory, store, again_id) == "done"
+    again = fresh(session, again_id)
+    assert again.blob and again.diff_summary["previous"] == str(first_id)
+    assert again.diff_summary["tabs"]["Photo Log"]["rows"] == 3
+    stages = [s[0] for s in seen]
+    assert stages.index(exports.COMPARING) < stages.index("Saving the file")
+
+
 # ------------------------------------------------------------- progress
 
 

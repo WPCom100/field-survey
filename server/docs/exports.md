@@ -55,13 +55,15 @@ reads the server's tables, never the local store.
 | `export.diff_summary` | against the project's previous done xlsx export: per data tab `rows`, `added`, `removed`, `changed` (by Level + ID / #) and up to five `examples`; `null` for the first export |
 | `export.job_state` | `queued → running → done`, `failed` or `cancelled` (D137, D166; `failed` rows are retried by `run_export` only on request) |
 | `export.stats` while running | `started_at`, `stage`, and for a counted stage `done` / `total` / `unit` (`Photo Log 3,200 / 10,000 pictures`), plus `stage_seconds` of the stages finished; written by `Progress` at each new stage and at most once a second. The finished row keeps `started_at`, `stage_seconds` and adds `finished_at` (T94 measures with them) |
-| `export.cancel_requested_at`, `cancelled_by_id` | Cancel (D166); a running job reads them on each progress write |
+| `export.cancel_requested_at`, `cancelled_by_id` | Cancel (D166); a running job reads them on each progress write — every stage up to `Saving the file` reports, so Cancel stops the workbook anywhere before it is stored (T170, D261) |
 
 **One at a time (T93, D166).** At most one queued or running export per project and kind (the
 partial unique index `ux_export_active`): a second `POST` is refused with 409 naming the active
 one, so the iPad shows that card instead. Stages: workbook `Starting` → `Reading the records` →
-`Photo Log` (counted, only with the Photo Log tab) → `Writing the workbook` → `Saving the file`
-→ `Comparing with the last export`; floor PDF `Reading the records` → `Devices` (counted) →
+`Photo Log` (counted, only with the Photo Log tab) → `Writing the workbook` → `Comparing with
+the last export` (only with a previous workbook; counted in tabs and reported every 500 rows, so
+Cancel stops it — T170, D261; reading the previous file is one uninterrupted step) → `Saving the
+file`; floor PDF `Reading the records` → `Devices` (counted) →
 `Plan snapshot` → `Photos` (counted) → `Rendering the PDF` → `Saving the file`. A worker restart
 (a deploy) puts a `running` export back to `queued` (or `cancelled` when Cancel was pressed) and it
 runs again from the start. The daily backup skips a project whose workbook is queued or running
