@@ -83,6 +83,8 @@ export {
   addressItemKind,
   addressItemText,
   addressKindOf,
+  addressWordings,
+  isAllNotes,
   actionableEnds,
   LINT_RULES,
   VOCAB_FIELDS,

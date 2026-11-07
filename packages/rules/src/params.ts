@@ -120,13 +120,19 @@ export const PARAMS: readonly ParamSpec[] = [
     placeholders: ['<signal>'],
   },
   // --- R3c: the address items (T146, D245, D246): Neuron ID, IP address, DMX address
-  { rule: 'R3c', key: 'item', kind: 'text', label: 'Neuron ID item text', changes: 'The Neuron ID item that ends every numbering group.', default: 'Missing all Device Neuron IDs' },
+  // T169 (D258): one item per floor and kind, worded "all" when no device on the floor that needs the address has one, "some" otherwise
+  { rule: 'R3c', key: 'item', kind: 'text', label: 'Neuron ID item text (none has one)', changes: 'The Neuron ID item of a floor where no device has its Neuron ID yet.', default: 'Missing all Device Neuron IDs' },
+  { rule: 'R3c', key: 'some.item', kind: 'text', label: 'Neuron ID item text (some have one)', changes: 'The Neuron ID item of a floor where some devices have their Neuron ID and some do not.', default: 'Missing some Device Neuron IDs' },
   { rule: 'R3c', key: 'owner', kind: 'owner', label: 'Neuron ID item owner', changes: 'The Owner of the Neuron ID item (EC or ETC, depending on the job — D246).', default: 'EC' },
-  { rule: 'R3c', key: 'ip.item', kind: 'text', label: 'IP address item text', changes: 'The IP address item that ends every numbering group.', default: 'Missing all Device IP addresses' },
+  { rule: 'R3c', key: 'ip.item', kind: 'text', label: 'IP address item text (none has one)', changes: 'The IP address item of a floor where no device has its IP address yet.', default: 'Missing all Device IP addresses' },
+  { rule: 'R3c', key: 'ip.some.item', kind: 'text', label: 'IP address item text (some have one)', changes: 'The IP address item of a floor where some devices have their IP address and some do not.', default: 'Missing some Device IP addresses' },
   { rule: 'R3c', key: 'ip.owner', kind: 'owner', label: 'IP address item owner', changes: 'The Owner of the IP address item (ETC owns IP addresses — D246).', default: 'ETC' },
-  { rule: 'R3c', key: 'dmx.item', kind: 'text', label: 'DMX address item text', changes: 'The DMX address item that ends every numbering group.', default: 'Missing all Device DMX addresses' },
+  { rule: 'R3c', key: 'dmx.item', kind: 'text', label: 'DMX address item text (none has one)', changes: 'The DMX address item of a floor where no device has its DMX address yet.', default: 'Missing all Device DMX addresses' },
+  { rule: 'R3c', key: 'dmx.some.item', kind: 'text', label: 'DMX address item text (some have one)', changes: 'The DMX address item of a floor where some devices have their DMX address and some do not.', default: 'Missing some Device DMX addresses' },
   { rule: 'R3c', key: 'dmx.owner', kind: 'owner', label: 'DMX address item owner', changes: 'The Owner of the DMX address item (EC or ETC, depending on the job — D246).', default: 'EC' },
-  { rule: 'R3c', key: 'device_text', kind: 'text', label: 'Device text', changes: 'The Punch List Device cell of the three address items.', default: 'All devices' },
+  { rule: 'R3c', key: 'device_text', kind: 'text', label: 'Device text (none has one)', changes: 'The Punch List Device cell of an address item worded "all".', default: 'All devices' },
+  { rule: 'R3c', key: 'some.device_text', kind: 'text', label: 'Device text (some have one)', changes: 'The Punch List Device cell of an address item worded "some" (its Notes list the devices).', default: 'See notes' },
+  { rule: 'R3c', key: 'all.notes', kind: 'text', label: 'Notes (none has one)', changes: 'The Notes of an address item worded "all" (no list: every device on the floor that needs the address is missing it).', default: 'All devices on this floor' },
   {
     rule: 'R3c',
     key: 'neuron_codes',

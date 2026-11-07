@@ -3,11 +3,12 @@
  * jump to its card), Tracking status + Date closed or Part status, Owner, Notes with the project's
  * `punch_note` / `part_note` chips, and its History. An R3c address item ("Missing all Device
  * Neuron IDs", …) is kept by the rules (D49, D170): its status is read-only here and the devices
- * its Notes name are listed per floor as links. No React or Expo imports: runs in Node.
+ * its Notes name are listed per floor as links (none when it reads "Missing all …": its Notes are
+ * a phrase, T169). No React or Expo imports: runs in Node.
  */
 
 import { displayNumber, punchDeviceText, reviewFields, type Store } from '@field-survey/core';
-import { ADDRESS_LABEL, addressItemKind, loadRuleParams, type AddressKind } from '@field-survey/rules';
+import { ADDRESS_LABEL, addressItemKind, isAllNotes, loadRuleParams, type AddressKind } from '@field-survey/rules';
 
 import { historyEntry, type HistoryEntry, type JumpTarget } from '../card/model';
 import { SEED_VOCAB } from '../vocab/seed';
@@ -41,8 +42,11 @@ export type ItemView = {
   pending: ReadonlySet<string>;
   phrases: readonly string[];
   history: HistoryEntry[];
-  /** An R3c address item: its kind, what it waits for, and the devices its Notes name per floor. */
-  rule: { kind: AddressKind; label: string; missing: MissingGroup[] } | null;
+  /**
+   * An R3c address item: its kind, what it waits for, and the devices its Notes name per floor;
+   * `all` when its Notes are the "all" phrase (no device on the floor has the address, T169): no list.
+   */
+  rule: { kind: AddressKind; label: string; all: boolean; missing: MissingGroup[] } | null;
 };
 
 /** History labels of the item's fields (the card's labels are a device's). */
@@ -100,12 +104,16 @@ export async function loadItem(store: Store, kind: ItemKind, id: string, fromLev
   let rule: ItemView['rule'] = null;
   if (kind === 'punch' && projectId) {
     const proposal = str(row.proposal_id) ? await store.get<Row>('proposal', String(row.proposal_id)) : null;
+    const params = await loadRuleParams(store, projectId);
     const k = addressItemKind(
-      await loadRuleParams(store, projectId),
+      params,
       { item: str(row.item), rule_id: str(row.rule_id) },
       proposal ? { rule_id: String(proposal.rule_id), discriminator: str(proposal.discriminator) } : null,
     );
-    if (k) rule = { kind: k, label: ADDRESS_LABEL[k], missing: await missingGroups(store, projectId, str(row.notes), fromLevelId) };
+    if (k) {
+      const all = isAllNotes(params, str(row.notes));
+      rule = { kind: k, label: ADDRESS_LABEL[k], all, missing: all ? [] : await missingGroups(store, projectId, str(row.notes), fromLevelId) };
+    }
   }
 
   const list = kind === 'punch' ? 'punch_note' : 'part_note';

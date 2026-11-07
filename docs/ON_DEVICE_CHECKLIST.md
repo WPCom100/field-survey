@@ -695,9 +695,20 @@ Decision D249 (Proposed): `eas.json` is not edited for the rig; the `simulator` 
 - [ ] **The other iPad follows.** After a sync, the second iPad shows the item Closed with the same Date closed and the part's new status; its History names who changed it. → saw:
 - [ ] **Export.** Export the workbook after closing an item and changing a part: the Punch List row has `Closed` and the date in Date closed; the Missing Parts row has the new Part status; reopening the item (Open) and exporting again clears Date closed. → saw:
 - [ ] **Notes chips.** The Notes chips are the project's Punch notes / Part notes (Vocabulary); a chip adds its phrase with "; " and free typing still works. → saw:
-- [ ] **The rules' address items.** Open "Missing all Device Neuron IDs" on a level: its status buttons are greyed with the "Kept by the rules (R3c)" line, and under "Waiting on" the devices are listed by floor; one tap opens that device's card (a device on another floor opens that floor). Type that device's Neuron ID and come back: it has left the list. → saw:
+- [ ] **The rules' address items.** Open a level's "Missing some Device Neuron IDs" item (since T169 a "Missing all …" item lists no device — see T169 below): its status buttons are greyed with the "Kept by the rules (R3c)" line, and under "Waiting on" that floor's devices are listed; one tap opens that device's card. Type that device's Neuron ID and come back: it has left the list. → saw:
 
 Decision D254 (Claude's readings of your answers): Date closed is the iPad's own date, set by Closed and cleared by reopening, never typed; Item / Part text and Type are not edited here; on an R3c item Owner and Notes stay editable though the rules rewrite the Notes. Your "some / all per floor" wording is task T169. → Approve / change:
+
+## T169 — Address items say "all" or "some" per floor  ·  Needs: no new build (JS update only)
+
+**Why it matters:** the EC and ETC read these rows to know which devices still need a Neuron ID, IP address or DMX address. Each floor now has its own item (06M no longer hides inside 06's), worded "Missing all …" with no list while nothing on the floor has been captured, and "Missing some …" with the floor's missing devices once some have. The rig proved the taps (lists.yaml: B2's item reads "Missing all Device Neuron IDs", Notes "All devices on this floor", no device listed; after B2-S1's Neuron ID it reads "Missing some Device Neuron IDs" and lists only B2-D1, which opens its card). These checks are the wording and the export, which only you can judge. Use the Tower project.
+
+- [ ] **The wording reads right.** On a floor where nobody has typed an ID yet, the Punch tab's last rows read `Missing all Device Neuron IDs` (and IP / DMX where those wires exist), Device `All devices`, Notes `All devices on this floor`. Type one device's Neuron ID on that floor: within a few seconds the row reads `Missing some Device Neuron IDs`, Device `See notes`, Notes the IDs still missing. Clear the ID again: it goes back to "all". → saw:
+- [ ] **06 and 06M.** Accept 06M's own address drafts in Lint (Drafts with no device: `Level 06M`): 06's items now list only 06's devices, 06M's only 06M's. Each floor's PDF shows its own address items at the end of its punch list. → saw:
+- [ ] **History.** Open a reworded item: History shows the Item, Device and Notes changes as "Rule engine R3c". → saw:
+- [ ] **Export.** Export the workbook: each floor's Punch List ends with its address items, the "some" rows with `See notes` in Device and the IDs in Notes, the "all" rows with `All devices` / `All devices on this floor`. Does that read right to the EC and ETC? → saw:
+
+Decision D258 (Claude's readings of your answers): the "all" Notes phrase is `All devices on this floor` (you picked "a short phrase" without wording; it is a rule parameter, Setup → Rules → R3c, if you want other text); the rules reword an item only while it reads one of the known all / some wordings (an item reworded by a ruling keeps its text); a closed item keeps the wording it last had. → Approve / change:
 
 ## Rules for this file
 

@@ -1,5 +1,5 @@
 # F2 on B1 and B2 (T81, T34, T68, T162): the Punch list's Device text, a Relocated that it follows at
-# once, and the Neuron ID item's Notes. Starts on Levels.
+# once, and the Neuron ID item's all / some wording and Notes (T169). Starts on Levels.
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - tapOn:
@@ -116,7 +116,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: '.*· Ordered'
 - tapOn:
     id: plan.back
-# B2: "Missing all Device Neuron IDs" (#9) names B2-D1 and B2-S1
+# B2: "Missing all Device Neuron IDs" (#9): no device on B2 has its Neuron ID yet, so its Notes
+# are the phrase "All devices on this floor" and the editor lists no device (T169, D258)
 - tapOn:
     id: level.B2
 - tapOn:
@@ -124,10 +125,25 @@ appId: productions.luminarytechnology.fieldsurvey
 - runFlow:
     file: _search.yaml
     env:
-      TERM: B2-S1
-- assertVisible:
+      TERM: Neuron
+- extendedWaitUntil:
+    visible:
+      id: plan.row.punch.9
+      text: '.*Missing all Device Neuron IDs.*'
+    timeout: 15000
+- tapOn:
     id: plan.row.punch.9
-    text: '.*Missing all Device Neuron IDs.*'
+- extendedWaitUntil:
+    visible:
+      id: item.missing.all
+    timeout: 5000
+- assertVisible: All devices on this floor
+- assertNotVisible:
+    id: item.missing.B2-D1
+- tapOn:
+    id: item.back
+- runFlow: _search-clear.yaml
+# a Neuron ID typed for B2-S1: B2 now reads "some" and lists only B2-D1 (T34 upkeep, D170, T169)
 - tapOn:
     id: plan.tab.devices
 - tapOn:
@@ -146,17 +162,15 @@ appId: productions.luminarytechnology.fieldsurvey
     id: card.close
 - tapOn:
     id: plan.tab.punch
-- extendedWaitUntil:
-    notVisible:
-      id: plan.row.punch.9
-    timeout: 15000
 - runFlow:
     file: _search.yaml
     env:
       TERM: B2-D1
-- assertVisible:
-    id: plan.row.punch.9
-    text: '.*Missing all Device Neuron IDs.*'
+- extendedWaitUntil:
+    visible:
+      id: plan.row.punch.9
+      text: '.*Missing some Device Neuron IDs.*'
+    timeout: 15000
 # T162: the rules keep this item; its status is read-only and B2-D1 is a link to its card
 - tapOn:
     id: plan.row.punch.9

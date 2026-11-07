@@ -16,7 +16,7 @@ import { DEVICE_CATEGORIES } from '../lints';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow, PunchItemRow } from '../snapshot';
 import { ADDRESS_KINDS, ADDRESS_LABEL, deviceRole, governingCables, parseLibraryAccessories, typeOfDevice, type AddressKind, type LibraryAccessory } from './library';
-import { addressItemText, addressItems, missingAddresses } from './r3';
+import { addressItemText, addressItems, addressSubject, floorAddresses } from './r3';
 import { cableOf, compareIds, compareLevels, deviceLabel, endLabel, signal, str, subjectOfDevice, subjectOfEnd } from './shared';
 
 function hasCode(ctx: RuleContext, d: DeviceRow, code: string): boolean {
@@ -81,23 +81,22 @@ export const ADDRESS_ITEM_LINT: Readonly<Record<AddressKind, string>> = { neuron
 export const LintNeuronItem: Rule = {
   id: 'lint.neuron_item',
   title: 'Address item missing or not last',
-  text: 'A numbering group with a device still missing its Neuron ID, IP address or DMX address has that kind\'s "Missing all Device …" item sorted last (R3c, D49, D245); a group without one, or an item not sorted last, is flagged (`lint.neuron_item`, `lint.ip_item`, `lint.dmx_item`).',
+  text: 'A floor with a device still missing its Neuron ID, IP address or DMX address has that kind\'s "Missing all / some Device …" item sorted last (R3c, D49, D245; per floor since T169, D258); a floor without one, or an item not sorted last, is flagged (`lint.neuron_item`, `lint.ip_item`, `lint.dmx_item`).',
   lints: ADDRESS_KINDS.map((k) => ADDRESS_ITEM_LINT[k]),
   run(ctx) {
-    for (const [groupId, group] of ctx.index.levelsByGroup) {
+    for (const group of ctx.index.levelsByGroup.values()) {
       const levels = group.slice().sort(compareLevels);
-      const first = levels[0];
-      if (!first) continue;
-      for (const kind of ADDRESS_KINDS) {
-        const lint_id = ADDRESS_ITEM_LINT[kind];
-        const text = addressItemText(ctx, kind);
-        const items = addressItems(ctx, kind, levels);
-        for (const p of items) {
-          if (!p.sort_last) ctx.find({ lint_id, subject: { entity_kind: 'punch_item', entity_id: p.id, level_id: p.level_id }, message: `${levelNames(levels)}: "${text}" is not sorted last` });
-        }
-        if (items.length) continue;
-        if (missingAddresses(ctx, kind, levels).length) {
-          ctx.find({ lint_id, subject: { entity_kind: 'numbering_group', entity_id: groupId, level_id: first.id }, message: `${levelNames(levels)}: no "${text}" item` });
+      for (const level of levels) {
+        const name = levelNames([level]);
+        for (const kind of ADDRESS_KINDS) {
+          const lint_id = ADDRESS_ITEM_LINT[kind];
+          const items = addressItems(ctx, kind, [level]);
+          for (const p of items) {
+            if (!p.sort_last) ctx.find({ lint_id, subject: { entity_kind: 'punch_item', entity_id: p.id, level_id: p.level_id }, message: `${name}: "${p.item ?? addressItemText(ctx, kind)}" is not sorted last` });
+          }
+          if (items.length) continue;
+          // the floor's R3c draft's subject, so the Lint view shows the finding with its draft
+          if (floorAddresses(ctx, kind, level).missing.length) ctx.find({ lint_id, subject: addressSubject(level, levels), message: `${name}: no "${addressItemText(ctx, kind)}" item` });
         }
       }
     }

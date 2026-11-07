@@ -155,4 +155,21 @@ describe('R3c address items in the editor (T162, D254)', () => {
     const plain = await editor.create('punch_item', { level_id: DEMO_LEVEL_ID, item: 'Install cover' }, FS);
     expect((await loadItem(store, 'punch', plain.id, DEMO_LEVEL_ID))!.rule).toBeNull();
   });
+
+  it('T169: a "some" item lists its floor\'s devices; an "all" item, whose Notes are the phrase, lists none', async () => {
+    const { store, editor, plan } = await setup();
+    const [a] = plan.devices.filter((d) => /^06M-\d\d$/.test(d.label)).map((d) => d.label);
+    const some = await editor.create(
+      'punch_item',
+      { level_id: DEMO_LEVEL_ID, item: 'Missing some Device DMX addresses', type: 'Information', owner: 'EC', sort_last: true, device_text: 'See notes', notes: a },
+      FS,
+    );
+    expect((await loadItem(store, 'punch', some.id, DEMO_LEVEL_ID))!.rule).toMatchObject({ kind: 'dmx', all: false, missing: [{ levelCode: '06M', devices: [{ label: a }] }] });
+    const all = await editor.create(
+      'punch_item',
+      { level_id: DEMO_LEVEL_ID, item: 'Missing all Device Neuron IDs', type: 'Information', owner: 'EC', sort_last: true, device_text: 'All devices', notes: 'All devices on this floor' },
+      FS,
+    );
+    expect((await loadItem(store, 'punch', all.id, DEMO_LEVEL_ID))!.rule).toEqual({ kind: 'neuron', label: 'Neuron ID', all: true, missing: [] });
+  });
 });

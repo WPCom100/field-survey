@@ -1,6 +1,6 @@
 # R1 step 1 (T157): Lint's "Drafts with no device" on a fresh seed copy (T100, T146). The seed has
-# Neuron items on every group but no IP or DMX item, so R3c drafts one of each per numbering group
-# (B1 has no IP need). Starts and ends on Levels.
+# Neuron items on every group but no IP or DMX item, so R3c drafts one of each per floor (T169;
+# B1 has no IP need). Starts and ends on Levels.
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - tapOn:

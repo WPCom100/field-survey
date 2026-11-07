@@ -227,11 +227,11 @@ describe('rule parameters over a store', () => {
     await setRuleParam(editor, 'R3c', 'owner', 'ETC');
     await engine.run();
     const r3c = await store.list<ProposalRow>('proposal', { where: `rule_id = 'R3c'`, orderBy: 'discriminator' });
-    // T146: one item per address kind; the two panels' network and DMX runs give them IP and DMX address needs
+    // T146: one item per address kind (per floor, worded "all" when none has its address, T169); the two panels' network and DMX runs give them IP and DMX address needs
     expect(r3c.map((p) => [p.discriminator, p.payload!.item, p.payload!.owner, p.payload!.notes])).toEqual([
-      [null, 'Missing all Device Neuron IDs', 'ETC', '07-S1'],
-      ['dmx', 'Missing all Device DMX addresses', 'EC', '06-01, 06-02'],
-      ['ip', 'Missing all Device IP addresses', 'ETC', '06-01, 06-02'],
+      [null, 'Missing all Device Neuron IDs', 'ETC', 'All devices on this floor'], // 07-S1, alone on 07
+      ['dmx', 'Missing all Device DMX addresses', 'EC', 'All devices on this floor'], // 06-01, 06-02
+      ['ip', 'Missing all Device IP addresses', 'ETC', 'All devices on this floor'],
     ]);
   });
 

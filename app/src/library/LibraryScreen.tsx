@@ -471,9 +471,9 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
           {/* T146 (D245): what the type's devices need; null = by the wires they get (U → Neuron ID, N / NG → IP address, X → DMX address). */}
           {(
             [
-              ['Neuron ID', neuron, setNeuron, 'neuron', 'A Unison (U) run needs one; stations and sensors ride the bus; an NSPS or rack hosts it and needs none. Needed / Not needed overrides the wires: the card hides the section and the device leaves “Missing all Device Neuron IDs” and the dashboard count.'],
-              ['IP address', ip, setIp, 'ip', 'A network (N, NG) run needs one. Needed / Not needed overrides the wires; the device leaves “Missing all Device IP addresses” when not needed.'],
-              ['DMX address', dmx, setDmx, 'dmx', 'A DMX (X) run needs one. Needed / Not needed overrides the wires; the device leaves “Missing all Device DMX addresses” when not needed.'],
+              ['Neuron ID', neuron, setNeuron, 'neuron', 'A Unison (U) run needs one; stations and sensors ride the bus; an NSPS or rack hosts it and needs none. Needed / Not needed overrides the wires: the card hides the section and the device leaves its floor’s “Missing all / some Device Neuron IDs” item and the dashboard count.'],
+              ['IP address', ip, setIp, 'ip', 'A network (N, NG) run needs one. Needed / Not needed overrides the wires; the device leaves its floor’s “Missing all / some Device IP addresses” item when not needed.'],
+              ['DMX address', dmx, setDmx, 'dmx', 'A DMX (X) run needs one. Needed / Not needed overrides the wires; the device leaves its floor’s “Missing all / some Device DMX addresses” item when not needed.'],
             ] as const
           ).map(([label, value, set, key, hint]) => (
             <Field key={label} label={label} hint={hint}>

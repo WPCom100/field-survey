@@ -24,7 +24,7 @@ export const RULES: readonly Rule[] = [R1, R2a, R2b, R2c, R2d, R2e, R2f, R2g, R3
 export const R5_TEXT = 'Far-end items wait for that floor\'s survey: an end on a level with no Surveyed date that nobody has surveyed raises no R3a / R3b / R4b item yet.';
 
 export { R1, R2a, R2b, R2c, R2d, R2e, R2f, R2g, R3a, R3b, R3c, R3d, R3f, R4a, R4b, R4d, E5, Acc };
-export { isAddressItem, addressItemKind, addressItemText, addressKindOf, actionableEnds } from './r3';
+export { isAddressItem, addressItemKind, addressItemText, addressKindOf, addressWordings, isAllNotes, actionableEnds } from './r3';
 export { LINT_RULES, VOCAB_FIELDS, ADDRESS_ITEM_LINT } from './lint';
 export { defaultPartNotes, partProblem } from './r4';
 export { LAND_0_10V } from './e5';

@@ -8,13 +8,15 @@
  *   or the cable's own `term_kit`; T103, D213) gets its own device-level item `Terminate <signal>
  *   to <far end>`, `Missing part`, `EC/ETC`, Notes "Waiting on DMX Termination Kits" (as the
  *   master's rows read; D175) — "Waiting on Fiber / Network Termination Kits" for those codes.
- * - R3c: every numbering group ends with one `sort_last` `Information` item per address kind
- *   (T146, D245, D246): "Missing all Device Neuron IDs" (`EC`), "Missing all Device IP addresses"
- *   (`ETC`), "Missing all Device DMX addresses" (`EC`), Notes = the device IDs still missing,
- *   counting only devices that need that address by the wires they get (`addressNeeds`: a U run →
+ * - R3c: every floor ends with one `sort_last` `Information` item per address kind (T146, D245,
+ *   D246; per floor since T169, D258): "Missing all Device Neuron IDs" (`EC`), "Missing all Device
+ *   IP addresses" (`ETC`), "Missing all Device DMX addresses" (`EC`) with Notes "All devices on this
+ *   floor" when no device has the address yet; "Missing some …", Device "See notes", Notes = the
+ *   floor's device IDs still missing, when some have it. Only devices that need that address
+ *   count, by the wires they get (`addressNeeds`: a U run →
  *   Neuron ID, N / NG → IP address, X → DMX address; the type's flag overrides); once accepted the
- *   engine maintains each: Notes rewritten, Closed when the list is empty, reopened on a new
- *   device without one (D49, D170).
+ *   engine maintains each: Notes and the all / some wording rewritten, Closed when the list is
+ *   empty, reopened on a new device without one (D49, D170).
  * - R3a / R3b skip an end that already holds an open item of their kind (`Cable not run`,
  *   `Termination`, a kit item), whatever its wording — the master's items, imported onto their
  *   ends (T119, D218).
@@ -25,13 +27,10 @@
  * `../params.ts`); the texts above are their defaults.
  */
 
-import { fillTemplate, ownerParam, textParam } from '../params';
+import { DEFAULT_PARAMS, fillTemplate, ownerParam, textParam } from '../params';
 import type { Rule, RuleContext } from '../rule';
-import type { CableEndRow, LevelRow, PunchItemRow } from '../snapshot';
+import type { CableEndRow, LevelRow, PunchItemRow, Subject } from '../snapshot';
 import {
-  DMX_ITEM,
-  IP_ITEM,
-  NEURON_ITEM,
   cableOf,
   compareIds,
   compareLevels,
@@ -152,22 +151,47 @@ export const R3b: Rule = {
 
 // ------------------------------------------------------------------ R3c
 
-/** The parameters each address kind's item is worded from (`R3c.<key>`); the Neuron keys are T34's. */
-const ITEM_KEY: Readonly<Record<AddressKind, { item: string; owner: string }>> = {
-  neuron: { item: 'item', owner: 'owner' },
-  ip: { item: 'ip.item', owner: 'ip.owner' },
-  dmx: { item: 'dmx.item', owner: 'dmx.owner' },
+/**
+ * The parameters each address kind's item is worded from (`R3c.<key>`); the Neuron keys are T34's.
+ * `item` is the "all" wording (no device on the floor has the address yet), `some` the wording of a
+ * floor where some have it (T169, D258).
+ */
+const ITEM_KEY: Readonly<Record<AddressKind, { item: string; some: string; owner: string }>> = {
+  neuron: { item: 'item', some: 'some.item', owner: 'owner' },
+  ip: { item: 'ip.item', some: 'ip.some.item', owner: 'ip.owner' },
+  dmx: { item: 'dmx.item', some: 'dmx.some.item', owner: 'dmx.owner' },
 };
-
-/** The built-in item text per kind (how an imported item is recognised when the project's wording differs). */
-const DEFAULT_ITEM: Readonly<Record<AddressKind, string>> = { neuron: NEURON_ITEM, ip: IP_ITEM, dmx: DMX_ITEM };
 
 /** The proposal discriminator per kind: none for the Neuron item (T34's key, so no accepted or rejected draft moves on upgrade). */
 const DISCRIMINATOR: Readonly<Record<AddressKind, string | null>> = { neuron: null, ip: 'ip', dmx: 'dmx' };
 
-/** The project's item text for a kind (`R3c.item`, `R3c.ip.item`, `R3c.dmx.item`). */
+/** The project's "all" item text for a kind (`R3c.item`, `R3c.ip.item`, `R3c.dmx.item`). */
 export function addressItemText(ctx: RuleContext, kind: AddressKind): string {
   return textParam(ctx.params, 'R3c', ITEM_KEY[kind].item);
+}
+
+/**
+ * Every wording an item of `kind` is recognised by, and the engine may reword between: the
+ * project's "all" and "some" texts and the built-in ones (the master's Neuron rows; an item
+ * accepted before the project changed its wording).
+ */
+export function addressWordings(params: RuleContext['params'], kind: AddressKind): string[] {
+  const keys = ITEM_KEY[kind];
+  return [...new Set([keys.item, keys.some].flatMap((k) => [textParam(params, 'R3c', k), textParam(DEFAULT_PARAMS, 'R3c', k)]))];
+}
+
+/** The Device texts the engine may reword between ("All devices" / "See notes", the project's and the built-in). */
+function addressDeviceTexts(params: RuleContext['params']): string[] {
+  return ['device_text', 'some.device_text'].flatMap((k) => [textParam(params, 'R3c', k), textParam(DEFAULT_PARAMS, 'R3c', k)]);
+}
+
+/**
+ * The Notes phrase of an item worded "all" (`R3c.all.notes`, and the built-in one): no device list,
+ * so a screen that links the devices an item's Notes name lists none (T169).
+ */
+export function isAllNotes(params: RuleContext['params'], notes: string | null | undefined): boolean {
+  const n = notes?.trim();
+  return !!n && (n === textParam(params, 'R3c', 'all.notes') || n === textParam(DEFAULT_PARAMS, 'R3c', 'all.notes'));
 }
 
 /** The kind an R3c proposal is for, from its discriminator. */
@@ -177,8 +201,8 @@ export function addressKindOf(discriminator: string | null | undefined): Address
 
 /**
  * R3c's item of one kind: made by the rule (its proposal's discriminator says which kind; an R3c
- * item with no proposal is the Neuron one, as before T146), or an item carrying the kind's text —
- * the project's `R3c.*.item`, or the built-in default (the master's Neuron rows).
+ * item with no proposal is the Neuron one, as before T146), or an item carrying one of the kind's
+ * wordings (`addressWordings`).
  */
 export function isAddressItem(ctx: RuleContext, kind: AddressKind, p: PunchItemRow): boolean {
   return addressItemKind(ctx.params, p, p.proposal_id ? (ctx.index.proposal.get(p.proposal_id) ?? null) : null) === kind;
@@ -194,13 +218,14 @@ export function addressItemKind(
   proposal: { rule_id: string; discriminator: string | null } | null,
 ): AddressKind | null {
   if (proposal?.rule_id === 'R3c') return addressKindOf(proposal.discriminator);
-  const text = ADDRESS_KINDS.find((k) => p.item === textParam(params, 'R3c', ITEM_KEY[k].item) || p.item === DEFAULT_ITEM[k]);
+  const item = p.item;
+  const text = item != null ? ADDRESS_KINDS.find((k) => addressWordings(params, k).includes(item)) : undefined;
   if (text) return text;
   // an R3c item whose proposal is gone and whose text matches no kind: the Neuron item under another wording
   return p.rule_id === 'R3c' ? 'neuron' : null;
 }
 
-/** The R3c items of one kind among a group's levels, the rule's own first, then `sort_last`, then by number. */
+/** The R3c items of one kind among the given levels, the rule's own first, then `sort_last`, then by number. */
 export function addressItems(ctx: RuleContext, kind: AddressKind, levels: readonly LevelRow[]): PunchItemRow[] {
   return levels
     .flatMap((l) => ctx.index.punchByLevel.get(l.id) ?? [])
@@ -208,65 +233,125 @@ export function addressItems(ctx: RuleContext, kind: AddressKind, levels: readon
     .sort((a, b) => Number(b.rule_id === 'R3c') - Number(a.rule_id === 'R3c') || Number(b.sort_last) - Number(a.sort_last) || (a.number ?? 0) - (b.number ?? 0));
 }
 
-/** The labels of the group's devices still missing an address of `kind`: level order, then natural ID order. */
-export function missingAddresses(ctx: RuleContext, kind: AddressKind, levels: readonly LevelRow[]): string[] {
+/** One floor and an address kind: how many of its devices need the address, and the labels of those still missing it (natural ID order). */
+export interface FloorAddresses {
+  needing: number;
+  missing: string[];
+}
+
+export function floorAddresses(ctx: RuleContext, kind: AddressKind, level: LevelRow): FloorAddresses {
   const field = ADDRESS_FIELD[kind];
-  return levels
-    .flatMap((l) => (ctx.index.devicesByLevel.get(l.id) ?? []).map((d) => ({ d, l })))
-    .filter(({ d }) => !str(d[field]) && deviceAddressNeeds(ctx, d)[kind])
-    .sort((a, b) => compareLevels(a.l, b.l) || compareIds(a.d.display_id ?? `${a.l.level}-?`, b.d.display_id ?? `${b.l.level}-?`))
-    .map(({ d }) => deviceLabel(ctx, d));
+  const needing = (ctx.index.devicesByLevel.get(level.id) ?? []).filter((d) => deviceAddressNeeds(ctx, d)[kind]);
+  const missing = needing
+    .filter((d) => !str(d[field]))
+    .sort((a, b) => compareIds(a.display_id ?? `${level.level}-?`, b.display_id ?? `${level.level}-?`))
+    .map((d) => deviceLabel(ctx, d));
+  return { needing: needing.length, missing };
+}
+
+/** What an open address item on a floor reads (T169): "all" with the Notes phrase when none has the address, else "some" with the list. */
+interface AddressWording {
+  some: boolean;
+  item: string;
+  device_text: string;
+  notes: string;
+  params: [string, string][];
+}
+
+function addressWording(ctx: RuleContext, kind: AddressKind, f: FloorAddresses): AddressWording | null {
+  if (!f.missing.length) return null;
+  const keys = ITEM_KEY[kind];
+  if (f.missing.length >= f.needing) {
+    return {
+      some: false,
+      item: textParam(ctx.params, 'R3c', keys.item),
+      device_text: textParam(ctx.params, 'R3c', 'device_text'),
+      notes: textParam(ctx.params, 'R3c', 'all.notes'),
+      params: [['R3c', keys.item], ['R3c', keys.owner], ['R3c', 'device_text'], ['R3c', 'all.notes']],
+    };
+  }
+  return {
+    some: true,
+    item: textParam(ctx.params, 'R3c', keys.some),
+    device_text: textParam(ctx.params, 'R3c', 'some.device_text'),
+    notes: f.missing.join(', '),
+    params: [['R3c', keys.some], ['R3c', keys.owner], ['R3c', 'some.device_text']],
+  };
+}
+
+/**
+ * The subject of a floor's address draft (and of the lint that asks for it): a numbering group of
+ * one level keeps T34's group subject, so its accepted or rejected drafts stay where they are; the
+ * floors of a shared group (06 / 06M, D33) are each their own level (T169).
+ */
+export function addressSubject(level: LevelRow, groupLevels: readonly LevelRow[]): Subject {
+  return groupLevels.length === 1 && level.numbering_group_id
+    ? { entity_kind: 'numbering_group', entity_id: level.numbering_group_id, level_id: level.id }
+    : { entity_kind: 'level', entity_id: level.id, level_id: level.id };
 }
 
 export const R3c: Rule = {
   id: 'R3c',
   title: 'Missing all Device Neuron IDs / IP addresses / DMX addresses',
-  text: 'Every numbering group ends with one item per address kind (`Information`, sorted last): "Missing all Device Neuron IDs" (`EC`), "Missing all Device IP addresses" (`ETC`), "Missing all Device DMX addresses" (`EC`), each with Notes listing the device IDs still missing. A device needs an address by the wires it gets (D245: a Unison run → Neuron ID, a network run → IP address, a DMX run → DMX address; stations and sensors ride the Unison bus; an NSPS or rack hosts it without a Neuron chip), unless its type says otherwise. Once accepted the engine keeps each item: Notes rewritten on each capture, Closed when the list is empty, reopened on a new device without one (D49, D170).',
+  text: 'Every floor with a device still missing an address ends with one item per address kind (`Information`, sorted last). When no device on the floor that needs the address has one: "Missing all Device Neuron IDs" (`EC`), "Missing all Device IP addresses" (`ETC`), "Missing all Device DMX addresses" (`EC`), Device "All devices", Notes "All devices on this floor". When some have it: "Missing some Device …", Device "See notes", Notes listing the floor\'s device IDs still missing (T169). A device needs an address by the wires it gets (D245: a Unison run → Neuron ID, a network run → IP address, a DMX run → DMX address; stations and sensors ride the Unison bus; an NSPS or rack hosts it without a Neuron chip), unless its type says otherwise. Once accepted the engine keeps each item: its Notes and its all / some wording rewritten on each capture, Closed when every device has its address, reopened on a new device without one (D49, D170, D258).',
   run(ctx) {
-    for (const [groupId, group] of ctx.index.levelsByGroup) {
+    for (const group of ctx.index.levelsByGroup.values()) {
       const levels = group.slice().sort(compareLevels);
-      const first = levels[0];
-      if (!first) continue;
-      if (!levels.some((l) => ctx.index.devicesByLevel.get(l.id)?.length)) continue;
-      for (const kind of ADDRESS_KINDS) {
-        const missing = missingAddresses(ctx, kind, levels);
-        const notes = missing.length ? missing.join(', ') : null;
-        const existing = addressItems(ctx, kind, levels)[0];
-        if (existing) {
-          maintainAddressItem(ctx, kind, existing, notes, missing.length);
-          continue;
+      for (const level of levels) {
+        if (!ctx.index.devicesByLevel.get(level.id)?.length) continue;
+        for (const kind of ADDRESS_KINDS) {
+          const f = floorAddresses(ctx, kind, level);
+          const wording = addressWording(ctx, kind, f);
+          const existing = addressItems(ctx, kind, [level])[0];
+          if (existing) {
+            maintainAddressItem(ctx, kind, existing, wording, f.missing.length);
+            continue;
+          }
+          if (!wording) continue;
+          const subject = addressSubject(level, levels);
+          ctx.propose({
+            subject,
+            discriminator: DISCRIMINATOR[kind],
+            kind: 'punch',
+            payload: {
+              level_id: level.id,
+              item: wording.item,
+              type: 'Information',
+              owner: ownerParam(ctx.params, 'R3c', ITEM_KEY[kind].owner),
+              tracking_status: 'Open',
+              notes: wording.notes,
+              sort_last: true,
+              device_text: wording.device_text,
+            },
+            // T34's inputs on a one-level group, so a rejected draft stays rejected; the floor on a shared one
+            inputs: subject.entity_kind === 'numbering_group' ? { group: subject.entity_id } : { level: level.id },
+            params: wording.params,
+            why: wording.some
+              ? `${f.missing.length} of the ${f.needing} devices on Level ${level.level} that need ${ADDRESS_ARTICLE[kind]} ${f.missing.length === 1 ? 'has' : 'have'} none.`
+              : f.needing === 1
+                ? `The one device on Level ${level.level} that needs ${ADDRESS_ARTICLE[kind]} has none.`
+                : `None of the ${f.needing} devices on Level ${level.level} that need ${ADDRESS_ARTICLE[kind]} has one.`,
+          });
         }
-        if (!missing.length) continue;
-        const keys = ITEM_KEY[kind];
-        ctx.propose({
-          subject: { entity_kind: 'numbering_group', entity_id: groupId, level_id: first.id },
-          discriminator: DISCRIMINATOR[kind],
-          kind: 'punch',
-          payload: {
-            level_id: first.id,
-            item: addressItemText(ctx, kind),
-            type: 'Information',
-            owner: ownerParam(ctx.params, 'R3c', keys.owner),
-            tracking_status: 'Open',
-            notes,
-            sort_last: true,
-            device_text: textParam(ctx.params, 'R3c', 'device_text'),
-          },
-          inputs: { group: groupId },
-          params: [['R3c', keys.item], ['R3c', keys.owner], ['R3c', 'device_text']],
-          why: `${missing.length} device${missing.length === 1 ? '' : 's'} on ${levelNames(levels)} ${missing.length === 1 ? 'has' : 'have'} no ${ADDRESS_LABEL[kind]}.`,
-        });
       }
     }
   },
 };
 
-function levelNames(levels: LevelRow[]): string {
-  return levels.length === 1 ? `Level ${levels[0]!.level}` : `Levels ${levels.map((l) => l.level).join('/')}`;
-}
-
-function maintainAddressItem(ctx: RuleContext, kind: AddressKind, item: PunchItemRow, notes: string | null, missing: number): void {
-  const fields: Record<string, unknown> = { notes };
+/**
+ * The upkeep of an accepted address item (D170): Notes; the all / some wording of Item and Device
+ * when the item reads one of the wordings the engine knows (T169, D258 — an item reworded to
+ * anything else keeps its text); Closed when the floor's list is empty, reopened when it is not.
+ * Item and Device are always among the fields once recognised (writing what the item already reads
+ * is no op), so a reworded item never reads as edited against its draft.
+ */
+function maintainAddressItem(ctx: RuleContext, kind: AddressKind, item: PunchItemRow, wording: AddressWording | null, missing: number): void {
+  const fields: Record<string, unknown> = { notes: wording?.notes ?? null };
+  if (item.item != null && addressWordings(ctx.params, kind).includes(item.item)) {
+    fields.item = wording?.item ?? item.item;
+    const dt = item.device_text ?? null;
+    if (dt == null || !dt.trim() || addressDeviceTexts(ctx.params).includes(dt)) fields.device_text = wording?.device_text ?? dt;
+  }
   if (missing === 0) {
     if (isOpen(item)) {
       fields.tracking_status = 'Closed';
@@ -302,12 +387,12 @@ export const R3d: Rule = {
 export const R3f: Rule = {
   id: 'R3f',
   title: 'Item outside the vocabulary',
-  text: 'Item text is picked from the project\'s `punch_item` vocabulary (R3e); a hand-typed item outside it is flagged (dismissable). Rule-made items are not checked.',
+  text: 'Item text is picked from the project\'s `punch_item` vocabulary (R3e); a hand-typed item outside it is flagged (dismissable). Rule-made items and the address items the rules keep (R3c, reworded by the engine — T169) are not checked.',
   run(ctx) {
     const vocab = new Set(ctx.snap.vocab.filter((v) => v.deleted_at == null && v.list === 'punch_item').map((v) => v.value));
     if (!vocab.size) return;
     for (const p of ctx.index.punchItem.values()) {
-      if (!isOpen(p) || p.rule_id || !p.item || vocab.has(p.item)) continue;
+      if (!isOpen(p) || p.rule_id || !p.item || vocab.has(p.item) || addressItemKind(ctx.params, p, null)) continue;
       ctx.find({ subject: { entity_kind: 'punch_item', entity_id: p.id, level_id: p.level_id }, message: `Item outside the vocabulary: "${p.item}"` });
     }
   },

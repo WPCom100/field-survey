@@ -8,6 +8,7 @@
  */
 
 import { OpError, vocab, type Editor, type Store } from '@field-survey/core';
+import { ADDRESS_ARTICLE } from '@field-survey/rules';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -158,7 +159,8 @@ export function ItemEditor(props: ItemEditorProps) {
           ) : null}
           {view.rule ? (
             <Text style={styles.ruleNote} testID="item.rule">
-              Kept by the rules (R3c): closes by itself when every device has its {view.rule.label}, and reopens when one is missing again.
+              Kept by the rules (R3c): reads “all” while no device on the floor has its {view.rule.label} and “some” once some do, closes by itself when every
+              device has one, and reopens when one is missing again.
             </Text>
           ) : null}
         </View>
@@ -166,7 +168,13 @@ export function ItemEditor(props: ItemEditorProps) {
         {view.rule ? (
           <View style={styles.section} testID="item.missing">
             <Text style={styles.label}>Waiting on</Text>
-            {view.rule.missing.length === 0 ? <Text style={styles.muted}>No device listed.</Text> : null}
+            {view.rule.all ? (
+              <Text style={styles.muted} testID="item.missing.all">
+                Every device on this floor that needs {ADDRESS_ARTICLE[view.rule.kind]}.
+              </Text>
+            ) : view.rule.missing.length === 0 ? (
+              <Text style={styles.muted}>No device listed.</Text>
+            ) : null}
             {view.rule.missing.map((g) => (
               <View key={g.levelCode ?? '-'} style={styles.missingGroup}>
                 <Text style={styles.missingLevel}>{g.levelCode ? `Level ${g.levelCode} (${g.devices.length})` : `Not found on this iPad (${g.devices.length})`}</Text>

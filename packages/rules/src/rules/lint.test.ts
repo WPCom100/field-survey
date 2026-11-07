@@ -66,7 +66,7 @@ describe('punch item lints', () => {
     expect(found(b, [LintOwner])).toEqual([['lint.item_owner', p.id, 'Punch #1 "Replace wire nuts": no Owner']]);
   });
 
-  it('flags a numbering group missing its Neuron ID, IP address or DMX address item, and an item not sorted last (T146)', () => {
+  it('flags a floor missing its Neuron ID, IP address or DMX address item, and an item not sorted last (T146; per floor since T169)', () => {
     const b = new Build();
     const l06 = b.level('06', { numbering_group_id: 'g6' });
     const l06m = b.level('06M', { numbering_group_id: 'g6' });
@@ -79,14 +79,21 @@ describe('punch item lints', () => {
     const nsps = b.device(l03, 'NSPS', { display_id: '03-02' }); // hosts the bus, needs none (D185)
     b.cable('U', { device: nsps }, null);
     expect(found(b, [LintNeuronItem])).toEqual([
-      ['lint.neuron_item', 'g6', 'Levels 06/06M: no "Missing all Device Neuron IDs" item'],
-      ['lint.ip_item', 'g6', 'Levels 06/06M: no "Missing all Device IP addresses" item'],
-      ['lint.dmx_item', 'g6', 'Levels 06/06M: no "Missing all Device DMX addresses" item'],
+      ['lint.neuron_item', l06m.id, 'Level 06M: no "Missing all Device Neuron IDs" item'],
+      ['lint.ip_item', l06m.id, 'Level 06M: no "Missing all Device IP addresses" item'],
+      ['lint.dmx_item', l06m.id, 'Level 06M: no "Missing all Device DMX addresses" item'],
     ]);
-    const item = b.punch(l06, { item: 'Missing all Device Neuron IDs', type: 'Information', sort_last: false });
+    // an item on 06 is not 06M's (the floors of a shared group each have their own)
     b.punch(l06, { item: 'Missing all Device IP addresses', type: 'Information', sort_last: true });
-    b.punch(l06, { item: 'Missing all Device DMX addresses', type: 'Information', sort_last: true });
-    expect(found(b, [LintNeuronItem])).toEqual([['lint.neuron_item', item.id, 'Levels 06/06M: "Missing all Device Neuron IDs" is not sorted last']]);
+    expect(found(b, [LintNeuronItem]).map((f) => f[0])).toEqual(['lint.neuron_item', 'lint.ip_item', 'lint.dmx_item']);
+    // a one-level group's finding names the group, as its draft does (T34's subject)
+    b.device(l03, 'Station', { display_id: '03-S2' });
+    expect(found(b, [LintNeuronItem]).at(-1)).toEqual(['lint.neuron_item', l03.numbering_group_id, 'Level 03: no "Missing all Device Neuron IDs" item']);
+    b.snap.devices.find((d) => d.display_id === '03-S2')!.neuron_id = '00A2';
+    const item = b.punch(l06m, { item: 'Missing some Device Neuron IDs', type: 'Information', sort_last: false });
+    b.punch(l06m, { item: 'Missing all Device IP addresses', type: 'Information', sort_last: true });
+    b.punch(l06m, { item: 'Missing all Device DMX addresses', type: 'Information', sort_last: true });
+    expect(found(b, [LintNeuronItem])).toEqual([['lint.neuron_item', item.id, 'Level 06M: "Missing some Device Neuron IDs" is not sorted last']]);
     item.sort_last = true;
     expect(found(b, [LintNeuronItem])).toEqual([]);
     expect(LintNeuronItem.lints).toEqual(['lint.neuron_item', 'lint.ip_item', 'lint.dmx_item']);

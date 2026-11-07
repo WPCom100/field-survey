@@ -55,39 +55,41 @@ describe('RULES over a store', () => {
     expect((await engine.run()).ops).toBe(0);
   });
 
-  it('R3c: Accept makes the item; afterwards the engine keeps its Notes, closes and reopens it as "Rule engine R3c" ops (D170)', async () => {
+  it('R3c: Accept makes the item; afterwards the engine keeps its Notes and its all / some wording, closes and reopens it as "Rule engine R3c" ops (D170, D258)', async () => {
     const { store, editor, engine, ids } = await project();
     await engine.run();
     const neuron = (await open(store)).find((p) => p.rule_id === 'R3c')!;
-    // the station and the sensor ride the Unison bus (D245); the relay panel has no Unison wire, the rack hosts it
-    expect(neuron.payload).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', notes: '06M-D1, 06M-S1', sort_last: true, device_text: 'All devices' });
+    // the station and the sensor on 06M ride the Unison bus (D245) and neither has its ID: "all"; the relay panel has no Unison wire, the rack on 06 hosts it
+    expect(neuron.subject).toMatchObject({ entity_kind: 'level', entity_id: ids.l06m });
+    expect(neuron.payload).toMatchObject({ level_id: ids.l06m, item: 'Missing all Device Neuron IDs', notes: 'All devices on this floor', sort_last: true, device_text: 'All devices' });
     const res = await engine.decide(neuron.id, { kind: 'accept' });
     const itemId = res.recordIds[0]!;
-    expect(await store.get<Row>('punch_item', itemId)).toMatchObject({ level_id: ids.l06, item: 'Missing all Device Neuron IDs', type: 'Information', owner: 'EC', tracking_status: 'Open', sort_last: true, rule_id: 'R3c', proposal_id: neuron.id, notes: '06M-D1, 06M-S1' });
+    expect(await store.get<Row>('punch_item', itemId)).toMatchObject({ level_id: ids.l06m, item: 'Missing all Device Neuron IDs', type: 'Information', owner: 'EC', tracking_status: 'Open', sort_last: true, rule_id: 'R3c', proposal_id: neuron.id, notes: 'All devices on this floor' });
     // the lint "no Missing all Device Neuron IDs item" (T36) resolves: one op, then nothing
     expect((await engine.run()).ops).toBe(1);
     expect((await engine.run()).ops).toBe(0);
     // a Neuron ID on the panel changes nothing: it needs none (no Unison wire, D246)
     await editor.setField('device', ids.panel, 'neuron_id', '00A1B2C3D4E5', CTX);
     expect((await engine.run()).ops).toBe(0);
-    // a capture → Notes rewritten by the engine, one op, naming the rule, carrying the proposal
+    // a capture → "some": Notes list the one still missing, Item and Device reworded, by the engine, naming the rule, carrying the proposal
     await editor.setField('device', ids.sensor, 'neuron_id', '00A1B2C3D4E6', CTX);
     const r = await engine.run();
-    expect(r).toMatchObject({ upkeep: 1, ops: 1 });
+    expect(r).toMatchObject({ upkeep: 1, ops: 3 });
     const item = (await store.get<Row>('punch_item', itemId))!;
-    expect(item.notes).toBe('06M-S1');
+    expect(item).toMatchObject({ notes: '06M-S1', item: 'Missing some Device Neuron IDs', device_text: 'See notes' });
     const ops = await store.opsFor(itemId);
-    expect(ops.at(-1)).toMatchObject({ kind: 'set', field: 'notes', now: '06M-S1', change_type: 'Field survey', reason: 'Rule engine R3c', proposal_id: neuron.id, user_id: ME });
+    expect(ops.slice(-3).map((o) => [o.field, o.now])).toEqual([['notes', '06M-S1'], ['item', 'Missing some Device Neuron IDs'], ['device_text', 'See notes']]);
+    for (const o of ops.slice(-3)) expect(o).toMatchObject({ kind: 'set', change_type: 'Field survey', reason: 'Rule engine R3c', proposal_id: neuron.id, user_id: ME });
     // the rewrite is not a person's Edit: the row stays accepted and the next run is quiet
     expect((await engine.run()).ops).toBe(0);
     expect(await store.get<ProposalRow>('proposal', neuron.id)).toMatchObject({ state: 'accepted' });
-    // every ID captured → Closed with today's date (the rack needs none, T68 / D185)
+    // every ID captured → Closed with today's date (the rack needs none, T68 / D185); the wording stays
     await editor.setField('device', ids.station, 'neuron_id', '00A1B2C3D4E7', CTX);
     await engine.run();
     const closed = (await store.get<Row>('punch_item', itemId))!;
-    expect(closed).toMatchObject({ notes: null, tracking_status: 'Closed' });
+    expect(closed).toMatchObject({ notes: null, tracking_status: 'Closed', item: 'Missing some Device Neuron IDs' });
     expect(closed.date_closed).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    // a new device without an ID → reopened
+    // a new device without an ID → reopened, still "some" (two of the three have theirs)
     await editor.create('device', { level_id: ids.l06m, category: 'Sensor', device: 'UHCI-WM' }, CTX);
     await engine.run();
     expect(await store.get<Row>('punch_item', itemId)).toMatchObject({ notes: '06M-?', tracking_status: 'Open', date_closed: null });
@@ -96,15 +98,18 @@ describe('RULES over a store', () => {
     expect((await store.list('punch_item', { where: 'level_id IN (?, ?)', params: [ids.l06, ids.l06m] })).length).toBe(1);
   });
 
-  it('R3c reads library_type.needs_neuron_id from the store (T68, D185): a rack type that needs one lists the rack', async () => {
-    const { store, editor, engine } = await project();
+  it('R3c reads library_type.needs_neuron_id from the store (T68, D185): a rack type that needs one makes 06 its own item', async () => {
+    const { store, editor, engine, ids } = await project();
     await editor.create('library_type', { project_id: PROJECT, model: 'Equipment rack', category: 'Equipment rack', needs_neuron_id: true, state: 'accepted' }, CTX);
     await engine.run();
-    const neuron = (await open(store)).find((p) => p.rule_id === 'R3c')!;
-    expect(neuron.payload).toMatchObject({ notes: '06-01, 06M-D1, 06M-S1' });
+    const neuron = (await open(store)).filter((p) => p.rule_id === 'R3c' && p.discriminator == null);
+    expect(neuron.map((p) => [p.payload!.level_id === ids.l06 ? '06' : '06M', p.payload!.notes]).sort()).toEqual([
+      ['06', 'All devices on this floor'],
+      ['06M', 'All devices on this floor'],
+    ]);
   });
 
-  it('R3c reads the wires from the store (T146, D245): a network run on the panel makes the IP item, a DMX run the DMX one', async () => {
+  it('R3c reads the wires from the store (T146, D245): a network run on the panel makes the IP item, a DMX run the DMX one, per floor', async () => {
     const { store, editor, engine, ids } = await project();
     await editor.group(CTX, async (g) => {
       const n = await g.create('cable', { project_id: PROJECT, cable: 'N', qty: 1 });
@@ -115,15 +120,17 @@ describe('RULES over a store', () => {
     });
     await engine.run();
     const r3c = (await open(store)).filter((p) => p.rule_id === 'R3c');
-    expect(r3c.map((p) => [p.discriminator, p.payload!.item, p.payload!.owner, p.payload!.notes])).toEqual([
-      [null, 'Missing all Device Neuron IDs', 'EC', '06M-D1, 06M-S1'],
-      ['dmx', 'Missing all Device DMX addresses', 'EC', '06-01, 06M-01'],
-      ['ip', 'Missing all Device IP addresses', 'ETC', '06M-01'],
+    const floor = (p: ProposalRow) => (p.payload!.level_id === ids.l06 ? '06' : '06M');
+    expect(r3c.map((p) => [floor(p), p.discriminator, p.payload!.item, p.payload!.owner, p.payload!.notes]).sort()).toEqual([
+      ['06', 'dmx', 'Missing all Device DMX addresses', 'EC', 'All devices on this floor'],
+      ['06M', null, 'Missing all Device Neuron IDs', 'EC', 'All devices on this floor'],
+      ['06M', 'dmx', 'Missing all Device DMX addresses', 'EC', 'All devices on this floor'],
+      ['06M', 'ip', 'Missing all Device IP addresses', 'ETC', 'All devices on this floor'],
     ]);
-    // an address typed on the card: the next run shortens the draft
+    // an address typed on the card: the next run drops 06M's IP draft
     await editor.setField('device', ids.panel, 'ip_address', '10.101.4.23', CTX);
     await engine.run();
-    expect((await open(store)).filter((p) => p.rule_id === 'R3c').map((p) => p.discriminator)).toEqual([null, 'dmx']);
+    expect((await open(store)).filter((p) => p.rule_id === 'R3c').map((p) => `${floor(p)}:${p.discriminator ?? ''}`).sort()).toEqual(['06:dmx', '06M:', '06M:dmx']);
   });
 
   it('accepting a library draft (R2c) makes the cable with both ends; the device then has the code and the draft stays accepted', async () => {
