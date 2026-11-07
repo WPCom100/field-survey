@@ -64,12 +64,31 @@ regression number beside T94's Droplet one (`docs/perf/tp3.md`), not a substitut
 | first export, nothing to compare (API, 2026-11-07) | 0.4 s | 5.5 s | 9.9 s | — | **16 s** |
 | `rig.sh long-export` run 1 (a previous export to compare) | 0.4 s | 6.3 s | 10.6 s | 23.8 s | **41 s** |
 | `rig.sh long-export` run 2 | 0.4 s | 6.0 s | 10.4 s | 23.6 s | **40 s** |
+| API, T170's code (2026-11-07, T171) | 0.3–0.5 s | 5.4–5.5 s | 7.8–7.9 s | 21.5–21.7 s | **35 s** |
+| API, read-only compare (T171, D262) | 0.3 s | 5.3–5.5 s | 7.7–7.8 s | 0.43–0.46 s | **14 s** |
 | worker at 0.1 CPU (`RIG_EXPORT_CPUS`, D259; cancelled in Photo Log) | 12–18 s | ~22 pictures/s | — | — | ~9 min (estimated) |
 
-"Comparing with the last export" (the diff against the previous workbook) now costs more than the
-rest of the job together on this project. Since T170 it reports progress per tab and every 500
-rows and runs before "Saving the file", so Cancel stops it; reading the previous workbook is still
-one step that reports nothing (T171 measures how much of the stage it is).
+"Comparing with the last export" (the diff against the previous workbook) cost more than the rest
+of the job together on this project. Since T170 it reports progress per tab and every 500 rows and
+runs before "Saving the file", so Cancel stops it.
+
+**The compare split (T171, 2026-11-07).** Three exports through the API at full speed (rig server
+rebuilt with T170's code, Maestro scale regenerated), then the previous workbook timed in the
+worker (`load_workbook` and the row walk of each tab, twice):
+
+| Step of "Comparing with the last export" | Full mode (T170) | Read-only (T171) |
+|---|---|---|
+| read the 34.0 MB blob from SeaweedFS | 0.03 s | 0.03 s |
+| `load_workbook` | 2.9–3.0 s | 0.07–0.44 s |
+| rows: Devices / Connections / Punch List / Missing Parts | 0.87 / 0.74 / 0.24 / 0.03 s | 0.04 / 0.04 / 0.02 / 0.01 s |
+| rows: Photo Log (10,000) | 16.3–16.7 s | 0.15 s |
+| **the stage in `stage_seconds`** | **21.7 s, 21.5 s** | **0.46 s, 0.43 s** |
+
+The load was not most of it: the row walk was, because it read `ws.max_column` (a scan of all
+80,012 Photo Log cells, ~1.6 ms) once per row. Read-only mode streams the values and gives the
+same rows on all five tabs (and the same `diff_summary` on the server), so the compare now opens
+the file read-only (D262). The workbook job on Maestro scale is ~14 s at full speed again (Photo
+Log 5.3–5.5 s, Writing 7.7–7.9 s).
 
 ## Keeping it useful
 

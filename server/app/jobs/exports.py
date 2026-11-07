@@ -342,13 +342,14 @@ def build_floor_pdf(
 
 
 def _rows_by_key(ws, tick: Callable[[], None] = lambda: None) -> dict[tuple, tuple]:
-    """Data rows of a tab keyed by (Level, ID | #); the Image column is never compared. `tick`
-    runs every `COMPARE_EVERY` rows (the job's progress report, where Cancel lands — T170)."""
+    """Data rows of a tab keyed by (Level, ID | #); the Image column is never compared. `ws` is a
+    read-only sheet (T171: rows streamed as values; the full-mode walk read `ws.max_column`, a
+    scan of every cell, once per row — 16 s on a 10,000-row Photo Log). `tick` runs every
+    `COMPARE_EVERY` rows (the job's progress report, where Cancel lands — T170)."""
     out: dict[tuple, tuple] = {}
-    for r in range(4, ws.max_row + 1):
-        if (r - 4) % COMPARE_EVERY == COMPARE_EVERY - 1:
+    for i, values in enumerate(ws.iter_rows(min_row=4, values_only=True)):
+        if i % COMPARE_EVERY == COMPARE_EVERY - 1:
             tick()
-        values = [ws.cell(r, c).value for c in range(1, ws.max_column + 1)]
         if all(v is None for v in values):
             continue
         key = (values[0], values[1])
@@ -364,18 +365,32 @@ def diff_summary(
 ) -> dict[str, Any]:
     """Rows added / removed / changed per tab against the previous xlsx export. Reports
     `Comparing with the last export n / N tabs` at each tab and every `COMPARE_EVERY` rows, so
-    Cancel stops it (T170, D261); reading the previous file is one step and reports nothing."""
+    Cancel stops it (T170, D261). The previous file is opened read-only (T171, D262): its load,
+    the one step that reports nothing, is under half a second on the 34 MB scale workbook."""
     out: dict[str, Any] = {"previous": str(previous.id), "tabs": {}}
     if not previous.blob:
         out["note"] = "previous export has no file"
         return out
     try:
         old = openpyxl.load_workbook(
-            io.BytesIO(store.read(object_key(previous.blob))), data_only=True
+            io.BytesIO(store.read(object_key(previous.blob))), read_only=True, data_only=True
         )
     except (ObjectMissing, KeyError, Exception) as e:  # noqa: BLE001 - a summary, never fatal
         out["note"] = f"previous export unreadable: {type(e).__name__}"
         return out
+    try:
+        _compare_tabs(old, data, out, progress)
+    finally:
+        old.close()
+    return out
+
+
+def _compare_tabs(
+    old: openpyxl.Workbook,
+    data: export_xlsx.ExportData,
+    out: dict[str, Any],
+    progress: export_xlsx.ProgressFn,
+) -> None:
     exported = set(data.stats.get("tabs") or DATA_TABS)
     # compare only tabs both files have (an export may leave tabs out, D141)
     tabs = [t for t in DATA_TABS if t in exported and t in old.sheetnames]
@@ -404,7 +419,6 @@ def diff_summary(
             "changed": len(changed),
             "examples": [f"{k[0]} {k[1]}" for k in (added + removed + changed)[:5]],
         }
-    return out
 
 
 def _comparable(row: tuple) -> tuple:

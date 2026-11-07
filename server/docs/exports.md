@@ -62,7 +62,9 @@ partial unique index `ux_export_active`): a second `POST` is refused with 409 na
 one, so the iPad shows that card instead. Stages: workbook `Starting` → `Reading the records` →
 `Photo Log` (counted, only with the Photo Log tab) → `Writing the workbook` → `Comparing with
 the last export` (only with a previous workbook; counted in tabs and reported every 500 rows, so
-Cancel stops it — T170, D261; reading the previous file is one uninterrupted step) → `Saving the
+Cancel stops it — T170, D261; the previous file is opened read-only and its rows streamed as
+values, so its load, the one uninterrupted step, is under half a second on the 34 MB scale
+workbook — T171, D262) → `Saving the
 file`; floor PDF `Reading the records` → `Devices` (counted) →
 `Plan snapshot` → `Photos` (counted) → `Rendering the PDF` → `Saving the file`. A worker restart
 (a deploy) puts a `running` export back to `queued` (or `cancelled` when Cancel was pressed) and it

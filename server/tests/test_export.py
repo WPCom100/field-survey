@@ -132,6 +132,73 @@ def test_tp4_master_round_trip(session, store, factory, client, tmp_path):
     assert [x["id"] for x in listed] == [got["id"]]
 
 
+def _full_mode_rows(ws, tick=lambda: None):
+    # T170's reader, kept as the reference for T171: a full-mode sheet walked cell by cell
+    out = {}
+    for r in range(4, ws.max_row + 1):
+        values = [ws.cell(r, c).value for c in range(1, ws.max_column + 1)]
+        if all(v is None for v in values):
+            continue
+        out[(values[0], values[1])] = tuple(
+            v.isoformat() if hasattr(v, "isoformat") else v for v in values
+        )
+    return out
+
+
+@needs_fixture
+def test_the_compare_reads_the_previous_workbook_read_only(
+    session, store, factory, client, monkeypatch
+):
+    """T171 (D262): `diff_summary` opens the previous workbook read-only and streams its rows;
+    the summary of the same pair of files equals the full-mode reader's (T170) byte for byte."""
+    project_id, _ = import_file(session, store, factory, FIXTURE)
+    first = run_export_via_api(client, factory, store, project_id)
+    # a changed device, a changed punch item and a removed one between the two files
+    b2 = session.scalars(
+        select(Level).where(Level.project_id == project_id, Level.level == "B2")
+    ).one()
+    session.execute(
+        update(Device)
+        .where(Device.level_id == b2.id, Device.display_id == "B2-01")
+        .values(status="Complete", notes="Done")
+    )
+    punch = session.scalars(
+        select(PunchItem).where(PunchItem.level_id == b2.id).order_by(PunchItem.number)
+    ).all()
+    session.execute(update(PunchItem).where(PunchItem.id == punch[0].id).values(item="Changed"))
+    session.execute(
+        update(PunchItem).where(PunchItem.id == punch[1].id).values(deleted_at=datetime.now(UTC))
+    )
+    session.commit()
+    _, data = export_xlsx.export_bytes(session, store, project_id)
+    previous = session.get(Export, uuid.UUID(first["id"]))
+
+    opened = []
+    real_load = openpyxl.load_workbook
+
+    def load(*args, **kwargs):
+        opened.append(kwargs.get("read_only", False))
+        return real_load(*args, **kwargs)
+
+    monkeypatch.setattr(exports.openpyxl, "load_workbook", load)
+    read_only = exports.diff_summary(store, previous, data)
+    assert opened == [True]
+
+    def load_full(*args, **kwargs):
+        return real_load(*args, **{**kwargs, "read_only": False})
+
+    monkeypatch.setattr(exports.openpyxl, "load_workbook", load_full)
+    monkeypatch.setattr(exports, "_rows_by_key", _full_mode_rows)
+    full = exports.diff_summary(store, previous, data)
+
+    assert json.dumps(read_only, sort_keys=True) == json.dumps(full, sort_keys=True)
+    assert set(read_only["tabs"]) == set(exports.DATA_TABS)
+    assert read_only["tabs"]["Devices"]["changed"] == 1
+    assert read_only["tabs"]["Punch List"]["removed"] == 1
+    assert read_only["tabs"]["Punch List"]["changed"] >= 1
+    assert read_only["tabs"]["Photo Log"]["rows"] > 0
+
+
 def test_tp5_precheck_catches_repair_causes(tmp_path):
     good = tmp_path / "good.xlsx"
     wb = xlsxwriter.Workbook(good)
