@@ -106,6 +106,17 @@ export class EditBatch {
     if (isBlank(opts.userId)) throw new OpError('userId is required');
   }
 
+  /**
+   * Whether the record exists (deleted or not) as this batch sees it. The answer is cached with
+   * the row, so a `create` of the same id later in the batch reads the same thing: a caller that
+   * skips existing ids (the rule engine's deterministic ids, T161) cannot be overtaken between
+   * the check and the create by a pull that lands in between.
+   */
+  async exists(kind: EntityKind, id: string): Promise<boolean> {
+    this.specFor(kind, 'exists');
+    return (await this.row(kind, id)) != null;
+  }
+
   /** `create`: the payload is the full record; returns the new id (`payload.id` or a UUID v7). */
   async create(kind: EntityKind, payload: Row): Promise<{ id: string; op: Op }> {
     const spec = this.specFor(kind, 'create');

@@ -29,6 +29,14 @@ function seedOp(entity_kind: Op['entity_kind'], entity_id: string, payload: Row)
   };
 }
 
+/** A pulled `set` of one field (another iPad's edit). */
+function seedOp2(entity_kind: Op['entity_kind'], entity_id: string, field: string, now: unknown): Op {
+  return {
+    op_id: uuidv7(), project_id: PROJECT, user_id: ANN, install_id: 'seed', client_ts: tsNext(),
+    entity_kind, entity_id, kind: 'set', field, now, change_type: 'Field survey', server_seq: ++seq, server_ts: tsNext(), state: 'applied',
+  };
+}
+
 /** The sample project as pulled ops (so it syncs like real data). */
 function seedOps(): Op[] {
   return [
@@ -102,6 +110,38 @@ describe('RuleEngine.run', () => {
     expect((await c.store.get<ProposalRow>('proposal', PID))!.state).toBe('proposed');
     expect(await c.engine.openFindings(LEVEL)).toEqual([]);
     expect((await c.store.get<Row>('finding', findings[0]!.id))!.state).toBe('resolved');
+  });
+
+  it('skips a proposal or finding that a pull applied between plan and write, and fails nothing (T161)', async () => {
+    // Ann's earlier run made the proposal and the finding; they reach Bob's iPad by pull while
+    // Bob's run is between its plan and its writes (the T154 rig run on a fresh launch).
+    const a = await client(null, ANN);
+    const b = await client(null, BOB);
+    for (const c of [a, b]) await c.store.applyRemote(seedOp2('device', PANEL, 'status', 'Issue'));
+    expect(await a.engine.run()).toMatchObject({ created: 2, skipped: 0 });
+    const made = (await a.store.list<Row>('finding', { where: 'project_id = ?', params: [PROJECT] }))[0]!;
+    const pulled = [...(await a.store.opsFor(PID)), ...(await a.store.opsFor(made.id as string))].map((o, i) => ({
+      ...o, server_seq: 5000 + i, server_ts: tsNext(), state: 'applied' as const,
+    }));
+    const plan = b.engine.plan.bind(b.engine);
+    let pulledMidRun = false;
+    b.engine.plan = async (snap) => {
+      const planned = await plan(snap);
+      if (!pulledMidRun) {
+        pulledMidRun = true;
+        expect(planned.changes.filter((c) => c.kind === 'create').map((c) => c.id).sort()).toEqual([PID, made.id].sort());
+        await b.store.applyRemoteMany(pulled);
+      }
+      return planned;
+    };
+    const r = await b.engine.run();
+    expect(pulledMidRun).toBe(true);
+    expect(r).toMatchObject({ created: 0, skipped: 2, ops: 0 });
+    expect(await b.store.outboxCount()).toBe(0);
+    expect(await b.store.get<ProposalRow>('proposal', PID)).toMatchObject({ state: 'proposed', rule_id: 'T.run' });
+    expect(await b.store.get<Row>('finding', made.id as string)).toMatchObject({ state: 'open', lint_id: 'T.issue.none' });
+    // the run the pull triggers finds the rows as it would have written them
+    expect(await b.engine.run()).toMatchObject({ ops: 0, created: 0, skipped: 0 });
   });
 
   it('serialises concurrent runs and runs once more when asked during a run', async () => {

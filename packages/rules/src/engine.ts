@@ -5,7 +5,8 @@
  *
  * - a run writes one `Field survey` group (`reason: "Rule engine"`) with the proposal /
  *   finding creates and sets `reconcile.ts` computed; a run that finds nothing new writes
- *   nothing (idempotent);
+ *   nothing (idempotent); a create whose (deterministic) row a pull applied after the run
+ *   planned is skipped, not an error (T161), and the run the pull triggers reconciles it;
  * - Accept / Edit write the record(s) of `decide.ts` and the proposal row's decision in one
  *   group whose ops carry `proposal_id`; the record carries `rule_id` and `proposal_id`;
  * - Reject writes the proposal row only.
@@ -51,6 +52,11 @@ export interface RunReport {
   ops: number;
   created: number;
   updated: number;
+  /**
+   * Creates dropped because the row appeared after the run planned (a pull applied it in
+   * between, T161); the run after the pull reconciles them.
+   */
+  skipped: number;
   /** Records a rule maintains without an Accept (D170) that changed this run. */
   upkeep: number;
   problems: number;
@@ -217,10 +223,19 @@ export class RuleEngine {
     for (const pr of out.problems) this.log('warn', `rule_${pr.kind}`, { rule: pr.rule_id, message: pr.message });
     let created = 0;
     let updated = 0;
+    let skipped = 0;
     const ops = changes.length
       ? await this.editor.group(RUN_CTX, async (g) => {
           for (const c of changes) {
             if (c.kind === 'create') {
+              // The id is deterministic (D169): a pull that applied the same row after this run
+              // planned (another iPad's earlier run, already on the server) makes the create
+              // moot. Skip it; the pull's commit triggers the next run, which reconciles the
+              // stored row against the output like any other (T161).
+              if (await g.exists(c.entity, c.id)) {
+                skipped++;
+                continue;
+              }
               await g.create(c.entity, { id: c.id, ...c.payload });
               created++;
             } else {
@@ -253,6 +268,7 @@ export class RuleEngine {
       ops: ops.length + upkeepOps,
       created,
       updated,
+      skipped,
       upkeep,
       problems: out.problems.length,
       ms: Date.now() - t0,

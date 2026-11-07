@@ -243,6 +243,26 @@ describe('group', () => {
     expect(await store.list('part_source', { where: 'missing_part_id = ?', params: [id] })).toHaveLength(1);
   });
 
+  it('exists() sees stored, deleted and in-batch rows, and keeps its answer for a later create (T161)', async () => {
+    const id = await newDevice();
+    const fresh = uuidv7();
+    await editor.group(SURVEY, async (g) => {
+      expect(await g.exists('device', id)).toBe(true);
+      expect(await g.exists('device', fresh)).toBe(false);
+      // a row that lands in the store after the check (a pull) does not change the batch's view
+      await store.applyRemote({
+        op_id: uuidv7(), project_id: PROJECT, user_id: ZACH, install_id: 'other', client_ts: new Date().toISOString(),
+        entity_kind: 'device', entity_id: fresh, kind: 'create', payload: { id: fresh, level_id: LEVEL },
+        change_type: 'Field survey', reason: 'pulled', server_seq: 1, server_ts: new Date().toISOString(), state: 'applied',
+      });
+      expect(await g.exists('device', fresh)).toBe(false);
+      await g.create('device', { id: fresh, level_id: LEVEL, status: 'Issue' }); // no "already exists"
+      await g.delete('device', id);
+      expect(await g.exists('device', id)).toBe(true);
+    });
+    await expect(editor.group(SURVEY, (g) => g.exists('outbox', id))).rejects.toThrow(/bad entity kind/);
+  });
+
   it('writes nothing when one op of the group is refused by the store, or when the group is empty', async () => {
     const id = await newDevice();
     await expect(editor.group(SURVEY, async (g) => {
