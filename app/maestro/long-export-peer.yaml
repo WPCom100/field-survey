@@ -1,0 +1,84 @@
+# Step 3 of `rig.sh long-export` (T165, T93), on B (Bob), while A's workbook export runs (and
+# `rig.sh` has paused the worker, so it cannot reach its next step until step 5): Export on SCALE
+# shows Ann's card, Generate workbook is disabled with "An export is already running (started by
+# Ann <time>)", Generate PDF stays enabled; Cancel export → confirm → "Cancelling (Bob)… it stops
+# at its next step". Ends on the Export screen (step 5 carries on from it).
+appId: productions.luminarytechnology.fieldsurvey
+name: Long export — the second iPad, Cancel
+---
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- runFlow: _open-project.yaml
+- tapOn:
+    id: nav.export
+- extendedWaitUntil:
+    visible:
+      id: export.card.progress
+      text: '(Photo Log [0-9,]+ / 10,000 pictures|Writing the workbook) · .*'
+    timeout: 30000
+- assertVisible: 'Started by Ann'
+# "hh:mm" in the simulator's locale: en-US reads "9:13 AM", a narrow no-break space before AM
+- assertVisible:
+    id: export.gate
+    text: 'An export is already running \(started by Ann \d\d?:\d\d(.[AP]M)?\)'
+- assertVisible:
+    id: export.generate
+    enabled: false
+
+# the floor PDF is another kind: still allowed
+- tapOn:
+    id: export.pane.pdf
+- runFlow:
+    when:
+      notVisible:
+        id: export.pdf.gate
+        text: Synced — .*
+    commands:
+      - tapOn:
+          id: export.pdf.syncFirst
+- extendedWaitUntil:
+    visible:
+      id: export.pdf.gate
+      text: Synced — .*
+    timeout: 120000
+- assertVisible:
+    id: export.generatePdf
+    enabled: true
+- tapOn:
+    id: export.pane.workbook
+
+# Cancel from this iPad. The alert's button, not the card's own "Cancel export" behind it: the iPad
+# stacks the alert's two buttons (Cancel export over Keep it running) in the middle, right of the
+# card's button. A tap while the alert still grows in can miss (T165 run 1: the alert closed, the
+# export kept running), so wait for the animation and try again while no "Cancelling" shows.
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        id: export.card.progress
+        text: Cancelling \(Bob\)… it stops at its next step
+    commands:
+      - tapOn:
+          id: export.card.cancel
+      - extendedWaitUntil:
+          visible: Cancel this Master workbook\?
+          timeout: 10000
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: Cancel export
+          rightOf:
+            id: export.card.cancel
+      - extendedWaitUntil:
+          visible:
+            id: export.card.progress
+            text: Cancelling \(Bob\)… it stops at its next step
+          timeout: 10000
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: export.card.progress
+      text: Cancelling \(Bob\)… it stops at its next step
+    timeout: 15000
+- assertNotVisible:
+    id: export.card.cancel

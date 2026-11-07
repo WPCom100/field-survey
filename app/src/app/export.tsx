@@ -401,7 +401,7 @@ function JobCard({
   const progress = progressLine(e, now);
   return (
     <View style={styles.card} testID="export.card">
-      <Text style={styles.cardTime}>
+      <Text style={styles.cardTime} testID="export.card.time">
         {exportTime(e.created_at)} · {KIND_LABEL[e.kind] ?? e.kind}
       </Text>
       {e.filename ? <Text style={styles.cardFile}>{e.filename}</Text> : null}

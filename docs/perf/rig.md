@@ -52,6 +52,24 @@ A whole run takes about 4 minutes. What it tells you:
 - **A quiet cycle with 20 projects** stays under a second; the 06M composite with 1,000 pins opens
   in about 1.2 s, the 500-pin demo in 0.4–1.0 s.
 
+## The export of Maestro scale (T165)
+
+`rig.sh long-export` ends with one workbook of Maestro scale (all levels, all tabs) at full speed and
+prints the server's `stats.stage_seconds`; the worker is the rig's (Colima, 4 CPUs, SeaweedFS on
+localhost, so each picture read is ~1 ms instead of the Droplet's ~110 ms to R2). No ceiling: a
+regression number beside T94's Droplet one (`docs/perf/tp3.md`), not a substitute.
+
+| Workbook of Maestro scale (10,000 pictures, 34.0 MB) | Reading | Photo Log | Writing | Comparing | Total |
+|---|---|---|---|---|---|
+| first export, nothing to compare (API, 2026-11-07) | 0.4 s | 5.5 s | 9.9 s | — | **16 s** |
+| `rig.sh long-export` run 1 (a previous export to compare) | 0.4 s | 6.3 s | 10.6 s | 23.8 s | **41 s** |
+| `rig.sh long-export` run 2 | 0.4 s | 6.0 s | 10.4 s | 23.6 s | **40 s** |
+| worker at 0.1 CPU (`RIG_EXPORT_CPUS`, D259; cancelled in Photo Log) | 12–18 s | ~22 pictures/s | — | — | ~9 min (estimated) |
+
+"Comparing with the last export" (the diff against the previous workbook) now costs more than the
+rest of the job together on this project, and it reports no progress, so Cancel does not stop it
+(T170).
+
 ## Keeping it useful
 
 - Make Maestro scale only in the session that needs it, and `server reset` (then `seed`,

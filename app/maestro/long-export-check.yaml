@@ -1,0 +1,33 @@
+# Step 6 of `rig.sh long-export` (T165, T93), on A (Ann), still on the Export screen: "Cancelled by
+# Bob" here too and Generate workbook enabled again; then (the worker at full speed again) one
+# workbook of SCALE to "Ready · <size>". `rig.sh` reads its stage times from the server.
+appId: productions.luminarytechnology.fieldsurvey
+name: Long export — Cancelled on the first iPad, then one to Ready
+---
+- extendedWaitUntil:
+    visible:
+      id: export.card.state
+      text: Cancelled by Bob
+    timeout: 30000
+- assertVisible: 'Started by Ann'
+- extendedWaitUntil:
+    visible:
+      id: export.gate
+      text: Synced — the export will include every edit on this iPad\.
+    timeout: 60000
+- assertVisible:
+    id: export.generate
+    enabled: true
+- tapOn:
+    id: export.generate
+- extendedWaitUntil:
+    visible:
+      id: export.card.progress
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: export.card.state
+      text: 'Ready · .* MB'
+    timeout: 300000
+- assertVisible: 'Started by Ann'
+- tapOn: ← Levels

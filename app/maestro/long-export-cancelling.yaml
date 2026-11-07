@@ -1,0 +1,17 @@
+# Step 4 of `rig.sh long-export` (T165, T93), on A (Ann), still on the Export screen step 2 left:
+# B's Cancel shows here too, with the worker still paused: "Cancelling (Bob)… it stops at its next
+# step", no Cancel button, Generate workbook still disabled.
+appId: productions.luminarytechnology.fieldsurvey
+name: Long export — Cancelling on the first iPad
+---
+- extendedWaitUntil:
+    visible:
+      id: export.card.progress
+      text: Cancelling \(Bob\)… it stops at its next step
+    timeout: 15000
+- assertVisible: 'Started by Ann'
+- assertNotVisible:
+    id: export.card.cancel
+- assertVisible:
+    id: export.generate
+    enabled: false

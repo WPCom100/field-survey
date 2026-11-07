@@ -2,6 +2,22 @@
 
 Archive of finished rounds from [ON_DEVICE_CHECKLIST.md](ON_DEVICE_CHECKLIST.md), newest first. Each round is copied here with the results as Landry filled them in. Earlier checks recorded directly in `TASKS.md` (T07, T17, T64) are not repeated.
 
+## Claude ran (rig) 2026-11-07 — R6 rest of docs/rig-plan.md (T165), Mac rig Simulator, local e2e server
+
+Sections whose every line a Maestro flow now proves (rig plan §7 4). `rig.sh long-export` on **Maestro scale** (the TP-3 generator's default size: 2,000 devices, 10,000 photos), A as Ann and B as Bob, green twice in a row. The rig's worker was held to a tenth of a CPU so the workbook ran for minutes (at full speed it is Ready in 16–41 s), and paused while B cancelled (D259).
+
+### T93 — A long export keeps its card; one at a time; Cancel  ·  Needs: no new build (server deploy + JS update)
+
+**Why it matters:** on TP-3 a long export showed no status, its card vanished when you left the screen, and a second Generate waited behind it (close-out G-4). Use "TP-3 synthetic" so the export runs long enough to watch; T94 (speed) comes after.
+
+- [x] **Stage and counts.** Export → Generate workbook (all levels, all tabs). Within a few seconds the card shows a stage line that changes, e.g. `Photo Log 1,240 / 10,000 pictures · 1 min 05 s`, the count climbing and the time ticking. → saw (Claude, rig, 2026-11-07, `rig.sh long-export`, long-export.yaml): A's card reads e.g. `Photo Log 28 / 10,000 pictures · 14 s`, then another line (e.g. `Photo Log 101 / 10,000 pictures · 16 s`); the flow compares the seconds of each reading and they rise; `Started by Ann`, Generate workbook disabled.
+- [x] **Leave and come back.** While it runs, go back to Levels, then open Export again: the same card is there with the stage and the time still counting, without pressing anything. → saw (Claude, rig, 2026-11-07, long-export.yaml): ← Levels, then Export: the card is back with no tap, its time line (e.g. `Exported Nov 7, 2026, 9:27 AM · Master workbook`) the same as before, its stage line still running with a later time, and the gate reads `An export is already running (started by Ann …)`.
+- [x] **Another iPad.** On a second iPad (any name), open Export on the same project: the same card, "Started by <first name>", same stage. Its Generate workbook button is disabled and the line above it reads `An export is already running (started by <name> hh:mm)`. Generate floor PDF stays available. → saw (Claude, rig, 2026-11-07, long-export-peer.yaml): B (Bob) opens Export on Maestro scale: Ann's card, `Started by Ann`, a running stage line (e.g. `Photo Log 290 / 10,000 pictures · 1 min 39 s`); the gate reads e.g. `An export is already running (started by Ann 9:27 AM)` (en-US shows 12-hour time), Generate workbook disabled; Floor PDF → Synced → Generate PDF enabled.
+- [x] **Cancel.** On the second iPad tap *Cancel export* → confirm. Within a couple of seconds both iPads show `Cancelling…`, then `Cancelled by <name>`; Generate workbook is enabled again. → saw (Claude, rig, 2026-11-07, long-export-peer / -cancelling / -cancelled / -check.yaml): B's Cancel export → `Cancel this Master workbook?` → Cancel export: B reads `Cancelling (Bob)… it stops at its next step` and the Cancel button is gone, A reads the same line (the worker was paused so neither missed it); unpaused, B and then A read `Cancelled by Bob` and Generate workbook is enabled on both; the server's row is `cancelled`, started by Ann, cancelled by Bob, stopped in Photo Log.
+- [x] **Run one to the end.** Generate again and wait: the card ends at `Ready · <size>` and Share works; note the minutes from Generate to Ready (also T32's number below). → saw (Claude, rig, 2026-11-07, long-export-check.yaml): on Maestro scale A's next workbook ends at `Ready · 32.5 MB` (`Started by Ann`); 40–41 s on the rig at full speed (`docs/perf/rig.md`, a regression number). Earlier (2026-11-04, `rig.sh export`) a small project's workbook and floor PDF ended at Ready and History listed both. Share (another process) and the minutes on the Droplet are what T32 / T94's Export line asks on the same project.
+
+Decision D166 (already answered by you: one at a time per project and kind, anyone may Cancel) — nothing to approve.
+
 ## Claude ran (rig) 2026-11-05 — O5–O6 and wave 5 of docs/rig-plan.md (T159), Mac rig Simulator, local e2e server
 
 Sections whose every line a Maestro flow now proves (rig plan §7 4). Lines Claude proved in a section that still has Landry's lines stay in the checklist with their `→ saw (Claude, rig, …)` note.

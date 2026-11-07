@@ -1,0 +1,19 @@
+# Step 5 of `rig.sh long-export` (T165, T93), on B (Bob), still on the Export screen step 3 left:
+# the worker runs again and stops the export at its next step: "Cancelled by Bob", Generate
+# workbook enabled again.
+appId: productions.luminarytechnology.fieldsurvey
+name: Long export — Cancelled on the second iPad
+---
+- extendedWaitUntil:
+    visible:
+      id: export.card.state
+      text: Cancelled by Bob
+    timeout: 300000
+- assertNotVisible:
+    id: export.card.progress
+- assertVisible:
+    id: export.gate
+    text: Synced — the export will include every edit on this iPad\.
+- assertVisible:
+    id: export.generate
+    enabled: true

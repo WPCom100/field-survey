@@ -108,13 +108,19 @@ usage: bash scripts/mac/rig.sh <command>
   restart               O6 (T159): with the api stopped A generates ~1,500 punch items on "$SCALE_PROJECT"
                         (restart-edit.yaml); the api is started and restarted mid-push; then nothing refused
                         (restart-check.yaml, the server's op states) and each numbering group continues
-  stranger              T160: smoke.yaml on A (Ann), stranger-signin.yaml (a fresh name); with the api
+  long-export           T165 (R6 rest, T93): A and B hold "$SCALE_PROJECT" (long-export-prep.yaml); with
+                        the worker at RIG_EXPORT_CPUS (0.1) CPU A's workbook runs for minutes: the stage
+                        line changes, ← Levels and back keep the card (long-export.yaml); the worker paused,
+                        B sees Ann's card, Generate disabled, the PDF allowed, and cancels (-peer); A shows
+                        Cancelling (-cancelling); unpaused, Cancelled by Bob on B (-cancelled) and A, then one
+                        to Ready at full speed (-check); the server's two workbooks. Run 'scale' first
+  stranger             T160: smoke.yaml on A (Ann), stranger-signin.yaml (a fresh name); with the api
                         stopped that name's app_user row is deleted (an old backup) and stranger-edit.yaml
                         queues an edit; stranger-check.yaml: the Sync screen names the lost user, Re-sign in
                         carries the edit over to the name's new id, and the server has it under that name
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
-     RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
+     RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT RIG_EXPORT_CPUS
      RIG_PICKER=old|new (the Files picker's tap spots; default by the simulator's iOS: 26+ new)
 EOF
 }
@@ -876,6 +882,79 @@ cmd_restart() {  # O6 (T159): the api restarted in the middle of a large push; n
 
 SCALE_CEILINGS="$ROOT/scripts/mac/scale-ceilings.txt"   # `key ms` per line, set from the first green run (docs/perf/rig.md)
 
+scale_exports() {  # -> the scale project's exports, newest first: "id kind state created_by cancelled_by run_seconds"
+  local pid
+  pid="$(server_sql "$SCALE_PROJECT" "select id from project where name = :'name';")"
+  curl -fsS -H "Authorization: Bearer $TOKEN" "$SERVER_URL/exports?project_id=$pid" | python3 -c '
+import json, sys
+from datetime import datetime
+for e in sorted(json.load(sys.stdin), key=lambda e: e["created_at"] or "", reverse=True):
+    st = e.get("stats") or {}
+    run = "-"
+    if st.get("started_at") and st.get("finished_at"):
+        run = round((datetime.fromisoformat(st["finished_at"]) - datetime.fromisoformat(st["started_at"])).total_seconds())
+    print(e["id"], e["kind"], e["job_state"], e.get("created_by") or "-", e.get("cancelled_by") or "-", run)
+'
+}
+
+cmd_long_export() {  # T165 (R6 rest, T93): a long workbook export of SCALE on two iPads
+  local worker all cpus="${RIG_EXPORT_CPUS:-0.1}" id st by n rows a b
+  server_up
+  project_exists "$SCALE_PROJECT" || die "no \"$SCALE_PROJECT\" on the server: rig.sh scale first"
+  worker="$(cd "$ROOT/server" && $COMPOSE ps -q worker)"
+  [ -n "$worker" ] || die "the worker is not running: rig.sh server"
+  all="$(docker info --format '{{.NCPU}}')"   # `docker update --cpus 0` does not lift a limit: all the VM's CPUs do
+  # whatever happens, the worker runs again at full speed: a paused or throttled worker stalls every later job
+  trap 'docker unpause "$worker" >/dev/null 2>&1 || true; docker update --cpus "$all" "$worker" >/dev/null 2>&1 || true' EXIT
+  docker unpause "$worker" >/dev/null 2>&1 || true
+  docker update --cpus "$all" "$worker" >/dev/null
+  # an export a stopped run left running would refuse this run's Generate (one per project and kind, D166)
+  scale_exports | while read -r id _ st _; do
+    case "$st" in queued|running) curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H "X-Survey-User: Ann" \
+      "$SERVER_URL/exports/$id/cancel" >/dev/null && say "cancelled a left-over export $id ($st)" ;; esac
+  done
+  for _ in $(seq 1 120); do scale_exports | awk '$3 == "queued" || $3 == "running" { f = 1 } END { exit f }' && break; sleep 1; done
+  cmd_second
+  say "long-export on \"$SCALE_PROJECT\": A (Ann) and B (Bob) hold it; A exports with the worker at $cpus CPU, B cancels"
+  # both download it now (at once: ~2 min each on a store without it), not while the export runs
+  PROJECT="$SCALE_PROJECT" USER_NAME=Ann cmd_flows --device A long-export-prep.yaml > "$OUT/long-export-prep-A.log" 2>&1 &
+  a=$!
+  sleep 5
+  PROJECT="$SCALE_PROJECT" USER_NAME=Bob cmd_flows --device B long-export-prep.yaml
+  wait "$a" || { cat "$OUT/long-export-prep-A.log"; die "long-export-prep.yaml failed on A"; }
+  # the export runs for minutes (~9 at 0.1 CPU; 16 s at full speed on the rig, too short to leave and come back)
+  docker update --cpus "$cpus" "$worker" >/dev/null
+  PROJECT="$SCALE_PROJECT" USER_NAME=Ann cmd_flows --device A long-export.yaml
+  # paused, the job cannot reach its next step: "Cancelling (Bob)…" stays on both iPads until unpause
+  docker pause "$worker" >/dev/null
+  say "worker paused: Ann's export stays running while B looks at it and cancels it"
+  PROJECT="$SCALE_PROJECT" USER_NAME=Bob cmd_flows --device B long-export-peer.yaml
+  PROJECT="$SCALE_PROJECT" USER_NAME=Ann cmd_flows --device A long-export-cancelling.yaml
+  docker unpause "$worker" >/dev/null
+  say "worker running again: the export stops at its next step"
+  PROJECT="$SCALE_PROJECT" USER_NAME=Bob cmd_flows --device B long-export-cancelled.yaml
+  docker update --cpus "$all" "$worker" >/dev/null
+  trap - EXIT
+  PROJECT="$SCALE_PROJECT" USER_NAME=Ann cmd_flows --device A long-export-check.yaml
+  # on the server: the newest workbook done; the one before it Ann's, cancelled by Bob after a minute
+  # or more (paused included) and before it reached "Saving the file" (uncancelled it runs ~9 min)
+  rows="$(scale_exports | awk '$2 == "xlsx"' | head -n 2)"
+  say "the server's two newest workbooks of \"$SCALE_PROJECT\" (id kind state started-by cancelled-by run-seconds; stage seconds):"
+  printf '%s\n' "$rows" | while read -r id _; do
+    printf '  %s  %s\n' "$(printf '%s\n' "$rows" | awk -v id="$id" '$1 == id')" \
+      "$(curl -fsS -H "Authorization: Bearer $TOKEN" "$SERVER_URL/exports/$id" \
+        | python3 -c 'import json, sys; s = json.load(sys.stdin)["stats"] or {}; print(s.get("stage_seconds"), s.get("bytes") or "")')"
+  done
+  printf '%s\n' "$rows" | awk 'NR == 1 && !($3 == "done" && $4 == "Ann") { exit 1 }
+    NR == 2 && !($3 == "cancelled" && $4 == "Ann" && $5 == "Bob" && $6 >= 60) { exit 1 }' \
+    || die "expected the newest workbook done (Ann) and the one before cancelled by Bob after a minute or more"
+  id="$(printf '%s\n' "$rows" | sed -n 2p | cut -d' ' -f1)"
+  case "$(curl -fsS -H "Authorization: Bearer $TOKEN" "$SERVER_URL/exports/$id")" in
+    *'"Saving the file"'*) die "the cancelled export had reached \"Saving the file\": it was not cut short" ;;
+  esac
+  say "long-export: green (the done row's stage seconds are the local server's regression number, not the Droplet's)"
+}
+
 cmd_stranger() {  # T160: the server loses a user's app_user row; the Sync screen says so, Re-sign in sends the edits
   local who t0 t1 gone n
   who="Zed$(date +%H%M%S)"   # a fresh name: its row must hold nothing for the delete to go through
@@ -975,6 +1054,7 @@ case "${1:-}" in
   pickup) cmd_pickup ;;
   scale-check) cmd_scale_check ;;
   restart) cmd_restart ;;
+  long-export) cmd_long_export ;;
   stranger) cmd_stranger ;;
   -h|--help|help|"") usage ;;
   *) usage; die "unknown command: $1" ;;

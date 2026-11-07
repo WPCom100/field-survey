@@ -1,0 +1,43 @@
+# Step 1 of `rig.sh long-export` (T165), on A (Ann) and on B (Bob): the store is kept and SCALE
+# (Maestro scale, `rig.sh scale`) is downloaded now if it is not there yet (~2 min on a store
+# without it), so neither simulator pulls 58,000 ops while the export runs. Ends when a sync cycle
+# pulls nothing, on SCALE's Levels home.
+appId: productions.luminarytechnology.fieldsurvey
+name: Long export — SCALE on this iPad
+---
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- tapOn:
+    id: nav.projects
+- runFlow:                    # a store without it lists it only after Refresh (T159)
+    when:
+      notVisible:
+        id: projects.open.${SCALE}
+    commands:
+      - tapOn:
+          id: projects.refresh
+- scrollUntilVisible:
+    element:
+      id: projects.open.${SCALE}
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 120000
+- tapOn:
+    id: projects.open.${SCALE}
+- extendedWaitUntil:
+    visible:
+      id: level.06M
+    timeout: 600000
+# the download (and the first rules run's push on a store that never had it) is done when a
+# cycle moves nothing
+- tapOn:
+    id: nav.sync
+- extendedWaitUntil:
+    visible:
+      id: sync.timing
+      text: 'Last cycle .* · 0 pushed, 0 pulled.*'
+    timeout: 900000
+- assertNotVisible: ".*need attention.*"
+- tapOn: ← Levels
+- assertVisible:
+    id: level.06M

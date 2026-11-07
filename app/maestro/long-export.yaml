@@ -1,0 +1,89 @@
+# Step 2 of `rig.sh long-export` (T165, T93), on A (Ann): Generate workbook on SCALE, whose export
+# runs for minutes while `rig.sh` holds the worker to a tenth of a CPU. The card's stage line
+# names the stage with its counts (`Photo Log 1,240 / 10,000 pictures · 25 s`), then changes and
+# its time ticks; ← Levels and Export again re-attach the same card, still running. Ends on the
+# Export screen, so A keeps following the export while B looks at it (no launch in A's next flow).
+appId: productions.luminarytechnology.fieldsurvey
+name: Long export — stage line, leave and come back
+---
+- runFlow: _resume.yaml
+- runFlow: _connect.yaml
+- runFlow: _open-project.yaml
+- tapOn:
+    id: nav.export
+- runFlow:
+    when:
+      notVisible:
+        id: export.gate
+        text: Synced — .*
+    commands:
+      - tapOn:
+          id: export.syncFirst
+- extendedWaitUntil:
+    visible:
+      id: export.gate
+      text: Synced — the export will include every edit on this iPad\.
+    timeout: 120000
+- assertVisible:
+    id: export.generate
+    enabled: true
+- tapOn:
+    id: export.generate
+
+# the stage with its counts, then a different line with a later time
+- extendedWaitUntil:
+    visible:
+      id: export.card.progress
+      text: 'Photo Log [0-9,]+ / 10,000 pictures · .*'
+    timeout: 120000
+- assertVisible: 'Started by Ann'
+- assertVisible:
+    id: export.generate
+    enabled: false
+- copyTextFrom:
+    id: export.card.progress
+- evalScript: ${output.p1 = maestro.copiedText}
+# its time in seconds ("14 s", "2 min 5 s"; Maestro's evalScript fails any regex with a `$`)
+- evalScript: '${output.s1 = (output.p1.split(" · ")[1].indexOf("min") < 0 ? 0 : 60 * parseInt(output.p1.split(" · ")[1], 10)) + parseInt(output.p1.split(" · ")[1].split("min ").pop(), 10)}'
+- copyTextFrom:
+    id: export.card.time
+- evalScript: ${output.t1 = maestro.copiedText}
+- extendedWaitUntil:
+    notVisible:
+      id: export.card.progress
+      text: ${output.p1}
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: export.card.progress
+      text: '(Photo Log [0-9,]+ / 10,000 pictures|Writing the workbook) · .*'
+    timeout: 15000
+- copyTextFrom:
+    id: export.card.progress
+- evalScript: ${output.p2 = maestro.copiedText}
+- evalScript: '${output.s2 = (output.p2.split(" · ")[1].indexOf("min") < 0 ? 0 : 60 * parseInt(output.p2.split(" · ")[1], 10)) + parseInt(output.p2.split(" · ")[1].split("min ").pop(), 10)}'
+- assertTrue: ${output.s2 > output.s1}
+
+# leave and come back: the same card, still running, its time still counting
+- tapOn: ← Levels
+- assertVisible:
+    id: level.06M
+- tapOn:
+    id: nav.export
+- extendedWaitUntil:
+    visible:
+      id: export.card.progress
+      text: '(Photo Log [0-9,]+ / 10,000 pictures|Writing the workbook) · .*'
+    timeout: 15000
+- assertVisible: 'Started by Ann'
+- copyTextFrom:
+    id: export.card.time
+- assertTrue: ${maestro.copiedText == output.t1}
+- copyTextFrom:
+    id: export.card.progress
+- evalScript: ${output.p3 = maestro.copiedText}
+- evalScript: '${output.s3 = (output.p3.split(" · ")[1].indexOf("min") < 0 ? 0 : 60 * parseInt(output.p3.split(" · ")[1], 10)) + parseInt(output.p3.split(" · ")[1].split("min ").pop(), 10)}'
+- assertTrue: ${output.s3 > output.s2}
+- assertVisible:
+    id: export.gate
+    text: 'An export is already running \(started by Ann .*\)'
