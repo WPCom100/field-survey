@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { loadLevelPlan } from './data';
 import { DEMO_LEVEL_ID, ensureDemoLevel } from './demo';
 import { EMPTY_FILTER, matchesFilter } from './filters';
-import { connectionMatches, loadLevelLists, rowMatches, searchIds, type ListRow } from './lists';
+import { connectionMatches, loadLevelLists, rowMatches, searchIds, wordsMatch, type ListRow } from './lists';
 
 const ME = uuidv7();
 let ts = 1_760_000_000_000;
@@ -276,6 +276,65 @@ describe('side lists', () => {
     expect(t.has(riser!)).toBe(true);
     expect(t.has(other!.id)).toBe(false);
     expect((await search('stations')).has(bus!)).toBe(true);
+  });
+
+  for (const mode of ['like', 'auto'] as const) {
+    it(`finds a punch item or part by its device's ID and Device text, as its row shows them (T163, ${mode})`, async () => {
+      const { store, pid } = await demo(mode);
+      const station = async (tag: string, room: string) => {
+        const id = uuidv7();
+        await store.apply(op('device', id, 'create', pid, { level_id: DEMO_LEVEL_ID, category: 'Station', device: 'PI1002', room_location: room }));
+        await store.db.exec('UPDATE device SET display_id = ? WHERE id = ?', [`06M-${tag}`, id]);
+        return id;
+      };
+      const s3 = await station('S3', 'Corridor XXB1-C005, north');
+      const s4 = await station('S4', 'Corridor XXB1-C007');
+      const item = async (fields: Record<string, unknown>) => {
+        const id = uuidv7();
+        await store.apply(op('punch_item', id, 'create', pid, { level_id: DEMO_LEVEL_ID, type: 'Missing part', owner: 'EC', ...fields }));
+        return id;
+      };
+      const cover3 = await item({ device_id: s3, item: 'Install cover' });
+      const cover4 = await item({ device_id: s4, item: 'Install cover' });
+      const neuron = await item({ item: 'Missing all Device Neuron IDs', type: 'Information', notes: '06M-S3' });
+      const part3 = uuidv7();
+      await store.apply(op('missing_part', part3, 'create', pid, { level_id: DEMO_LEVEL_ID, device_id: s3, part: 'Backbox', owner: 'EC' }));
+      const { lists } = await load(store, pid);
+      expect(lists.punch.find((r) => r.id === cover3)!.sub).toBe('06M-S3 · PI1002 S3 - Corridor XXB1-C005, north · Missing part · EC · Open');
+
+      const rows = [...lists.connections, ...lists.punch, ...lists.parts];
+      const search = async (q: string) => (await searchIds(store, DEMO_LEVEL_ID, q, rows))!;
+      const mine = [cover3, cover4, neuron, part3];
+      const found = async (q: string) => {
+        const ids = await search(q);
+        return mine.filter((id) => ids.has(id));
+      };
+      // The device's ID: its items and parts, and the Neuron item whose Notes name it.
+      expect(await found('06M-S3')).toEqual([cover3, neuron, part3]);
+      expect(await found('06m-s4')).toEqual([cover4]);
+      // A room code from the Device text: that device's item and part only.
+      expect(await found('XXB1-C005')).toEqual([cover3, part3]);
+      expect(await found('corridor xxb1-c005')).toEqual([cover3, part3]);
+      expect(await found('c005')).toEqual([cover3, part3]);
+      expect(await found('PI1002 S4')).toEqual([cover4]);
+      expect(await found('install cover north')).toEqual([cover3]);
+      // A term matches at the start of a word, not inside one.
+      expect((await search('6m-s3')).has(cover3)).toBe(false);
+      // The row comes back, not the device (D167): a search for one station never adds the other.
+      const ids = await search('06M-S3');
+      expect(ids.has(s4)).toBe(false);
+      expect((await search('XXB1-C005')).has(s4)).toBe(false);
+    });
+  }
+
+  it('wordsMatch: every term starts a word', () => {
+    const text = 'b1-s3 pi1002 s3 - corridor xxb1-c005, north';
+    expect(wordsMatch(['b1-s3'], text)).toBe(true);
+    expect(wordsMatch(['c005', 'north'], text)).toBe(true);
+    expect(wordsMatch(['1-s3'], text)).toBe(false);
+    expect(wordsMatch(['orth'], text)).toBe(false);
+    expect(wordsMatch(['s3', 'south'], text)).toBe(false);
+    expect(wordsMatch(['#8'], 'item #8')).toBe(true);
   });
 
   it('handles 2,000 rows per tab and search/filter over them quickly', async () => {

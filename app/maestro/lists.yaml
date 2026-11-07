@@ -1,6 +1,7 @@
 # F2 (T155, rig plan wave 1): the plan's side lists on a fresh copy of the master. Conns rows name
 # both ends (T95); a C-nn search lists that run and its two end devices, a device search that
-# device only; B1's Punch list shows #8's Device text from its device and follows a Relocated
+# device only; a search for B1-S3 or its room finds its punch item #8 by the row's shown text (T163);
+# B1's Punch list shows #8's Device text from its device and follows a Relocated
 # room at once (T81); typing a Neuron ID takes the station off B2's "Missing all Device Neuron
 # IDs" item (T34 upkeep, D170); a rack's card asks for no Neuron ID (T68).
 # The item editor (T162): a Punch row opens it, Tracking status Open → Closed stamps Date closed, an

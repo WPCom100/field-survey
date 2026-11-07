@@ -6,7 +6,18 @@ appId: productions.luminarytechnology.fieldsurvey
     id: level.B1
 - tapOn:
     id: plan.tab.punch
-- runFlow: _search-clear.yaml       # the Device text on a punch row is not searchable (filed: T163)
+# T163: a device search finds its punch items by the row's device ID, and a room by its Device text
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: XXB1-C005
+- assertVisible:
+    id: plan.row.punch.8
+    text: '.*Install cover.*B1-S3 · .*Corridor XXB1-C005, north.*'
+- runFlow:
+    file: _search.yaml
+    env:
+      TERM: B1-S3
 - assertVisible:
     id: plan.row.punch.8
     text: '.*Install cover.*B1-S3 · .*Corridor XXB1-C005, north.*'
@@ -82,6 +93,7 @@ appId: productions.luminarytechnology.fieldsurvey
       text: '.*EC/ETC · Closed.*'
     timeout: 10000
 # Parts: Needed → Ordered on the level's first part
+- runFlow: _search-clear.yaml
 - tapOn:
     id: plan.tab.parts
 - tapOn:

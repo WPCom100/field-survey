@@ -12,9 +12,13 @@
  * A connection row names both ends, `06M-04 ↔ ERP24` (D167): each end's device ID, or the
  * placeholder's text (D26) where an end is not a device. A connection-number search (D163)
  * also returns the two end devices, so the Devices tab lists them and the plan shows their pins.
+ *
+ * A punch or part row is found by what it shows (T163): its device's ID and Device text (D148,
+ * D151) as well as its own text in the search index, each term at the start of a word as the
+ * index matches; the row itself is returned, never its device.
  */
 
-import { displayNumber, isNew, punchDeviceText, type Store } from '@field-survey/core';
+import { defaultDeviceText, displayNumber, isNew, punchDeviceText, type Store } from '@field-survey/core';
 import { cableCodes, loadRuleParams } from '@field-survey/rules';
 
 import { loadDraftEndLabels, waitsForDraft } from '../cables/draftEnds';
@@ -221,6 +225,7 @@ export async function loadLevelLists(
   const parts = (await store.list<Row>('missing_part', { where: 'level_id = ?', params: [levelId], includeDeleted })).map((m): ListRow => {
     const id = String(m.id);
     const { deviceLabel, ...inherited } = inherit(str(m.device_id));
+    const linked = str(m.device_id) ? deviceRows.get(String(m.device_id)) : undefined;
     return withText(
       {
         id,
@@ -236,7 +241,8 @@ export async function loadLevelLists(
         open: str(m.part_status) !== 'Installed',
         owner: str(m.owner),
       },
-      [str(m.notes), str(m.part_no)],
+      // the device's Device text is searched too (T163), so a room finds its parts as it finds its items
+      [str(m.notes), str(m.part_no), linked && !linked.deleted_at ? defaultDeviceText(linked) : null],
     );
   });
 
@@ -297,12 +303,14 @@ export function rowMatches(row: ListRow, f: PlanFilter): boolean {
  * Ids matching a search on this level: FTS (or the LIKE fallback) for devices, punch and parts,
  * a text match for connections (not in the index). `null` means no query, so no restriction.
  * A connection-number search (`C-14`, D163) also returns the devices at both ends (D167).
+ * `rows` are the level's list rows (connections, punch, parts): a punch or part row also matches
+ * by its shown text, its device's ID and Device text included (T163), and adds only itself.
  */
 export async function searchIds(
   store: Store,
   levelId: string,
   query: string,
-  connections: readonly ListRow[],
+  rows: readonly ListRow[],
 ): Promise<Set<string> | null> {
   const q = query.trim();
   if (!q) return null;
@@ -312,7 +320,11 @@ export async function searchIds(
   const byNumber = terms.some((t) => connectionNumber(t) !== undefined);
   const level = await store.get<{ project_id: string }>('level', levelId);
   const codes = await projectCableCodes(store, level?.project_id ?? null);
-  for (const c of connections) {
+  for (const c of rows) {
+    if (c.tab !== 'connections') {
+      if (wordsMatch(terms, c.text)) ids.add(c.id);
+      continue;
+    }
     if (!connectionMatches(terms, c, codes)) continue;
     ids.add(c.id);
     if (byNumber) {
@@ -321,6 +333,16 @@ export async function searchIds(
     }
   }
   return ids;
+}
+
+/** Every lower-case term starts a word of `text` (as the search index's prefix match): `b1-s3`, `xxb1-c005`, `c005`, `8`; not `1-s3` or `18` for `8`. */
+export function wordsMatch(terms: readonly string[], text: string): boolean {
+  return terms.every((t) => {
+    for (let i = text.indexOf(t); i >= 0; i = text.indexOf(t, i + 1)) {
+      if (i === 0 || !/[\p{L}\p{N}]/u.test(text[i - 1]!) || !/[\p{L}\p{N}]/u.test(t[0]!)) return true;
+    }
+    return false;
+  });
 }
 
 /** The number of a term shaped like a connection number (`c-14`, `c14`, `14`), else undefined. */

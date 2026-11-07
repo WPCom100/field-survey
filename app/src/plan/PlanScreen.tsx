@@ -469,7 +469,8 @@ export function PlanScreen(props: PlanScreenProps) {
   });
   const canInk = !!editor && !!props.blobs && !!plan?.sheet;
 
-  // Search: FTS over device / punch / part text plus a text match on connections; debounced.
+  // Search: FTS over device / punch / part text plus a text match on the rows' shown text
+  // (connections; punch and parts by their device's ID and Device text, T163); debounced.
   useEffect(() => {
     if (!query.trim()) {
       setHits(null);
@@ -477,7 +478,7 @@ export function PlanScreen(props: PlanScreenProps) {
     }
     let active = true;
     const t = setTimeout(() => {
-      searchIds(store, levelId, query, lists?.connections ?? []).then(
+      searchIds(store, levelId, query, lists ? [...lists.connections, ...lists.punch, ...lists.parts] : []).then(
         (ids) => active && setHits(ids),
         (e: unknown) => console.warn('[plan] search failed', e),
       );
