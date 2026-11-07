@@ -25,14 +25,14 @@ appId: productions.luminarytechnology.fieldsurvey
           id: sources.davinci
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 14%,46%          # sidebar: On My iPad
+    point: ${PICK_SIDE}          # sidebar: On My iPad
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 41%,35%          # 1st file: DaVinci_categories.xlsx
+    point: ${PICK_1}          # 1st file: DaVinci_categories.xlsx
 - tapOn:
-    point: 53%,35%          # 2nd file: davinci-library-sample.json
+    point: ${PICK_2}          # 2nd file: davinci-library-sample.json
 - tapOn:
-    point: 92%,28%          # Open
+    point: ${PICK_OPEN}        # Open
 # app-library drafts are server-wide: the first run imports, later runs find the same files
 - extendedWaitUntil:
     visible:

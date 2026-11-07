@@ -17,7 +17,7 @@ name: Sheets — the older DaVinci categories, an ERn device, a Neuron flag by h
 - runFlow:
     file: _sheet.yaml
     env:
-      AT: 65%,35%           # 3rd file: the 06M composite PDF
+      AT: ${PICK_3}           # 3rd file: the 06M composite PDF
 - runFlow: _logbox.yaml
 - tapOn:
     id: setup.home

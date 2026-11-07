@@ -16,7 +16,7 @@ appId: productions.luminarytechnology.fieldsurvey
     id: plans.display.06M
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 14%,46%          # On My iPad
+    point: ${PICK_SIDE}          # On My iPad
 - runFlow: _pick-wait.yaml
 - tapOn:
     point: ${AT}

@@ -11,4 +11,4 @@ appId: productions.luminarytechnology.fieldsurvey
 - runFlow:
     file: _sheet.yaml
     env:
-      AT: 65%,35%           # 3rd file: the 06M composite PDF
+      AT: ${PICK_3}           # 3rd file: the 06M composite PDF

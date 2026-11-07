@@ -16,10 +16,10 @@ appId: productions.luminarytechnology.fieldsurvey
     id: seed.choose
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 14%,46%          # sidebar: On My iPad
+    point: ${PICK_SIDE}          # sidebar: On My iPad
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 41%,35%          # the one file: the master workbook
+    point: ${PICK_1}          # the one file: the master workbook
 - extendedWaitUntil:
     visible:
       id: seed.matched

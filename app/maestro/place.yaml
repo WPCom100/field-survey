@@ -14,11 +14,11 @@ name: F4 — place devices, undo, waiting cables, flags
 - runFlow:
     file: _seed-copy.yaml
     env:
-      SEED_AT: 53%,35%      # 2nd file: the master workbook
+      SEED_AT: ${PICK_2}      # 2nd file: the master workbook
 - runFlow:
     file: _sheet.yaml
     env:
-      AT: 41%,35%           # 1st file: the 06M composite PDF
+      AT: ${PICK_1}           # 1st file: the 06M composite PDF
 - runFlow: _logbox.yaml
 - runFlow: _place-drafts.yaml
 - runFlow: _place-entry.yaml

@@ -115,6 +115,7 @@ usage: bash scripts/mac/rig.sh <command>
 
 env: RIG_SERVER_URL RIG_TOKEN RIG_METRO_URL RIG_USER RIG_PROJECT RIG_SIM_A RIG_SIM_B
      RIG_SEED_PROJECT RIG_PIPELINE_PROJECT RIG_SCALE_PROJECT
+     RIG_PICKER=old|new (the Files picker's tap spots; default by the simulator's iOS: 26+ new)
 EOF
 }
 
@@ -178,6 +179,37 @@ sim_for() {  # A|B -> udid
     A|a) ensure_sim "$SIM_A" ;;
     B|b) ensure_sim "$SIM_B" ;;
     *) die "device must be A or B" ;;
+  esac
+}
+
+sim_ios_major() {  # udid -> the major iOS version of its runtime (e.g. 26)
+  xcrun simctl list devices -j | python3 -c '
+import json, re, sys
+u = sys.argv[1]
+for rt, rows in json.load(sys.stdin)["devices"].items():
+    for d in rows:
+        if d["udid"] == u:
+            m = re.search(r"iOS-(\d+)", rt)
+            print(m.group(1) if m else 0); sys.exit()
+print(0)
+' "$1"
+}
+
+picker_env() {  # udid -> "K=v ..." the Files picker's spots for the flows (T168)
+  # The picker is another process (Maestro sees none of it), so flows tap it by position, in whole
+  # screen percentages on the iPad Pro 13" simulator in portrait: PICK_SIDE = the sidebar's "On My
+  # iPad", PICK_1..3 = the folder's files in name order, PICK_OPEN = Open (multiple selection).
+  # PICK_PHOTO: the photo picker's first photo (`rig.sh media` adds two).
+  # iOS 26 shows a floating sheet over the lower middle; older runtimes a wider one higher up
+  # (measured on the first rig's pre-26 runtime, T151). RIG_PICKER=old|new overrides the runtime's choice.
+  local set="${RIG_PICKER:-}"
+  if [ -z "$set" ]; then
+    if [ "$(sim_ios_major "$1")" -ge 26 ]; then set=new; else set=old; fi
+  fi
+  case "$set" in
+    new) echo "PICKER=new PICK_SIDE=25%,47% PICK_1=51%,35% PICK_2=66%,35% PICK_3=80%,35% PICK_OPEN=84%,29% PICK_PHOTO=45%,35%" ;;
+    old) echo "PICKER=old PICK_SIDE=14%,46% PICK_1=41%,35% PICK_2=53%,35% PICK_3=65%,35% PICK_OPEN=92%,28% PICK_PHOTO=39%,35%" ;;
+    *) die "RIG_PICKER must be old or new" ;;
   esac
 }
 
@@ -316,10 +348,11 @@ cmd_flows() {
   udid="$(sim_for "$dev")"
   command -v maestro >/dev/null || export PATH="$HOME/.maestro/bin:$PATH"
   command -v java >/dev/null || die "Maestro needs Java 17+: brew install openjdk@17 and set JAVA_HOME (docs/ops.md §6.1)"
-  say "maestro on $dev ($udid): ${flow:-smoke.yaml} against $SERVER_URL as $USER_NAME, project \"$PROJECT\""
+  local picks; picks="$(picker_env "$udid")"
+  say "maestro on $dev ($udid): ${flow:-smoke.yaml} against $SERVER_URL as $USER_NAME, project \"$PROJECT\", picker ${picks%% *}"
   # RIG_ENV="K=v K2=v2": extra flow variables for one run (T159: ROUND); values have no spaces
   local extra=() kv
-  for kv in ${RIG_ENV:-}; do extra+=(-e "$kv"); done
+  for kv in $picks ${RIG_ENV:-}; do extra+=(-e "$kv"); done
   maestro --device "$udid" test \
     -e SERVER_URL="$SERVER_URL" -e TOKEN="$TOKEN" -e METRO_URL="$METRO_URL" -e USER="$USER_NAME" \
     -e PROJECT="$PROJECT" -e SIDE="${SIDE:-$dev}" -e SEED="$SEED_PROJECT" -e SCALE="$SCALE_PROJECT" \

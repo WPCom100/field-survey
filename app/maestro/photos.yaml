@@ -48,7 +48,7 @@ name: Photos — library photos, upload resume, a link, + Photo here
 - runFlow:
     file: _photo-library.yaml
     env:
-      PHOTO_AT: '39%,35%'      # the picker's first photo (portrait, iPad Pro 13")
+      PHOTO_AT: ${PICK_PHOTO}      # the photo picker's first photo (rig.sh, per runtime: T168)
 - runFlow: _resume.yaml
 # the relaunch picks the queue up: nothing waits once the status bar reads Synced
 - extendedWaitUntil:
@@ -138,7 +138,7 @@ name: Photos — library photos, upload resume, a link, + Photo here
     timeout: 5000
     optional: true
 - tapOn:
-    point: '39%,35%'
+    point: ${PICK_PHOTO}
 - extendedWaitUntil:
     visible:
       id: photo.save

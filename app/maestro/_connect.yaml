@@ -37,17 +37,24 @@ appId: productions.luminarytechnology.fieldsurvey
           id: connect.submit
       # iOS offers to save the token (a secure field) as a password. The sheet belongs to another
       # process: Maestro sees neither it nor the app behind it, so while the picker stays hidden
-      # the sheet is up, and its "Not Now" is tapped by position (T151).
+      # the sheet is up, and its "Not Now" is tapped by position (T151; the same spot on iOS 26).
+      # On a fresh simulator the sheet can come up after the first tap (T168: B's first run, with
+      # A importing beside it), so tap again while the picker stays hidden.
       - extendedWaitUntil:
           visible: Who is surveying?
           timeout: 5000
           optional: true
-      - runFlow:
-          when:
+      - repeat:
+          times: 3
+          while:
             notVisible: Who is surveying?
           commands:
             - tapOn:
                 point: 43%,57%
+            - extendedWaitUntil:
+                visible: Who is surveying?
+                timeout: 5000
+                optional: true
       - extendedWaitUntil:
           visible: Who is surveying?
           timeout: 15000

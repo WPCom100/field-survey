@@ -26,7 +26,7 @@ name: Resume — edits and a photo survive a kill and a re-sign-in
 - runFlow:
     file: _photo-library.yaml
     env:
-      PHOTO_AT: '39%,35%'      # the picker's first photo (portrait, iPad Pro 13")
+      PHOTO_AT: ${PICK_PHOTO}      # the photo picker's first photo (rig.sh, per runtime: T168)
 - tapOn:
     id: card.close
 - tapOn:

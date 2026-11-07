@@ -64,10 +64,10 @@ name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
     id: sources.bom
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 14%,46%          # sidebar: On My iPad
+    point: ${PICK_SIDE}          # sidebar: On My iPad
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 41%,35%          # 1st file: BOM.pdf
+    point: ${PICK_1}          # 1st file: BOM.pdf
 - extendedWaitUntil:
     visible:
       id: sources.bom.status
@@ -77,10 +77,10 @@ name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
     id: sources.riser
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 14%,46%          # On My iPad
+    point: ${PICK_SIDE}          # On My iPad
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 65%,35%          # 3rd file: riser.pdf
+    point: ${PICK_3}          # 3rd file: riser.pdf
 - extendedWaitUntil:
     visible:
       id: sources.riser.status
@@ -95,10 +95,10 @@ name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
     id: plans.display.06M
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 14%,46%          # On My iPad
+    point: ${PICK_SIDE}          # On My iPad
 - runFlow: _pick-wait.yaml
 - tapOn:
-    point: 53%,35%          # 2nd file: the 06M composite PDF
+    point: ${PICK_2}          # 2nd file: the 06M composite PDF
 - extendedWaitUntil:
     visible:
       id: plans.open.06M     # shown once the sheet job is done and the sheet synced
