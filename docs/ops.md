@@ -221,8 +221,12 @@ The server side is in since T03 (`server/docs/auth.md`); the iPad side since T04
 Droplet stays on `AUTH_MODE=token` until T04's build is on every iPad.
 
 **0. The registration (once, Entra admin centre → App registrations → New registration).** One
-registration "Field Survey", single tenant (LTP), serves as both the API and the iPad's public
-client:
+registration "Field Survey", single tenant (**ilxlighting.com**: everyone signs in with their
+`@ilxlighting.com` work account), serves as both the API and the iPad's public client. Making it
+needs the right to create app registrations (on by default for users, else *Application
+Developer*); **Grant admin consent** needs *Global*, *Cloud Application* or *Application
+Administrator* — without it each person may get "Need admin approval" at first sign-in, so ask
+the ilxlighting.com Microsoft 365 admin if you are not one:
 
 - *Authentication* → Add a platform → **Mobile and desktop applications** → custom redirect URI
   `fieldsurvey://auth`. (No secret: the iPad uses authorization code + PKCE.)
