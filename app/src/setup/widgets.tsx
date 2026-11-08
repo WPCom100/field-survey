@@ -1,7 +1,17 @@
-/** Small form pieces shared by the project setup screens (T41). Light theme only (app.json). */
+/**
+ * Small form pieces shared by the project setup screens (T41). Since T174 (D266) they are the UI
+ * system's primitives (`app/src/ui`) under their old names and props, so the screens that import
+ * them change only when their own task comes (T180). Light theme only (app.json).
+ */
 
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+
+import { Banner } from '../ui/Banner';
+import { Btn as UiBtn } from '../ui/Btn';
+import { Chip } from '../ui/Chip';
+import { Field as UiField, fieldStyles } from '../ui/Field';
+import { color, font, hit, radius, space } from '../ui/tokens';
 
 export function Field({
   label,
@@ -24,23 +34,7 @@ export function Field({
   /** `<screen>.<element>`: what a Maestro flow taps (T149). */
   testID?: string;
 }) {
-  return (
-    <View style={[styles.field, width ? { width } : styles.fieldGrow]}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={[styles.input, multiline && styles.inputMulti]}
-        value={value}
-        onChangeText={onChange}
-        onBlur={onCommit}
-        placeholder={placeholder}
-        placeholderTextColor="#9aa0a8"
-        autoCapitalize="none"
-        autoCorrect={false}
-        multiline={multiline}
-        testID={testID}
-      />
-    </View>
-  );
+  return <UiField label={label} value={value} onChange={onChange} onCommit={onCommit} placeholder={placeholder} multiline={multiline} width={width} testID={testID} />;
 }
 
 export function Btn({
@@ -59,22 +53,13 @@ export function Btn({
   /** `<screen>.<element>`: what a Maestro flow taps (T149). */
   testID?: string;
 }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      testID={testID}
-      style={[styles.btn, primary && styles.btnPrimary, small && styles.btnSmall, disabled && styles.btnDisabled]}
-    >
-      <Text style={[styles.btnText, primary && styles.btnTextPrimary, small && styles.btnTextSmall]}>{title}</Text>
-    </Pressable>
-  );
+  return <UiBtn title={title} onPress={onPress} kind={primary ? 'primary' : 'secondary'} disabled={disabled} small={small} testID={testID} />;
 }
 
 export function Check({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <Pressable onPress={() => onChange(!value)} style={styles.check}>
-      <Text style={styles.checkBox}>{value ? '☑' : '☐'}</Text>
+    <Pressable onPress={() => onChange(!value)} style={styles.check} accessibilityRole="checkbox" accessibilityState={{ checked: value }}>
+      <Text style={[styles.checkBox, value && { color: color.primary }]}>{value ? '☑' : '☐'}</Text>
       <Text style={styles.checkLabel}>{label}</Text>
     </Pressable>
   );
@@ -104,18 +89,20 @@ export function ChipPicker({
   const current = options.find((o) => o.id === value)?.label ?? none;
   return (
     <View style={styles.picker}>
-      <Pressable onPress={() => !disabled && setOpen((o) => !o)} style={[styles.pickerValue, disabled && styles.btnDisabled]} testID={testID}>
+      <Pressable
+        onPress={() => !disabled && setOpen((o) => !o)}
+        style={({ pressed }) => [styles.pickerValue, pressed && !disabled && { backgroundColor: color.surface2 }, disabled && styles.btnDisabled]}
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open, disabled: !!disabled }}
+      >
         <Text style={styles.pickerText}>{current} ▾</Text>
       </Pressable>
       {open ? (
         <View style={styles.pickerList}>
-          <Pressable onPress={() => (setOpen(false), onPick(null))} style={styles.pickerItem} testID={testID && `${testID}.none`}>
-            <Text style={styles.pickerItemText}>{none}</Text>
-          </Pressable>
+          <Chip label={none} small selected={value == null} onPress={() => (setOpen(false), onPick(null))} testID={testID && `${testID}.none`} />
           {options.map((o) => (
-            <Pressable key={o.id} onPress={() => (setOpen(false), onPick(o.id))} style={styles.pickerItem} testID={testID && `${testID}.${o.id}`}>
-              <Text style={[styles.pickerItemText, o.id === value && styles.pickerItemOn]}>{o.label}</Text>
-            </Pressable>
+            <Chip key={o.id} label={o.label} small selected={o.id === value} onPress={() => (setOpen(false), onPick(o.id))} testID={testID && `${testID}.${o.id}`} />
           ))}
         </View>
       ) : null}
@@ -138,7 +125,7 @@ export function ScopeSwitch({ value, onChange }: { value: boolean; onChange: (v:
       accessibilityState={{ checked: value }}
       accessibilityLabel="In scope">
       <View pointerEvents="none">
-        <Switch value={value} />
+        <Switch value={value} trackColor={{ true: color.primary }} />
       </View>
       {value ? null : <Text style={styles.scopeOff}>out of scope (far ends only)</Text>}
     </Pressable>
@@ -162,6 +149,7 @@ export const LEVEL_HELP = {
   splitOf: 'A part of another floor drawn on its own sheet (06M of 06); it is listed right after it.',
 } as const;
 
+/** A page section: a title over its content (the shell's page pattern, `docs/ui-plan.md` §4). */
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
@@ -171,40 +159,45 @@ export function Section({ title, children }: { title: string; children: ReactNod
   );
 }
 
+/** A result line under an action: a success banner, or a danger one with `error` (a `Banner`, T174). */
 export function Notice({ text, error, testID }: { text: string | null; error?: boolean; testID?: string }) {
   if (!text) return null;
-  return <Text style={[styles.notice, error && styles.noticeError]} testID={testID}>{text}</Text>;
+  return <Banner tone={error ? 'danger' : 'success'} text={text} testID={testID} style={styles.notice} />;
 }
 
+/**
+ * The styles screens reach into as `w.row`, `w.label`, `w.input` (and the rest, kept under their
+ * names): the system's values. A screen's own task (T180) replaces them with the primitives.
+ */
 export const styles = StyleSheet.create({
-  field: { gap: 4 },
-  fieldGrow: { flex: 1 },
-  label: { fontSize: 12, fontWeight: '700', color: '#555', textTransform: 'uppercase' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 16, backgroundColor: '#fff', color: '#111' },
-  inputMulti: { minHeight: 70, textAlignVertical: 'top' },
-  btn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0', backgroundColor: '#fff' },
-  btnPrimary: { backgroundColor: '#1565c0' },
-  btnSmall: { paddingHorizontal: 8, paddingVertical: 5 },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { color: '#1565c0', fontSize: 15, fontWeight: '600' },
-  btnTextPrimary: { color: '#fff' },
-  btnTextSmall: { fontSize: 13 },
-  check: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
-  checkBox: { fontSize: 18 },
-  checkLabel: { fontSize: 15 },
+  field: fieldStyles.field,
+  fieldGrow: fieldStyles.grow,
+  label: { ...font.captionBold, color: color.text2, textTransform: 'uppercase' },
+  input: fieldStyles.input,
+  inputMulti: fieldStyles.multi,
+  btn: { height: hit.target, paddingHorizontal: 18, borderRadius: radius.control, borderWidth: 1, borderColor: color.border, backgroundColor: color.surface, justifyContent: 'center' },
+  btnPrimary: { backgroundColor: color.primary, borderColor: color.primary },
+  btnSmall: { height: hit.small, paddingHorizontal: space.md },
+  btnDisabled: { opacity: 0.45 },
+  btnText: { ...font.calloutBold, color: color.text },
+  btnTextPrimary: { color: color.onPrimary },
+  btnTextSmall: { fontSize: 13, lineHeight: 18 },
+  check: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: hit.target },
+  checkBox: { fontSize: 20, color: color.text2 },
+  checkLabel: { ...font.body, color: color.text },
   picker: { minWidth: 90 },
-  pickerValue: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: '#fff' },
-  pickerText: { fontSize: 14 },
-  pickerList: { marginTop: 4, borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, backgroundColor: '#fff', flexDirection: 'row', flexWrap: 'wrap', gap: 2, padding: 4 },
-  pickerItem: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 4, backgroundColor: '#f3f5f8' },
-  pickerItemText: { fontSize: 14 },
-  pickerItemOn: { fontWeight: '700', color: '#1565c0' },
-  section: { gap: 10, marginBottom: 22 },
-  sectionTitle: { fontSize: 20, fontWeight: '600' },
-  notice: { fontSize: 14, color: '#2e7d32', marginTop: 4 },
-  noticeError: { color: '#c62828' },
-  row: { flexDirection: 'row', gap: 12, alignItems: 'flex-end' },
-  scope: { minHeight: 44, minWidth: 80, justifyContent: 'center', gap: 2 },
-  scopeOff: { fontSize: 11, color: '#777' },
-  help: { fontSize: 11, color: '#777' },
+  pickerValue: { minHeight: hit.control, justifyContent: 'center', borderWidth: 1, borderColor: color.border, borderRadius: radius.control, paddingHorizontal: space.md, backgroundColor: color.surface },
+  pickerText: { ...font.callout, color: color.text },
+  pickerList: { marginTop: space.xs, borderWidth: 1, borderColor: color.border, borderRadius: radius.control, backgroundColor: color.surface, flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 6 },
+  pickerItem: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: color.surface2 },
+  pickerItemText: { ...font.caption, color: color.text },
+  pickerItemOn: { fontWeight: '600', color: color.primary },
+  section: { gap: space.md, marginBottom: space.xl },
+  sectionTitle: { ...font.title, color: color.text },
+  notice: { marginTop: space.xs, alignSelf: 'stretch' },
+  noticeError: { color: color.danger },
+  row: { flexDirection: 'row', gap: space.md, alignItems: 'flex-end' },
+  scope: { minHeight: hit.target, minWidth: 80, justifyContent: 'center', gap: 2 },
+  scopeOff: { ...font.caption, color: color.text3 },
+  help: { ...font.caption, color: color.text3 },
 });

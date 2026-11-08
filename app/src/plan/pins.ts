@@ -111,7 +111,11 @@ export function pinShape(roleOrCategory: Role | string | null, size: number, sha
 
 export type PinStyle = { fill: string; hollow: boolean; glyph: string };
 
-const STYLES: Record<PinStatus, PinStyle> = {
+/**
+ * Fill and glyph per status (D64): the hexes the floor PDF uses too. `ui/tokens.ts` imports them
+ * for the swatches, buttons and rows (T174); they are spelled here only.
+ */
+export const STATUS_STYLE: Readonly<Record<PinStatus, PinStyle>> = {
   Complete: { fill: '#2e7d32', hollow: false, glyph: 'C' },
   'Installed, untested': { fill: '#6a1b9a', hollow: false, glyph: 'U' },
   Issue: { fill: '#c62828', hollow: false, glyph: '!' },
@@ -119,9 +123,10 @@ const STYLES: Record<PinStatus, PinStyle> = {
   'No access': { fill: '#f9a825', hollow: false, glyph: 'A' },
   'Not started': { fill: '#757575', hollow: false, glyph: '·' },
 };
+const STYLES = STATUS_STYLE;
 
-/** A device nobody has given a status yet: grey like `Not started`, with a dash. */
-const NO_STATUS_STYLE: PinStyle = { fill: '#757575', hollow: false, glyph: '–' };
+/** A device nobody has given a status yet (`Unsurveyed`, D110): grey like `Not started`, with a dash. */
+export const NO_STATUS_STYLE: PinStyle = { fill: '#757575', hollow: false, glyph: '–' };
 
 export function pinStyle(status: PinStatus): PinStyle {
   return STYLES[status];

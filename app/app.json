@@ -9,7 +9,7 @@
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "fieldsurvey",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "productions.luminarytechnology.fieldsurvey",
       "supportsTablet": true,

@@ -178,7 +178,7 @@ flows they run keep the server up (`mac-rig-two-simulators` in Claude's memory, 
 
 | Task | Status | Date | Flows green | Found |
 |---|---|---|---|---|
-| T174 tokens and primitives | todo | | | |
+| T174 tokens and primitives | done | 2026-11-07 | smoke ×2 (A) | nothing; D267 records the readings (icons as Skia path data, dark glyph on the No access yellow, `Notice` as a banner, placeholders in `text3`) |
 | T175 device card | todo | | | |
 | T176 shell | todo | | | |
 | T177 plan screen | todo | | | |
