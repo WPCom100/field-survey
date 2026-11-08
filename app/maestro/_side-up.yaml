@@ -21,5 +21,18 @@ appId: productions.luminarytechnology.fieldsurvey
     duration: 500
 - waitForAnimationToEnd:
     timeout: 3000
+# that extra swipe can push a row that sat near the bottom off the screen (T175, the taller card):
+# then swipe back by the same amount
+- runFlow:
+    when:
+      notVisible:
+        id: ${ID}
+    commands:
+      - swipe:
+          start: 86%,60%
+          end: 86%,40%
+          duration: 500
+      - waitForAnimationToEnd:
+          timeout: 3000
 - assertVisible:
     id: ${ID}

@@ -63,7 +63,7 @@ name: Resume — edits and a photo survive a kill and a re-sign-in
     text: Resume O4 note
 - assertVisible:
     id: card.section.photos
-    text: '.*Photos \(1\).*waiting.*'
+    text: 'Photos 1.*waiting.*'
 - tapOn:
     id: card.close
 - tapOn:

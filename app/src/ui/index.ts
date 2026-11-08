@@ -1,7 +1,7 @@
 /** The UI system (D266, `docs/ui-plan.md` §3): tokens and primitives. Screens import from here. */
 
 export * from './tokens';
-export { contrastRatio, luminance, onFill, readable } from './contrast';
+export { contrastRatio, luminance, onFill, readable, tint, tinted } from './contrast';
 export { Icon, ICON_NAMES, ICON_PATHS, type IconName } from './icons';
 export { Btn, type BtnKind, type BtnProps } from './Btn';
 export { Field, fieldStyles, type FieldProps } from './Field';

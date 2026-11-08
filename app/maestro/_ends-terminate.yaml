@@ -4,15 +4,16 @@
 # (the X end offers that chip, T118) → the R3b kit item: Missing part · EC/ETC.
 appId: productions.luminarytechnology.fieldsurvey
 ---
-# the part's Source names the accepted Run item by its number once the sync has numbered it
+# the part's Source names the accepted Run item by its number once the sync has numbered it (the
+# part row is one element since T175: its number, part and status line read as one text)
 - runFlow:
     file: _side-down.yaml
     env:
       ID: card.part.DMX termination kit - Level 11 run
 - extendedWaitUntil:
     visible:
-      text: 'Needed · EC · src #\d+ · Need to be ordered'
-      below: 'DMX termination kit - Level 11 run.*'
+      id: card.part.DMX termination kit - Level 11 run
+      text: '.*Needed · EC · src #\d+ · Need to be ordered'
     timeout: 60000
 - runFlow:
     file: _side-up.yaml

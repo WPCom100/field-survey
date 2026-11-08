@@ -35,7 +35,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: card.notes
     text: Not Installed.
-- assertVisible: '.*Punch items \(0\).*'
+- assertVisible: 'Punch items 0.*'
 # the station
 - tapOn:
     id: card.close

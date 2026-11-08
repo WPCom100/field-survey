@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: color.surface2 },
   selectedPressed: { opacity: 0.8 },
   off: { opacity: 0.45 },
-  text: { ...font.callout, color: color.text },
+  text: { ...font.callout, color: color.text, flexShrink: 1 },
   textSmall: { ...font.caption },
   textSelected: { color: color.primary, fontWeight: '600' },
 });

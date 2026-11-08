@@ -87,7 +87,7 @@ name: Photos — library photos, upload resume, a link, + Photo here
       ID: card.photo.library
 - assertVisible:
     id: card.section.photos
-    text: '▾ Photos \(1\)'        # the whole header: no "📷 n waiting" after it
+    text: 'Photos 1'              # the whole header: no "📷 n waiting" after it
 - tapOn:
     id: 'photo\.thumb\..*'
 - extendedWaitUntil:
@@ -117,7 +117,7 @@ name: Photos — library photos, upload resume, a link, + Photo here
       ID: card.photo.library
 - assertVisible:
     id: card.section.photos
-    text: '▾ Photos \(1\)'        # the linked photo, nothing waiting
+    text: 'Photos 1'              # the linked photo, nothing waiting
 - tapOn:
     id: card.close
 

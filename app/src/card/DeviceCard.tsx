@@ -1,13 +1,26 @@
 /**
- * Device card (T20, Phase 3 §4.3): the side panel beside the plan when a device is selected.
- * Sections scroll and collapse; every tap commits one op (D45, no Save button) through
- * `actions.ts`. Plain taps are `Field survey` (D96); `[⋯]` delete / restore / move pin ask for
- * a reason (`Correction`), as does a connection row's `⋯` → Delete… (T138), whose History line
- * offers Restore…; Put back in the unplaced list… (T139) takes a placement back. Camera / Library and a thumbnail tap hand over to the photo flow
- * (T21); a connection row opens the end editor (T22); rule drafts are decided through the
- * `ProposalDecider` (T33); the quick actions E6 / E7 / E9 run through `runQuickAction` of the
- * rules package (T34). Neuron ID scan (T54) is shown with its button disabled until it lands.
- * Render it with `key={deviceId}`: a card instance belongs to one device (its note commits on leave).
+ * Device card (T20, Phase 3 §4.3): the side panel beside the plan when a device is selected. Since
+ * T175 (D266, the "Plan · rail, card, status buttons" board) it is built on the UI system
+ * (`app/src/ui`): a header with the ID, its badges, "model type" and "category · grid · room", ⋯ and
+ * ×; Status as a two-column grid of swatch buttons with a check on the current one ("each tap
+ * saves"); Notes with the vocabulary chips; rows for Type, the addresses `addressNeeds` asks for
+ * (T146) and Photos with thumbnails and Camera / Library; collapsible sections with counts
+ * (Accessories, Connections, Punch items, Parts, Quick actions, History) whose open state the card
+ * keeps while it is open (`docs/ui-plan.md` §6); proposals as dashed DRAFT cards.
+ *
+ * Every tap commits one op (D45, no Save button) through `actions.ts`. Plain taps are `Field
+ * survey` (D96); `⋯` delete / restore / move pin ask for a reason (`Correction`), as does a
+ * connection row's ⋯ → Delete… (T138), whose History line offers Restore…; Put back in the unplaced
+ * list… (T139) takes a placement back. Camera / Library and a thumbnail tap hand over to the photo
+ * flow (T21); a connection row opens the end editor (T22); rule drafts are decided through the
+ * `ProposalDecider` (T33); the quick actions E6 / E7 / E9 run through `runQuickAction` of the rules
+ * package (T34). Neuron ID scan (T54) gets its button when it lands. Render it with
+ * `key={deviceId}`: a card instance belongs to one device (its note commits on leave).
+ *
+ * Maestro reads a control's accessibility label as its text (and an accessibility state's value
+ * before it): the current status button labels itself `✓ <status>` (the flows assert it), and a
+ * section header labels itself with its title and count (`Punch items 3 · 1 draft`, `Parts 2`,
+ * `Photos 1`), never through the children's join, which iOS separates with commas.
  */
 
 import { OpError, vocab, type Editor, type Store } from '@field-survey/core';
@@ -16,11 +29,36 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PhotoStrip } from '../photo/PhotoStrip';
-import { BadgeStrip, Swatch, chipStyles } from '../plan/chips';
+import { BadgeStrip } from '../plan/chips';
 import { UNSURVEYED } from '../plan/filters';
 import type { Badges } from '../plan/lists';
 import { pinStyleFor } from '../plan/pins';
 import { UNPLACE_REASON, unplaceDevice } from '../placement/actions';
+import {
+  BADGE,
+  Badge,
+  Banner,
+  Btn,
+  Chip,
+  Field,
+  Icon,
+  Row,
+  Section,
+  Swatch,
+  color,
+  fieldStyles,
+  font,
+  hit,
+  hitSlopTo,
+  photosBadge,
+  radius,
+  ruleBadge,
+  shadow,
+  space,
+  tabular,
+  tinted,
+  type IconName,
+} from '../ui';
 import {
   addOptionalAccessory,
   addOptionalCable,
@@ -42,7 +80,7 @@ import {
   setStatus,
   setType,
 } from './actions';
-import { accessoryGroupLine, loadDeviceCard, type CardDraft, type DeviceCard as Card, type HistoryEntry, type JumpTarget } from './model';
+import { accessoryGroupLine, loadDeviceCard, type CardConnection, type CardDraft, type DeviceCard as Card, type HistoryEntry, type JumpTarget } from './model';
 import { QUICK_ACTIONS, type ProposalDecider, type QuickActionKey } from './proposals';
 
 const CHIPS_SHOWN = 4;
@@ -88,12 +126,20 @@ type Pending =
   | { kind: 'deleteCable' | 'restoreCable'; cableId: string; title: string; reason: string }
   | null;
 
+type SectionKey = 'accessories' | 'connections' | 'punch' | 'parts' | 'quick' | 'history';
+
+/** How the sections start: Quick actions and History folded, the rest open. The card keeps each one's state while it is open (D266, `docs/ui-plan.md` §6). */
+const SECTIONS_OPEN: Readonly<Record<SectionKey, boolean>> = { accessories: true, connections: true, punch: true, parts: true, quick: false, history: false };
+
 export function DeviceCard(props: DeviceCardProps) {
   const { store, editor, deviceId, reloadKey, onEdited } = props;
   const [card, setCard] = useState<Card | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  const [headHeight, setHeadHeight] = useState(0);
   const [pending, setPending] = useState<Pending>(null);
+  const [open, setOpen] = useState<Record<SectionKey, boolean>>(SECTIONS_OPEN);
+  const fold = (k: SectionKey) => ({ open: open[k], onToggle: (v: boolean) => setOpen((o) => ({ ...o, [k]: v })) });
 
   useEffect(() => {
     let active = true;
@@ -125,7 +171,7 @@ export function DeviceCard(props: DeviceCardProps) {
   );
 
   if (!card) {
-    return <View style={styles.loading}>{error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator />}</View>;
+    return <View style={styles.loading}>{error ? <Banner tone="danger" text={error} /> : <ActivityIndicator color={color.primary} />}</View>;
   }
   const d = card.device;
   const readOnly = !editor || d.deleted;
@@ -174,24 +220,22 @@ export function DeviceCard(props: DeviceCardProps) {
     }
   };
   const danger = pending?.kind === 'delete' || pending?.kind === 'deleteCable';
+  const okLabel = danger ? 'Delete' : pending?.kind === 'move' ? 'Tap the new position ▸' : pending?.kind === 'unplace' ? 'Put back' : 'Restore';
+  const punchCount = `${card.punch.length}${card.drafts.length ? ` · ${card.drafts.length} ${card.drafts.length === 1 ? 'draft' : 'drafts'}` : ''}`;
 
   return (
     <View style={styles.root}>
-      {/* header */}
-      <View style={styles.head}>
+      {/* header: ID with its badges, "model type", "category · grid · room", ⋯ and × */}
+      <View style={styles.head} onLayout={(e) => setHeadHeight(e.nativeEvent.layout.height)}>
         <View style={styles.headLine}>
-          <Text style={styles.headId}>{d.label}</Text>
-          <BadgeStrip b={{ ...props.badges, isNew: d.isNew, deleted: d.deleted }} />
-          {d.fieldAddition ? <Text style={chipStyles.badgePlain}>+</Text> : null}
-          <View style={styles.flex} />
-          {editor ? (
-            <Pressable onPress={() => setMenu((m) => !m)} hitSlop={8} style={styles.headBtn} testID="card.menu">
-              <Text style={styles.headBtnText}>⋯</Text>
-            </Pressable>
-          ) : null}
-          <Pressable onPress={props.onClose} hitSlop={8} style={styles.headBtn} testID="card.close">
-            <Text style={styles.headBtnText}>×</Text>
-          </Pressable>
+          {/* the badges wrap under the ID when the panel is narrow; ⋯ and × stay top right */}
+          <View style={styles.headTitle}>
+            <Text style={styles.headId}>{d.label}</Text>
+            <BadgeStrip b={{ ...props.badges, isNew: d.isNew, deleted: d.deleted }} />
+            {d.fieldAddition ? <Badge text="+" /> : null}
+          </View>
+          {editor ? <IconButton name="more" label="More: move pin, put back, delete" onPress={() => setMenu((m) => !m)} testID="card.menu" /> : null}
+          <IconButton name="close" label="Close" onPress={props.onClose} testID="card.close" />
         </View>
         <Text style={styles.headModel} numberOfLines={2} testID="card.model">
           {[d.device, d.type].filter(Boolean).join(' ') || '(no model)'}
@@ -202,111 +246,82 @@ export function DeviceCard(props: DeviceCardProps) {
         {d.isNew ? <Text style={styles.headNote}>NEW · ID assigned at sync</Text> : null}
       </View>
 
-      {menu ? (
-        <View style={styles.menu}>
-          {props.canMovePin && !d.deleted ? (
-            <MenuButton testID="card.menu.move" label={props.unplaced ? 'Place pin…' : 'Move pin…'} onPress={() => (setMenu(false), setPending({ kind: 'move', reason: '' }))} />
-          ) : null}
-          {!d.deleted && (d.placedFromDraft || d.pin) ? (
-            <MenuButton testID="card.menu.unplace" label="Put back in the unplaced list…" onPress={() => (setMenu(false), setPending({ kind: 'unplace', reason: UNPLACE_REASON }))} />
-          ) : null}
-          {d.deleted ? (
-            <MenuButton testID="card.menu.restore" label="Restore…" onPress={() => (setMenu(false), setPending({ kind: 'restore', reason: '' }))} />
-          ) : (
-            <MenuButton testID="card.menu.delete" label="Delete…" danger onPress={() => (setMenu(false), setPending({ kind: 'delete', reason: '' }))} />
-          )}
-        </View>
-      ) : null}
-
       {pending ? (
         <View style={styles.reasonBox}>
-          <Text style={styles.label}>{pendingQuestion(pending)}</Text>
+          <Text style={styles.reasonQuestion}>{pendingQuestion(pending)}</Text>
           <TextInput
-            style={styles.input}
+            style={fieldStyles.input}
             value={pending.reason}
             onChangeText={(t) => setPending({ ...pending, reason: t })}
             placeholder="Reason (kept in the history)"
-            placeholderTextColor="#888"
+            placeholderTextColor={color.text3}
             autoFocus
             returnKeyType="done"
             onSubmitEditing={confirmPending}
             testID="card.reason"
           />
-          <View style={styles.rowWrap}>
-            <SmallButton
-              label={danger ? 'Delete' : pending.kind === 'move' ? 'Tap the new position ▸' : pending.kind === 'unplace' ? 'Put back' : 'Restore'}
-              danger={danger}
-              disabled={!pending.reason.trim()}
-              onPress={confirmPending}
-              testID="card.reason.ok"
-            />
-            <SmallButton label="Cancel" onPress={() => setPending(null)} testID="card.reason.cancel" />
+          <View style={styles.actions}>
+            <Btn title={okLabel} kind={danger ? 'destructive' : 'primary'} disabled={!pending.reason.trim()} onPress={confirmPending} testID="card.reason.ok" />
+            <Btn title="Cancel" onPress={() => setPending(null)} testID="card.reason.cancel" />
           </View>
         </View>
       ) : null}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Banner tone="danger" text={error} style={styles.banner} /> : null}
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         {d.deleted ? (
-          <View style={styles.deleted}>
-            <Text style={styles.deletedText}>Deleted{d.deleteReason ? `: ${d.deleteReason}` : ''}</Text>
-            {editor ? <SmallButton label="Restore…" onPress={() => setPending({ kind: 'restore', reason: '' })} /> : null}
-          </View>
+          <Banner
+            tone="danger"
+            text={`Deleted${d.deleteReason ? `: ${d.deleteReason}` : ''}`}
+            action={editor ? { label: 'Restore…', onPress: () => setPending({ kind: 'restore', reason: '' }) } : undefined}
+            style={styles.banner}
+          />
         ) : null}
 
-        <Section title="Status" marks={marks(card, 'status')}>
-          <View style={styles.rowWrap}>
-            {vocab.DEVICE_STATUS.map((s) => {
-              const on = d.status === s;
-              const st = pinStyleFor(s);
-              return (
-                <Pressable
-                  key={s}
-                  disabled={readOnly}
-                  onPress={() => !on && run((e) => setStatus(e, d.id, s))}
-                  testID={`card.status.${s}`}
-                  style={[styles.statusBtn, on && (st.hollow ? { borderColor: st.fill, borderWidth: 2 } : { backgroundColor: st.fill, borderColor: st.fill })]}>
-                  <Text style={[styles.statusText, on && { color: st.hollow ? st.fill : '#fff', fontWeight: '700' }]}>
-                    {on ? '✓ ' : ''}
-                    {s}
-                  </Text>
-                </Pressable>
-              );
-            })}
+        {/* Status: the five device statuses as swatch buttons, two to a row; each tap saves (D45) */}
+        <View style={styles.block}>
+          <FieldHead title="Status" hint="each tap saves">
+            <Marks card={card} field="status" />
+          </FieldHead>
+          <View style={styles.statusGrid}>
+            {vocab.DEVICE_STATUS.map((s) => (
+              <StatusButton key={s} status={s} on={d.status === s} disabled={readOnly} onPress={() => void run((e) => setStatus(e, d.id, s))} />
+            ))}
           </View>
-          {!d.status ? <Text style={styles.muted}>{UNSURVEYED}</Text> : null}
+          {!d.status ? <Text style={styles.hint}>{UNSURVEYED}</Text> : null}
           {card.findings.map((f) => (
             <Text key={f.id} style={styles.finding}>
               ⚑ {f.lintId}: {f.message}
             </Text>
           ))}
-        </Section>
+        </View>
 
         <NotesSection card={card} readOnly={readOnly} run={run} />
 
-        <TypeSection card={card} readOnly={readOnly} run={run} />
+        {/* rows: Type, the addresses the device needs or has (T146, D245), Photos */}
+        <View>
+          <TypeRow card={card} readOnly={readOnly} run={run} />
+          {d.needsNeuronId || d.neuronId ? <AddressRow kind="neuron" card={card} store={store} readOnly={readOnly} run={run} /> : null}
+          {d.needsIpAddress || d.ipAddress ? <AddressRow kind="ip" card={card} store={store} readOnly={readOnly} run={run} /> : null}
+          {d.needsDmxAddress || d.dmxAddress ? <AddressRow kind="dmx" card={card} store={store} readOnly={readOnly} run={run} /> : null}
+          <PhotosRow card={card} readOnly={readOnly} resolveBlobUri={props.resolveBlobUri} onPhoto={props.onPhoto} onOpenPhoto={props.onOpenPhoto} />
+        </View>
 
         {card.accessories.length || card.accessoryOffers.length ? (
-          <Section title="Accessories" marks="">
+          <Section title="Accessories" count={card.accessories.length} {...fold('accessories')}>
             {card.accessories.map((a) => {
               const top = Math.max(a.expected ?? 2, a.found ?? 0);
               return (
                 <View key={a.id} style={styles.acc}>
                   <Text style={styles.accModel} numberOfLines={1}>
-                    {a.model} <Text style={styles.muted}>expected {a.expected ?? '—'}</Text>
+                    {a.model} <Text style={styles.accExpected}>expected {a.expected ?? '—'}</Text>
                     {a.short ? <Text style={styles.finding}> ⚑ short</Text> : null}
                   </Text>
-                  <View style={styles.rowWrap}>
-                    <Text style={styles.muted}>found</Text>
+                  <View style={styles.chips}>
+                    <Text style={styles.hint}>found</Text>
                     {Array.from({ length: top + 1 }, (_, n) => (
-                      <Pressable
-                        key={n}
-                        disabled={readOnly}
-                        onPress={() => a.found !== n && run((e) => setFound(e, a.id, n))}
-                        style={[styles.num, a.found === n && styles.numOn]}>
-                        <Text style={[styles.numText, a.found === n && styles.numTextOn]}>{n}</Text>
-                      </Pressable>
+                      <Chip key={n} label={String(n)} small selected={a.found === n} disabled={readOnly} onPress={() => void (a.found !== n && run((e) => setFound(e, a.id, n)))} />
                     ))}
                   </View>
                 </View>
@@ -319,14 +334,14 @@ export function DeviceCard(props: DeviceCardProps) {
                   label={`+ add ${o.model}`}
                   sub={o.expected !== null ? `expected ${o.expected}` : null}
                   disabled={readOnly}
-                  onPress={() => run((e) => addOptionalAccessory(e, d.id, o.model, o.expected))}
+                  onPress={() => void run((e) => addOptionalAccessory(e, d.id, o.model, o.expected))}
                 />
               ));
               if (!block.group) return rows;
               // One block per accessory group of the type (T113): "one of these back boxes".
               return (
                 <View key={`group:${block.group.label}`} style={styles.offerGroup}>
-                  <Text style={styles.muted}>{accessoryGroupLine(block)}</Text>
+                  <Text style={styles.groupLine}>{accessoryGroupLine(block)}</Text>
                   {rows}
                 </View>
               );
@@ -334,118 +349,85 @@ export function DeviceCard(props: DeviceCardProps) {
           </Section>
         ) : null}
 
-        {/* Addresses follow the wires (T146, D245): a section shows when the device needs that address or has one anyway. */}
-        {card.device.needsNeuronId || card.device.neuronId ? <NeuronSection card={card} store={store} readOnly={readOnly} run={run} /> : null}
-        {card.device.needsIpAddress || card.device.ipAddress ? <AddressSection kind="ip" card={card} store={store} readOnly={readOnly} run={run} /> : null}
-        {card.device.needsDmxAddress || card.device.dmxAddress ? <AddressSection kind="dmx" card={card} store={store} readOnly={readOnly} run={run} /> : null}
-
-        <Section title={`Photos (${card.photos.length})`} marks={card.photosWaiting ? `📷 ${card.photosWaiting} waiting` : ''} testID="card.section.photos">
-          <PhotoStrip photos={card.photos} resolveBlobUri={props.resolveBlobUri} onOpen={props.onOpenPhoto} />
-          <View style={styles.rowWrap}>
-            <SmallButton label="📷 Camera" disabled={readOnly || !props.onPhoto} onPress={() => props.onPhoto?.('camera')} />
-            <SmallButton label="🖼 Library" disabled={readOnly || !props.onPhoto} onPress={() => props.onPhoto?.('library')} testID="card.photo.library" />
-          </View>
-        </Section>
-
-        <Section title={`Connections (${card.connections.length})`} marks="" testID="card.section.connections">
-          {card.connections.length === 0 ? <Text style={styles.muted}>None on this device.</Text> : null}
-          {card.connections.map((c) => (
-            <Pressable key={c.id} style={styles.item} onPress={() => props.onOpenEnd?.(c.id)} disabled={!props.onOpenEnd}>
-              <View style={styles.itemLine}>
-                <Swatch {...pinStyleFor(c.status ?? 'Not started')} />
-                <Text style={styles.itemId} testID={`card.conn.${c.label}`}>{c.label}</Text>
-                <Text style={styles.itemText} numberOfLines={2}>
-                  {c.cable ?? '?'} → {c.to}
-                </Text>
-              </View>
-              <View style={styles.itemLine}>
-                <Text style={styles.itemSub} numberOfLines={2}>
-                  {[c.status ?? 'Not started', c.singleRow ? '1 row' : null, c.statusSource === 'copied' ? 'copied' : null, c.note].filter(Boolean).join(' · ')}
-                </Text>
-                {c.jump && (c.jump.sameLevel || props.canOpenLevels) ? (
-                  <Pressable onPress={() => props.onJump(c.jump!)} hitSlop={6} style={styles.jump} testID={`card.conn.${c.label}.jump`}>
-                    <Text style={styles.jumpText}>{c.jump.label} ▸</Text>
-                  </Pressable>
-                ) : null}
-                {c.farDraft ? (
-                  <Text style={styles.itemSub} numberOfLines={2}>
-                    → {c.farDraft}
-                  </Text>
-                ) : null}
-                {readOnly ? null : (
-                  <Pressable
-                    onPress={() => setPending({ kind: 'deleteCable', cableId: c.cableId, title: `${c.cable ?? '?'} ${c.label} → ${c.to}`, reason: '' })}
-                    hitSlop={6}
-                    style={styles.jump}
-                    accessibilityLabel={`Delete connection ${c.label}`}>
-                    <Text style={styles.rowMenu}>⋯</Text>
-                  </Pressable>
-                )}
-                {props.onOpenEnd ? <Text style={styles.chev}>›</Text> : null}
-              </View>
-            </Pressable>
+        <Section title="Connections" count={card.connections.length} {...fold('connections')} testID="card.section.connections">
+          {card.connections.length === 0 ? <Text style={styles.empty}>None on this device.</Text> : null}
+          {card.connections.map((c, i) => (
+            <ConnectionRow
+              key={c.id}
+              c={c}
+              first={i === 0}
+              readOnly={readOnly}
+              canOpenLevels={props.canOpenLevels}
+              onOpenEnd={props.onOpenEnd}
+              onJump={props.onJump}
+              onDelete={() => setPending({ kind: 'deleteCable', cableId: c.cableId, title: `${c.cable ?? '?'} ${c.label} → ${c.to}`, reason: '' })}
+            />
           ))}
           {/* The type's optional cables (Library, T105): greyed until tapped, then a real run with both ends. */}
           {card.cableOffers.map((o) => (
-            <OfferRow key={o.key} label={`+ add ${o.title}`} sub="optional" disabled={readOnly} onPress={() => run((e) => addOptionalCable(e, store, d.id, o.cable))} />
+            <OfferRow key={o.key} label={`+ add ${o.title}`} sub="optional" disabled={readOnly} onPress={() => void run((e) => addOptionalCable(e, store, d.id, o.cable))} />
           ))}
         </Section>
 
-        <Section title={`Punch items (${card.punch.length})${card.drafts.length ? ` + proposals (${card.drafts.length})` : ''}`} marks="" testID="card.section.punch">
-          {card.punch.length === 0 && card.drafts.length === 0 ? <Text style={styles.muted}>None.</Text> : null}
-          {card.punch.map((p) => (
-            <Pressable
+        <Section title="Punch items" count={punchCount} {...fold('punch')} testID="card.section.punch">
+          {card.punch.length === 0 && card.drafts.length === 0 ? <Text style={styles.empty}>None.</Text> : null}
+          {card.punch.map((p, i) => (
+            <Row
               key={p.id}
-              style={[styles.item, !p.open && styles.closed]}
-              onPress={() => props.onOpenItem?.('punch', p.id)}
-              disabled={!props.onOpenItem}
-              testID={`card.punch.${p.item}`}>
-              <View style={styles.itemLine}>
-                <Text style={styles.itemId}>{p.label === 'NEW' ? 'NEW' : `#${p.label}`}</Text>
-                <Text style={styles.itemText} numberOfLines={2}>
-                  {p.item}
+              first={i === 0}
+              onPress={props.onOpenItem ? () => props.onOpenItem?.('punch', p.id) : undefined}
+              testID={`card.punch.${p.item}`}
+              style={p.open ? undefined : styles.closed}
+            >
+              <View style={styles.flex}>
+                <View style={styles.line}>
+                  <Text style={styles.itemId}>{p.label === 'NEW' ? 'NEW' : `#${p.label}`}</Text>
+                  <Text style={styles.itemText} numberOfLines={2}>
+                    {p.item}
+                  </Text>
+                </View>
+                <Text style={styles.itemSub} numberOfLines={2}>
+                  {[p.deviceText, p.type, p.owner, p.tracking, p.notes].filter(Boolean).join(' · ')}
                 </Text>
-                {props.onOpenItem ? <Text style={styles.chev}>›</Text> : null}
               </View>
-              <Text style={styles.itemSub} numberOfLines={2}>
-                {[p.deviceText, p.type, p.owner, p.tracking, p.notes].filter(Boolean).join(' · ')}
-              </Text>
-            </Pressable>
+            </Row>
           ))}
           {card.drafts.map((dr) => (
             <DraftRow key={dr.id} draft={dr} decider={props.decider} readOnly={readOnly} onDecided={onEdited} />
           ))}
         </Section>
 
-        <Section title={`Missing parts (${card.parts.length})`} marks="" testID="card.section.parts">
-          {card.parts.length === 0 ? <Text style={styles.muted}>None.</Text> : null}
-          {card.parts.map((m) => (
-            <Pressable
+        <Section title="Parts" count={card.parts.length} {...fold('parts')} testID="card.section.parts">
+          {card.parts.length === 0 ? <Text style={styles.empty}>None.</Text> : null}
+          {card.parts.map((m, i) => (
+            <Row
               key={m.id}
-              style={[styles.item, m.partStatus === 'Installed' && styles.closed]}
-              onPress={() => props.onOpenItem?.('part', m.id)}
-              disabled={!props.onOpenItem}
-              testID={`card.part.${m.part}`}>
-              <View style={styles.itemLine}>
-                <Text style={styles.itemId}>{m.label === 'NEW' ? 'NEW' : `#${m.label}`}</Text>
-                <Text style={styles.itemText} numberOfLines={2}>
-                  {m.part}
-                  {m.qty != null ? ` ×${m.qty}` : ''}
+              first={i === 0}
+              onPress={props.onOpenItem ? () => props.onOpenItem?.('part', m.id) : undefined}
+              testID={`card.part.${m.part}`}
+              style={m.partStatus === 'Installed' ? styles.closed : undefined}
+            >
+              <View style={styles.flex}>
+                <View style={styles.line}>
+                  <Text style={styles.itemId}>{m.label === 'NEW' ? 'NEW' : `#${m.label}`}</Text>
+                  <Text style={styles.itemText} numberOfLines={2}>
+                    {m.part}
+                    {m.qty != null ? ` ×${m.qty}` : ''}
+                  </Text>
+                </View>
+                <Text style={styles.itemSub} numberOfLines={2}>
+                  {[m.partStatus, m.owner, m.sources.length ? `src ${m.sources.join(', ')}` : null, m.notes].filter(Boolean).join(' · ')}
                 </Text>
-                {props.onOpenItem ? <Text style={styles.chev}>›</Text> : null}
               </View>
-              <Text style={styles.itemSub} numberOfLines={2}>
-                {[m.partStatus, m.owner, m.sources.length ? `src ${m.sources.join(', ')}` : null, m.notes].filter(Boolean).join(' · ')}
-              </Text>
-            </Pressable>
+            </Row>
           ))}
         </Section>
 
-        <Section title="Quick actions" marks="" collapsed testID="card.section.quick">
+        <Section title="Quick actions" {...fold('quick')} testID="card.section.quick">
           <QuickActions deviceId={d.id} readOnly={readOnly} run={run} />
         </Section>
 
-        <Section title={`History (${card.history.length})`} marks="" collapsed testID="card.section.history">
+        <Section title="History" count={card.history.length} {...fold('history')} testID="card.section.history">
           {card.history.map((h) => (
             <HistoryLine
               key={h.opId}
@@ -458,18 +440,117 @@ export function DeviceCard(props: DeviceCardProps) {
           ))}
         </Section>
       </ScrollView>
+
+      {/* the ⋯ menu: a popover under the header, dismissed by a tap anywhere else on the card (docs/ui-plan.md §6) */}
+      {menu ? (
+        <>
+          <Pressable style={styles.menuBackdrop} onPress={() => setMenu(false)} accessibilityRole="button" accessibilityLabel="Close the menu" />
+          <View style={[styles.menu, { top: Math.max(headHeight - space.xs, hit.target) }]} accessibilityRole="menu">
+            {props.canMovePin && !d.deleted ? (
+              <MenuItem
+                testID="card.menu.move"
+                label={props.unplaced ? 'Place pin…' : 'Move pin…'}
+                onPress={() => {
+                  setMenu(false);
+                  setPending({ kind: 'move', reason: '' });
+                }}
+              />
+            ) : null}
+            {!d.deleted && (d.placedFromDraft || d.pin) ? (
+              <MenuItem
+                testID="card.menu.unplace"
+                label="Put back in the unplaced list…"
+                onPress={() => {
+                  setMenu(false);
+                  setPending({ kind: 'unplace', reason: UNPLACE_REASON });
+                }}
+              />
+            ) : null}
+            {d.deleted ? (
+              <MenuItem
+                testID="card.menu.restore"
+                label="Restore…"
+                onPress={() => {
+                  setMenu(false);
+                  setPending({ kind: 'restore', reason: '' });
+                }}
+              />
+            ) : (
+              <MenuItem
+                testID="card.menu.delete"
+                label="Delete…"
+                danger
+                onPress={() => {
+                  setMenu(false);
+                  setPending({ kind: 'delete', reason: '' });
+                }}
+              />
+            )}
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
 
-// ------------------------------------------------------------------ sections
-
-/** IN REVIEW / unsynced marks of one field, as the section header shows them. */
-function marks(card: Card, field: string): string {
-  return [card.inReview.has(field) ? 'in review' : null, card.pending.has(field) ? '↑ not synced' : null].filter(Boolean).join(' · ');
-}
+// ------------------------------------------------------------------ status, notes
 
 type Run = (fn: (e: Editor) => Promise<unknown>) => Promise<boolean>;
+
+/**
+ * One status as the board draws it: the swatch with its glyph, the word, and on the current one a
+ * check, the status colour as border and text over its pale tint (dark text on the No access yellow).
+ */
+function StatusButton({ status, on, disabled, onPress }: { status: string; on: boolean; disabled: boolean; onPress: () => void }) {
+  const st = pinStyleFor(status);
+  const t = tinted(st.fill, color.text);
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={() => !on && onPress()}
+      testID={`card.status.${status}`}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: on, disabled }}
+      accessibilityLabel={on ? `✓ ${status}` : status}
+      style={({ pressed }) => [
+        styles.statusBtn,
+        on && { borderColor: st.fill, borderWidth: 1.5, backgroundColor: t.bg },
+        pressed && !on && styles.pressed,
+        disabled && !on && styles.off,
+      ]}
+    >
+      <Swatch {...st} size={20} />
+      <Text style={[styles.statusText, on && { color: t.fg, fontWeight: '600' }]} numberOfLines={2}>
+        {status}
+      </Text>
+      {on ? <Icon name="check" size={18} color={t.fg} strokeWidth={2.5} /> : null}
+    </Pressable>
+  );
+}
+
+/** A field's caption row: the title, an optional hint and the field's marks. */
+function FieldHead({ title, hint, children }: { title: string; hint?: string; children?: ReactNode }) {
+  return (
+    <View style={styles.fieldHead}>
+      <Text style={styles.fieldTitle}>{title}</Text>
+      {hint ? <Text style={styles.fieldHint}>· {hint}</Text> : null}
+      {children}
+    </View>
+  );
+}
+
+/** The field's review and unsynced marks (Phase 3 §13), in the words the flows read: `in review`, `↑ not synced`. */
+function Marks({ card, field }: { card: Card; field: string }) {
+  const review = card.inReview.has(field);
+  const pend = card.pending.has(field);
+  if (!review && !pend) return null;
+  return (
+    <>
+      {review ? <Text style={styles.markReview}>in review</Text> : null}
+      {pend ? <Text style={styles.markPending}>↑ not synced</Text> : null}
+    </>
+  );
+}
 
 function NotesSection({ card, readOnly, run }: { card: Card; readOnly: boolean; run: Run }) {
   const d = card.device;
@@ -509,9 +590,12 @@ function NotesSection({ card, readOnly, run }: { card: Card; readOnly: boolean; 
 
   const chips = more ? card.phrases : card.phrases.slice(0, CHIPS_SHOWN);
   return (
-    <Section title="Notes" marks={marks(card, 'notes')}>
+    <View style={styles.block}>
+      <FieldHead title="Notes">
+        <Marks card={card} field="notes" />
+      </FieldHead>
       <TextInput
-        style={[styles.input, styles.notes, card.inReview.has('notes') && styles.review]}
+        style={[fieldStyles.input, styles.notes, card.inReview.has('notes') && styles.reviewBorder]}
         value={draft}
         editable={!readOnly}
         onChangeText={edit}
@@ -522,195 +606,146 @@ function NotesSection({ card, readOnly, run }: { card: Card; readOnly: boolean; 
         }}
         placeholder="Notes"
         testID="card.notes"
-        placeholderTextColor="#888"
+        placeholderTextColor={color.text3}
         multiline
         submitBehavior="blurAndSubmit"
         returnKeyType="done"
       />
       {readOnly ? null : (
-        <View style={styles.rowWrap}>
+        <View style={styles.chips}>
           {chips.map((p) => (
-            <Pressable
+            <Chip
               key={p}
-              style={styles.phrase}
+              label={p}
+              style={styles.chip}
               onPress={() => {
                 const next = appendPhrase(typed.current, p);
                 edit(next);
                 commit(next);
-              }}>
-              <Text style={styles.phraseText} numberOfLines={1}>
-                {p}
-              </Text>
-            </Pressable>
+              }}
+            />
           ))}
-          {card.phrases.length > CHIPS_SHOWN ? (
-            <Pressable style={styles.phrase} onPress={() => setMore((m) => !m)}>
-              <Text style={styles.phraseMore}>{more ? 'less ▴' : `more (${card.phrases.length - CHIPS_SHOWN}) ▾`}</Text>
-            </Pressable>
-          ) : null}
+          {card.phrases.length > CHIPS_SHOWN ? <Chip label={more ? 'less ▴' : `more (${card.phrases.length - CHIPS_SHOWN}) ▾`} onPress={() => setMore((m) => !m)} /> : null}
         </View>
       )}
-    </Section>
+    </View>
   );
 }
 
+// ------------------------------------------------------------------ rows
+
 /**
- * The master's Type column (T104): the stored text, Edit… opens a box with the project's `type`
- * vocabulary as chips (a chip replaces the text); free typing stays. Save writes one op.
+ * The master's Type column (T104): a row with the stored text; a tap opens a box with the project's
+ * `type` vocabulary as chips (a chip replaces the text); free typing stays. Save writes one op.
  */
-function TypeSection({ card, readOnly, run }: { card: Card; readOnly: boolean; run: Run }) {
+function TypeRow({ card, readOnly, run }: { card: Card; readOnly: boolean; run: Run }) {
   const d = card.device;
   const [typing, setTyping] = useState<string | null>(null);
   const save = (text: string) => void run((e) => setType(e, d.id, text)).then((ok) => ok && setTyping(null));
   return (
-    <Section title="Type" marks={marks(card, 'type')} collapsed={!d.type && !card.typeChips.length}>
-      {typing === null ? (
-        <View style={styles.rowWrap}>
-          <Text style={[styles.flex, card.inReview.has('type') && styles.review]} testID="card.type">{d.type ?? '—'}</Text>
-          {readOnly ? null : <SmallButton label="Edit…" onPress={() => setTyping(d.type ?? '')} testID="card.type.edit" />}
+    <>
+      <Row first minHeight={48} onPress={readOnly ? undefined : () => setTyping(d.type ?? '')} testID="card.type.edit">
+        <Text style={styles.rowLabel}>Type</Text>
+        <View style={styles.rowValues}>
+          <Text style={[styles.rowValue, !d.type && styles.rowEmpty, card.inReview.has('type') && styles.reviewText]} numberOfLines={2} testID="card.type">
+            {d.type ?? '—'}
+          </Text>
+          <Marks card={card} field="type" />
         </View>
-      ) : (
-        <>
+      </Row>
+      {typing !== null ? (
+        <View style={styles.rowEditor}>
           <TextInput
-            style={styles.input}
+            style={fieldStyles.input}
             value={typing}
             onChangeText={setTyping}
             placeholder="Type (e.g. Echo relay panel)"
-            placeholderTextColor="#888"
+            placeholderTextColor={color.text3}
             testID="card.type.input"
             autoFocus
             returnKeyType="done"
             onSubmitEditing={() => save(typing)}
           />
           {card.typeChips.length ? (
-            <View style={styles.rowWrap}>
+            <View style={styles.chips}>
               {card.typeChips.map((c) => (
-                <Pressable key={c} style={styles.phrase} onPress={() => setTyping(c)}>
-                  <Text style={styles.phraseText} numberOfLines={1}>
-                    {c}
-                  </Text>
-                </Pressable>
+                <Chip key={c} label={c} small selected={typing === c} style={styles.chip} onPress={() => setTyping(c)} />
               ))}
             </View>
           ) : null}
-          <View style={styles.rowWrap}>
-            <SmallButton label="Save" onPress={() => save(typing)} testID="card.type.save" />
-            <SmallButton label="Cancel" onPress={() => setTyping(null)} />
+          <View style={styles.actions}>
+            <Btn title="Save" kind="primary" onPress={() => save(typing)} testID="card.type.save" />
+            <Btn title="Cancel" onPress={() => setTyping(null)} />
           </View>
-        </>
-      )}
-    </Section>
-  );
-}
-
-function NeuronSection({ card, store, readOnly, run }: { card: Card; store: Store; readOnly: boolean; run: Run }) {
-  const d = card.device;
-  const [typing, setTyping] = useState<string | null>(null);
-  const [dupes, setDupes] = useState<{ id: string; label: string }[]>([]);
-  const check = typing === null ? null : checkNeuronId(typing);
-
-  useEffect(() => {
-    if (!check || check.error) return setDupes([]);
-    let active = true;
-    neuronDuplicates(store, d.projectId, check.value, d.id).then((r) => active && setDupes(r), () => {});
-    return () => {
-      active = false;
-    };
-  }, [store, d.projectId, d.id, check?.value, check?.error]);
-
-  const save = () => run((e) => saveNeuronId(e, d.id, typing ?? '')).then((ok) => ok && setTyping(null));
-
-  return (
-    <Section title="Neuron ID" marks={marks(card, 'neuron_id')}>
-      <View style={styles.rowWrap}>
-        <Text style={[styles.neuron, !d.neuronId && styles.muted]}>{d.neuronId ?? '— not captured'}</Text>
-        {d.neuronId && d.neuronMethod ? <Text style={styles.muted}>({d.neuronMethod})</Text> : null}
-      </View>
-      {typing === null ? (
-        readOnly ? null : (
-          <View style={styles.rowWrap}>
-            <SmallButton label="Scan ▸" disabled onPress={() => {}} />
-            <SmallButton label="Type…" onPress={() => setTyping(d.neuronId ?? '')} testID="card.neuron.type" />
-          </View>
-        )
-      ) : (
-        <View>
-          {/* Save and Cancel sit beside the field, so the keyboard never covers them (T20-9); Return saves. */}
-          <View style={styles.neuronRow}>
-            <TextInput
-              style={[styles.input, styles.mono, styles.flex]}
-              value={typing}
-              onChangeText={setTyping}
-              placeholder="12 hex digits, e.g. 00A1B2C3D4E5"
-              placeholderTextColor="#888"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              autoFocus
-              maxLength={20}
-              returnKeyType="done"
-              onSubmitEditing={() => check && !check.error && void save()}
-              testID="card.neuron.input"
-            />
-            <SmallButton label={dupes.length ? 'Save anyway' : 'Save'} disabled={!check || !!check.error} onPress={() => void save()} testID="card.neuron.save" />
-            <SmallButton label="Cancel" onPress={() => setTyping(null)} />
-          </View>
-          {check && typing ? (
-            <Text style={check.error ? styles.error : styles.muted}>{check.error ?? `${check.value} ✓`}</Text>
-          ) : null}
-          {dupes.length ? <Text style={styles.finding}>⚠ Already on {dupes.map((x) => x.label).join(', ')} in this project.</Text> : null}
         </View>
-      )}
-    </Section>
+      ) : null}
+    </>
   );
 }
+
+type AddressKind = 'neuron' | 'ip' | 'dmx';
+
+const ADDRESS: Readonly<Record<AddressKind, { title: string; field: string; placeholder: string }>> = {
+  neuron: { title: 'Neuron ID', field: 'neuron_id', placeholder: '12 hex digits, e.g. 00A1B2C3D4E5' },
+  ip: { title: 'IP address', field: 'ip_address', placeholder: 'IPv4, e.g. 10.101.4.23' },
+  dmx: { title: 'DMX address', field: 'dmx_address', placeholder: 'universe/address, e.g. 1/001' },
+};
 
 /**
- * IP address or DMX address (T146, D246): typed entry with the format check (`checkIpAddress`,
- * `checkDmxAddress`), the duplicate warning for IP, one `Field survey` op; Clear empties it.
+ * Neuron ID, IP address or DMX address (T146, D246) as a row: the value (or "Not entered"), Add /
+ * Edit, Clear (IP and DMX). The editor opens under the row with the format check (`checkNeuronId`,
+ * `checkIpAddress`, `checkDmxAddress`), the duplicate warning (Neuron ID, IP) and one `Field
+ * survey` op; Save and Cancel sit beside the field so the keyboard never covers them (T20-9);
+ * Return saves. The Neuron ID is normalised and saved with its method (`typed`).
  */
-function AddressSection({ kind, card, store, readOnly, run }: { kind: 'ip' | 'dmx'; card: Card; store: Store; readOnly: boolean; run: Run }) {
+function AddressRow({ kind, card, store, readOnly, run }: { kind: AddressKind; card: Card; store: Store; readOnly: boolean; run: Run }) {
   const d = card.device;
-  const value = kind === 'ip' ? d.ipAddress : d.dmxAddress;
-  const field = kind === 'ip' ? 'ip_address' : 'dmx_address';
-  const title = kind === 'ip' ? 'IP address' : 'DMX address';
+  const a = ADDRESS[kind];
+  const value = kind === 'neuron' ? d.neuronId : kind === 'ip' ? d.ipAddress : d.dmxAddress;
   const [typing, setTyping] = useState<string | null>(null);
   const [dupes, setDupes] = useState<{ id: string; label: string }[]>([]);
-  const check = typing === null || !typing.trim() ? null : kind === 'ip' ? checkIpAddress(typing) : checkDmxAddress(typing);
+  const check = typing === null || !typing.trim() ? null : kind === 'neuron' ? checkNeuronId(typing) : kind === 'ip' ? checkIpAddress(typing) : checkDmxAddress(typing);
 
   useEffect(() => {
-    if (kind !== 'ip' || !check || check.error) return setDupes([]);
+    if (kind === 'dmx' || !check || check.error) return setDupes([]);
     let active = true;
-    ipDuplicates(store, d.projectId, check.value, d.id).then((r) => active && setDupes(r), () => {});
+    (kind === 'neuron' ? neuronDuplicates : ipDuplicates)(store, d.projectId, check.value, d.id).then(
+      (r) => active && setDupes(r),
+      () => {},
+    );
     return () => {
       active = false;
     };
   }, [kind, store, d.projectId, d.id, check?.value, check?.error]);
 
-  const save = () => run((e) => (kind === 'ip' ? saveIpAddress(e, d.id, typing ?? '') : saveDmxAddress(e, d.id, typing ?? ''))).then((ok) => ok && setTyping(null));
-  const clear = () => run((e) => (kind === 'ip' ? saveIpAddress(e, d.id, '') : saveDmxAddress(e, d.id, ''))).then((ok) => ok && setTyping(null));
+  const write = (text: string) => (e: Editor) => (kind === 'neuron' ? saveNeuronId(e, d.id, text) : kind === 'ip' ? saveIpAddress(e, d.id, text) : saveDmxAddress(e, d.id, text));
+  const save = () => run(write(typing ?? '')).then((ok) => ok && setTyping(null));
+  const clear = () => run(write('')).then((ok) => ok && setTyping(null));
 
   return (
-    <Section title={title} marks={marks(card, field)}>
-      <View style={styles.rowWrap}>
-        <Text style={[styles.neuron, !value && styles.muted]}>{value ?? '— not captured'}</Text>
-      </View>
-      {typing === null ? (
-        readOnly ? null : (
-          <View style={styles.rowWrap}>
-            <SmallButton label="Type…" onPress={() => setTyping(value ?? '')} testID={`card.${kind}.type`} />
-            {value ? <SmallButton label="Clear" onPress={() => void clear()} testID={`card.${kind}.clear`} /> : null}
-          </View>
-        )
-      ) : (
-        <View>
-          <View style={styles.neuronRow}>
+    <>
+      <Row minHeight={48}>
+        <Text style={styles.rowLabel}>{a.title}</Text>
+        <View style={styles.rowValues}>
+          <Text style={[styles.rowValue, styles.mono, !value && styles.rowEmpty, card.inReview.has(a.field) && styles.reviewText]} numberOfLines={2}>
+            {value ?? 'Not entered'}
+          </Text>
+          {kind === 'neuron' && value && d.neuronMethod ? <Text style={styles.hint}>({d.neuronMethod})</Text> : null}
+          <Marks card={card} field={a.field} />
+        </View>
+        {readOnly || typing !== null ? null : <Btn title={value ? 'Edit' : 'Add'} kind="tertiary" small onPress={() => setTyping(value ?? '')} testID={`card.${kind}.type`} />}
+      </Row>
+      {typing !== null ? (
+        <View style={styles.rowEditor}>
+          <View style={styles.editLine}>
             <TextInput
-              style={[styles.input, styles.mono, styles.flex]}
+              style={[fieldStyles.input, styles.mono, styles.flex]}
               value={typing}
               onChangeText={setTyping}
-              placeholder={kind === 'ip' ? 'IPv4, e.g. 10.101.4.23' : 'universe/address, e.g. 1/001'}
-              placeholderTextColor="#888"
-              keyboardType={kind === 'ip' ? 'decimal-pad' : 'numbers-and-punctuation'}
+              placeholder={a.placeholder}
+              placeholderTextColor={color.text3}
+              keyboardType={kind === 'ip' ? 'decimal-pad' : kind === 'dmx' ? 'numbers-and-punctuation' : 'default'}
+              autoCapitalize={kind === 'neuron' ? 'characters' : 'none'}
               autoCorrect={false}
               autoFocus
               maxLength={20}
@@ -718,22 +753,141 @@ function AddressSection({ kind, card, store, readOnly, run }: { kind: 'ip' | 'dm
               onSubmitEditing={() => check && !check.error && void save()}
               testID={`card.${kind}.input`}
             />
-            <SmallButton label={dupes.length ? 'Save anyway' : 'Save'} disabled={!check || !!check.error} onPress={() => void save()} testID={`card.${kind}.save`} />
-            <SmallButton label="Cancel" onPress={() => setTyping(null)} />
+            <Btn title={dupes.length ? 'Save anyway' : 'Save'} kind="primary" small disabled={!check || !!check.error} onPress={() => void save()} testID={`card.${kind}.save`} />
+            <Btn title="Cancel" small onPress={() => setTyping(null)} />
           </View>
-          {check && typing ? <Text style={check.error ? styles.error : styles.muted}>{check.error ?? `${check.value} ✓`}</Text> : null}
+          {check && typing ? <Text style={check.error ? styles.errorText : styles.hint}>{check.error ?? `${check.value} ✓`}</Text> : null}
           {dupes.length ? <Text style={styles.finding}>⚠ Already on {dupes.map((x) => x.label).join(', ')} in this project.</Text> : null}
+          {kind !== 'neuron' && value ? (
+            <View style={styles.actions}>
+              <Btn title="Clear" kind="tertiary" small onPress={() => void clear()} testID={`card.${kind}.clear`} />
+            </View>
+          ) : null}
         </View>
-      )}
-    </Section>
+      ) : null}
+    </>
   );
 }
 
+/** Photos: the count and the waiting badge, Camera / Library (T21), the thumbnails (D128). */
+function PhotosRow({
+  card,
+  readOnly,
+  resolveBlobUri,
+  onPhoto,
+  onOpenPhoto,
+}: {
+  card: Card;
+  readOnly: boolean;
+  resolveBlobUri: DeviceCardProps['resolveBlobUri'];
+  onPhoto: DeviceCardProps['onPhoto'];
+  onOpenPhoto: DeviceCardProps['onOpenPhoto'];
+}) {
+  const off = readOnly || !onPhoto;
+  return (
+    <View style={styles.photoBlock}>
+      <View style={styles.photoHead}>
+        {/* one element reading `Photos 1`, then `📷 n waiting` while some bytes are on this iPad only (the flows match it) */}
+        <View
+          style={styles.photoTitle}
+          accessible
+          accessibilityLabel={`Photos ${card.photos.length}${card.photosWaiting ? ` ${photosBadge(card.photosWaiting).text}` : ''}`}
+          testID="card.section.photos"
+        >
+          <Text style={styles.rowLabel}>Photos</Text>
+          <Text style={styles.count}>{card.photos.length}</Text>
+          {card.photosWaiting ? <Badge {...photosBadge(card.photosWaiting)} /> : null}
+        </View>
+        <View style={styles.flex} />
+        {/* one group, so a narrow panel wraps both buttons to the next line together */}
+        <View style={styles.line}>
+          <Btn title="Camera" kind="tertiary" small icon={<Icon name="camera" size={18} color={color.primary} />} disabled={off} onPress={() => onPhoto?.('camera')} />
+          <Btn title="Library" kind="tertiary" small icon={<Icon name="image" size={18} color={color.primary} />} disabled={off} onPress={() => onPhoto?.('library')} testID="card.photo.library" />
+        </View>
+      </View>
+      <PhotoStrip photos={card.photos} resolveBlobUri={resolveBlobUri} onOpen={onOpenPhoto} />
+    </View>
+  );
+}
+
+// ------------------------------------------------------------------ sections
+
+/** A connection of the device: swatch, `C-nn`, `X → to`, the end's status and note, the jump to the far device, ⋯ → Delete… (T138). */
+function ConnectionRow({
+  c,
+  first,
+  readOnly,
+  canOpenLevels,
+  onOpenEnd,
+  onJump,
+  onDelete,
+}: {
+  c: CardConnection;
+  first: boolean;
+  readOnly: boolean;
+  canOpenLevels: boolean;
+  onOpenEnd: DeviceCardProps['onOpenEnd'];
+  onJump: DeviceCardProps['onJump'];
+  onDelete: () => void;
+}) {
+  return (
+    <Row first={first} onPress={onOpenEnd ? () => onOpenEnd(c.id) : undefined}>
+      <Swatch {...pinStyleFor(c.status ?? 'Not started')} size={20} />
+      <View style={styles.flex}>
+        <View style={styles.line}>
+          <Text style={styles.itemId} testID={`card.conn.${c.label}`}>
+            {c.label}
+          </Text>
+          <Text style={styles.itemText} numberOfLines={2}>
+            {c.cable ?? '?'} → {c.to}
+          </Text>
+        </View>
+        <Text style={styles.itemSub} numberOfLines={2}>
+          {[c.status ?? 'Not started', c.singleRow ? '1 row' : null, c.statusSource === 'copied' ? 'copied' : null, c.note].filter(Boolean).join(' · ')}
+        </Text>
+        {c.jump && (c.jump.sameLevel || canOpenLevels) ? (
+          <Pressable onPress={() => onJump(c.jump!)} hitSlop={hitSlopTo(hit.small)} style={styles.jumpBtn} testID={`card.conn.${c.label}.jump`} accessibilityRole="button">
+            <Text style={styles.link}>{c.jump.label} ▸</Text>
+          </Pressable>
+        ) : null}
+        {c.farDraft ? (
+          <Text style={styles.itemSub} numberOfLines={2}>
+            → {c.farDraft}
+          </Text>
+        ) : null}
+      </View>
+      {readOnly ? null : (
+        <Pressable onPress={onDelete} hitSlop={hitSlopTo(hit.small)} style={styles.linkBtn} accessibilityRole="button" accessibilityLabel={`Delete connection ${c.label}`}>
+          <Icon name="more" size={20} color={color.text2} />
+        </Pressable>
+      )}
+    </Row>
+  );
+}
+
+/** A greyed "+ add …" row: something the device's type offers but the device does not have yet (T105). */
+function OfferRow(props: { label: string; sub: string | null; disabled: boolean; onPress: () => void }) {
+  return (
+    <Row minHeight={48} chevron={false} onPress={props.disabled ? undefined : props.onPress} testID={`card.offer.${props.label.replace(/^\+ add /, '')}`}>
+      <Text style={styles.offerText} numberOfLines={2}>
+        {props.label}
+      </Text>
+      {props.sub ? <Text style={styles.hint}>{props.sub}</Text> : null}
+    </Row>
+  );
+}
+
+/** `tracking_status` → `Tracking status`: the Edit form's field labels. */
+function labelOf(key: string): string {
+  const words = key.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /**
- * One rule draft (Phase 3 §4.3): Accept, Edit (a small form over the payload's text fields,
- * then "Save & accept"), Reject, and "why?" from the engine's `explain()` (T33). A decision is
- * one op group; the card reloads through `onDecided`. The Lint view lists the drafts no card
- * shows with it too (T100).
+ * One rule draft (Phase 3 §4.3) as a dashed DRAFT card: the rule, the item, its type · owner; Accept,
+ * Edit (a small form over the payload's text fields, then "Save & accept"), Reject, and "why?" from
+ * the engine's `explain()` (T33). A decision is one op group; the card reloads through `onDecided`.
+ * The Lint view lists the drafts no card shows with it too (T100).
  */
 export function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardDraft; decider: ProposalDecider; readOnly: boolean; onDecided: () => void }) {
   const [why, setWhy] = useState<string | null>(null);
@@ -784,68 +938,62 @@ export function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardD
   };
 
   return (
-    <View style={[styles.item, styles.draft]}>
-      <View style={styles.itemLine}>
-        <Text style={[chipStyles.badge, chipStyles.badgeDraft]}>DRAFT</Text>
-        <Text style={styles.itemId}>⚑ {draft.ruleId}</Text>
-        <Text style={styles.itemText} numberOfLines={2}>
-          {draft.title}
-        </Text>
+    <View style={styles.draft}>
+      <View style={styles.line}>
+        <Badge {...BADGE.draft} />
+        <Badge {...ruleBadge(draft.ruleId)} />
       </View>
+      <Text style={styles.draftTitle}>{draft.title}</Text>
       {draft.sub ? <Text style={styles.itemSub}>{draft.sub}</Text> : null}
       {editing ? (
         <View style={styles.draftForm}>
           {Object.keys(editing).map((k) => (
-            <View key={k} style={styles.draftField}>
-              <Text style={styles.draftLabel}>{k.replace(/_/g, ' ')}</Text>
-              <TextInput
-                style={styles.draftInput}
-                value={editing[k]}
-                onChangeText={(v) => setEditing((f) => (f ? { ...f, [k]: v } : f))}
+            <View key={k} style={styles.question}>
+              <Field
+                label={labelOf(k)}
+                value={editing[k] ?? ''}
+                onChange={(v) => setEditing((f) => (f ? { ...f, [k]: v } : f))}
                 multiline={k === 'notes' || k === 'item'}
-                autoCapitalize="none"
-                autoCorrect={false}
                 testID={`proposal.field.${k}`}
               />
               {draft.chips?.[k]?.length ? (
-                <View style={styles.rowWrap}>
+                <View style={styles.chips}>
                   {draft.chips[k]!.map((c) => (
-                    <Pressable key={c} onPress={() => setEditing((f) => (f ? { ...f, [k]: c } : f))} style={[styles.phrase, editing[k] === c && styles.phraseOn]}>
-                      <Text style={styles.phraseText}>{c}</Text>
-                    </Pressable>
+                    <Chip key={c} label={c} small selected={editing[k] === c} style={styles.chip} onPress={() => setEditing((f) => (f ? { ...f, [k]: c } : f))} />
                   ))}
                 </View>
               ) : null}
             </View>
           ))}
-          <View style={styles.rowWrap}>
-            <SmallButton label="Save & accept" disabled={!canAct} onPress={saveEdit} testID={`proposal.save.${draft.title}`} />
-            <SmallButton label="Cancel" disabled={busy} onPress={() => setEditing(null)} />
+          {/* small, like the draft's own buttons: both fit one line inside the dashed card on the portrait panel */}
+          <View style={styles.actions}>
+            <Btn title="Save & accept" kind="primary" small disabled={!canAct} onPress={saveEdit} testID={`proposal.save.${draft.title}`} />
+            <Btn title="Cancel" small disabled={busy} onPress={() => setEditing(null)} />
           </View>
         </View>
       ) : (
-        <View style={styles.rowWrap}>
-          <SmallButton label="Accept" disabled={!canAct} onPress={() => act({ kind: 'accept' })} testID={`proposal.accept.${draft.title}`} />
-          <SmallButton label="Edit" disabled={!canAct || draft.editable.length === 0} onPress={startEdit} testID={`proposal.edit.${draft.title}`} />
-          <SmallButton label="Reject" disabled={!canAct} onPress={() => act({ kind: 'reject' })} testID={`proposal.reject.${draft.title}`} />
-          <Pressable onPress={toggleWhy} hitSlop={6} testID={`proposal.why.${draft.title}`}>
-            <Text style={styles.jumpText}>why? {why !== null ? '▴' : '▸'}</Text>
+        <View style={styles.draftActions}>
+          <Btn title="Accept" kind="primary" small disabled={!canAct} onPress={() => act({ kind: 'accept' })} testID={`proposal.accept.${draft.title}`} style={styles.draftAccept} />
+          <Btn title="Edit" small disabled={!canAct || draft.editable.length === 0} onPress={startEdit} testID={`proposal.edit.${draft.title}`} />
+          <Btn title="Reject" kind="tertiary" small disabled={!canAct} onPress={() => act({ kind: 'reject' })} testID={`proposal.reject.${draft.title}`} />
+          <Pressable onPress={toggleWhy} hitSlop={hitSlopTo(hit.small)} style={styles.linkBtn} testID={`proposal.why.${draft.title}`} accessibilityRole="button">
+            <Text style={styles.link}>why? {why !== null ? '▴' : '▸'}</Text>
           </Pressable>
         </View>
       )}
       {why !== null ? <Text style={styles.itemSub}>{why}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!decider.wired ? <Text style={styles.muted}>Read-only here; decide from the plan.</Text> : null}
+      {error ? <Banner tone="danger" text={error} /> : null}
+      {!decider.wired ? <Text style={styles.hint}>Read-only here; decide from the plan.</Text> : null}
     </View>
   );
 }
 
 /**
- * Quick actions E6 / E7 / E9 (Phase 3 §4.3, T34) and "Not found on site" (T101, runs on its tap): a tap opens the one question the action asks
- * (what was found / the make / the new room), Apply writes the records in one group through the
- * rules package; the card reloads through `run`.
+ * Quick actions E6 / E7 / E9 (Phase 3 §4.3, T34) and "Not found on site" (T101, runs on its tap): a
+ * tap opens the one question the action asks (what was found / the make / the new room), Apply
+ * writes the records in one group through the rules package; the card reloads through `run`.
  */
-function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly: boolean; run: (fn: (e: Editor) => Promise<unknown>) => Promise<boolean> }) {
+function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly: boolean; run: Run }) {
   const [asking, setAsking] = useState<QuickActionKey | null>(null);
   const [answer, setAnswer] = useState('');
   const [busy, setBusy] = useState(false);
@@ -874,13 +1022,14 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
   };
 
   return (
-    <View style={styles.draftForm}>
-      <View style={styles.rowWrap}>
+    <View style={styles.quick}>
+      <View style={styles.actions}>
         {QUICK_ACTIONS.map((x) => (
-          <SmallButton
+          <Btn
             key={x.key}
+            small
             testID={`card.quick.${x.key}`}
-            label={x.label}
+            title={x.label}
             disabled={readOnly || !x.enabled || busy}
             onPress={() => {
               setAnswer('');
@@ -895,16 +1044,31 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
         ))}
       </View>
       {q?.input ? (
-        <View style={styles.draftField}>
-          <Text style={styles.draftLabel}>{q.input}</Text>
-          <TextInput style={styles.draftInput} value={answer} onChangeText={setAnswer} autoCapitalize="sentences" autoCorrect={false} autoFocus testID="card.quick.input" returnKeyType="done" onSubmitEditing={() => void apply()} />
-          <View style={styles.rowWrap}>
-            <SmallButton label="Apply" disabled={busy || (!q.optional && !answer.trim())} onPress={() => void apply()} testID="card.quick.apply" />
-            <SmallButton label="Cancel" disabled={busy} onPress={() => setAsking(null)} />
+        <View style={styles.question}>
+          <Text style={styles.fieldTitle}>{q.input}</Text>
+          <TextInput
+            style={fieldStyles.input}
+            value={answer}
+            onChangeText={setAnswer}
+            autoCapitalize="sentences"
+            autoCorrect={false}
+            autoFocus
+            testID="card.quick.input"
+            returnKeyType="done"
+            onSubmitEditing={() => void apply()}
+          />
+          <View style={styles.actions}>
+            <Btn title="Apply" kind="primary" disabled={busy || (!q.optional && !answer.trim())} onPress={() => void apply()} testID="card.quick.apply" />
+            <Btn title="Cancel" disabled={busy} onPress={() => setAsking(null)} />
           </View>
         </View>
       ) : null}
-      {!readOnly && !q ? <Text style={styles.muted}>Spot-check fixed closes an ETC item "Reterminated - all good"; Non-ETC device marks it Not installed and asks the EC to confirm; Relocated notes the move; Not found on site marks it Not installed and not found, no item.</Text> : null}
+      {!readOnly && !q ? (
+        <Text style={styles.hint}>
+          Spot-check fixed closes an ETC item "Reterminated - all good"; Non-ETC device marks it Not installed and asks the EC to confirm; Relocated notes the move; Not found on site marks it Not installed
+          and not found, no item.
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -938,8 +1102,8 @@ function HistoryLine({ h, names, onRestore }: { h: HistoryEntry; names: Readonly
         {h.reason && h.reason !== h.changeType ? ` · "${h.reason}"` : ''}
       </Text>
       {onRestore ? (
-        <View style={styles.rowWrap}>
-          <SmallButton label="Restore…" onPress={onRestore} testID="card.history.restore" />
+        <View style={styles.actions}>
+          <Btn title="Restore…" small onPress={onRestore} testID="card.history.restore" />
         </View>
       ) : null}
     </View>
@@ -948,124 +1112,128 @@ function HistoryLine({ h, names, onRestore }: { h: HistoryEntry; names: Readonly
 
 // ------------------------------------------------------------------ pieces
 
-function Section({ title, marks: m, collapsed, children, testID }: { title: string; marks: string; collapsed?: boolean; children: ReactNode; testID?: string }) {
-  const [open, setOpen] = useState(!collapsed);
+/** A 44-pt icon-only button (⋯, ×) with its own label for VoiceOver. */
+function IconButton({ name, label, onPress, testID }: { name: IconName; label: string; onPress: () => void; testID?: string }) {
   return (
-    <View style={[styles.section, m.includes('in review') && styles.review]}>
-      <Pressable onPress={() => setOpen((o) => !o)} style={styles.sectionHead} hitSlop={4} testID={testID}>
-        <Text style={styles.sectionTitle}>
-          {open ? '▾' : '▸'} {title}
-        </Text>
-        {m ? <Text style={styles.sectionMarks}>{m}</Text> : null}
-      </Pressable>
-      {open ? <View style={styles.sectionBody}>{children}</View> : null}
-    </View>
-  );
-}
-
-function SmallButton({ label, onPress, disabled, danger, testID }: { label: string; onPress: () => void; disabled?: boolean; danger?: boolean; testID?: string }) {
-  return (
-    <Pressable disabled={disabled} onPress={onPress} style={[styles.btn, danger && styles.btnDanger, disabled && styles.btnDisabled]} testID={testID}>
-      <Text style={[styles.btnText, danger && styles.btnDangerText, disabled && styles.btnDisabledText]}>{label}</Text>
+    <Pressable onPress={onPress} testID={testID} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
+      <Icon name={name} size={22} color={color.text2} />
     </Pressable>
   );
 }
 
-function MenuButton({ label, onPress, danger, testID }: { label: string; onPress: () => void; danger?: boolean; testID?: string }) {
+function MenuItem({ label, onPress, danger, testID }: { label: string; onPress: () => void; danger?: boolean; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={styles.menuItem} testID={testID}>
-      <Text style={[styles.menuText, danger && styles.btnDangerText]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-/** A greyed "+ add …" row: something the device's type offers but the device does not have yet (T105). */
-function OfferRow(props: { label: string; sub: string | null; disabled: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={props.onPress} disabled={props.disabled} style={[styles.item, styles.offer]} hitSlop={4} testID={`card.offer.${props.label.replace(/^\+ add /, '')}`}>
-      <View style={styles.itemLine}>
-        <Text style={styles.offerText} numberOfLines={2}>
-          {props.label}
-        </Text>
-        {props.sub ? <Text style={styles.muted}>{props.sub}</Text> : null}
-      </View>
+    <Pressable onPress={onPress} testID={testID} accessibilityRole="menuitem" style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}>
+      <Text style={[styles.menuText, danger && styles.menuDanger]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: color.surface },
   flex: { flex: 1 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
-  scroll: { paddingBottom: 40 },
-  head: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1', gap: 2 },
-  headLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headId: { fontSize: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  headBtn: { paddingHorizontal: 8, paddingVertical: 2 },
-  headBtnText: { fontSize: 22, color: '#1565c0', fontWeight: '600' },
-  headModel: { fontSize: 14, color: '#222' },
-  headSub: { fontSize: 12, color: '#555' },
-  headNote: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
-  menu: { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1', backgroundColor: '#f8f9fb' },
-  menuItem: { paddingHorizontal: 14, paddingVertical: 10 },
-  menuText: { fontSize: 15, color: '#1565c0' },
-  reasonBox: { padding: 12, gap: 6, backgroundColor: '#fff8e1', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  label: { fontSize: 13, fontWeight: '600', color: '#333' },
-  error: { color: '#b71c1c', fontSize: 13, paddingHorizontal: 12, paddingVertical: 4 },
-  muted: { fontSize: 12, color: '#777' },
-  finding: { fontSize: 12, color: '#e65100', marginTop: 4 },
-  deleted: { margin: 12, padding: 10, borderRadius: 6, backgroundColor: '#ffebee', gap: 6 },
-  deletedText: { color: '#b71c1c', fontWeight: '600' },
-  section: { marginHorizontal: 8, marginTop: 8, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: '#d6d9de' },
-  review: { borderColor: '#e65100', borderWidth: 2 },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 8 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#333' },
-  sectionMarks: { fontSize: 11, color: '#e65100' },
-  sectionBody: { paddingHorizontal: 10, paddingBottom: 10, gap: 6 },
-  rowWrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  statusBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
-  statusText: { fontSize: 13, color: '#222' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 14, backgroundColor: '#fff' },
-  neuronRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  notes: { minHeight: 60, textAlignVertical: 'top' },
-  mono: { fontVariant: ['tabular-nums'], letterSpacing: 1 },
-  phrase: { maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, backgroundColor: '#eef2f7' },
-  phraseOn: { backgroundColor: '#cfe0f5' },
-  phraseText: { fontSize: 12, color: '#1f3b63' },
-  phraseMore: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
-  acc: { gap: 4 },
-  offerGroup: { gap: 2, paddingLeft: 6, borderLeftWidth: 2, borderColor: '#c9ccd1' },
-  offer: { minHeight: 44, justifyContent: 'center', opacity: 0.6 },
-  offerText: { flex: 1, fontSize: 13, color: '#555', fontStyle: 'italic' },
-  accModel: { fontSize: 13, fontWeight: '600' },
-  num: { minWidth: 30, paddingVertical: 4, alignItems: 'center', borderRadius: 5, borderWidth: 1, borderColor: '#c9ccd1' },
-  numOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  numText: { fontSize: 13 },
-  numTextOn: { color: '#fff', fontWeight: '700' },
-  neuron: { fontSize: 15, fontVariant: ['tabular-nums'], letterSpacing: 1 },
-  item: { gap: 2, paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#eceef1' },
-  itemLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  itemId: { fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  itemText: { flex: 1, fontSize: 13, color: '#222' },
-  itemSub: { flex: 1, fontSize: 12, color: '#555' },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg },
+  scroll: { paddingTop: space.lg, paddingBottom: 40, gap: 14 },
+  // header
+  head: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm, gap: 2, borderBottomWidth: 1, borderBottomColor: color.hairline, backgroundColor: color.surface },
+  headLine: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: hit.target },
+  headTitle: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
+  headId: { ...font.headline, ...tabular, color: color.text },
+  headModel: { ...font.callout, color: color.text },
+  headSub: { ...font.caption, color: color.text3 },
+  headNote: { ...font.captionBold, color: color.primary },
+  iconBtn: { width: hit.target, height: hit.target, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' },
+  pressed: { backgroundColor: color.surface2 },
+  off: { opacity: 0.45 },
+  // the ⋯ popover
+  menuBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  menu: { position: 'absolute', right: space.sm, minWidth: 260, paddingVertical: space.xs, backgroundColor: color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: color.hairline, ...shadow.card },
+  menuItem: { minHeight: hit.target, justifyContent: 'center', paddingHorizontal: space.lg },
+  menuText: { ...font.callout, color: color.text },
+  menuDanger: { color: color.danger },
+  // the reason box
+  reasonBox: { padding: space.lg, gap: space.sm, backgroundColor: color.warningTint, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  reasonQuestion: { ...font.captionBold, color: color.warning },
+  banner: { marginHorizontal: space.lg },
+  // field blocks (Status, Notes)
+  block: { paddingHorizontal: space.lg, gap: space.sm },
+  fieldHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, minHeight: 18 },
+  fieldTitle: { ...font.captionBold, color: color.text2 },
+  fieldHint: { ...font.caption, color: color.text3 },
+  markReview: { ...font.captionBold, color: color.warning },
+  markPending: { ...font.caption, color: color.text3 },
+  hint: { ...font.caption, color: color.text3 },
+  finding: { ...font.caption, color: color.warning },
+  errorText: { ...font.caption, color: color.danger },
+  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  statusBtn: {
+    flexBasis: '48%',
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: color.surface,
+  },
+  statusText: { ...font.callout, color: color.text, flex: 1 },
+  notes: { minHeight: 56, textAlignVertical: 'top', paddingVertical: space.sm },
+  reviewBorder: { borderColor: color.warning, borderWidth: 2 },
+  reviewText: { color: color.warning },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
+  chip: { maxWidth: '100%' },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
+  // rows (Type, addresses, Photos): the panel is 287 pt in portrait, so the label column is 80 and a
+  // value may wrap to two lines rather than truncate
+  rowLabel: { ...font.callout, color: color.text2, width: 80 },
+  rowValues: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  rowValue: { ...font.callout, color: color.text, flexShrink: 1 },
+  rowEmpty: { color: color.text3 },
+  mono: { ...tabular, letterSpacing: 0.5 },
+  rowEditor: { paddingHorizontal: space.lg, paddingBottom: space.md, gap: space.sm },
+  editLine: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  photoBlock: { paddingHorizontal: space.lg, paddingVertical: space.sm, gap: space.sm, borderTopWidth: 1, borderTopColor: color.hairline },
+  photoHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.xs, minHeight: hit.small },
+  photoTitle: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  count: { ...font.callout, ...tabular, color: color.text3 },
+  // sections
+  empty: { ...font.callout, color: color.text3, paddingHorizontal: space.lg, paddingVertical: space.sm },
+  line: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  itemId: { ...font.captionBold, ...tabular, color: color.text2 },
+  itemText: { ...font.callout, color: color.text, flex: 1 },
+  itemSub: { ...font.caption, color: color.text3, flex: 1 },
   closed: { opacity: 0.55 },
-  draft: { borderWidth: 1, borderStyle: 'dashed', borderColor: '#6a1b9a', borderRadius: 6, padding: 6 },
-  draftForm: { gap: 4, paddingTop: 4 },
-  draftField: { gap: 2 },
-  draftLabel: { fontSize: 11, color: '#6a1b9a', textTransform: 'capitalize' },
-  draftInput: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 4, fontSize: 13, backgroundColor: '#fff' },
-  jump: { paddingHorizontal: 6, paddingVertical: 2 },
-  jumpText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
-  chev: { fontSize: 20, color: '#999', paddingLeft: 4 },
-  rowMenu: { fontSize: 18, color: '#1565c0', fontWeight: '600' },
-  btn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0', backgroundColor: '#fff' },
-  btnText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
-  btnDanger: { borderColor: '#b71c1c' },
-  btnDangerText: { color: '#b71c1c' },
-  btnDisabled: { borderColor: '#d0d3d8' },
-  btnDisabledText: { color: '#aaa' },
-  hist: { paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#eceef1' },
-  histHead: { fontSize: 12, fontWeight: '600', color: '#333' },
-  histBody: { fontSize: 12, color: '#222' },
-  histWhy: { fontSize: 11, color: '#777' },
+  link: { ...font.calloutBold, color: color.primary },
+  linkBtn: { minHeight: hit.small, justifyContent: 'center', paddingHorizontal: space.xs },
+  jumpBtn: { minHeight: hit.small, justifyContent: 'center', alignSelf: 'flex-start' },
+  offerText: { ...font.callout, color: color.text3, fontStyle: 'italic', flex: 1 },
+  acc: { paddingHorizontal: space.lg, paddingVertical: space.sm, gap: space.xs },
+  accModel: { ...font.calloutBold, color: color.text },
+  accExpected: { ...font.caption, color: color.text3 },
+  offerGroup: { marginLeft: space.lg, paddingLeft: space.sm, borderLeftWidth: 2, borderLeftColor: color.border },
+  groupLine: { ...font.caption, color: color.text3, paddingHorizontal: space.lg, paddingTop: space.sm },
+  draft: {
+    marginHorizontal: space.lg,
+    marginVertical: space.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: space.xs,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: color.muted,
+    borderRadius: radius.card,
+  },
+  draftTitle: { ...font.headline, color: color.text },
+  draftActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm, marginTop: 6 },
+  draftAccept: { flexGrow: 1, flexBasis: 72 },
+  draftForm: { gap: space.sm, paddingTop: space.xs },
+  quick: { paddingHorizontal: space.lg, paddingVertical: space.sm, gap: space.sm },
+  question: { gap: space.xs },
+  hist: { paddingHorizontal: space.lg, paddingVertical: space.sm, gap: 2, borderTopWidth: 1, borderTopColor: color.hairline },
+  histHead: { ...font.captionBold, color: color.text2 },
+  histBody: { ...font.caption, color: color.text },
+  histWhy: { ...font.caption, color: color.text3 },
 });

@@ -95,8 +95,8 @@ export function RowText({ title, sub, muted, style }: { title: string; sub?: str
 
 export type SectionProps = {
   title: string;
-  /** Shown after the title in the caption colour (`Connections · 4`). */
-  count?: number | null;
+  /** Shown after the title in the caption colour: a number (`Connections 4`) or a summary (`3 · 1 draft`). */
+  count?: number | string | null;
   children: ReactNode;
   /** Controlled open state; with `onToggle` the header toggles it. */
   open?: boolean;
@@ -120,6 +120,10 @@ export function Section({ title, count, children, open, onToggle, defaultOpen = 
     if (open === undefined) setOwn(next);
     onToggle?.(next);
   };
+  // The header's label is its title and count as one string (`Punch items 3 · 1 draft`): what
+  // VoiceOver reads and what a Maestro flow copies or matches. No `accessibilityState` here — iOS
+  // reports a state as the element's value, and Maestro takes a value as the element's text.
+  const label = count != null ? `${title} ${count}` : title;
   const header = (
     <>
       {fixed ? null : <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={20} color={color.muted} />}
@@ -134,7 +138,7 @@ export function Section({ title, count, children, open, onToggle, defaultOpen = 
   return (
     <View style={style}>
       {fixed ? (
-        <View style={styles.sectionHead} testID={testID}>
+        <View style={styles.sectionHead} testID={testID} accessibilityLabel={label}>
           {header}
         </View>
       ) : (
@@ -142,7 +146,8 @@ export function Section({ title, count, children, open, onToggle, defaultOpen = 
           onPress={toggle}
           style={({ pressed }) => [styles.sectionHead, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityState={{ expanded: isOpen }}
+          accessibilityLabel={label}
+          accessibilityHint={isOpen ? 'Folds the section' : 'Opens the section'}
           testID={testID}
         >
           {header}

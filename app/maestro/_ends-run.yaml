@@ -1,6 +1,7 @@
 # F1 step 1 (T155): on 06M-01's card (open), the X run C-23 to the placeholder "Level 11" (Not
 # started in the master, no item) → This end Not installed → back on the card the R3a Run draft →
-# Accept (Punch items +1) → the R4b kit draft for that end → Accept (Missing parts +1).
+# Accept (Punch items +1) → the R4b kit draft for that end → Accept (Parts +1). A section header
+# reads as its title and count (`Punch items 3 · 1 draft`, `Parts 2`; T175).
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - runFlow:
@@ -9,14 +10,14 @@ appId: productions.luminarytechnology.fieldsurvey
       ID: card.section.punch
 - copyTextFrom:
     id: card.section.punch
-- evalScript: ${output.punch = parseInt(maestro.copiedText.match(/Punch items \((\d+)\)/)[1])}
+- evalScript: ${output.punch = parseInt(maestro.copiedText.match(/Punch items (\d+)/)[1])}
 - runFlow:
     file: _side-down.yaml
     env:
       ID: card.section.parts
 - copyTextFrom:
     id: card.section.parts
-- evalScript: ${output.parts = parseInt(maestro.copiedText.match(/Missing parts \((\d+)\)/)[1])}
+- evalScript: ${output.parts = parseInt(maestro.copiedText.match(/Parts (\d+)/)[1])}
 - runFlow:
     file: _side-up.yaml
     env:
@@ -46,7 +47,7 @@ appId: productions.luminarytechnology.fieldsurvey
       ID: card.section.punch
 - assertVisible:
     id: card.section.punch
-    text: '.*Punch items \(${output.punch + 1}\).*'
+    text: 'Punch items ${output.punch + 1}( · .*)?'
 - runFlow:
     file: _side-down.yaml
     env:
@@ -59,4 +60,4 @@ appId: productions.luminarytechnology.fieldsurvey
       ID: card.section.parts
 - assertVisible:
     id: card.section.parts
-    text: '.*Missing parts \(${output.parts + 1}\).*'
+    text: 'Parts ${output.parts + 1}'

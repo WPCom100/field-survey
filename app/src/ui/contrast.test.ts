@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { pinStyleFor } from '../plan/pins';
-import { contrastRatio, luminance, onFill, readable, rgb } from './contrast';
+import { contrastRatio, luminance, onFill, readable, rgb, tint, tinted } from './contrast';
 import { BACKGROUNDS, FILLED_COLORS, SEMANTIC_TEXT_COLORS, TEXT_COLORS, color, hitSlopTo, status } from './tokens';
 
 describe('contrast arithmetic', () => {
@@ -69,6 +69,19 @@ describe('tokens (D266 (2), docs/ui-plan.md §3)', () => {
       expect(glyphOn(status.style[s].fill), s).toBe(color.onPrimary);
     }
     expect(glyphOn(status.none.fill)).toBe(color.onPrimary);
+  });
+
+  it('a selected status button (T175) reads: the fill as text on its own tint, else dark text on it', () => {
+    expect(tint('#000000', 1)).toBe('#ffffff');
+    expect(tint('#1F5FD6', 0)).toBe('#1f5fd6');
+    for (const s of ['Complete', 'Installed, untested', 'Issue', 'Not installed'] as const) {
+      const t = tinted(status.style[s].fill, color.text);
+      expect(t.fg, s).toBe(status.style[s].fill);
+      expect(readable(t.fg, t.bg), `${s}: ${contrastRatio(t.fg, t.bg).toFixed(2)}`).toBe(true);
+    }
+    const yellow = tinted(status.style['No access'].fill, color.text);
+    expect(yellow.fg).toBe(color.text);
+    expect(readable(yellow.fg, yellow.bg)).toBe(true);
   });
 
   it('hitSlopTo brings 36- and 40-pt controls to 44 and leaves 44 alone', () => {

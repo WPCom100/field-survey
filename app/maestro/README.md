@@ -71,7 +71,7 @@ team Ann / Bob), never to the Droplet.
 | `_seed-review.yaml` | Needs review on a fresh seed: Link, Create device ▸, Put on, Keep |
 | `_seed-copy.yaml` | + New project → Seed import of the master (no mapping detours) → "Imported" → sync → Load standard lists: each wave-1 run's own copy (T155; `rig.sh flows` stages the workbook); `SEED_AT` (env) is the workbook's spot when `rig.sh` stages the sheet beside it (place.yaml) |
 | `_open-level.yaml`, `_open-card.yaml` | Projects → `PROJECT` → level `LEVEL` (env) → its plan; `_open-card` then taps Devices → `DEVICE` |
-| `_side-down.yaml`, `_side-up.yaml` | swipe the plan's side panel (card, end editor) until `ID` (env) is on screen, then a little more, clear of the edge and of the card's fixed header |
+| `_side-down.yaml`, `_side-up.yaml` | swipe the plan's side panel (card, end editor) until `ID` (env) is on screen, then a little more, clear of the edge and of the card's fixed header; `_side-up` swipes back when that extra swipe loses the element off the bottom (T175) |
 | `_open-end.yaml` | the card's connection `CONN` (env, tapped by its C-label) → its end editor |
 | `_end-note-clear.yaml` | empties this end's note (two tap-and-erase passes: eraseText deletes before the cursor) |
 | `_ends-run.yaml`, `_ends-terminate.yaml`, `_ends-wire.yaml`, `_ends-elsewhere.yaml`, `_ends-placeholder.yaml` | the steps of `ends.yaml` |

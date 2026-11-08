@@ -7,6 +7,7 @@
 import { Image, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
 import type { CardPhoto } from '../card/model';
+import { color, font } from '../ui/tokens';
 
 export function PhotoStrip(props: {
   photos: readonly CardPhoto[];
@@ -36,7 +37,7 @@ export function PhotoStrip(props: {
 const styles = StyleSheet.create({
   photos: { gap: 6 },
   photo: { width: 72, alignItems: 'center' },
-  photoImg: { width: 64, height: 64, borderRadius: 4, backgroundColor: '#ddd' },
-  photoNum: { width: 64, height: 64, borderRadius: 4, backgroundColor: '#e3e5e8', textAlign: 'center', lineHeight: 64, fontSize: 20 },
-  photoLabel: { fontSize: 11, color: '#555' },
+  photoImg: { width: 64, height: 64, borderRadius: 6, backgroundColor: color.border },
+  photoNum: { width: 64, height: 64, borderRadius: 6, backgroundColor: color.surface2, textAlign: 'center', lineHeight: 64, fontSize: 20 },
+  photoLabel: { ...font.micro, color: color.text3 },
 });

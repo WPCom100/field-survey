@@ -37,6 +37,7 @@ appId: productions.luminarytechnology.fieldsurvey
     id: draft.edit.model
 - eraseText
 - inputText: MAESTRO-SN2
+- pressKey: Enter          # closes the keyboard: in portrait it covers Save & accept (T175)
 - tapOn:
     id: draft.save
 - assertVisible: Saved and accepted

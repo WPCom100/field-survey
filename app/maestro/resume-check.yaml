@@ -28,7 +28,7 @@ name: Resume — signed in again, everything synced
     text: Resume O4 note
 - assertVisible:
     id: card.section.photos
-    text: '.*Photos \(1\)'
+    text: 'Photos 1'
 - tapOn:
     id: card.close
 - tapOn:

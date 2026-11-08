@@ -23,5 +23,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:
     visible:
       id: card.section.photos
-      text: '.*Photos \(1\).*'
+      text: 'Photos 1.*'
     timeout: 20000

@@ -179,7 +179,7 @@ flows they run keep the server up (`mac-rig-two-simulators` in Claude's memory, 
 | Task | Status | Date | Flows green | Found |
 |---|---|---|---|---|
 | T174 tokens and primitives | done | 2026-11-07 | smoke ×2 (A) | nothing; D267 records the readings (icons as Skia path data, dark glyph on the No access yellow, `Notice` as a banner, placeholders in `text3`) |
-| T175 device card | todo | | | |
+| T175 device card | done | 2026-11-08 | ends ×3 (runs 2, 4, 5), lists ×2, additions ×2, chips ×2 (runs 3, 4), lint ×2, photos ×2, setup ×1 — all on A | the side panel is 287 / 334 pt, not the board's 360 (row values 15 pt in an 80-pt label column, Clear inside the address editor, the jump link on its own line); a section header labels itself (iOS reports `expanded` as the value Maestro reads as text); a `Row` is one element (flows assert on it by id); Review drafts' Save & accept under the keyboard → T180; D268 |
 | T176 shell | todo | | | |
 | T177 plan screen | todo | | | |
 | T178 Sync screen | todo | | | |

@@ -40,3 +40,18 @@ export function readable(fg: string, bg: string): boolean {
 export function onFill(fill: string, dark: string, light: string): string {
   return contrastRatio(fill, light) >= contrastRatio(fill, dark) ? light : dark;
 }
+
+/** `hex` mixed toward white by `amount` (0 = the colour itself, 1 = white), as a lower-case hex. */
+export function tint(hex: string, amount = 0.92): string {
+  const channel = (c: number) => Math.round(c + (255 - c) * amount).toString(16).padStart(2, '0');
+  return `#${rgb(hex).map(channel).join('')}`;
+}
+
+/**
+ * A fill's pale tint and the text colour that reads on it (the selected status button, T175): the
+ * fill itself where it reaches 4.5:1 there, else `dark` (the No access yellow).
+ */
+export function tinted(fill: string, dark: string): { bg: string; fg: string } {
+  const bg = tint(fill);
+  return { bg, fg: readable(fill, bg) ? fill : dark };
+}
