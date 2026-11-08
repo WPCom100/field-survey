@@ -215,6 +215,24 @@ spelling (standing, with who / when / reason). A device whose new category names
 panels (`CTxxLCPA/B`, whose Device text is the panel tag) need their type picked on the card
 afterwards; the NSPS, EBDKs, rack and Foundry panels match by Device text or category.
 
+### 4.3 Switching to Entra sign-in (T03, T04, D264)
+
+The server side is in since T03 (`server/docs/auth.md`); the iPad side is T04. The Droplet stays
+on `AUTH_MODE=token` until T04's build is on an iPad. Then, in `server/.env.production` (and
+`scp` as in §1.6):
+
+1. `ENTRA_TENANT_ID=<LTP tenant id>`, `ENTRA_AUDIENCE=<API client id>,api://field-survey`
+   (the "Field Survey" registration, manifest `accessTokenAcceptedVersion: 2`), `AUTH_MODE=both`;
+   `docker compose up -d api`. iPads on the old build keep working with the shared token.
+2. Each person signs in on the T04 build; the first sign-in offers to merge their picker name
+   (same user id, history kept). Check: `docker compose exec postgres psql -U survey -c
+   "select name, email, entra_oid is not null as signed_in from app_user order by name"`.
+3. When every person shows `signed_in`, `AUTH_MODE=entra` and `docker compose up -d api`; the
+   shared token then opens nothing. The Mac rig stays on `token`.
+
+A 503 "Sign-in keys unavailable" means the server cannot reach
+`login.microsoftonline.com` and has no cached keys: `docker compose logs api | grep jwks`.
+
 ## 5. iOS builds and TestFlight (T06b, D59, D70)
 
 All on the PC in `app/`, in **your own terminal** (EAS asks for the Apple ID password and 2FA code interactively). Needs the Apple Developer Program membership **active** (developer.apple.com → Account → Membership shows a Team ID). Nothing here needs a Mac. **Always run `eas` from `app/`**: from the repo root it writes a stray `eas.json`/`app.json` there and fails with "The `expo` package was not found". Apple team `H2CLZXHCH8`; commands that need it non-interactively take `--apple-team-id H2CLZXHCH8` (e.g. `eas device:list`).

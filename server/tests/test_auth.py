@@ -66,6 +66,7 @@ def test_add_team_member(client):
     assert "Dee" in [m["name"] for m in client.get("/team", headers=hdr()).json()]
 
 
-def test_entra_mode_not_yet_available(client, monkeypatch):
-    monkeypatch.setattr(settings, "auth_mode", "entra")
-    assert client.get("/team", headers=hdr()).status_code == 501
+def test_unknown_auth_mode_is_refused(client, monkeypatch):
+    monkeypatch.setattr(settings, "auth_mode", "jwt")
+    assert client.get("/team", headers=hdr()).status_code == 500
+    assert client.get("/health").status_code == 200

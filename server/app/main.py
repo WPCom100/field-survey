@@ -1,11 +1,20 @@
+import uuid
 from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, text
 
 from app.api import blobs, exports, imports, library, ops, projects
-from app.auth import SessionDep, current_user, is_system_user, require_token, upsert_user
+from app.auth import (
+    Principal,
+    SessionDep,
+    current_user,
+    is_system_user,
+    merge_entra_user,
+    require_token,
+    upsert_user,
+)
 from app.config import settings
 from app.models import User
 
@@ -57,6 +66,35 @@ def add_team_member(body: NewMember, session: SessionDep) -> TeamMember:
     return TeamMember(id=str(user.id), name=user.name)
 
 
+class Me(BaseModel):
+    id: str
+    name: str
+    email: str | None
+
+
+class MergeChoice(BaseModel):
+    # The interim user to merge into this Microsoft sign-in; null starts a new user (D264).
+    user_id: uuid.UUID | None
+
+
+def _me(user: User) -> Me:
+    return Me(id=str(user.id), name=user.name, email=user.email)
+
+
 @app.get("/me")
-def me(user: Annotated[User, Depends(current_user)]) -> TeamMember:
-    return TeamMember(id=str(user.id), name=user.name)
+def me(user: Annotated[User, Depends(current_user)]) -> Me:
+    """The caller's user. A first Microsoft sign-in with an interim user to merge answers 409
+    `merge_pending` (with `merge_candidate`) until `POST /me/merge`."""
+    return _me(user)
+
+
+@app.post("/me/merge")
+def me_merge(
+    body: MergeChoice,
+    principal: Annotated[Principal, Depends(require_token)],
+    session: SessionDep,
+) -> Me:
+    """Finish a first Microsoft sign-in after the iPad's confirmation (T04)."""
+    if principal.entra is None:
+        raise HTTPException(400, "Merging needs a Microsoft sign-in")
+    return _me(merge_entra_user(session, principal.entra, body.user_id))

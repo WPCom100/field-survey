@@ -169,6 +169,8 @@ Capture → JPEG + 320-px thumb → SHA-256 → `photo` record syncs at once, by
 
 **Target:** Entra ID app registration "Field Survey" (public client, redirect `fieldsurvey://auth`, scopes `openid profile email offline_access` + `api://field-survey/access`). `expo-auth-session` authorization-code + PKCE; refresh token in `expo-secure-store`; silent refresh before each sync; interactive sign-in only when refresh fails and the iPad is online. Editing never needs a token; sync, setup uploads and exports do. Server validates the bearer JWT against tenant JWKS, upserts `user`, no roles. Everyone is in the LTP tenant (D39).
 
+**Merge and transition (T03, D264):** a first sign-in whose interim user can be found (the `X-Survey-User` name the iPad was using, else a unique match on the Entra display or given name) gets 409 `merge_pending` with the candidate; after the iPad's prompt, `POST /me/merge` adopts that interim row (it keeps its id and name and gains the oid and email) or starts a new user. `AUTH_MODE=both` accepts the shared token or an Entra token while the iPads move to the sign-in build. Details: `server/docs/auth.md`.
+
 ## 5. UX (from Phase 3 wireframes; §numbers refer to `docs/history/Phase3_UX_Wireframes.md`)
 
 | Screen | Key behaviour |
@@ -315,7 +317,7 @@ Cover: "ETC Lighting Controls Survey — Level NN", "Surveyed <date>" only (R7),
 | `GET /projects` · `POST /projects` (+ levels, copy-from) | project list and creation (server-side so numbering groups exist before any op); the project, its groups, levels and copies are written as ops so an iPad pulls them (D127) |
 | `POST /imports` · `GET /imports/{id}` · `GET /imports/{id}/crop` | setup and seed jobs; drafts delivered as ops; a draft's source crop as PNG (T44); `kind=davinci` (+ `categories`) seeds the app library from DaVinci's `library.json` (T111, `server/docs/library.md`) |
 | `POST /exports` · `GET /exports/{id}` · `GET /exports?project` · `POST /exports/{id}/cancel` | workbook / floor PDF jobs and history; one queued or running per project and kind, stage and counts in `stats`, Cancel (D166) |
-| `GET /me` | user upsert from JWT |
+| `GET /me` · `POST /me/merge` | user upsert from JWT (409 `merge_pending` on a first sign-in with an interim user to merge); finish that sign-in by merging or declining (D264) |
 | `GET /health` | |
 
 All routes need a bearer token except `/health`. Jobs run in the worker (same image, `python -m app.worker`), state in Postgres, artifacts in Spaces.
