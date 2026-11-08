@@ -195,6 +195,8 @@ Capture → JPEG + 320-px thumb → SHA-256 → `photo` record syncs at once, by
 
 Record badges: `NEW`, `↑n`, `IN REVIEW`, `DRAFT`, `DELETED`, `📷 n waiting`, `⚑ rule`.
 
+Look (D266): the tokens, components and screen layouts of `docs/ui-plan.md`, drawn in the "Field Survey UI mock-ups" canvas (https://claude.ai/artifact/JErKMqFFj5Awmd5G5iQa2u); built by T174–T181. The boards are the look, not the spec: where a board disagrees with this section or §3's vocabulary, this file wins and the board is corrected. Screen names, badge words and testIDs do not change; the status bar's copy does (D266 (2)).
+
 ## 6. Rule engine (`packages/rules`, client only — D24)
 
 Pure TypeScript over an in-memory project snapshot (no DB, no React; the same package can later run on the server or in a web dashboard). Runs debounced after each committed edit and after each pull. Outputs `proposal` and `finding`. Proposals keyed by `(rule_id, subject, discriminator)` + `inputs_hash`: never duplicates; rejected stays rejected until inputs change; a proposal whose condition disappears → `superseded`. Accept → record with `rule_id`; Edit-then-accept → `edited`.
