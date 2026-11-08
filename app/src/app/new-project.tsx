@@ -6,7 +6,7 @@ import { openAppStore } from '../db';
 import { listProjects, type HomeProject } from '../home/data';
 import { useIdentity } from '../identity/IdentityGate';
 import { createProject, fetchProjects, type NewLevel, type NewProjectBody } from '../setup/api';
-import { DEFAULT_EXPORT_TITLE, SetupError, createFailureText, normLevelCode, parseLevelRange, shareProblem } from '../setup/model';
+import { DEFAULT_EXPORT_TITLE, SetupError, addDraftLevels, createFailureText, normLevelCode, parseLevelRange, shareProblem } from '../setup/model';
 import { Btn, Check, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../setup/widgets';
 import { getSyncEngine } from '../sync/engine';
 
@@ -67,7 +67,8 @@ export default function NewProjectScreen() {
     const code = normLevelCode(newCode);
     if (!code) return;
     if (levels.some((l) => l.code === code)) return setError(`Level ${code} is already in the list`);
-    setLevels([...levels, { code, inScope: true, shareWith: null, splitOf: null }]);
+    // a `<code>M` joins its `<code>` by default (T172, D263)
+    setLevels(addDraftLevels(levels, [{ code, inScope: true, shareWith: null, splitOf: null }]));
     setNewCode('');
     toBottom();
   };
@@ -77,7 +78,7 @@ export default function NewProjectScreen() {
     try {
       const have = new Set(levels.map((l) => l.code));
       const fresh = parseLevelRange(range).filter((c) => !have.has(c));
-      setLevels([...levels, ...fresh.map((code) => ({ code, inScope: false, shareWith: null, splitOf: null }))]);
+      setLevels(addDraftLevels(levels, fresh.map((code) => ({ code, inScope: false, shareWith: null, splitOf: null }))));
       setRange('');
     } catch (e) {
       setError(e instanceof SetupError ? e.message : String(e));

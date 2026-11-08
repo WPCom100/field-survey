@@ -693,7 +693,7 @@ Decision D258 (Claude's readings of your answers): the "all" Notes phrase is `Al
 
 **Why it matters:** the pilot (T50) sets a real floor up exactly this way. The rig walked it twice from nothing to 06M locked in under 5 minutes of Maestro time (`docs/test/setup-e2e.md` has the steps, its times and what the server held); it cannot tell whether the drafts and the proposals are *right*, has no Claude key for the riser's far ends, and is not your iPad. One sitting, about 30 minutes, with a stopwatch (the phone's is fine). Use a new project named `E2E <date>`; nothing else is touched.
 
-- [ ] **New project.** Projects → New project `E2E <date>`, levels B2, B1, 01, 02, 03, 04, 06, 06M, 07; on 06M's row set **Share numbering → 06** and **Split of → 06** (without them Review drafts cannot move the riser's panels to 06M — found by T49, task **T172**). Time from Create to the Levels home. → saw:
+- [ ] **New project.** Projects → New project `E2E <date>`, levels B2, B1, 01, 02, 03, 04, 06, 06M, 07; 06M's row should already read **Share numbering 06** and **Split of 06** (New project joins a `<code>M` to its `<code>` since T172, D263); leave them. Time from Create to the Levels home. → saw:
 - [ ] **BOM.** Setup → Sources → BOM → `BOM.pdf`. Time until `Done: …`; copy the line. The rig read `108 device drafts, 17 excluded lines, 35 flagged`. → saw:
 - [ ] **Riser.** Sources → Riser → `riser.pdf`. Time until `Done: …`; copy the line. On the rig (no Claude) the far ends all came back to pick; with the Droplet's key, how many are left to pick? → saw:
 - [ ] **Sheets.** Floor plans → 06M display → the 06M composite; 07 display → the real 07 composite if you have it (else the 06M one, as the rig did). Time until each plan opens. → saw:

@@ -2,7 +2,19 @@ import { Editor, Store, SyncEngine, TransportError, rememberProjects, uuidv7, ty
 import { BetterSqliteDriver, FakeServer } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
-import { SetupActions, SetupError, createFailureText, loadProjectSetup, normLevelCode, parseLevelDate, parseLevelRange, shareProblem } from './model';
+import {
+  SetupActions,
+  SetupError,
+  addDraftLevels,
+  createFailureText,
+  loadProjectSetup,
+  mezzanineBase,
+  mezzanineParent,
+  normLevelCode,
+  parseLevelDate,
+  parseLevelRange,
+  shareProblem,
+} from './model';
 
 const ME = uuidv7();
 
@@ -255,5 +267,71 @@ describe('New project: numbering shares and the server reason (T142)', () => {
     expect(createFailureText(new TransportError('rejected', 'POST /projects → 400', 400, null))).toBe('Could not create the project: the server answered 400.');
     expect(createFailureText(new TransportError('network', 'Network request failed'))).toMatch(/not reachable/);
     expect(createFailureText(new Error('disk full'))).toBe('Could not create the project: disk full');
+  });
+});
+
+describe('a <code>M joins its <code> by default (T172, D263)', () => {
+  const lv = (code: string, shareWith: string | null = null, splitOf: string | null = null) => ({ code, inScope: true, shareWith, splitOf });
+
+  it('knows the floor a mezzanine code splits', () => {
+    expect(mezzanineBase('06M', ['06', '07'])).toBe('06');
+    expect(mezzanineBase('06M', ['05', '07'])).toBeNull();
+    expect(mezzanineBase('06', ['06M'])).toBeNull();
+    expect(mezzanineBase('M', ['', 'M'])).toBeNull();
+  });
+
+  it('New project: Add level 06M after 06 sets Share numbering and Split of 06', () => {
+    expect(addDraftLevels([lv('04'), lv('06')], [lv('06M')])).toEqual([lv('04'), lv('06'), lv('06M', '06', '06')]);
+    // 06 added after 06M makes the pair too
+    expect(addDraftLevels([lv('06M')], [lv('06')])).toEqual([lv('06M', '06', '06'), lv('06')]);
+    // Add range brings both at once
+    const range = addDraftLevels([], [lv('06'), lv('06M'), lv('07')]);
+    expect(range.map((l) => [l.code, l.shareWith, l.splitOf])).toEqual([
+      ['06', null, null],
+      ['06M', '06', '06'],
+      ['07', null, null],
+    ]);
+    expect(shareProblem(range)).toBeNull();
+  });
+
+  it('shares with the group 06 itself shares, so no chain is made', () => {
+    const out = addDraftLevels([lv('05'), lv('06', '05')], [lv('06M')]);
+    expect(out[2]).toEqual(lv('06M', '05', '06'));
+    expect(shareProblem(out)).toBeNull();
+  });
+
+  it('leaves picks the user made, and pairs that stood before this add', () => {
+    // 06M with its own picks
+    expect(addDraftLevels([lv('06'), lv('07')], [lv('06M', '07', null)])[2]).toEqual(lv('06M', '07', null));
+    // the user cleared 06M's pickers earlier; adding 07 does not set them again
+    expect(addDraftLevels([lv('06'), lv('06M')], [lv('07')])).toEqual([lv('06'), lv('06M'), lv('07')]);
+    // 06 already shares with 06M: joining back would loop
+    expect(addDraftLevels([lv('06', '06M')], [lv('06M')])[1]).toEqual(lv('06M'));
+  });
+
+  it('Setup → Add level: a typed 06M defaults to 06', () => {
+    const levels = [
+      { id: 'a', code: '04' },
+      { id: 'b', code: '06' },
+    ];
+    expect(mezzanineParent('6m', levels)).toEqual({ id: 'b', code: '06' });
+    expect(mezzanineParent('06M', levels)?.id).toBe('b');
+    expect(mezzanineParent('05M', levels)).toBeNull();
+    expect(mezzanineParent('06', levels)).toBeNull();
+    expect(mezzanineParent('', levels)).toBeNull();
+    // 06M already there: Add refuses it, nothing to default
+    expect(mezzanineParent('06M', [...levels, { id: 'c', code: '06M' }])).toBeNull();
+  });
+
+  it('Setup → Add level with the defaults puts 09M in the group of 09, right after it', async () => {
+    const { store, pid, actions } = await tower();
+    await actions.addLevel({ code: '10' });
+    const s = (await loadProjectSetup(store, pid))!;
+    const parent = mezzanineParent('9m', s.levels)!;
+    expect(parent.code).toBe('09');
+    await actions.addLevel({ code: '9m', shareWithLevelId: parent.id, splitOfLevelId: parent.id });
+    const after = (await loadProjectSetup(store, pid))!;
+    expect(after.levels.map((l) => l.code)).toEqual(['B2', '06', '06M', '09', '09M', '10']);
+    expect(after.levels.find((l) => l.code === '09M')).toMatchObject({ splitOfId: parent.id, splitOfCode: '09', groupId: parent.groupId, groupLabel: '09/09M', shared: true });
   });
 });

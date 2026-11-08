@@ -16,6 +16,7 @@ name: E2E — setup on the fixtures, timed
 - runFlow:
     label: 'e2e: create project'
     file: _e2e-create.yaml
+- runFlow: _setup-mezzanine.yaml   # T172: Setup → Add level's 07M defaults (unlabelled: no stage time)
 - runFlow:
     label: 'e2e: BOM extraction'
     file: _e2e-bom.yaml

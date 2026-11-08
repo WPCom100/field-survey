@@ -34,23 +34,38 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 5000
 - tapOn: Levels                 # closes the keyboard over Create
 - assertNotVisible: own group    # no numbering picker open
-# 06M shares 06's numbering group and is a split of 06, as the Tower (D33): Review drafts offers
-# the riser's "06 or 06M?" choice only for a split (T49 found it warns with no choice otherwise)
+# 06M arrived sharing 06's numbering group and as a split of 06, as the Tower (D33): New project
+# joins a <code>M to its <code> by default (T172, D263)
 - scrollUntilVisible:
     element:
       id: newProject.share.06M
     direction: DOWN
-- tapOn:
+- assertVisible:
     id: newProject.share.06M
-- tapOn:
-    id: newProject.share.06M.06
-- tapOn:
-    id: newProject.split.06M
-- tapOn:
-    id: newProject.split.06M.06
+    text: '06 ▾'
 - assertVisible:
     id: newProject.split.06M
     text: '06 ▾'
+# `rig.sh e2e --unjoined` (UNJOINED=yes): both cleared, so Review drafts must offer the riser's
+# "06 or 06M?" by the codes alone (T172)
+- runFlow:
+    when:
+      true: ${UNJOINED == 'yes'}
+    commands:
+      - tapOn:
+          id: newProject.share.06M
+      - tapOn:
+          id: newProject.share.06M.none
+      - tapOn:
+          id: newProject.split.06M
+      - tapOn:
+          id: newProject.split.06M.none
+      - assertVisible:
+          id: newProject.share.06M
+          text: 'own group ▾'
+      - assertVisible:
+          id: newProject.split.06M
+          text: '— ▾'
 - scrollUntilVisible:
     element:
       id: newProject.create

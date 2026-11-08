@@ -54,15 +54,18 @@ import {
   cablesOn,
   cropBox,
   deviceForDraft,
+  deviceNeeds,
   devicesOn,
   draftRole,
   endpointOptions,
   flaggedDraftCounts,
+  isChoiceConflict,
   levelCounts,
   levelKeyOf,
   loadDraftReview,
   mismatchList,
   sourcesOf,
+  splitLevelCodes,
   srcBadge,
   withChosen,
 } from './model';
@@ -72,7 +75,8 @@ const ME = uuidv7();
 let clock = 1_760_800_000_000;
 const now = () => new Date((clock += 1000)).toISOString();
 
-async function setup() {
+/** `unjoined`: 06M on its own numbering group and not a split of 06 (New project with no picks, T172). */
+async function setup(opts: { unjoined?: boolean } = {}) {
   const store = await Store.open(new BetterSqliteDriver(), { installId: uuidv7(), search: 'like' });
   const editor = new Editor(store, { projectId: PROJECT, userId: ME, now });
   const ids = {
@@ -94,7 +98,7 @@ async function setup() {
   create('level', { id: ids.l01, project_id: PROJECT, level: '01', floor_order: 1, numbering_group_id: uuidv7(), in_scope: true });
   create('level', { id: ids.l02, project_id: PROJECT, level: '02', floor_order: 2, numbering_group_id: uuidv7(), in_scope: true });
   create('level', { id: ids.l06, project_id: PROJECT, level: '06', floor_order: 3, numbering_group_id: g06, in_scope: true });
-  create('level', { id: ids.l06m, project_id: PROJECT, level: '06M', floor_order: 4, numbering_group_id: g06, in_scope: true, split_of_id: ids.l06 });
+  create('level', { id: ids.l06m, project_id: PROJECT, level: '06M', floor_order: 4, numbering_group_id: opts.unjoined ? uuidv7() : g06, in_scope: true, split_of_id: opts.unjoined ? null : ids.l06 });
   // the master's devices on 06M (D30)
   create('device', { id: ids.panel, level_id: ids.l06m, display_id: '06M-04', category: 'Relay panel', device: 'ERP48', panel_name: 'CT06LCPA' });
   create('device', { id: ids.rack, level_id: ids.l06m, display_id: '06M-01', category: 'Equipment rack', device: 'Equipment Rack 18U' });
@@ -195,6 +199,40 @@ describe('draft review read model (T44)', () => {
     expect(mismatchList(data, ids.l01).map((m) => m.text)).toEqual(['SR or LR? P-DOC-C-SR / P-DOC-C-LR — pick one', 'BOM qty 1 ≠ riser 2 (PI1004)']);
     expect(mismatchList(data, ids.l06).map((m) => m.text)).toEqual(['ERP24-FT-241P: on 06 or 06M? — pick the level']);
     expect(mismatchList(data, ids.l06m).map((m) => m.text)).toEqual(['N from CT06LCPA: far end not found — pick it']);
+  });
+
+  it('offers 06 or 06M by the codes the server flags, when 06M is not a split of 06 (T172)', async () => {
+    const { store, editor, ids } = await setup({ unjoined: true });
+    let data = await loadDraftReview(store, PROJECT);
+    expect(row(data.devices, ids.dH).needs).toEqual({ level: { options: [{ id: ids.l06, code: '06' }, { id: ids.l06m, code: '06M' }] } });
+    expect(mismatchList(data, ids.l06).map((m) => m.text)).toEqual(['ERP24-FT-241P: on 06 or 06M? — pick the level']);
+    expect(deviceBlockers(row(data.devices, ids.dH))).toEqual(['Pick the level: 06 or 06M.']);
+    await acceptDevice(editor, row(data.devices, ids.dH), { levelId: ids.l06m });
+    data = await loadDraftReview(store, PROJECT);
+    expect(row(data.devices, ids.dH)).toMatchObject({ levelId: ids.l06m, state: 'edited' });
+  });
+
+  it('reads any split-floor flag, not only 06/06M (T172)', () => {
+    expect(splitLevelCodes('level:06/06M')).toEqual(['06', '06M']);
+    expect(splitLevelCodes('level:02/02M')).toEqual(['02', '02M']);
+    expect(splitLevelCodes('level:none')).toBeNull();
+    expect(splitLevelCodes('qty:bom≠riser')).toBeNull();
+    expect(isChoiceConflict('level:02/02M')).toBe(true);
+    expect(isChoiceConflict('qty:bom≠riser')).toBe(true);
+    expect(isChoiceConflict('source:riser_only')).toBe(false);
+    const levels = [
+      { id: 'a', code: '01', splitOfId: null },
+      { id: 'b', code: '02', splitOfId: null },
+      { id: 'c', code: '02M', splitOfId: null },
+      { id: 'd', code: '03', splitOfId: null },
+    ];
+    const d = { candidates: [], conflicts: ['level:02/02M'], qty: 1, category: 'Power Distribution', sourceRef: null, levelId: 'b' };
+    expect(deviceNeeds(d, levels)).toEqual({ level: { options: [{ id: 'b', code: '02' }, { id: 'c', code: '02M' }] } });
+    // joined by Split of and flagged: the same two, once each
+    const joined = levels.map((l) => (l.id === 'c' ? { ...l, splitOfId: 'b' } : l));
+    expect(deviceNeeds(d, joined)).toEqual({ level: { options: [{ id: 'b', code: '02' }, { id: 'c', code: '02M' }] } });
+    // a flag naming a level the project no longer has: nothing to pick
+    expect(deviceNeeds({ ...d, conflicts: ['level:03/03M'], levelId: 'd' }, levels)).toEqual({});
   });
 
   it('drops a device mismatch once the draft is settled, and the N line once an N cable draft reaches it (T133)', async () => {

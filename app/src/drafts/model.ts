@@ -235,7 +235,16 @@ export function srcBadge(ref: Record<string, unknown> | null, extraction: string
 
 // ------------------------------------------------------------------ device choices
 
-const CHOICE_CONFLICTS = new Set(['model:SR/LR', 'qty:bom≠riser', 'level:06/06M']);
+const CHOICE_CONFLICTS = new Set(['model:SR/LR', 'qty:bom≠riser']);
+
+/**
+ * `level:06/06M` → [`06`, `06M`]: the riser and BOM flag a panel-class draft on a floor the project
+ * splits by the level codes alone (`split_level`, T172), whether or not the two levels are joined.
+ */
+export function splitLevelCodes(c: string): [string, string] | null {
+  const m = /^level:([^/]+)\/([^/]+)$/.exec(c);
+  return m ? [m[1]!, m[2]!] : null;
+}
 
 /** The choices Accept needs on a device draft (D28): model among candidates, BOM or riser quantity, 06 or 06M, a category. */
 export function deviceNeeds(
@@ -254,10 +263,12 @@ export function deviceNeeds(
     const bom = bomRef ? num(bomRef.qty) : ref.kind === 'bom_line' ? d.qty : null;
     if (riser !== bom) out.qty = { bom, riser };
   }
-  if (d.conflicts.includes('level:06/06M')) {
+  const split = d.conflicts.map(splitLevelCodes).find((s) => s != null);
+  if (split) {
+    // the two codes the server names (T172, D263), and any level joined to the draft's by Split of
     const here = levels.find((l) => l.id === d.levelId);
     const parentId = here?.splitOfId ?? here?.id;
-    const options = levels.filter((l) => l.id === parentId || (parentId != null && l.splitOfId === parentId)).map((l) => ({ id: l.id, code: l.code }));
+    const options = levels.filter((l) => split.includes(l.code) || l.id === parentId || (parentId != null && l.splitOfId === parentId)).map((l) => ({ id: l.id, code: l.code }));
     if (options.length > 1) out.level = { options };
   }
   if (!d.category) out.category = true;
@@ -265,7 +276,7 @@ export function deviceNeeds(
 }
 
 /** True when the conflict is one Accept itself settles by a choice (as opposed to one it only acknowledges). */
-export const isChoiceConflict = (c: string): boolean => CHOICE_CONFLICTS.has(c);
+export const isChoiceConflict = (c: string): boolean => CHOICE_CONFLICTS.has(c) || splitLevelCodes(c) != null;
 
 // ------------------------------------------------------------------ cable endpoints
 
@@ -350,9 +361,10 @@ export function deviceMismatches(d: DeviceDraftRow, levelCode: (id: string | nul
   const out: string[] = [];
   const open = d.state === 'proposed';
   for (const c of open ? d.conflicts : []) {
-    if (c === 'qty:bom≠riser') out.push(d.needs.qty ? `BOM qty ${d.needs.qty.bom ?? '?'} ≠ riser ${d.needs.qty.riser ?? '?'} (${model})` : `BOM and riser quantities differ (${model})`);
+    const split = splitLevelCodes(c);
+    if (split) out.push(`${model}: on ${split.join(' or ')}? — pick the level`);
+    else if (c === 'qty:bom≠riser') out.push(d.needs.qty ? `BOM qty ${d.needs.qty.bom ?? '?'} ≠ riser ${d.needs.qty.riser ?? '?'} (${model})` : `BOM and riser quantities differ (${model})`);
     else if (c === 'model:SR/LR') out.push(`SR or LR? ${d.candidates.join(' / ')} — pick one`);
-    else if (c === 'level:06/06M') out.push(`${model}: on 06 or 06M? — pick the level`);
     else if (c === 'source:riser_only') out.push(`Riser device not in the BOM: ${model}`);
     else if (c === 'cards:bom≠riser') out.push(`Option cards differ between the BOM and the riser (${model})`);
     else if (c === 'pairing:ebdk≠erp') out.push(`EBDK and relay panels do not pair one to one (${model})`);

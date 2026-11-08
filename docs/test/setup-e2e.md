@@ -17,6 +17,7 @@ lock 06M. Two halves (CLAUDE.md §7 5a):
 bash scripts/mac/rig.sh server     # if not running
 bash scripts/mac/rig.sh metro      # in its own terminal
 bash scripts/mac/rig.sh e2e        # about 5 min; RIG_PROJECT="…" names the project
+bash scripts/mac/rig.sh e2e --unjoined   # T172: the same with 06M not joined to 06 (both pickers cleared)
 ```
 
 `rig.sh e2e` puts `BOM.pdf`, `Level_06M_-_Lighting_Composite_vector.pdf` and `riser.pdf` in the
@@ -27,7 +28,7 @@ project `Maestro e2e <hhmmss>`, prints each stage's time (`scripts/mac/stages.py
 
 | Stage | Sub-flow | What it does and asserts |
 |---|---|---|
-| create project | `_e2e-create.yaml` | New project with B2, B1, 01, 02, 03, 04, 06, 06M, 07; 06M **shares 06's numbering group and is a split of 06** (as the Tower, D33 — see defect 1); Create → the Levels home lists 07, 06M, B2 |
+| create project | `_e2e-create.yaml` | New project with B2, B1, 01, 02, 03, 04, 06, 06M, 07; 06M arrives **sharing 06's numbering group and as a split of 06** (New project's default since T172, D263; as the Tower, D33) and the flow asserts both pickers read 06; with `--unjoined` (`UNJOINED=yes`) it clears both, and Review drafts must still offer 06 or 06M (defect 1); Create → the Levels home lists 07, 06M, B2 |
 | BOM extraction | `_e2e-bom.yaml` | Sources → BOM → `BOM.pdf` → `Done: n device drafts, n excluded lines, n flagged` |
 | riser extraction | `_e2e-riser.yaml` | Sources → Riser → `riser.pdf` → `Done: … (n merged into the BOM's), n cable drafts, n far ends to pick` |
 | plan sheets 06M + 07 | `_e2e-sheets.yaml` | The 06M composite as 06M's display sheet, then again as 07's (the fixtures hold no 07 sheet); each waits for its sheet job and the synced sheet |
@@ -85,7 +86,7 @@ type; 07-S1 PI1002 on 07; every other level still `setup`.
 
 | # | Found | Became |
 |---|---|---|
-| 1 | **The riser's "06 or 06M?" offers no choice unless 06M is a split of 06.** The server flags `level:06/06M` on a 06 panel whenever the project has a level `06M` (`riser_extract.py`, `bom_extract.py`: by the code), but Review drafts lists the 06 / 06M radios only for levels joined by `split_of_id` (`drafts/model.ts`). New project creates 06 and 06M as two own groups with no split unless the user sets both pickers, so the first run showed the ⚠ "A panel-class device on a split floor: 06 or 06M?" with nothing to pick (`Level 06 · basis: riser_band`): Review drafts cannot put the panels on 06M; the way round is Setup → Levels → 06M Split of 06 afterwards, or accepting on 06 and then Flag → Move to… 06M in Place devices (T143). | **T172** (decision first: offer the choice by code like the server, or have New project join `<code>M` to `<code>`) |
+| 1 | **The riser's "06 or 06M?" offers no choice unless 06M is a split of 06.** The server flags `level:06/06M` on a 06 panel whenever the project has a level `06M` (`riser_extract.py`, `bom_extract.py`: by the code), but Review drafts lists the 06 / 06M radios only for levels joined by `split_of_id` (`drafts/model.ts`). New project creates 06 and 06M as two own groups with no split unless the user sets both pickers, so the first run showed the ⚠ "A panel-class device on a split floor: 06 or 06M?" with nothing to pick (`Level 06 · basis: riser_band`): Review drafts cannot put the panels on 06M; the way round is Setup → Levels → 06M Split of 06 afterwards, or accepting on 06 and then Flag → Move to… 06M in Place devices (T143). | **T172** — done 2026-11-07 (D263, both): Review drafts offers the two codes the server flags, joined or not; New project and + Add level join a `<code>M` to `<code>` by default. `rig.sh e2e` and `rig.sh e2e --unjoined` prove each |
 | 2 | Placement order sets the device numbers. The server numbers 06M in the order the devices are placed (D25), so the run's 06M-01 is CT06LCPA, while the master's 06M-01 is the rack. Working as designed; whether setup should number a level's panels in a fixed order (rack first) is Landry's call. | a question in the T49 checklist section (no task unless Landry wants it) |
 | 3 | The fixtures hold no 07 sheet; the rig uses the 06M composite for 07, so 07 shows 06M's drawing and (with the pooled ERP24 / ERP48 lines) could propose 06M's panel tags there. Only the pooled station is placed on 07. | none (a fixture gap; the checklist uses the real 07 sheet if Landry has it) |
 | 4 | The rig's riser has no Claude endpoints: far ends stay to pick. | the checklist runs it against the Droplet |

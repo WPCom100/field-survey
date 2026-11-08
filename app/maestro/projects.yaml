@@ -55,6 +55,7 @@ name: R7 — Projects
     file: _projects-level.yaml
     env:
       CODE: 06M
+# 06M arrives sharing 06 (and a split of it) by default (T172); 06 → 06M makes the two-way share
 - tapOn:
     id: newProject.share.06
 - tapOn:

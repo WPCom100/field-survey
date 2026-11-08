@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 
 import { openAppStore } from '../../db';
 import { useCurrentUser } from '../../identity/IdentityGate';
-import { SetupActions, SetupError, loadProjectSetup, type ProjectSetup, type SetupLevel } from '../../setup/model';
+import { SetupActions, SetupError, loadProjectSetup, mezzanineParent, type ProjectSetup, type SetupLevel } from '../../setup/model';
 import { Btn, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
 import { SourcesStep } from '../../setup/SourcesStep';
 import { AssignmentsStep } from '../../setup/AssignmentsStep';
@@ -337,7 +337,25 @@ function LevelsStep({
   const [newShare, setNewShare] = useState<string | null>(null);
   const [newSplit, setNewSplit] = useState<string | null>(null);
   const [range, setRange] = useState('');
+  /** True once the user picked either Add level picker: typing no longer resets them. */
+  const [picked, setPicked] = useState(false);
   const options = setup.levels.map((l) => ({ id: l.id, label: l.code }));
+  /** A typed `<code>M` defaults both pickers to `<code>` until the user picks (T172, D263). */
+  const typeCode = (text: string) => {
+    setNewCode(text);
+    if (picked) return;
+    const parent = mezzanineParent(text, setup.levels);
+    setNewShare(parent?.id ?? null);
+    setNewSplit(parent?.id ?? null);
+  };
+  const pickShare = (id: string | null) => {
+    setPicked(true);
+    setNewShare(id);
+  };
+  const pickSplit = (id: string | null) => {
+    setPicked(true);
+    setNewSplit(id);
+  };
   /** Enter adds the level and keeps the keyboard up for the next one (P-3). */
   const addLevel = () => {
     if (!newCode.trim()) return;
@@ -347,6 +365,7 @@ function LevelsStep({
         setNewCode('');
         setNewShare(null);
         setNewSplit(null);
+        setPicked(false);
         toBottom();
       },
       `Added level ${newCode.trim().toUpperCase()}`,
@@ -376,7 +395,7 @@ function LevelsStep({
           <TextInput
             style={w.input}
             value={newCode}
-            onChangeText={setNewCode}
+            onChangeText={typeCode}
             placeholder="06M"
             autoCapitalize="characters"
             autoCorrect={false}
@@ -384,15 +403,16 @@ function LevelsStep({
             onSubmitEditing={addLevel}
             submitBehavior="submit"
             returnKeyType="next"
+            testID="setup.levelCode"
           />
         </View>
         <View style={{ gap: 4 }}>
           <Text style={w.label}>Shares numbering with</Text>
-          <ChipPicker value={newShare} options={options} onPick={setNewShare} none="own group" />
+          <ChipPicker value={newShare} options={options} onPick={pickShare} none="own group" testID="setup.newShare" />
         </View>
         <View style={{ gap: 4 }}>
           <Text style={w.label}>Split of</Text>
-          <ChipPicker value={newSplit} options={options} onPick={setNewSplit} />
+          <ChipPicker value={newSplit} options={options} onPick={pickSplit} testID="setup.newSplit" />
         </View>
         <Btn title="+ Add level" onPress={addLevel} />
       </View>

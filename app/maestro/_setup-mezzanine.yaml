@@ -1,0 +1,43 @@
+# T172 (D263): Setup → 2 Levels → Add level: a typed 07M fills "Shares numbering with" and
+# "Split of" with 07 while the user has not picked; erased, both go back to own group / —. Return
+# on the empty field adds nothing. Leaves the levels as they were and ends on the Levels home.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.levels
+- scrollUntilVisible:
+    element:
+      id: setup.levelCode
+    direction: DOWN
+- tapOn:
+    id: setup.levelCode
+- inputText: 07M
+- assertVisible:
+    id: setup.levelCode
+    text: 07M
+- assertVisible:
+    id: setup.newShare
+    text: '07 ▾'
+- assertVisible:
+    id: setup.newSplit
+    text: '07 ▾'
+- eraseText: 6
+- assertVisible:
+    id: setup.newShare
+    text: 'own group ▾'
+- assertVisible:
+    id: setup.newSplit
+    text: '— ▾'
+- pressKey: Enter
+- assertNotVisible: Added level.*
+# back to the Levels home, where the next stage starts (Setup has no sidebar); the first tap after
+# typing only closes the keyboard, so a plain label first
+- tapOn: Shares numbering with
+- tapOn:
+    id: setup.home
+- extendedWaitUntil:
+    visible:
+      id: level.07
+    timeout: 10000

@@ -43,6 +43,7 @@ import {
   loadDraftReview,
   mismatchList,
   pct,
+  splitLevelCodes,
   type CableDraftRow,
   type DeviceDraftRow,
   type DraftFilter,
@@ -60,7 +61,6 @@ const CONFLICT_TEXT: Readonly<Record<string, string>> = {
   'model:SR/LR': 'SR or LR — the BOM does not say which (D28)',
   'qty:bom≠riser': 'BOM and riser quantities differ (D28)',
   'cards:bom≠riser': 'Option cards differ between BOM and riser',
-  'level:06/06M': 'A panel-class device on a split floor: 06 or 06M?',
   'source:riser_only': 'On the riser, not in the BOM',
   'pairing:ebdk≠erp': 'EBDKs and relay panels do not pair one to one',
   'network:no_N_run': 'No network (N) run drawn to it',
@@ -69,6 +69,12 @@ const CONFLICT_TEXT: Readonly<Record<string, string>> = {
   'endpoint:unresolved': 'Far end not found',
   'code:unknown': 'A line with no wire code — what is it?',
 };
+
+/** A conflict's sentence; a split-floor one names the two codes the server flagged (T172). */
+function conflictText(c: string): string {
+  const split = splitLevelCodes(c);
+  return split ? `A panel-class device on a split floor: ${split.join(' or ')}?` : (CONFLICT_TEXT[c] ?? c);
+}
 
 const STATE_LABEL: Record<string, string> = { proposed: '', accepted: '✓ accepted', edited: '✓ edited', rejected: '✗ rejected' };
 
@@ -442,7 +448,7 @@ function DevicePanel({ d, data, batches, identity, editor, store, run }: { d: De
       {d.accessories.length ? <Line k="Accessories" v={d.accessories.map((a) => `${a.model} ×${a.qty ?? '?'}${a.role === 'component' ? ' (component)' : ''}`).join(' · ')} /> : null}
       {d.conflicts.map((c) => (
         <Text key={c} style={styles.warn}>
-          ⚠ {CONFLICT_TEXT[c] ?? c}
+          ⚠ {conflictText(c)}
         </Text>
       ))}
       {d.reviewItemId ? <Text style={styles.warn}>⚑ Source conflict with the master's count (D30) — Accept or Reject settles it.</Text> : null}
@@ -595,7 +601,7 @@ function CablePanel({
       ))}
       {c.conflicts.map((k) => (
         <Text key={k} style={styles.warn}>
-          ⚠ {CONFLICT_TEXT[k] ?? k}
+          ⚠ {conflictText(k)}
         </Text>
       ))}
       <Text style={w.label}>Riser crop (the bubble outlined)</Text>

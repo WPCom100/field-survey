@@ -130,6 +130,48 @@ export function shareProblem(levels: { code: string; shareWith: string | null }[
   return null;
 }
 
+/**
+ * The floor a mezzanine code splits (`06M` → `06`) when `codes` holds it: the riser and BOM
+ * extractions ask "06 or 06M?" of a panel by the codes alone (T172), and D33 has the two share
+ * one numbering group. Null for any other code.
+ */
+export function mezzanineBase(code: string, codes: Iterable<string>): string | null {
+  if (code.length < 2 || !code.endsWith('M')) return null;
+  const base = code.slice(0, -1);
+  for (const c of codes) if (c === base) return base;
+  return null;
+}
+
+type DraftPick = { code: string; shareWith: string | null; splitOf: string | null };
+
+/**
+ * New project's Add level / Add range (T172, D263): append `fresh`, and give each `<code>M` with
+ * neither picker set whose `<code>` the list now holds — when this add makes the pair — Split of
+ * `<code>` and Share numbering with `<code>` (or the level `<code>` itself shares with). Pickers
+ * already set, and pairs that already stood before this add, are left as they are; the user can
+ * change both afterwards.
+ */
+export function addDraftLevels<L extends DraftPick>(levels: readonly L[], fresh: readonly L[]): L[] {
+  const all = [...levels, ...fresh];
+  const codes = all.map((l) => l.code);
+  const isNew = new Set(fresh.map((l) => l.code));
+  return all.map((l) => {
+    const base = mezzanineBase(l.code, codes);
+    if (!base || l.shareWith || l.splitOf || !(isNew.has(l.code) || isNew.has(base))) return l;
+    const parent = all.find((x) => x.code === base)!;
+    if (parent.shareWith === l.code || parent.splitOf === l.code) return l;
+    return { ...l, splitOf: base, shareWith: parent.shareWith ?? base };
+  });
+}
+
+/** Setup → Levels → + Add level (T172, D263): the level a typed `<code>M` defaults to for Share numbering and Split of, or null. */
+export function mezzanineParent<L extends { code: string }>(code: string, levels: readonly L[]): L | null {
+  const c = normLevelCode(code);
+  if (levels.some((l) => l.code === c)) return null; // already there: Add refuses it anyway
+  const base = mezzanineBase(c, levels.map((l) => l.code));
+  return base ? (levels.find((l) => l.code === base) ?? null) : null;
+}
+
 /** Why `POST /projects` failed, for the form: the server's reason (its `detail`) when it sent one. */
 export function createFailureText(e: unknown): string {
   if (e instanceof TransportError) {
