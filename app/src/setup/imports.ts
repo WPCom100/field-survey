@@ -7,6 +7,7 @@
 import { HttpClient } from '@field-survey/core';
 
 import type { Identity } from '../identity/api';
+import { httpOptions } from '../identity/http';
 import { uploadForm, type UploadPart } from './upload';
 
 export type { FilePart } from './upload';
@@ -91,13 +92,13 @@ export function jobLine(b: ImportBatch): string {
 }
 
 function client(identity: Identity): HttpClient {
-  return new HttpClient({ serverUrl: identity.serverUrl, token: identity.token, userName: identity.user?.name, timeoutMs: 120_000 });
+  return new HttpClient({ ...httpOptions(identity), timeoutMs: 120_000 });
 }
 
 export async function previewWorkbook(identity: Identity, file: UploadPart, mapping?: Mapping): Promise<ImportPreview> {
   const c = client(identity);
   const res = await c.send('POST', '/imports/preview', {
-    headers: c.headers(),
+    headers: await c.headers(),
     body: uploadForm(file, { mapping: mapping && Object.keys(mapping).length ? JSON.stringify(mapping) : undefined }),
   });
   return (await res.json()) as ImportPreview;
@@ -106,7 +107,7 @@ export async function previewWorkbook(identity: Identity, file: UploadPart, mapp
 export async function startImport(identity: Identity, projectId: string, kind: ImportKind, file: UploadPart, mapping: Mapping): Promise<ImportBatch> {
   const c = client(identity);
   const res = await c.send('POST', '/imports', {
-    headers: c.headers(),
+    headers: await c.headers(),
     body: uploadForm(file, { project_id: projectId, kind, mapping: Object.keys(mapping).length ? JSON.stringify(mapping) : undefined }),
   });
   return (await res.json()) as ImportBatch;

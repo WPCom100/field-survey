@@ -131,7 +131,7 @@ export {
 } from './sync';
 export { HttpTransport, type HttpTransportOptions } from './http-transport';
 export { LIBRARY_STREAM, isLibraryStream } from './library-stream';
-export { HttpClient, httpFailure, errorCode, failureOf, type HttpClientOptions } from './http';
+export { HttpClient, httpFailure, errorCode, failureOf, type HttpClientOptions, type TokenSource } from './http';
 export {
   BlobQueue,
   BlobUploadError,

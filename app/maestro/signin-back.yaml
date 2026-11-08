@@ -1,0 +1,7 @@
+# T04 step 4 of `rig.sh signin`, the server back on AUTH_MODE=token: the edit made while sign-in was
+# needed syncs (`_sync` fails on "need attention"); rig.sh then finds it applied on the server.
+appId: productions.luminarytechnology.fieldsurvey
+name: Sign-in — the token is taken again; the waiting edit syncs
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml

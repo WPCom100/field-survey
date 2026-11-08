@@ -1,0 +1,37 @@
+# T04 step 3 of `rig.sh signin`, the server on AUTH_MODE=entra (the shared token opens nothing): the
+# status bar reads "Sign-in needed to sync", an edit is still made and waits in the outbox, and the
+# Sync screen says why and offers "Sign in with Microsoft". (TP-12's offline half is on the iPad.)
+appId: productions.luminarytechnology.fieldsurvey
+name: Sign-in — sign-in needed; editing goes on
+---
+- runFlow: _resume.yaml
+- runFlow: _logbox.yaml
+- tapOn:
+    id: nav.sync
+- tapOn:
+    id: sync.now
+- extendedWaitUntil:
+    visible:
+      id: sync.signInNeeded
+      text: 'Sign-in needed to sync. The server no longer takes the team token.*'
+    timeout: 30000
+- assertVisible:
+    id: sync.signInNeeded.microsoft
+- tapOn: ← Levels
+- runFlow: _open-project.yaml
+- tapOn:
+    id: nav.setup
+- tapOn:
+    id: setup.step.levels
+- tapOn:
+    id: setup.level.06M.surveyed
+- eraseText: 12
+- inputText: 2026-11-07
+- pressKey: Enter
+- tapOn:
+    id: setup.home
+- extendedWaitUntil:
+    visible:
+      id: status.bar
+      text: '.*Sign-in needed to sync · [1-9]\d* pending.*'
+    timeout: 30000

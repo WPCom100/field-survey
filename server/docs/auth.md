@@ -1,6 +1,6 @@
 # Authentication — server (T60, T03; D69, D77, D264)
 
-Every route but `GET /health` needs `Authorization: Bearer <…>`. What the bearer may be is
+Every route but `GET /health` and `GET /auth/config` needs `Authorization: Bearer <…>`. What the bearer may be is
 `AUTH_MODE` in `.env`:
 
 | `AUTH_MODE` | Bearer | Who the caller is |
@@ -29,6 +29,21 @@ authenticated route.
   error="invalid_token"`; the reason goes to the `auth` log, never to the client.
 - Issuer, audience or tenant missing from `.env` → every bearer is refused (401), as an empty
   shared token refuses everything (D77).
+
+## What the iPad is told: `GET /auth/config` (T04, D265)
+
+Public, like `/health`. The iPad reads it from the server URL it was given:
+
+```json
+{"mode": "both", "entra": {"tenant_id": "…", "client_id": "…",
+  "scopes": ["openid", "profile", "email", "offline_access", "api://field-survey/access"]}}
+```
+
+`entra` is null unless `AUTH_MODE` is `entra` or `both` **and** `ENTRA_TENANT_ID` and
+`ENTRA_CLIENT_ID` are set; then the iPad offers "Sign in with Microsoft" (authorization code +
+PKCE against `https://login.microsoftonline.com/<tenant_id>/oauth2/v2.0/…`, redirect
+`fieldsurvey://auth`). `ENTRA_SCOPES` (space-separated, default `api://field-survey/access`) is
+what it asks for beside the four OpenID scopes. Nothing in it is a secret (a public client).
 
 ## First sign-in and the interim merge (D264)
 

@@ -10,6 +10,7 @@
 import { HttpClient, openReviewItems, type Store, type SyncStatus } from '@field-survey/core';
 
 import type { Identity } from '../identity/api';
+import { httpOptions } from '../identity/http';
 
 export type ExportKind = 'xlsx' | 'floor_pdf';
 export const KIND_LABEL: Record<ExportKind, string> = { xlsx: 'Master workbook', floor_pdf: 'Floor PDF' };
@@ -366,7 +367,7 @@ export function shareName(e: ExportRow): string {
 // ------------------------------------------------------------------ server
 
 function client(identity: Identity): HttpClient {
-  return new HttpClient({ serverUrl: identity.serverUrl, token: identity.token, userName: identity.user?.name, timeoutMs: 60_000 });
+  return new HttpClient({ ...httpOptions(identity), timeoutMs: 60_000 });
 }
 
 export const startExport = (identity: Identity, body: { project_id: string; kind: ExportKind; params?: Record<string, unknown> }): Promise<ExportRow> =>

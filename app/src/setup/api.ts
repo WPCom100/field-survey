@@ -8,6 +8,7 @@
 import { HttpClient, rememberProjects, type Store } from '@field-survey/core';
 
 import type { Identity } from '../identity/api';
+import { httpOptions } from '../identity/http';
 
 export type ServerLevel = {
   id: string;
@@ -45,7 +46,7 @@ export type NewProjectBody = {
 export type CreatedProject = ServerProject & { server_seq: number; copied: Record<string, number> };
 
 function client(identity: Identity): HttpClient {
-  return new HttpClient({ serverUrl: identity.serverUrl, token: identity.token, userName: identity.user?.name });
+  return new HttpClient(httpOptions(identity));
 }
 
 /** Every project on the server; also records their ids locally so they are pulled. */

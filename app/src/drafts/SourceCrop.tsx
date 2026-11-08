@@ -43,7 +43,7 @@ function Crop({ identity, batch, source }: { identity: Identity; batch: Batch | 
 }
 
 function CropImage({ identity, url, label, onPress }: { identity: Identity; url: string; label: string; onPress: () => void }) {
-  const crop = useCropFile(url, authHeaders(identity));
+  const crop = useCropFile(url, () => authHeaders(identity));
   if (crop.state === 'failed') return <Failed message={crop.message} retry={crop.retry} />;
   if (crop.state === 'loading') return <Text style={[styles.small, styles.loading]}>Loading crop…</Text>;
   return (
@@ -56,7 +56,7 @@ function CropImage({ identity, url, label, onPress }: { identity: Identity; url:
 
 function BigCrop({ identity, batch, source, onClose }: { identity: Identity; batch: Batch | null; source: DraftSource; onClose: () => void }) {
   const url = cropUrl(identity.serverUrl, batch, source, { px: 2000, pad: source.kind === 'riser' ? 260 : 60 });
-  const crop = useCropFile(url, authHeaders(identity));
+  const crop = useCropFile(url, () => authHeaders(identity));
   return (
     <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={styles.modal}>

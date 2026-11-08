@@ -118,6 +118,12 @@ usage: bash scripts/mac/rig.sh <command>
                         stopped that name's app_user row is deleted (an old backup) and stranger-edit.yaml
                         queues an edit; stranger-check.yaml: the Sync screen names the lost user, Re-sign in
                         carries the edit over to the name's new id, and the server has it under that name
+  signin               T04: smoke.yaml on A (Ann); the Sync screen on a token server offers no Microsoft
+                        sign-in (signin-token.yaml); the api on AUTH_MODE=both with a fake Entra registration
+                        offers it, the token still syncs and the sign-in sheet opens and cancels
+                        (signin-both.yaml); on AUTH_MODE=entra "Sign-in needed to sync" and an edit still
+                        queues (signin-needed.yaml); back on token the edit syncs (signin-back.yaml) and the
+                        server has it as Ann's
   assigned              T166: a copy of the master by curl with the 06M and 03 sheets; assigned.yaml on A
                         (Ann: 06M × Bob, the network-kit Lint flag, R3a owner → ETC), assigned-peer.yaml on
                         B (Bob: only 06M's sheet fetched, his draft reads ETC); the 02 Concourse PDF posted
@@ -1001,6 +1007,52 @@ cmd_stranger() {  # T160: the server loses a user's app_user row; the Sync scree
   say "stranger: green ($n surveyed-date edit made under the lost id applied as $who's new id)"
 }
 
+auth_mode() {  # token | both | entra: recreate the api with that AUTH_MODE (T04); both/entra get a fake Entra registration
+  local f="$OUT/auth-mode.yml" mode
+  mkdir -p "$OUT"
+  if [ "$1" = token ]; then
+    (cd "$ROOT/server" && $COMPOSE up -d api)
+  else
+    cat > "$f" <<YML
+services:
+  api:
+    environment:
+      AUTH_MODE: $1
+      ENTRA_TENANT_ID: 00000000-0000-4000-8000-0000000000f4
+      ENTRA_CLIENT_ID: 00000000-0000-4000-8000-0000000000c4
+      ENTRA_AUDIENCE: api://field-survey
+YML
+    (cd "$ROOT/server" && $COMPOSE -f "$f" up -d api)
+  fi
+  for _ in $(seq 1 60); do curl -fsS "$SERVER_URL/health" >/dev/null 2>&1 && break; sleep 1; done
+  mode="$(curl -fsS "$SERVER_URL/auth/config" | python3 -c 'import json, sys; print(json.load(sys.stdin)["mode"])')" \
+    || die "GET /auth/config did not answer: is the api built from T04's code? (rig.sh server)"
+  [ "$mode" = "$1" ] || die "the api reports AUTH_MODE=$mode, not $1"
+  say "api on AUTH_MODE=$1"
+}
+
+cmd_signin() {  # T04: the Sync screen across AUTH_MODE token → both → entra → token on the local server
+  local t0 n
+  server_up
+  say "signin on \"$PROJECT\": A (Ann) on token, both (Microsoft offered), entra (sign-in needed, edits kept), token again"
+  USER_NAME=Ann cmd_flows --device A smoke.yaml   # no Files picker (T168)
+  USER_NAME=Ann cmd_flows --device A signin-token.yaml
+  trap 'auth_mode token >/dev/null 2>&1 || true' EXIT
+  auth_mode both
+  USER_NAME=Ann cmd_flows --device A signin-both.yaml
+  auth_mode entra
+  t0="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  USER_NAME=Ann cmd_flows --device A signin-needed.yaml
+  auth_mode token
+  trap - EXIT
+  USER_NAME=Ann cmd_flows --device A signin-back.yaml
+  n="$(server_sql "$PROJECT" "select count(*) from op o join project p on p.id = o.project_id join app_user u on u.id = o.user_id
+    where p.name = :'name' and o.entity_kind = 'level' and o.field = 'surveyed' and o.state = 'applied'
+      and o.client_ts >= '$t0' and u.name = 'Ann';")"
+  [ "$n" -ge 1 ] || die "the surveyed-date edit made while sign-in was needed is not on the server as Ann's"
+  say "signin: green ($n edit made while sign-in was needed applied as Ann's)"
+}
+
 cmd_scale_check() {  # W5 (T159): the scale project's timings on a fresh store, held to the ceilings
   local t0 t1 pid res bad="" k c v
   server_up
@@ -1222,6 +1274,7 @@ case "${1:-}" in
   restart) cmd_restart ;;
   long-export) cmd_long_export ;;
   stranger) cmd_stranger ;;
+  signin) cmd_signin ;;
   assigned) cmd_assigned ;;
   riser) cmd_riser ;;
   e2e) shift; cmd_e2e "$@" ;;

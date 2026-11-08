@@ -100,6 +100,8 @@ export interface SyncStatus {
   /** Pull cursor per project (`last_server_seq:<project_id>`). */
   lastServerSeq: Record<string, number>;
   lastError: string | null;
+  /** What kind of failure the last failed cycle was (`auth`: a sign-in is needed, T04); null after a success. */
+  lastFailure: TransportFailure | null;
   /** Consecutive failed cycles. */
   failures: number;
   /** Earliest time the next automatic attempt will run (ISO 8601), null when none is due. */
@@ -238,6 +240,7 @@ export class SyncEngine {
     lastSyncAt: null,
     lastServerSeq: {},
     lastError: null,
+    lastFailure: null,
     failures: 0,
     nextAttemptAt: null,
     lastCycle: null,
@@ -418,16 +421,16 @@ export class SyncEngine {
       } catch (e) {
         failure = e as Error;
         this.opts.log('warn', 'push_failed', { project, error: String(failure.message) });
-        // No connection: the pull would fail the same way. Any other refusal (409, 422, 5xx)
-        // still lets the pull go ahead so the iPad keeps receiving others' edits.
-        if (e instanceof TransportError && e.failure === 'network') break;
+        // No connection or no sign-in (T04): the pull would fail the same way. Any other refusal
+        // (409, 422, 5xx) still lets the pull go ahead so the iPad keeps receiving others' edits.
+        if (e instanceof TransportError && (e.failure === 'network' || e.failure === 'auth')) break;
       }
       try {
         pulled += await this.pull(transport, project);
       } catch (e) {
         failure = e as Error;
         this.opts.log('warn', 'pull_failed', { project, error: String(failure.message) });
-        if (e instanceof TransportError && e.failure === 'network') break;
+        if (e instanceof TransportError && (e.failure === 'network' || e.failure === 'auth')) break;
       }
     }
     await this.refresh();
@@ -449,6 +452,7 @@ export class SyncEngine {
         state: offline ? 'offline' : 'error',
         failures,
         lastError: failure.message,
+        lastFailure: failure instanceof TransportError ? failure.failure : 'server',
         nextAttemptAt: new Date(this.nextAttemptMs).toISOString(),
         lastCycle,
       });
@@ -459,6 +463,7 @@ export class SyncEngine {
       state: 'idle',
       failures: 0,
       lastError: null,
+      lastFailure: null,
       nextAttemptAt: null,
       lastSyncAt: lastCycle.at,
       lastCycle,

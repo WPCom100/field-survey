@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 import { ExpoBlobTransport } from '../blobs/expo-blob-transport';
 import { getBlobFiles, getBlobQueue, setBlobUser } from '../blobs/queue';
 import { loadSignedUsers, saveSignedUsers } from '../identity/api';
+import { httpOptions } from '../identity/http';
 import { useIdentity } from '../identity/IdentityGate';
 import { logTo } from '../log';
 import { syncDataKey } from './dataKey';
@@ -22,17 +23,19 @@ export function SyncRunner() {
 
   useEffect(() => {
     let active = true;
-    const connection = {
-      serverUrl: identity.serverUrl,
-      token: identity.token,
-      userName: identity.user.name,
-    };
+    // The shared token, or the Microsoft session asked for a fresh token before each request (T04).
+    const connection = httpOptions(identity);
     setBlobUser(identity.user.id);
     let stop = () => {};
     Promise.all([getSyncEngine(), getBlobQueue()]).then(async ([engine, blobs]) => {
       if (!active) return;
       engine.setTransport(new HttpTransport(connection));
-      await carryQueuedEdits(engine, { serverUrl: identity.serverUrl, id: identity.user.id, name: identity.user.name });
+      await carryQueuedEdits(engine, {
+        serverUrl: identity.serverUrl,
+        id: identity.user.id,
+        name: identity.user.name,
+        oid: identity.microsoft?.oid ?? undefined,
+      });
       if (!active) return;
       blobs.setTransport(new ExpoBlobTransport(connection, getBlobFiles()));
       engine.start();
@@ -64,7 +67,7 @@ export function SyncRunner() {
       active = false;
       stop();
     };
-  }, [identity.serverUrl, identity.token, identity.user.name, identity.user.id]);
+  }, [identity.serverUrl, identity.token, identity.user.name, identity.user.id, identity.microsoft?.session, identity.microsoft?.oid]);
 
   return null;
 }

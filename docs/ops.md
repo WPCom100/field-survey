@@ -217,18 +217,38 @@ afterwards; the NSPS, EBDKs, rack and Foundry panels match by Device text or cat
 
 ### 4.3 Switching to Entra sign-in (T03, T04, D264)
 
-The server side is in since T03 (`server/docs/auth.md`); the iPad side is T04. The Droplet stays
-on `AUTH_MODE=token` until T04's build is on an iPad. Then, in `server/.env.production` (and
-`scp` as in §1.6):
+The server side is in since T03 (`server/docs/auth.md`); the iPad side since T04 (D265). The
+Droplet stays on `AUTH_MODE=token` until T04's build is on every iPad.
 
-1. `ENTRA_TENANT_ID=<LTP tenant id>`, `ENTRA_AUDIENCE=<API client id>,api://field-survey`
-   (the "Field Survey" registration, manifest `accessTokenAcceptedVersion: 2`), `AUTH_MODE=both`;
-   `docker compose up -d api`. iPads on the old build keep working with the shared token.
+**0. The registration (once, Entra admin centre → App registrations → New registration).** One
+registration "Field Survey", single tenant (LTP), serves as both the API and the iPad's public
+client:
+
+- *Authentication* → Add a platform → **Mobile and desktop applications** → custom redirect URI
+  `fieldsurvey://auth`. (No secret: the iPad uses authorization code + PKCE.)
+- *Expose an API* → Application ID URI `api://field-survey` → Add a scope `access` (admins and
+  users, "Use Field Survey"). Then *API permissions* → Add → My APIs → Field Survey → `access`, and
+  **Grant admin consent** for LTP (plus Microsoft Graph `openid`, `profile`, `email`,
+  `offline_access`, which are there by default or added the same way).
+- *Manifest* → `"accessTokenAcceptedVersion": 2` (the server checks the v2.0 issuer).
+- Note the **Directory (tenant) ID** and the **Application (client) ID**.
+
+Then, in `server/.env.production` (and `scp` as in §1.6):
+
+1. `ENTRA_TENANT_ID=<tenant id>`, `ENTRA_CLIENT_ID=<application id>`,
+   `ENTRA_AUDIENCE=<application id>,api://field-survey`, `ENTRA_SCOPES=api://field-survey/access`
+   (the default), `AUTH_MODE=both`; `docker compose up -d api`. Check:
+   `curl -s https://survey.wpcom.cloud/auth/config` shows `"mode":"both"` and the `entra` block.
+   iPads on the old build keep working with the shared token; on T04's build Sync → Install
+   offers **Sign in with Microsoft**.
 2. Each person signs in on the T04 build; the first sign-in offers to merge their picker name
    (same user id, history kept). Check: `docker compose exec postgres psql -U survey -c
    "select name, email, entra_oid is not null as signed_in from app_user order by name"`.
 3. When every person shows `signed_in`, `AUTH_MODE=entra` and `docker compose up -d api`; the
-   shared token then opens nothing. The Mac rig stays on `token`.
+   shared token then opens nothing. The Mac rig stays on `token` (`rig.sh signin` steps its local
+   server through `both` and `entra` with a fake registration and back). An iPad still on the
+   team picker then reads "Sign-in needed to sync" and offers **Sign in with Microsoft**; its edits
+   wait and sync after the sign-in. The tests a person runs on the iPad are `docs/test/tp12.md`.
 
 A 503 "Sign-in keys unavailable" means the server cannot reach
 `login.microsoftonline.com` and has no cached keys: `docker compose logs api | grep jwks`.

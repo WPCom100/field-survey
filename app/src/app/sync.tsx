@@ -8,7 +8,9 @@ import { useBlobStatus } from '../blobs/useBlobStatus';
 import { openAppStore } from '../db';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
-import { useIdentity, useSignOut } from '../identity/IdentityGate';
+import { useIdentity, useMicrosoftSignIn, useSignOut } from '../identity/IdentityGate';
+import { fetchAuthConfig, SignInCancelled } from '../identity/microsoft';
+import { SIGN_IN_NEEDED } from '../identity/session';
 import { exportLog } from '../log';
 import { lastRulesPass } from '../rules/engine';
 import { getSyncEngine } from '../sync/engine';
@@ -33,7 +35,10 @@ const time = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '�
 export default function SyncScreen() {
   const identity = useIdentity();
   const signOut = useSignOut();
+  const microsoftSignIn = useMicrosoftSignIn();
   const sync = useSyncStatus();
+  // Does this server offer Microsoft sign-in (T04, D265)? Asked so a team-picker iPad can move over.
+  const [offersMicrosoft, setOffersMicrosoft] = useState(false);
   const blobs = useBlobStatus();
   const [data, setData] = useState<SyncScreenData | null>(null);
   const [installId, setInstallId] = useState('');
@@ -71,6 +76,13 @@ export default function SyncScreen() {
     void loadServerVersion(identity.serverUrl).then(setServerVersion);
   }, [identity.serverUrl, sync.lastSyncAt, sync.state]);
 
+  useEffect(() => {
+    fetchAuthConfig(identity.serverUrl).then(
+      (c) => setOffersMicrosoft(!!c.entra),
+      () => {}, // offline: keep what was known
+    );
+  }, [identity.serverUrl, sync.state]);
+
   const run = (fn: () => Promise<string | void>) => () =>
     fn().then(
       (m) => {
@@ -84,12 +96,31 @@ export default function SyncScreen() {
   const online = sync.state === 'idle' || sync.state === 'syncing';
   const build = Constants.platform?.ios?.buildNumber ?? '—';
   const version = Constants.expoConfig?.version ?? '—';
-  const stranger = data ? unknownUserNotice(data.outbox.quarantined, identity.user) : null;
+  const signedInMicrosoft = !!identity.microsoft;
+  const stranger = data ? unknownUserNotice(data.outbox.quarantined, identity.user, signedInMicrosoft) : null;
+  const needsSignIn = sync.state === 'error' && sync.lastFailure === 'auth';
   const confirmResign = () =>
-    Alert.alert('Re-sign in?', 'You will enter the server and token again. Edits on this iPad are kept and still sync afterwards.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Re-sign in', onPress: () => void signOut() },
-    ]);
+    Alert.alert(
+      'Re-sign in?',
+      signedInMicrosoft
+        ? 'You will enter the server again and sign in (with Microsoft or a token). Edits on this iPad are kept and still sync afterwards.'
+        : 'You will enter the server and token again. Edits on this iPad are kept and still sync afterwards.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Re-sign in', onPress: () => void signOut() },
+      ],
+    );
+  // Interactive Microsoft sign-in (T04): the sync engine restarts with the new session at once.
+  const signInMicrosoft = run(async () => {
+    try {
+      await microsoftSignIn();
+      return 'Signed in with Microsoft.';
+    } catch (e) {
+      if (e instanceof SignInCancelled) return;
+      throw e;
+    }
+  });
+  const canMicrosoft = signedInMicrosoft || offersMicrosoft;
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
@@ -118,6 +149,23 @@ export default function SyncScreen() {
           </Text>
         ) : null}
         {sync.nextAttemptAt && !online ? <Text style={styles.sub}>Next try {time(sync.nextAttemptAt)}</Text> : null}
+        {needsSignIn ? (
+          <>
+            <Text style={styles.warn} testID="sync.signInNeeded">
+              {SIGN_IN_NEEDED}.{' '}
+              {signedInMicrosoft
+                ? 'Your Microsoft sign-in has run out or was refused. Edits are kept on this iPad and sync once you sign in again.'
+                : canMicrosoft
+                  ? 'The server no longer takes the team token. Sign in with Microsoft; edits on this iPad are kept and sync afterwards.'
+                  : 'The server refused this iPad\'s token. Re-sign in with the current token; edits on this iPad are kept.'}
+            </Text>
+            {canMicrosoft ? (
+              <Btn label="Sign in with Microsoft" testID="sync.signInNeeded.microsoft" onPress={signInMicrosoft} />
+            ) : (
+              <Btn label="Re-sign in" testID="sync.signInNeeded.resign" onPress={confirmResign} />
+            )}
+          </>
+        ) : null}
         <Btn
           label="Sync now"
           testID="sync.now"
@@ -149,7 +197,11 @@ export default function SyncScreen() {
                 <Text style={styles.warn} testID="sync.unknownUser">
                   {stranger}
                 </Text>
-                <Btn label="Re-sign in" testID="sync.unknownUser.resign" onPress={confirmResign} />
+                {signedInMicrosoft ? (
+                  <Btn label="Sign in with Microsoft" testID="sync.unknownUser.microsoft" onPress={signInMicrosoft} />
+                ) : (
+                  <Btn label="Re-sign in" testID="sync.unknownUser.resign" onPress={confirmResign} />
+                )}
               </>
             ) : null}
             <Btn
@@ -253,6 +305,11 @@ export default function SyncScreen() {
         <Text style={styles.value}>
           {identity.user.name} · app {version} ({build})
         </Text>
+        <Text style={styles.sub} testID="sync.account">
+          {signedInMicrosoft
+            ? `Signed in with Microsoft${identity.microsoft?.email ? ` (${identity.microsoft.email})` : ''}`
+            : 'Team picker with the shared token'}
+        </Text>
         <View style={styles.row}>
           <Text style={styles.value}>This iPad:</Text>
           <TextInput
@@ -288,6 +345,9 @@ export default function SyncScreen() {
             testID="sync.resign"
             onPress={confirmResign}
           />
+          {offersMicrosoft && !signedInMicrosoft ? (
+            <Btn label="Sign in with Microsoft" testID="sync.microsoft" onPress={signInMicrosoft} />
+          ) : null}
           <Btn
             label="Check for update"
             disabled={!info.enabled || updates.isChecking || updates.isDownloading}

@@ -82,4 +82,34 @@ describe('HttpTransport', () => {
     }
     expect(failures).toEqual(['network', 'auth', 'rejected', 'rejected', 'server']);
   });
+
+  it('asks a token source for every request and tells it about a 401 (T04)', async () => {
+    const s = stub([
+      () => json(200, { ops: [], server_seq: 0, has_more: false }),
+      () => json(401, { detail: 'Missing or invalid token' }),
+      () => json(200, { status: 'ok' }),
+    ]);
+    let n = 0;
+    const rejected: string[] = [];
+    const tokenSource = { token: async () => `entra-${++n}`, rejected: (t: string) => rejected.push(t) };
+    const t = new HttpTransport({ serverUrl: 'https://s', token: '', tokenSource, userName: 'Landry', fetch: s.fetch });
+    await t.pull('p', 0, 10);
+    await expect(t.pull('p', 0, 10)).rejects.toMatchObject({ failure: 'auth', status: 401 });
+    await t.ping();
+    expect(s.calls.map((c) => (c.init.headers as Record<string, string>).Authorization)).toEqual(['Bearer entra-1', 'Bearer entra-2', undefined]);
+    expect(s.calls[0]!.init.headers).toMatchObject({ 'X-Survey-User': 'Landry' });
+    expect(rejected).toEqual(['entra-2']); // /health is public: no token asked, none rejected
+  });
+
+  it('a token source that cannot give a token fails the request without sending it', async () => {
+    const s = stub([]);
+    const tokenSource = {
+      token: async () => {
+        throw new TransportError('auth', 'Sign-in needed');
+      },
+    };
+    const t = new HttpTransport({ serverUrl: 'https://s', token: '', tokenSource, fetch: s.fetch });
+    await expect(t.push({ project_id: 'p', since: 0, ops: [] })).rejects.toMatchObject({ failure: 'auth', message: 'Sign-in needed' });
+    expect(s.calls).toEqual([]);
+  });
 });

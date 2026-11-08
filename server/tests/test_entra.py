@@ -372,3 +372,38 @@ def test_merged_user_keeps_its_name_for_the_picker(client, monkeypatch, session)
     assert picked["id"] == str(landry.id)
     me = client.get("/me", headers=bearer(SHARED, user="Landry")).json()
     assert me["id"] == str(landry.id) and me["email"] == "landry@ltp.example"
+
+
+# --- GET /auth/config (T04, D265) -------------------------------------------------------------
+
+CLIENT_ID = "99999999-0000-0000-0000-000000000000"
+
+
+@pytest.mark.parametrize("mode", ["entra", "both"])
+def test_auth_config_offers_microsoft(client, monkeypatch, mode):
+    monkeypatch.setattr(settings, "auth_mode", mode)
+    monkeypatch.setattr(settings, "entra_client_id", f" {CLIENT_ID} ")
+    monkeypatch.setattr(settings, "entra_scopes", "api://field-survey/access openid")
+    r = client.get("/auth/config")  # no bearer: public
+    assert r.status_code == 200, r.text
+    assert r.json() == {
+        "mode": mode,
+        "entra": {
+            "tenant_id": TENANT,
+            "client_id": CLIENT_ID,
+            "scopes": ["openid", "profile", "email", "offline_access", "api://field-survey/access"],
+        },
+    }
+
+
+def test_auth_config_token_mode_offers_no_microsoft(client, monkeypatch):
+    monkeypatch.setattr(settings, "auth_mode", "token")
+    monkeypatch.setattr(settings, "entra_client_id", CLIENT_ID)
+    assert client.get("/auth/config").json() == {"mode": "token", "entra": None}
+
+
+@pytest.mark.parametrize("field", ["entra_client_id", "entra_tenant_id"])
+def test_auth_config_needs_tenant_and_client(client, monkeypatch, field):
+    monkeypatch.setattr(settings, "entra_client_id", CLIENT_ID)
+    monkeypatch.setattr(settings, field, "")
+    assert client.get("/auth/config").json() == {"mode": "entra", "entra": None}

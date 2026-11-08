@@ -11,6 +11,7 @@ const INITIAL: SyncStatus = {
   lastSyncAt: null,
   lastServerSeq: {},
   lastError: null,
+  lastFailure: null,
   failures: 0,
   nextAttemptAt: null,
   lastCycle: null,
@@ -44,6 +45,8 @@ export function describeSync(s: SyncStatus): string {
     case 'offline':
       return `Offline${pending}${held}${review}`;
     case 'error':
+      // 401, or a Microsoft refresh that was refused (T04): only signing in again helps.
+      if (s.lastFailure === 'auth') return `Sign-in needed to sync${pending}`;
       return `Sync error: ${s.lastError ?? 'unknown'}${pending}${held}`;
     case 'no_token':
       return `Not connected${pending}`;

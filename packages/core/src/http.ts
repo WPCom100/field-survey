@@ -1,15 +1,30 @@
 /**
  * The HTTP plumbing shared by the op transport (T11) and the blob transport (T12): base URL, the
- * interim identity headers (D69, D77: shared bearer token + `X-Survey-User`), a timeout, and the
- * mapping of failures onto `TransportError`. Uses the runtime's `fetch`; tests inject a stub.
+ * identity headers (D69, D77: the shared bearer token + `X-Survey-User`; T04, D265: an Entra access
+ * token from a `TokenSource`), a timeout, and the mapping of failures onto `TransportError`. Uses
+ * the runtime's `fetch`; tests inject a stub.
  */
 
 import { TransportError, type TransportFailure } from './sync';
 
+/**
+ * Where a fresh bearer comes from when it is not a fixed shared token (Entra sign-in, T04): asked
+ * before every request. `token()` resolves with a bearer good for at least the next request or
+ * throws a `TransportError` (`auth` when a sign-in is needed, `network` when it could not refresh
+ * offline). `rejected` is told when the server answered 401 to a bearer it gave.
+ */
+export interface TokenSource {
+  token(): Promise<string>;
+  rejected?(token: string): void;
+}
+
 export interface HttpClientOptions {
   /** `https://survey.example.com` (no trailing slash needed). */
   serverUrl: string;
+  /** The shared bearer token (interim, D69); unused when `tokenSource` is set. */
   token: string;
+  /** A bearer per request instead of `token` (Entra, T04). */
+  tokenSource?: TokenSource | null;
   /** The name picked on this iPad; stamped on every request for the server's `app_user` upsert. */
   userName?: string;
   fetch?: typeof fetch;
@@ -50,16 +65,26 @@ export class HttpClient {
     return this.base + path;
   }
 
-  /** Identity headers for every request (also used by native upload/download tasks). */
-  headers(): Record<string, string> {
-    const h: Record<string, string> = { Authorization: `Bearer ${this.opts.token}` };
+  /**
+   * Identity headers for one request (also used by native upload/download tasks). With a
+   * `tokenSource` this may refresh the token first, and rejects with its `TransportError`.
+   */
+  async headers(): Promise<Record<string, string>> {
+    const token = this.opts.tokenSource ? await this.opts.tokenSource.token() : this.opts.token;
+    const h: Record<string, string> = { Authorization: `Bearer ${token}` };
     if (this.opts.userName) h['X-Survey-User'] = this.opts.userName;
     return h;
   }
 
+  /** The server answered 401 to a request sent with `headers`: the token source must not reuse its bearer. */
+  rejected(headers: Record<string, string> | undefined): void {
+    const auth = headers?.Authorization;
+    if (this.opts.tokenSource?.rejected && auth?.startsWith('Bearer ')) this.opts.tokenSource.rejected(auth.slice(7));
+  }
+
   /** A JSON request; the parsed body on 2xx, `TransportError` otherwise. */
   async json<T>(method: Method, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = { ...this.headers(), Accept: 'application/json' };
+    const headers: Record<string, string> = { ...(await this.headers()), Accept: 'application/json' };
     const init: RequestInit = { method, headers };
     if (body !== undefined) {
       headers['Content-Type'] = 'application/json';
@@ -75,11 +100,12 @@ export class HttpClient {
 
   /** Any request; resolves with the 2xx `Response`, throws `TransportError` otherwise. */
   async send(method: Method, path: string, init: RequestInit = {}): Promise<Response> {
+    const headers = (init.headers as Record<string, string> | undefined) ?? (await this.headers());
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), this.timeoutMs) : null;
     let res: Response;
     try {
-      const req: RequestInit = { ...init, method, headers: init.headers ?? this.headers() };
+      const req: RequestInit = { ...init, method, headers };
       if (controller) req.signal = controller.signal;
       res = await this.fetchImpl(this.url(path), req);
     } catch (e) {
@@ -87,7 +113,10 @@ export class HttpClient {
     } finally {
       if (timer) clearTimeout(timer);
     }
-    if (!res.ok) throw await failureOf(res, method, path);
+    if (!res.ok) {
+      if (res.status === 401) this.rejected(headers);
+      throw await failureOf(res, method, path);
+    }
     return res;
   }
 }

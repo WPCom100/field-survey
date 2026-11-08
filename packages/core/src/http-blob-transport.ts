@@ -58,7 +58,7 @@ export class HttpBlobTransport implements BlobTransport {
     if (!this.opts.readRange) throw new Error('HttpBlobTransport: no readRange for chunk uploads');
     const bytes = await this.opts.readRange(source.path, source.offset, source.length);
     await this.http.send('PUT', this.chunkPath(sha256, n), {
-      headers: { ...this.http.headers(), 'Content-Type': 'application/octet-stream' },
+      headers: { ...(await this.http.headers()), 'Content-Type': 'application/octet-stream' },
       body: bytes as unknown as BodyInit,
     });
   }

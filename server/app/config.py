@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     entra_issuer: str = ""
     entra_jwks_url: str = ""
     entra_leeway_seconds: int = 120
+    # What the public GET /auth/config tells the iPad (T04, D265): the "Field Survey" public
+    # client registration it signs in with, and the API scopes it asks for (space-separated;
+    # openid profile email offline_access are always added).
+    entra_client_id: str = ""
+    entra_scopes: str = "api://field-survey/access"
     s3_endpoint: str = "http://localhost:9000"
     s3_bucket: str = "survey"
     s3_access_key: str = ""
@@ -56,6 +61,11 @@ class Settings(BaseSettings):
     @property
     def entra_audiences(self) -> list[str]:
         return [a.strip() for a in self.entra_audience.split(",") if a.strip()]
+
+    @property
+    def entra_scope_list(self) -> list[str]:
+        scopes = ["openid", "profile", "email", "offline_access", *self.entra_scopes.split()]
+        return list(dict.fromkeys(scopes))
 
     @property
     def entra_issuer_url(self) -> str:

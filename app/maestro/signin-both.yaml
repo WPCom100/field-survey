@@ -1,0 +1,36 @@
+# T04 step 2 of `rig.sh signin`, the server on AUTH_MODE=both with a fake Entra registration: the
+# Sync screen offers "Sign in with Microsoft" while the shared token still syncs. Tapping it opens
+# Microsoft's page in the sign-in sheet (expo-auth-session + expo-web-browser linked in this
+# build); the fake tenant cannot sign anyone in, so the sheet is cancelled and nothing changes.
+appId: productions.luminarytechnology.fieldsurvey
+name: Sign-in — a both server offers Microsoft sign-in, the token still syncs
+---
+- runFlow: _resume.yaml
+- runFlow: _sync.yaml
+- tapOn:
+    id: nav.sync
+- scrollUntilVisible:
+    element:
+      id: sync.microsoft
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: sync.account
+    text: Team picker with the shared token
+- tapOn:
+    id: sync.microsoft
+# the sheet: Microsoft's error page for an unknown tenant (AADSTS90002), or still loading
+- extendedWaitUntil:
+    visible: 'Cancel'
+    timeout: 30000
+- takeScreenshot: signin-sheet
+- tapOn: Cancel
+- extendedWaitUntil:
+    visible: Sync & uploads
+    timeout: 10000
+# a cancelled sheet says nothing; a missing native module would put its error in the note
+- assertNotVisible: '.*[Nn]ative module.*'
+- assertNotVisible: '.*Microsoft sign-in failed.*'
+- assertVisible:
+    id: sync.account
+    text: Team picker with the shared token

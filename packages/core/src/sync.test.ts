@@ -468,11 +468,23 @@ describe('failures and backoff', () => {
     await newDevice(a);
     server.fail({ on: 'push', failure: 'auth', status: 401 });
     expect((await a.engine.sync()).outcome).toBe('failed');
-    expect(a.engine.status()).toMatchObject({ state: 'error', failures: 1 });
+    expect(a.engine.status()).toMatchObject({ state: 'error', failures: 1, lastFailure: 'auth' });
     expect(a.engine.status().lastError).toMatch(/401/);
-    // Ops are untouched and the pull still ran.
+    // Ops are untouched; the pull would be refused the same way, so it is not sent (T04).
     expect(await a.store.outboxCount()).toBe(1);
-    expect(server.pulls).toHaveLength(1);
+    expect(server.pulls).toHaveLength(0);
+    // Signed in again: the next cycle syncs and the failure kind clears.
+    clock += 60_000;
+    expect((await a.engine.sync()).outcome).toBe('ran');
+    expect(a.engine.status()).toMatchObject({ state: 'idle', lastFailure: null, pendingOps: 0 });
+  });
+
+  it('records what kind of failure the last cycle was', async () => {
+    const a = await client(server, ANN, 'ipad-a');
+    await newDevice(a);
+    server.fail({ on: 'push', failure: 'network' });
+    await a.engine.sync();
+    expect(a.engine.status()).toMatchObject({ state: 'offline', lastFailure: 'network' });
   });
 
   it('stops for the cycle on a network error instead of trying every project', async () => {

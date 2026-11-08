@@ -206,4 +206,28 @@ describe('a user the server does not know (T160)', () => {
     expect(carryOver(r.seen, { serverUrl: srv, id: 'ann-2', name: 'Ann' }).from).toEqual([]);
     expect(carryOver([], { serverUrl: srv, id: ANN, name: 'Ann' })).toEqual({ from: [], seen: [{ serverUrl: srv, id: ANN, name: 'Ann' }] });
   });
+
+  it('carryOver with Microsoft sign-in (T04): keyed by oid, never matched to a picker entry by name', () => {
+    const srv = 'https://survey.example.com';
+    const picker = { serverUrl: srv, id: ANN, name: 'Ann' };
+    // Merged: same id and name, now with an oid — nothing to carry, the picker entry stays.
+    const merged = carryOver([picker], { serverUrl: srv, id: ANN, name: 'Ann', oid: 'oid-ann' });
+    expect(merged.from).toEqual([]);
+    expect(merged.seen).toEqual([picker, { serverUrl: srv, id: ANN, name: 'Ann', oid: 'oid-ann' }]);
+    // Declined, with a display name equal to the picker name: never takes the picker user's edits.
+    expect(carryOver([picker], { serverUrl: srv, id: 'new', name: 'Ann', oid: 'oid-x' }).from).toEqual([]);
+    // The server lost the signed-in row and recreated it under the display name: the oid carries the edits over.
+    const lost = carryOver(merged.seen, { serverUrl: srv, id: 'ann-2', name: 'Ann Smith', oid: 'oid-ann' });
+    expect(lost.from).toEqual([ANN]);
+    expect(lost.seen).toEqual([picker, { serverUrl: srv, id: 'ann-2', name: 'Ann Smith', oid: 'oid-ann' }]);
+    // Another person with the same name is not the same person.
+    expect(carryOver(lost.seen, { serverUrl: srv, id: 'z', name: 'Ann Smith', oid: 'oid-other' }).from).toEqual([]);
+  });
+
+  it('unknownUserNotice asks a Microsoft user to sign in with Microsoft again (T04)', () => {
+    expect(unknownUserNotice([refused(`POST /ops → 422: unknown user ${ANN}`)], { id: ANN, name: 'Ann' }, true)).toBe(
+      "The server has no record of this iPad's user, Ann (as after a restore from an old backup), so it refuses their edits. " +
+        'Sign in with Microsoft again to send the 1 refused edit as you.',
+    );
+  });
 });

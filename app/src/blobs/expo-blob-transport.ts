@@ -46,6 +46,8 @@ export class ExpoBlobTransport extends HttpBlobTransport {
       handle.close();
     }
     const path = this.chunkPath(sha256, n);
+    // Before the try: a sign-in needed or a refresh offline is reported as itself (T04).
+    const headers = { ...(await this.http.headers()), 'Content-Type': 'application/octet-stream' };
     let res: { status: number; body: string };
     try {
       res = await tmp
@@ -53,7 +55,7 @@ export class ExpoBlobTransport extends HttpBlobTransport {
           httpMethod: 'PUT',
           uploadType: UploadType.BINARY_CONTENT,
           mimeType: 'application/octet-stream',
-          headers: { ...this.http.headers(), 'Content-Type': 'application/octet-stream' },
+          headers,
           sessionType: 'background',
         })
         .uploadAsync();
@@ -67,6 +69,7 @@ export class ExpoBlobTransport extends HttpBlobTransport {
       }
     }
     if (res.status < 200 || res.status >= 300) {
+      if (res.status === 401) this.http.rejected(headers);
       throw await failureOf({ status: res.status, json: async () => JSON.parse(res.body) }, 'PUT', path);
     }
   }
@@ -75,9 +78,10 @@ export class ExpoBlobTransport extends HttpBlobTransport {
     const dest = this.files.file(destPath);
     const parent = dest.parentDirectory;
     if (!parent.exists) parent.create({ intermediates: true, idempotent: true });
+    const headers = await this.http.headers();
     try {
       const file = await File.downloadFileAsync(this.http.url(this.contentPath(sha256)), dest, {
-        headers: this.http.headers(),
+        headers,
         idempotent: true,
       });
       return { size: file.size, mime: file.type || null };
@@ -86,6 +90,7 @@ export class ExpoBlobTransport extends HttpBlobTransport {
       const status = /\b([45]\d\d)\b/.exec(message(e));
       if (status) {
         const code = Number(status[1]);
+        if (code === 401) this.http.rejected(headers);
         throw new TransportError(httpFailure(code), message(e), code);
       }
       throw new TransportError('network', message(e));

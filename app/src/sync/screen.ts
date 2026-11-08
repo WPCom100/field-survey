@@ -191,7 +191,7 @@ export function describeCycle(
 }
 
 /** A user signed in on this iPad against one server (T160; kept in the keychain by `identity/api.ts`). */
-export type SignedUser = { serverUrl: string; id: string; name: string };
+export type SignedUser = { serverUrl: string; id: string; name: string; /** Microsoft sign-in's object id (T04). */ oid?: string };
 
 const sameServer = (a: string, b: string) => a.replace(/\/+$/, '').toLowerCase() === b.replace(/\/+$/, '').toLowerCase();
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -201,9 +201,15 @@ const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
  * server keys interim users by name (`upsert_user`), so a name with a new id means it lost the
  * old `app_user` row; that person's queued edits are re-attributed to the new id (`from`). `seen`
  * is the list to keep: the same-name entries replaced by `now`.
+ *
+ * T04 (D265, re-reading D252 (5)): a Microsoft sign-in is keyed by its `oid`: two entries that
+ * both carry one are the same person exactly when the oids match, whatever the names (a server that
+ * lost the row recreates it under the Entra display name). A Microsoft sign-in and a team-picker
+ * entry are never matched by name: the merge prompt is where a person says they are that user.
  */
 export function carryOver(seen: readonly SignedUser[], now: SignedUser): { from: string[]; seen: SignedUser[] } {
-  const same = (u: SignedUser) => sameServer(u.serverUrl, now.serverUrl) && sameName(u.name, now.name);
+  const samePerson = (u: SignedUser) => (u.oid || now.oid ? u.oid === now.oid : sameName(u.name, now.name));
+  const same = (u: SignedUser) => sameServer(u.serverUrl, now.serverUrl) && samePerson(u);
   const from = [...new Set(seen.filter((u) => same(u) && u.id !== now.id).map((u) => u.id))];
   return { from, seen: [...seen.filter((u) => !same(u)), now] };
 }
@@ -212,7 +218,7 @@ export function carryOver(seen: readonly SignedUser[], now: SignedUser): { from:
  * T160: what the Sync screen says when the server refused edits because it has no record of their
  * user ("unknown user …", e.g. after a restore from an old backup). Null when no refusal says so.
  */
-export function unknownUserNotice(quarantined: readonly QuarantinedEdit[], me: { id: string; name: string }): string | null {
+export function unknownUserNotice(quarantined: readonly QuarantinedEdit[], me: { id: string; name: string }, microsoft = false): string | null {
   const ids = new Set(quarantined.map((q) => unknownUserOf(q.error)).filter((x): x is string => x !== null));
   if (ids.size === 0) return null;
   const n = quarantined.filter((q) => unknownUserOf(q.error) !== null).length;
@@ -220,7 +226,9 @@ export function unknownUserNotice(quarantined: readonly QuarantinedEdit[], me: {
   if (ids.has(me.id.toLowerCase())) {
     return (
       `The server has no record of this iPad's user, ${me.name} (as after a restore from an old backup), so it refuses their edits. ` +
-      `Re-sign in and pick ${me.name} again: the ${edits} are then sent as ${me.name}.`
+      (microsoft
+        ? `Sign in with Microsoft again to send the ${edits} as you.`
+        : `Re-sign in and pick ${me.name} again: the ${edits} are then sent as ${me.name}.`)
     );
   }
   const who = [...ids].map((id) => `user …${id.slice(-6)}`).join(', ');

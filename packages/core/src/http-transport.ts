@@ -32,8 +32,8 @@ export class HttpTransport implements SyncTransport {
     return this.http.json<PullResponse>('GET', `/ops?${q.toString()}`);
   }
 
-  /** `GET /health` (public, no token needed): resolves when the server answers 2xx. */
+  /** `GET /health` (public, sent without a token): resolves when the server answers 2xx. */
   async ping(): Promise<void> {
-    await this.http.send('GET', '/health');
+    await this.http.send('GET', '/health', { headers: {} });
   }
 }

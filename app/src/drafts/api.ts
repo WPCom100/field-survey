@@ -8,6 +8,7 @@
 import { HttpClient } from '@field-survey/core';
 
 import type { Identity } from '../identity/api';
+import { httpOptions } from '../identity/http';
 import type { ImportBatch } from '../setup/imports';
 import { uploadForm, type UploadPart } from '../setup/upload';
 import { excludedKey, type ExcludedLine } from './actions';
@@ -17,7 +18,7 @@ export type Batch = ImportBatch & { kind: string; files?: { name: string; sha256
 export type ExtractionKind = 'bom' | 'riser' | 'davinci';
 
 function client(identity: Identity, timeoutMs = 30_000): HttpClient {
-  return new HttpClient({ serverUrl: identity.serverUrl, token: identity.token, userName: identity.user?.name, timeoutMs });
+  return new HttpClient({ ...httpOptions(identity), timeoutMs });
 }
 
 export const listImports = (identity: Identity, projectId: string): Promise<Batch[]> =>
@@ -36,12 +37,12 @@ export async function startExtraction(
 ): Promise<Batch> {
   const c = client(identity, kind === 'davinci' ? 300_000 : 120_000);
   const fields = { project_id: projectId, kind, retire_hand_made: more.retireHandMade ? 'true' : undefined };
-  const res = await c.send('POST', '/imports', { headers: c.headers(), body: uploadForm(file, fields, undefined, { categories: more.categories }) });
+  const res = await c.send('POST', '/imports', { headers: await c.headers(), body: uploadForm(file, fields, undefined, { categories: more.categories }) });
   return (await res.json()) as Batch;
 }
 
-/** The headers an `<Image>` needs to load a crop. */
-export const authHeaders = (identity: Identity): Record<string, string> => client(identity).headers();
+/** The headers a crop download needs (refreshes a Microsoft token first, T04). */
+export const authHeaders = (identity: Identity): Promise<Record<string, string>> => client(identity).headers();
 
 const fileOf = (b: Batch): string | null => (typeof b.stats?.file === 'string' ? b.stats.file : (b.files?.[0]?.name ?? null));
 

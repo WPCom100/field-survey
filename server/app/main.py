@@ -38,6 +38,31 @@ def health(session: SessionDep) -> dict[str, str]:
     return {"status": "ok", "commit": settings.git_sha, "migration": migration}
 
 
+class EntraClient(BaseModel):
+    tenant_id: str
+    client_id: str
+    scopes: list[str]
+
+
+class AuthConfig(BaseModel):
+    mode: str
+    entra: EntraClient | None
+
+
+@app.get("/auth/config")
+def auth_config() -> AuthConfig:
+    """Public (T04, D265): how this server signs people in. The iPad offers Microsoft sign-in
+    when `entra` is set and signs in against that registration. Nothing here is a secret."""
+    mode = settings.auth_mode
+    tenant, client_id = settings.entra_tenant_id.strip(), settings.entra_client_id.strip()
+    client = None
+    if mode in ("entra", "both") and tenant and client_id:
+        client = EntraClient(
+            tenant_id=tenant, client_id=client_id, scopes=settings.entra_scope_list
+        )
+    return AuthConfig(mode=mode, entra=client)
+
+
 class TeamMember(BaseModel):
     id: str
     name: str

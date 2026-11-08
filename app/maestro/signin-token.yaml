@@ -1,0 +1,21 @@
+# T04 step 1 of `rig.sh signin`, the server on AUTH_MODE=token: the Sync screen says the iPad uses
+# the team picker with the shared token and offers no Microsoft sign-in (GET /auth/config has none).
+appId: productions.luminarytechnology.fieldsurvey
+name: Sign-in — a token server offers no Microsoft sign-in
+---
+- runFlow: _resume.yaml
+- runFlow: _logbox.yaml
+- tapOn:
+    id: nav.sync
+- assertVisible: Sync & uploads
+- scrollUntilVisible:
+    element:
+      id: sync.account
+    direction: DOWN
+- assertVisible:
+    id: sync.account
+    text: Team picker with the shared token
+- assertNotVisible:
+    id: sync.microsoft
+- assertNotVisible:
+    id: sync.signInNeeded

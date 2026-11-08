@@ -8,6 +8,7 @@
 import { HttpClient, gridSummary, parseGridSets, type Store } from '@field-survey/core';
 
 import type { Identity } from '../identity/api';
+import { httpOptions } from '../identity/http';
 import type { ImportBatch } from './imports';
 import { uploadForm, type UploadPart } from './upload';
 
@@ -53,14 +54,14 @@ export async function loadLevelSheets(store: Store, projectId: string): Promise<
 }
 
 function client(identity: Identity): HttpClient {
-  return new HttpClient({ serverUrl: identity.serverUrl, token: identity.token, userName: identity.user?.name, timeoutMs: 300_000 });
+  return new HttpClient({ ...httpOptions(identity), timeoutMs: 300_000 });
 }
 
 /** Upload one PDF for a level; the server analyses it and the sheet arrives with the next sync. */
 export async function startSheetImport(identity: Identity, projectId: string, levelId: string, kind: SheetKind, file: UploadPart): Promise<ImportBatch> {
   const c = client(identity);
   const body = uploadForm(file, { project_id: projectId, kind: 'plans', level_id: levelId, sheet_kind: kind });
-  const res = await c.send('POST', '/imports', { headers: c.headers(), body });
+  const res = await c.send('POST', '/imports', { headers: await c.headers(), body });
   return (await res.json()) as ImportBatch;
 }
 

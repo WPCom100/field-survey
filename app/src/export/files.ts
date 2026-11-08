@@ -4,6 +4,7 @@ import { Share } from 'react-native';
 
 import { openAppStore } from '../db';
 import type { Identity } from '../identity/api';
+import { httpOptions } from '../identity/http';
 import { downloadedExports, rememberDownload, shareName, type ExportRow } from './model';
 
 /**
@@ -36,8 +37,8 @@ export async function ensureExportFile(identity: Identity, e: ExportRow): Promis
   const dest = fileFor(rel);
   const parent = dest.parentDirectory;
   if (!parent.exists) parent.create({ intermediates: true, idempotent: true });
-  const http = new HttpClient({ serverUrl: identity.serverUrl, token: identity.token, userName: identity.user?.name });
-  await File.downloadFileAsync(http.url(`/exports/${e.id}/file`), dest, { headers: http.headers(), idempotent: true });
+  const http = new HttpClient(httpOptions(identity));
+  await File.downloadFileAsync(http.url(`/exports/${e.id}/file`), dest, { headers: await http.headers(), idempotent: true });
   await rememberDownload(await openAppStore(), e.id, rel);
   return dest;
 }
