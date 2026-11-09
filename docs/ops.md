@@ -230,7 +230,9 @@ the ilxlighting.com Microsoft 365 admin if you are not one:
 
 - *Authentication* → Add a platform → **Mobile and desktop applications** → custom redirect URI
   `fieldsurvey://auth`. (No secret: the iPad uses authorization code + PKCE.)
-- *Expose an API* → Application ID URI `api://field-survey` → Add a scope `access` (admins and
+- *Expose an API* → Application ID URI: keep the offered default `api://<application id>`
+  (ilxlighting.com's tenant policy refuses `api://field-survey`: new URIs must contain a verified
+  domain, the tenant ID or the app ID) → Add a scope `access` (admins and
   users, "Use Field Survey"). Then *API permissions* → Add → My APIs → Field Survey → `access`, and
   **Grant admin consent** for ilxlighting.com (plus Microsoft Graph `openid`, `profile`, `email`,
   `offline_access`, which are there by default or added the same way).
@@ -240,8 +242,9 @@ the ilxlighting.com Microsoft 365 admin if you are not one:
 Then, in `server/.env.production` (and `scp` as in §1.6):
 
 1. `ENTRA_TENANT_ID=<tenant id>`, `ENTRA_CLIENT_ID=<application id>`,
-   `ENTRA_AUDIENCE=<application id>,api://field-survey`, `ENTRA_SCOPES=api://field-survey/access`
-   (the default), `AUTH_MODE=both`; `docker compose up -d api`. Check:
+   `ENTRA_AUDIENCE=<application id>,api://<application id>`,
+   `ENTRA_SCOPES=api://<application id>/access` (not the default `api://field-survey/access`; the
+   iPad reads the scope from `/auth/config`, so no build changes), `AUTH_MODE=both`; `docker compose up -d api`. Check:
    `curl -s https://survey.wpcom.cloud/auth/config` shows `"mode":"both"` and the `entra` block.
    iPads on the old build keep working with the shared token; on T04's build Sync → Install
    offers **Sign in with Microsoft**.
