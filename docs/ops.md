@@ -232,7 +232,7 @@ the ilxlighting.com Microsoft 365 admin if you are not one:
   `fieldsurvey://auth`. (No secret: the iPad uses authorization code + PKCE.)
 - *Expose an API* → Application ID URI `api://field-survey` → Add a scope `access` (admins and
   users, "Use Field Survey"). Then *API permissions* → Add → My APIs → Field Survey → `access`, and
-  **Grant admin consent** for LTP (plus Microsoft Graph `openid`, `profile`, `email`,
+  **Grant admin consent** for ilxlighting.com (plus Microsoft Graph `openid`, `profile`, `email`,
   `offline_access`, which are there by default or added the same way).
 - *Manifest* → `"accessTokenAcceptedVersion": 2` (the server checks the v2.0 issuer).
 - Note the **Directory (tenant) ID** and the **Application (client) ID**.
