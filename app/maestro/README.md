@@ -105,6 +105,7 @@ team Ann / Bob), never to the Droplet.
 | `_dash-search.yaml` | the Dashboard's search box: `TERM` (env) typed, Return |
 | `_projects-follow.yaml` | the home's project chip `CHIP` (env) → its levels; Lint, Cable / riser, Dashboard and Export follow (`HAS`, `HASNOT` level codes) |
 | `_projects-level.yaml` | the new-project form: level `CODE` (env) added with Return, the keyboard closed |
+| `_create-again.yaml` | right after tapping Create project: taps it again only while it still reads "Create project" (a lost tap; a tap that took reads "Creating…" or has left the screen). The Simulator's "Hide keyboard" key only minimises the keyboard: the field keeps focus and the form drops the keyboard inset at the next touch, jumping 76 pt under the finger and cancelling that press, so `_e2e-create` and `pipeline` tap the "Levels" title first to take that touch (T183) |
 | `station-setup.yaml` | (top level, step 1 of `rig.sh export` and `rig.sh review`) a new project with the 06M sheet and a station, synced |
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a

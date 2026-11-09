@@ -44,12 +44,16 @@ name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
 - tapOn: Hide keyboard          # the keyboard's own key closes it over Create (the "Levels"
                                 #   title scrolls off under the 44-pt rows since T174, T50)
 - assertNotVisible: own group    # no numbering picker open (its list's first chip)
+- tapOn: Levels                  # T183: takes the touch that drops the minimised keyboard's inset
+- waitForAnimationToEnd:         #   (the form jumps 76 pt), so Create's tap is not the lost one
+    timeout: 5000
 - scrollUntilVisible:
     element:
       id: newProject.create
     direction: DOWN
 - tapOn:
     id: newProject.create
+- runFlow: _create-again.yaml    # T183
 - extendedWaitUntil:
     visible:
       id: level.06M

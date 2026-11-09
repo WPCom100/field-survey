@@ -1,0 +1,17 @@
+# Right after tapping New project's Create project: tap it once more if the first tap was lost (T183).
+# A tap that took turns the button into "Creating…" (busy, disabled) or leaves the screen, so it is
+# tapped again only while it still reads "Create project" — never a second project. What loses a tap:
+# a minimised keyboard (the Simulator's hardware keyboard) whose inset the form drops at the next
+# touch, moving the button 76 pt under the finger.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow:
+    when:
+      visible:
+        id: newProject.create
+        text: Create project
+    commands:
+      - tapOn:
+          id: newProject.create

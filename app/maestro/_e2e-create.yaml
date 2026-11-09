@@ -36,6 +36,14 @@ appId: productions.luminarytechnology.fieldsurvey
 # scrolled off by nine 44-pt rows since T174 (T50)
 - tapOn: Hide keyboard
 - assertNotVisible: own group    # no numbering picker open
+# T183: on the Simulator (a hardware keyboard attached) that key only minimises the keyboard: the
+# code field keeps focus and the form keeps its keyboard inset until the NEXT touch, which drops the
+# inset; the form jumps 76 pt under the finger and the press is cancelled. Tapped on Create, that
+# touch was lost and the run waited out its 2 minutes on the form. The title, back on screen now,
+# takes that touch (a plain label: it only ends the editing).
+- tapOn: Levels
+- waitForAnimationToEnd:
+    timeout: 5000
 # 06M arrived sharing 06's numbering group and as a split of 06, as the Tower (D33): New project
 # joins a <code>M to its <code> by default (T172, D263)
 - scrollUntilVisible:
@@ -74,6 +82,7 @@ appId: productions.luminarytechnology.fieldsurvey
     direction: DOWN
 - tapOn:
     id: newProject.create
+- runFlow: _create-again.yaml
 - extendedWaitUntil:
     visible:
       id: level.07
