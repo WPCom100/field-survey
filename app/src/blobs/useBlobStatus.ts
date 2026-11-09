@@ -36,10 +36,4 @@ export function useBlobStatus(): BlobQueueStatus {
   return status;
 }
 
-/** "3 photos waiting", "1 upload failed", or null when there is nothing to say. */
-export function describeBlobs(s: BlobQueueStatus): string | null {
-  const parts: string[] = [];
-  if (s.photosWaiting) parts.push(`${s.photosWaiting} photo${s.photosWaiting === 1 ? '' : 's'} waiting`);
-  if (s.uploadsFailed) parts.push(`${s.uploadsFailed} upload${s.uploadsFailed === 1 ? '' : 's'} failed`);
-  return parts.length ? parts.join(' · ') : null;
-}
+export { describeBlobs } from '../sync/describe';

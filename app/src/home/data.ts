@@ -1,5 +1,6 @@
 /**
- * Read model of the project home (T18, PLAN §5): the levels table for one project. Reads only
+ * Read model of the project home (T18, PLAN §5; the shell's tiles, pills and level lines, T176):
+ * the levels table for one project. Reads only
  * (writes go through `Store.apply`); no React or Expo imports, so it is tested in Node over
  * `BetterSqliteDriver`. Everything comes from the local store, so it works offline.
  */
@@ -22,13 +23,27 @@ export type HomeLevel = {
   openItems: number;
   /** Open `review_item`s on the level. */
   reviews: number;
+  /** Devices with a status (the rest are `Unsurveyed`, D110). */
+  surveyed: number;
+  /** Punch items not `Closed`, and `Closed` ones (the Open punch items tile). */
+  openPunch: number;
+  closedPunch: number;
   cache: CacheState;
   assignedToMe: boolean;
+  /** Codes of the earlier levels in its numbering group ("shares numbers with 06", D33). */
+  sharesWith: string[];
 };
 
 export type HomeProject = { id: string; name: string; site: string | null };
 
-export type ProjectHome = { project: HomeProject; levels: HomeLevel[] };
+export type ProjectHome = {
+  project: HomeProject;
+  levels: HomeLevel[];
+  /** Open `review_item`s of the project, level or not (the Needs review pill and tile). */
+  reviewOpen: number;
+  /** Open lint findings of the project (the Lint pill). */
+  lintOpen: number;
+};
 
 type Row = Record<string, unknown>;
 
@@ -79,6 +94,32 @@ export async function loadProjectHome(store: Store, projectId: string, userId: s
      WHERE deleted_at IS NULL AND state = 'open' AND level_id IS NOT NULL GROUP BY level_id`,
     [],
   );
+  const surveyed = await counts(
+    store,
+    `SELECT level_id, count(*) AS n FROM device
+     WHERE deleted_at IS NULL AND coalesce(status, '') <> '' GROUP BY level_id`,
+    [],
+  );
+  const punchSql = (closed: boolean) =>
+    `SELECT d.level_id AS level_id, count(*) AS n FROM punch_item p JOIN device d ON d.id = p.device_id
+     WHERE p.deleted_at IS NULL AND d.deleted_at IS NULL AND coalesce(p.tracking_status, '') ${closed ? '=' : '<>'} 'Closed'
+     GROUP BY d.level_id`;
+  const openPunch = await counts(store, punchSql(false), []);
+  const closedPunch = await counts(store, punchSql(true), []);
+  const projectCount = async (sql: string) => (await store.db.query<{ n: number }>(sql, [projectId] as never))[0]?.n ?? 0;
+  const reviewOpen = await projectCount(`SELECT count(*) AS n FROM review_item WHERE deleted_at IS NULL AND state = 'open' AND project_id = ?`);
+  const lintOpen = await projectCount(`SELECT count(*) AS n FROM finding WHERE state = 'open' AND project_id = ?`);
+
+  // Levels sharing a numbering group (06 / 06M, D33): each names the ones before it in floor order.
+  const before = new Map<string, string[]>();
+  const seen = new Map<string, string[]>();
+  for (const l of levels) {
+    const group = typeof l.numbering_group_id === 'string' ? l.numbering_group_id : null;
+    if (!group) continue;
+    const earlier = seen.get(group) ?? [];
+    before.set(String(l.id), [...earlier]);
+    seen.set(group, [...earlier, String(l.level)]);
+  }
 
   // Cache state of the display sheet: bytes on disk, queued for download, or neither.
   const cacheRows = await store.db.query<{ level_id: string; local_path: string | null; queued: number | null }>(
@@ -113,11 +154,72 @@ export async function loadProjectHome(store: Store, projectId: string, userId: s
         issueOrNi: issues.get(id) ?? 0,
         openItems: open.get(id) ?? 0,
         reviews: reviews.get(id) ?? 0,
+        surveyed: surveyed.get(id) ?? 0,
+        openPunch: openPunch.get(id) ?? 0,
+        closedPunch: closedPunch.get(id) ?? 0,
         cache: cache.get(id) ?? 'no sheet',
         assignedToMe: mine.has(id),
+        sharesWith: before.get(id) ?? [],
       };
     }),
+    reviewOpen,
+    lintOpen,
   };
+}
+
+// ------------------------------------------------------------- the shell (T176)
+
+/** "Basement 2", "Level 1", "Level 6 mezzanine" from the level code; null for any other code. */
+export function levelName(code: string): string | null {
+  let m = /^B(\d+)$/i.exec(code);
+  if (m) return `Basement ${Number(m[1])}`;
+  m = /^(\d+)$/.exec(code);
+  if (m) return `Level ${Number(m[1])}`;
+  m = /^(\d+)M$/i.exec(code);
+  if (m) return `Level ${Number(m[1])} mezzanine`;
+  return null;
+}
+
+/** The line under a level's code: "Level 6 mezzanine · shares numbers with 06", "Level 1 · assigned to me". */
+export function levelSubline(l: Pick<HomeLevel, 'code' | 'assignedToMe' | 'sharesWith' | 'inScope'>): string {
+  const parts = [levelName(l.code)];
+  if (l.assignedToMe) parts.push('assigned to me');
+  if (l.sharesWith.length) parts.push(`shares numbers with ${l.sharesWith.join(', ')}`);
+  if (!l.inScope) parts.push('out of scope');
+  return parts.filter(Boolean).join(' · ');
+}
+
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** The caption under the project name: "9 levels · B2 to 07 · 6 locked". */
+export function homeSummary(levels: readonly Pick<HomeLevel, 'code' | 'state'>[]): string {
+  if (!levels.length) return '0 levels';
+  const first = levels[0]!.code;
+  const last = levels[levels.length - 1]!.code;
+  const locked = levels.filter((l) => l.state === 'baseline_locked').length;
+  return [count(levels.length, 'level'), first === last ? first : `${first} to ${last}`, `${locked} locked`].join(' · ');
+}
+
+/** "on B1", "on B1 and 01", "on 3 levels". */
+function onLevels(codes: readonly string[]): string {
+  if (codes.length === 1) return `on ${codes[0]}`;
+  if (codes.length === 2) return `on ${codes[0]} and ${codes[1]}`;
+  return `on ${count(codes.length, 'level')}`;
+}
+
+export type HomeTile = { key: 'devices' | 'issues' | 'punch' | 'review'; label: string; value: number; sub: string; tone: 'text' | 'danger' | 'warning' };
+
+/** The four tiles over the table: sums over the levels (and the project's open reviews). */
+export function homeTiles(home: Pick<ProjectHome, 'levels' | 'reviewOpen'>): HomeTile[] {
+  const sum = (f: (l: HomeLevel) => number) => home.levels.reduce((n, l) => n + f(l), 0);
+  const issues = sum((l) => l.issueOrNi);
+  const reviewLevels = home.levels.filter((l) => l.reviews > 0).map((l) => l.code);
+  return [
+    { key: 'devices', label: 'Devices', value: sum((l) => l.devices), sub: `${sum((l) => l.surveyed)} surveyed`, tone: 'text' },
+    { key: 'issues', label: 'Issue or not installed', value: issues, sub: `on ${count(home.levels.filter((l) => l.issueOrNi > 0).length, 'level')}`, tone: issues ? 'danger' : 'text' },
+    { key: 'punch', label: 'Open punch items', value: sum((l) => l.openPunch), sub: `${sum((l) => l.closedPunch)} closed`, tone: 'text' },
+    { key: 'review', label: 'Needs review', value: home.reviewOpen, sub: reviewLevels.length ? onLevels(reviewLevels) : 'on 0 levels', tone: home.reviewOpen ? 'warning' : 'text' },
+  ];
 }
 
 /** "Assigned to me" keeps only the user's levels. */

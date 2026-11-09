@@ -33,5 +33,5 @@ name: Sign-in — sign-in needed; editing goes on
 - extendedWaitUntil:
     visible:
       id: status.bar
-      text: '.*Sign-in needed to sync · [1-9]\d* pending.*'
+      text: '.*Sign-in needed to sync · [1-9]\d* edits? waiting.*'
     timeout: 30000

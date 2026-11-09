@@ -117,4 +117,4 @@ name: Offline — every kind of edit, server stopped
 - tapOn: ← Levels
 - assertVisible:
     id: status.bar
-    text: 'Offline · [1-9]\d* pending.*'
+    text: 'Offline · [1-9]\d* edits? waiting.*'

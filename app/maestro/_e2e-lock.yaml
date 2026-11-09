@@ -28,4 +28,4 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 10000
 - tapOn:
     id: setup.home
-- assertVisible: '06M.*🔒.*'
+- assertVisible: '06M, .*Locked, .*'   # the Levels row (T176: a lock icon, no 🔒)

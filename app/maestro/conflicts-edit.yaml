@@ -119,4 +119,4 @@ name: Conflicts — the same fields edited on both iPads, offline
 - tapOn: ◀ Levels
 - assertVisible:
     id: status.bar
-    text: 'Offline · [1-9]\d* pending.*'
+    text: 'Offline · [1-9]\d* edits? waiting.*'

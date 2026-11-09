@@ -9,7 +9,7 @@ name: Offline — the edits drained
 - extendedWaitUntil:
     visible:
       id: status.bar
-      text: 'Synced [^·]*'      # no " · n pending", no " · n need attention"
+      text: 'Synced [^·]*'      # no " · n edits waiting", no " · n need attention"
     timeout: 60000
 - runFlow:
     file: _open-card.yaml

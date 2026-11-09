@@ -1,10 +1,13 @@
-import { Link, useLocalSearchParams } from 'expo-router';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { openAppStore } from '../db';
 import {
   filterLevels,
+  homeSummary,
+  homeTiles,
+  levelSubline,
   listProjects,
   loadProjectHome,
   type HomeLevel,
@@ -13,40 +16,27 @@ import {
 } from '../home/data';
 import { awaitingProject, pickProject, rememberProject } from '../home/currentProject';
 import { useCurrentUser } from '../identity/IdentityGate';
+import { useRulesVersion } from '../rules/useRulesVersion';
 import { BaselineDialog } from '../setup/BaselineDialog';
 import { loadLockTable, type LockLevel } from '../setup/lock';
-import { homeIdentityLine, loadInstallLabels } from '../sync/install';
+import { homeIdentityLine, installName, loadInstallLabels } from '../sync/install';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { syncDataKey } from '../sync/dataKey';
+import { Banner, Btn, Empty, Icon, Sidebar, color, font, radius, space, tabular, type IconName } from '../ui';
 
-/** Sidebar targets (PLAN §5). Each lights up when its task lands; Levels is this screen. */
-const SIDEBAR = [
-  'Levels',
-  'Cable / riser',
-  'Needs review',
-  'Dashboard',
-  'Rulings',
-  'Lint',
-  'Export',
-  'Setup',
-  'Vocabulary',
-  'Library',
-  'Sync',
-] as const;
-
-/** Sidebar test IDs for the Maestro flows (T149): `nav.levels`, `nav.cable-riser`, `nav.needs-review`, … `nav.sync`. */
-const navId = (name: string) => `nav.${name.toLowerCase().replace(/[^a-z]+/g, '-').replace(/-$/, '')}`;
-
-const CACHE_LABEL: Record<HomeLevel['cache'], string> = {
-  cached: 'Cached',
-  downloading: 'Downloading…',
-  'not cached': 'Not cached',
-  'no sheet': 'No sheet',
+/** The Plan column (the board): the display sheet on this iPad, on its way, not yet, or none. */
+const PLAN_CELL: Record<HomeLevel['cache'], { label: string; icon: IconName | null; fg: string; bold?: boolean }> = {
+  cached: { label: 'On iPad', icon: 'check', fg: color.text2 },
+  downloading: { label: 'Downloading…', icon: 'download', fg: color.text2 },
+  'not cached': { label: 'Download', icon: 'download', fg: color.primary, bold: true },
+  'no sheet': { label: 'No sheet yet', icon: null, fg: color.text3 },
 };
 
 export default function ProjectHomeScreen() {
   const user = useCurrentUser();
+  const router = useRouter();
   const sync = useSyncStatus();
+  const rules = useRulesVersion();
   const dataKey = syncDataKey(sync);
   const { project: wanted } = useLocalSearchParams<{ project?: string }>();
   const [projects, setProjects] = useState<HomeProject[]>([]);
@@ -58,13 +48,16 @@ export default function ProjectHomeScreen() {
   }, [wanted]);
   const [home, setHome] = useState<ProjectHome | null>(null);
   const [mineOnly, setMineOnly] = useState(false);
-  const [who, setWho] = useState(`Signed in as ${user.name}`);
+  const [who, setWho] = useState({ label: `Signed in as ${user.name}`, sub: '' });
   const [locks, setLocks] = useState<Map<string, LockLevel>>(new Map());
   const [dialog, setDialog] = useState<LockLevel | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  // Four tiles across when they fit at 160 pt each, else two by two (portrait beside the sidebar).
+  const [tileCols, setTileCols] = useState(4);
 
-  // Reload after each sync: pulls change counts, reviews, assignments and the sheet cache.
+  // Reload after each sync: pulls change counts, reviews, assignments and the sheet cache; after
+  // each rules run: the Lint pill.
   useEffect(() => {
     let live = true;
     (async () => {
@@ -72,7 +65,11 @@ export default function ProjectHomeScreen() {
       const list = await listProjects(store);
       if (!live) return;
       setProjects(list);
-      setWho(homeIdentityLine(user.name, store.installId, await loadInstallLabels(store)));
+      const labels = await loadInstallLabels(store);
+      setWho({
+        label: homeIdentityLine(user.name, store.installId, labels),
+        sub: `This iPad: ${installName(store.installId, labels)}${labels.has(store.installId) ? '' : ' (name it on the Sync screen)'}`,
+      });
       const known = list.map((p) => p.id);
       if (awaitingProject(known, typeof wanted === 'string' ? wanted : null, projectId)) {
         // just created: it arrives with the next sync, which re-runs this effect (dataKey)
@@ -91,7 +88,7 @@ export default function ProjectHomeScreen() {
     return () => {
       live = false;
     };
-  }, [projectId, wanted, user.id, user.name, dataKey, sync.pendingOps, reload]);
+  }, [projectId, wanted, user.id, user.name, dataKey, sync.pendingOps, reload, rules]);
   const waiting = awaitingProject(
     projects.map((p) => p.id),
     typeof wanted === 'string' ? wanted : null,
@@ -99,121 +96,83 @@ export default function ProjectHomeScreen() {
   );
 
   const rows = useMemo(() => (home ? filterLevels(home.levels, mineOnly) : []), [home, mineOnly]);
+  const tiles = useMemo(() => (home ? homeTiles(home) : []), [home]);
+  const projectName = home?.project.name ?? projects.find((p) => p.id === projectId)?.name ?? null;
 
   return (
     <View style={styles.root}>
-      <View style={styles.sidebar}>
-        <Text style={styles.brand}>Field Survey</Text>
-        <Link href="/projects" style={[styles.navItem, styles.navText]} testID="nav.projects">
-          Projects
-        </Link>
-        {SIDEBAR.map((name) =>
-          name === 'Sync' ? (
-            <Link key={name} href="/sync" style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : name === 'Cable / riser' && projectId ? (
-            <Link key={name} href={{ pathname: '/cables', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : name === 'Needs review' && projectId ? (
-            <Link key={name} href={{ pathname: '/review', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : name === 'Dashboard' && projectId ? (
-            <Link key={name} href={{ pathname: '/dashboard', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : name === 'Rulings' && projectId ? (
-            <Link key={name} href={{ pathname: '/rulings', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : name === 'Lint' && projectId ? (
-            <Link key={name} href={{ pathname: '/lint', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : name === 'Export' && projectId ? (
-            <Link key={name} href={{ pathname: '/export', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : name === 'Vocabulary' && projectId ? (
-            <Link key={name} href={{ pathname: '/vocabulary', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : name === 'Library' && projectId ? (
-            <Link key={name} href={{ pathname: '/library', params: { project: projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : name === 'Setup' && projectId ? (
-            <Link key={name} href={{ pathname: '/setup/[projectId]', params: { projectId } }} style={[styles.navItem, styles.navText]} testID={navId(name)}>
-              {name}
-            </Link>
-          ) : (
-            <View key={name} style={[styles.navItem, name === 'Levels' && styles.navActive]} testID={navId(name)}>
-              <Text style={[styles.navText, name !== 'Levels' && styles.navDim]}>{name}</Text>
+      <Sidebar
+        active="Levels"
+        projectId={projectId}
+        projectName={projectName}
+        counts={{ review: home?.reviewOpen, lint: home?.lintOpen }}
+        user={{ name: user.name, sub: who.sub, label: who.label }}
+        extra={
+          __DEV__ ? (
+            <View style={styles.demo}>
+              <Link href="/demo-plan" style={styles.demoLink}>
+                Demo plan (06M composite) →
+              </Link>
+              <Link href={{ pathname: '/demo-plan', params: { pins: '500' } }} style={styles.demoLink}>
+                500 pins →
+              </Link>
             </View>
-          ),
-        )}
-        <View style={{ flex: 1 }} />
-        <Link href="/demo-plan" style={styles.demo}>
-          Demo plan (06M composite) →
-        </Link>
-        <Link href={{ pathname: '/demo-plan', params: { pins: '500' } }} style={styles.demo}>
-          500 pins →
-        </Link>
-        <Text style={styles.user}>{user.name}</Text>
-      </View>
+          ) : null
+        }
+      />
 
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
-        <Text style={styles.who} accessibilityRole="header">
-          {who}
-        </Text>
-        {projects.length > 1 ? (
-          <View style={styles.chips}>
-            {projects.map((p) => (
-              <Pressable key={p.id} onPress={() => setProjectId(p.id)} style={[styles.chip, p.id === projectId && styles.chipOn]} testID={`home.project.${p.name}`}>
-                <Text style={p.id === projectId ? styles.chipTextOn : styles.chipText}>{p.name}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-
         {waiting ? (
-          <Text style={styles.empty} testID="home.waiting">
-            Downloading the project from the server…
-          </Text>
+          <Empty text="Downloading the project from the server…" icon="download" testID="home.waiting" />
         ) : !home ? (
-          <View>
-            <Text style={styles.empty}>No project on this iPad yet.</Text>
-            <Link href="/projects" style={styles.link}>
-              Open Projects to download one from the server or create a new one →
-            </Link>
-          </View>
+          <Empty
+            text="No project on this iPad yet."
+            icon="levels"
+            action={{ label: 'Open Projects to download one from the server or create a new one', onPress: () => router.push('/projects'), testID: 'home.openProjects' }}
+          />
         ) : (
           <>
-            <Text style={styles.title}>{home.project.name}</Text>
-            {home.project.site ? <Text style={styles.sub}>{home.project.site}</Text> : null}
-            {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Assigned to me</Text>
-              <Switch value={mineOnly} onValueChange={setMineOnly} testID="home.mine" />
+            <View style={styles.header}>
+              <View style={styles.headerText}>
+                <Text style={styles.title} accessibilityRole="header">
+                  {home.project.name}
+                </Text>
+                <Text style={styles.caption}>{[home.project.site, homeSummary(home.levels)].filter(Boolean).join(' · ')}</Text>
+              </View>
+              <View style={styles.mine}>
+                <Text style={styles.mineLabel}>Assigned to me</Text>
+                <Switch value={mineOnly} onValueChange={setMineOnly} trackColor={{ true: color.primary, false: color.border }} testID="home.mine" />
+              </View>
+            </View>
+            {notice ? <Banner tone="success" text={notice} /> : null}
+
+            <View style={styles.tiles} onLayout={(e) => setTileCols(e.nativeEvent.layout.width >= 4 * 160 + 3 * space.lg ? 4 : 2)}>
+              {tiles.map((t) => (
+                <View key={t.key} style={[styles.tile, { width: tileCols === 4 ? '21%' : '46%', flexGrow: 1 }]} testID={`home.tile.${t.key}`}>
+                  <Text style={styles.tileLabel}>{t.label}</Text>
+                  <Text style={[styles.tileValue, t.tone === 'danger' && { color: color.danger }, t.tone === 'warning' && { color: color.warning }]}>{t.value}</Text>
+                  <Text style={styles.tileSub}>{t.sub}</Text>
+                </View>
+              ))}
             </View>
 
-            <View style={[styles.tr, styles.th]}>
-              <Text style={[styles.cLevel, styles.thText]}>Level</Text>
-              <Text style={[styles.cState, styles.thText]}>State</Text>
-              <Text style={[styles.cNum, styles.thText]}>Devices</Text>
-              <Text style={[styles.cNum, styles.thText]}>Issue / NI</Text>
-              <Text style={[styles.cNum, styles.thText]}>Open items</Text>
-              <Text style={[styles.cNum, styles.thText]}>Review</Text>
-              <Text style={[styles.cCache, styles.thText]}>Plan</Text>
+            <View style={styles.table}>
+              <View style={[styles.tr, styles.th]}>
+                <Text style={[styles.cLevel, styles.thText]}>Level</Text>
+                <Text style={[styles.cState, styles.thText]}>State</Text>
+                <Text style={[styles.cDevices, styles.thText, styles.right]}>Devices</Text>
+                <Text style={[styles.cIssue, styles.thText, styles.right]}>Issue / not installed</Text>
+                <Text style={[styles.cOpen, styles.thText, styles.right]}>Open items</Text>
+                <Text style={[styles.cReview, styles.thText, styles.right]}>Review</Text>
+                <Text style={[styles.cPlan, styles.thText]}>Plan</Text>
+              </View>
+              {rows.map((l, i) => (
+                <LevelRow key={l.id} level={l} first={i === 0} lock={locks.get(l.id) ?? null} onLock={setDialog} />
+              ))}
+              {rows.length === 0 ? (
+                <Text style={styles.none}>{mineOnly ? 'No levels are assigned to you.' : 'This project has no levels yet.'}</Text>
+              ) : null}
             </View>
-            {rows.map((l) => (
-              <LevelRow key={l.id} level={l} lock={locks.get(l.id) ?? null} onLock={setDialog} />
-            ))}
-            {rows.length === 0 ? (
-              <Text style={styles.empty}>{mineOnly ? 'No levels are assigned to you.' : 'This project has no levels yet.'}</Text>
-            ) : null}
           </>
         )}
       </ScrollView>
@@ -235,79 +194,98 @@ export default function ProjectHomeScreen() {
   );
 }
 
-function LevelRow({ level: l, lock, onLock }: { level: HomeLevel; lock: LockLevel | null; onLock: (l: LockLevel) => void }) {
-  const cells = (
-    <View style={[styles.tr, !l.inScope && styles.outOfScope]}>
-      <View style={styles.cLevel}>
-        <Text style={styles.levelCode}>
-          {l.code}
-          {l.assignedToMe ? '  ●' : ''}
-        </Text>
-        {!l.inScope ? <Text style={styles.small}>out of scope</Text> : null}
-      </View>
-      <View style={[styles.cState, styles.stateCell]}>
-        <Text style={styles.stateText}>{l.state === 'baseline_locked' ? '🔒 Locked' : 'Setup'}</Text>
-        {/* Lock / Unlock (T47): its own touch target inside the row, which opens the plan. */}
-        {lock && l.inScope ? (
-          <Pressable onPress={() => onLock(lock)} hitSlop={8} style={styles.lockBtn} testID={`home.lock.${l.code}`}>
-            <Text style={styles.lockBtnText}>{lock.locked ? 'Unlock…' : 'Lock…'}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      <Text style={styles.cNum}>{l.devices}</Text>
-      <Text style={[styles.cNum, l.issueOrNi > 0 && styles.red]}>{l.issueOrNi}</Text>
-      <Text style={styles.cNum}>{l.openItems}</Text>
-      <Text style={[styles.cNum, l.reviews > 0 && styles.badge]}>{l.reviews > 0 ? `IN REVIEW ${l.reviews}` : '0'}</Text>
-      <Text style={[styles.cCache, l.cache === 'not cached' && styles.red]}>{CACHE_LABEL[l.cache]}</Text>
-    </View>
-  );
+/** A count cell: red Issue, amber Review; a Setup level's zero reads "–" (nothing surveyed yet). */
+function Num({ n, style, tone, setup }: { n: number; style: StyleProp<TextStyle>; tone?: 'danger' | 'warning'; setup: boolean }) {
+  if (n === 0 && setup) return <Text style={[style, styles.num, styles.right, { color: color.muted }]}>–</Text>;
+  const fg = n === 0 ? color.text3 : tone === 'danger' ? color.danger : tone === 'warning' ? color.warning : color.text;
+  return <Text style={[style, styles.num, styles.right, { color: fg }, n > 0 && tone ? styles.bold : null]}>{n}</Text>;
+}
+
+function LevelRow({ level: l, first, lock, onLock }: { level: HomeLevel; first: boolean; lock: LockLevel | null; onLock: (l: LockLevel) => void }) {
+  const router = useRouter();
+  const setup = l.state !== 'baseline_locked';
+  const plan = PLAN_CELL[l.cache];
+  const sub = levelSubline(l);
   // Every level opens, sheet or not (T71): without a sheet the plan area says so and the lists still work.
   return (
-    <Link href={{ pathname: '/plan/[levelId]', params: { levelId: l.id } }} asChild>
-      <Pressable testID={`level.${l.code}`}>{cells}</Pressable>
-    </Link>
+    <Pressable
+      onPress={() => router.push({ pathname: '/plan/[levelId]', params: { levelId: l.id } })}
+      testID={`level.${l.code}`}
+      style={({ pressed }) => [styles.tr, styles.row, !first && styles.rowLine, pressed && styles.rowPressed, !l.inScope && styles.outOfScope]}
+    >
+      <View style={styles.cLevel}>
+        {/* One Text: the row reads "06  ●, …" to VoiceOver and the flows (T158). */}
+        <Text style={styles.code}>
+          {l.code}
+          {l.assignedToMe ? <Text style={styles.mineDot}>{'  ●'}</Text> : null}
+        </Text>
+        {sub ? <Text style={styles.sub}>{sub}</Text> : null}
+      </View>
+      <View style={[styles.cState, styles.state]}>
+        {setup ? null : <Icon name="lock" size={16} color={color.text2} />}
+        <Text style={[styles.stateText, setup && { color: color.text3 }]}>{setup ? 'Setup' : 'Locked'}</Text>
+        {/* Lock / Unlock (T47): its own touch target inside the row, which opens the plan. */}
+        {lock && l.inScope ? <Btn small title={lock.locked ? 'Unlock…' : 'Lock…'} onPress={() => onLock(lock)} testID={`home.lock.${l.code}`} /> : null}
+      </View>
+      <Num n={l.devices} style={styles.cDevices} setup={false} />
+      <Num n={l.issueOrNi} style={styles.cIssue} tone="danger" setup={setup} />
+      <Num n={l.openItems} style={styles.cOpen} setup={setup} />
+      <Num n={l.reviews} style={styles.cReview} tone="warning" setup={setup} />
+      <View style={[styles.cPlan, styles.state]}>
+        {plan.icon ? <Icon name={plan.icon} size={16} color={plan.fg} strokeWidth={plan.icon === 'check' ? 2.2 : 2} /> : null}
+        <Text style={[styles.stateText, { color: plan.fg }, plan.bold && styles.bold]}>{plan.label}</Text>
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: '#fff' },
-  sidebar: { width: 220, backgroundColor: '#f3f5f8', borderRightWidth: 1, borderRightColor: '#d5d9e0', padding: 12, gap: 2 },
-  brand: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
-  navItem: { paddingVertical: 9, paddingHorizontal: 10, borderRadius: 6 },
-  navActive: { backgroundColor: '#dce8fb' },
-  navText: { fontSize: 15, color: '#111' },
-  navDim: { color: '#9aa0a8' },
-  demo: { fontSize: 13, color: '#1565c0', marginBottom: 10 },
-  user: { fontSize: 13, color: '#555' },
-  who: { fontSize: 15, fontWeight: '600', color: '#1a2b3c', marginBottom: 8 },
+  root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
+  demo: { paddingHorizontal: space.md, paddingTop: space.lg, gap: space.sm },
+  demoLink: { ...font.caption, color: color.primary },
   main: { flex: 1 },
-  mainContent: { padding: 20, gap: 6 },
-  title: { fontSize: 28, fontWeight: '600' },
-  sub: { fontSize: 15, color: '#555' },
-  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 },
-  filterLabel: { fontSize: 15 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }, // wraps: past the width a chip was out of reach (T157)
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111' },
-  chipTextOn: { color: '#fff' },
-  tr: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
-  th: { backgroundColor: '#f3f5f8', paddingVertical: 8 },
-  thText: { fontSize: 12, fontWeight: '700', color: '#555', textTransform: 'uppercase' },
+  mainContent: { paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xxl, gap: 20 },
+  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.lg, flexWrap: 'wrap' },
+  headerText: { flex: 1, minWidth: 240 },
+  title: { ...font.display, color: color.text },
+  caption: { ...font.caption, color: color.text3, marginTop: space.xs },
+  mine: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 },
+  mineLabel: { ...font.callout, color: color.text2 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: space.lg },
+  tile: {
+    backgroundColor: color.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: color.hairline,
+    borderRadius: radius.card,
+    paddingVertical: space.lg,
+    paddingHorizontal: 20,
+    gap: 2,
+  },
+  tileLabel: { ...font.caption, color: color.text2 },
+  tileValue: { ...font.display, ...tabular, color: color.text },
+  tileSub: { ...font.caption, color: color.text3 },
+  table: { backgroundColor: color.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: color.hairline, borderRadius: radius.card, overflow: 'hidden' },
+  tr: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, gap: space.sm },
+  th: { minHeight: 40, paddingVertical: space.sm, backgroundColor: color.surface2 },
+  thText: { ...font.caption, color: color.text2 },
+  row: { minHeight: 52, paddingVertical: space.sm },
+  rowLine: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },
+  rowPressed: { backgroundColor: color.bg },
   outOfScope: { opacity: 0.55 },
-  cLevel: { width: 110 },
-  cState: { width: 170, fontSize: 14 },
-  stateCell: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  stateText: { fontSize: 14 },
-  lockBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0' },
-  lockBtnText: { fontSize: 13, color: '#1565c0' },
-  notice: { fontSize: 14, color: '#2e7d32' },
-  cNum: { width: 100, fontSize: 15, textAlign: 'right' },
-  cCache: { flex: 1, fontSize: 14, paddingLeft: 20 },
-  levelCode: { fontSize: 17, fontWeight: '600' },
-  small: { fontSize: 11, color: '#777' },
-  red: { color: '#c62828', fontWeight: '600' },
-  badge: { color: '#1565c0', fontWeight: '700', fontSize: 12 },
-  empty: { fontSize: 15, color: '#666', marginTop: 24 },
-  link: { fontSize: 15, color: '#1565c0', marginTop: 8 },
+  cLevel: { flex: 2 },
+  cState: { flex: 1.9 },
+  cDevices: { flex: 1 },
+  cIssue: { flex: 1.3 },
+  cOpen: { flex: 1.1 },
+  cReview: { flex: 0.9 },
+  cPlan: { flex: 1.8, paddingLeft: space.md },
+  right: { textAlign: 'right' },
+  code: { ...font.headline, color: color.text },
+  mineDot: { color: color.primary },
+  sub: { ...font.caption, color: color.text3 },
+  state: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
+  stateText: { ...font.callout, color: color.text2 },
+  num: { ...font.body, ...tabular },
+  bold: { fontWeight: '600' },
+  none: { ...font.callout, color: color.text3, padding: space.lg },
 });

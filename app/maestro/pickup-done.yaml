@@ -15,5 +15,5 @@ name: Pickup — B rejects the app type
 - extendedWaitUntil:
     visible:
       id: status.bar
-      text: '(?!.*pending).*Synced.*'
+      text: '(?!.*edits? waiting).*Synced.*'
     timeout: 20000

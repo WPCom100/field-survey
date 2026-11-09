@@ -34,11 +34,11 @@ name: Resume — edits and a photo survive a kill and a re-sign-in
 - extendedWaitUntil:
     visible:
       id: status.bar
-      text: 'Offline · [1-9]\d* pending.*[1-9]\d* photos? waiting.*'   # photos sharing the picked image's blob all count
+      text: 'Offline · [1-9]\d* edits? waiting.*[1-9]\d* photos? waiting.*'   # photos sharing the picked image's blob all count
     timeout: 30000
 - copyTextFrom:
     id: status.bar
-- evalScript: ${output.pending = maestro.copiedText.match(/(\d+) pending/)[1]}
+- evalScript: ${output.pending = maestro.copiedText.match(/(\d+) edits? waiting/)[1]}
 
 # kill and relaunch before any sync
 - runFlow: _resume.yaml
@@ -47,11 +47,11 @@ name: Resume — edits and a photo survive a kill and a re-sign-in
 - extendedWaitUntil:
     visible:
       id: status.bar
-      text: 'Offline · [1-9]\d* pending.*[1-9]\d* photos? waiting.*'
+      text: 'Offline · [1-9]\d* edits? waiting.*[1-9]\d* photos? waiting.*'
     timeout: 60000
 - copyTextFrom:
     id: status.bar
-- assertTrue: ${parseInt(maestro.copiedText.match(/(\d+) pending/)[1]) >= parseInt(output.pending)}
+- assertTrue: ${parseInt(maestro.copiedText.match(/(\d+) edits? waiting/)[1]) >= parseInt(output.pending)}
 - runFlow:
     file: _open-card.yaml
     env:

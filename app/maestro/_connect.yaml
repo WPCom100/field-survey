@@ -87,4 +87,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:
     visible: Signed in as ${USER}.*
     timeout: 15000
-- assertVisible: Field Survey
+- assertVisible:            # the Levels home (T176: the sidebar has no "Field Survey" title)
+    id: nav.projects

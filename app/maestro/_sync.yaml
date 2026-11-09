@@ -14,4 +14,5 @@ appId: productions.luminarytechnology.fieldsurvey
 # server reset left the keychain's old user id, and every edit went unknown-user for a whole session)
 - assertNotVisible: ".*need attention.*"
 - tapOn: ← Levels
-- assertVisible: Field Survey
+- assertVisible:            # the Levels home (T176: the sidebar has no "Field Survey" title)
+    id: nav.projects

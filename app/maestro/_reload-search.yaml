@@ -16,4 +16,5 @@ appId: productions.luminarytechnology.fieldsurvey
     visible: No matches\.
     timeout: 10000
 - tapOn: ← Levels
-- assertVisible: Field Survey
+- assertVisible:            # the Levels home (T176: the sidebar has no "Field Survey" title)
+    id: nav.projects

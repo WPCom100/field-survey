@@ -16,5 +16,5 @@ name: Conflict — one device status, offline
 - extendedWaitUntil:
     visible:
       id: status.bar
-      text: 'Offline · [1-9]\d* pending.*'
+      text: 'Offline · [1-9]\d* edits? waiting.*'
     timeout: 60000

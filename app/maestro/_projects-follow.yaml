@@ -1,10 +1,18 @@
-# R7 (T157): the Levels home's project chip CHIP (env) → its levels (HAS shown; HASNOT, unless
-# "none", not), and Lint, Cable / riser, Dashboard, Rulings and Export follow it (T83). Starts and
-# ends on the Levels home.
+# R7 (T157): the sidebar's project button → Projects → project CHIP (env) → its levels (HAS shown;
+# HASNOT, unless "none", not), and Lint, Cable / riser, Dashboard, Rulings and Export follow it (T83).
+# Starts and ends on the Levels home. (The home's project chips went with T176.)
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - tapOn:
-    id: home.project.${CHIP}  # the chips wrap (T157: past the width a chip was out of reach)
+    id: nav.projects
+- scrollUntilVisible:
+    element:
+      id: projects.open.${CHIP}
+    direction: DOWN
+    visibilityPercentage: 50   # the newest project is the last row, partly under the edge (T156)
+    timeout: 30000
+- tapOn:
+    id: projects.open.${CHIP}
 - extendedWaitUntil:
     visible:
       id: level.${HAS}

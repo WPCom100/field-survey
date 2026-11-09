@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 
 import { getSyncEngine } from './engine';
 
+export { describeSync } from './describe';
+
 const INITIAL: SyncStatus = {
   state: 'no_token',
   pendingOps: 0,
@@ -32,25 +34,4 @@ export function useSyncStatus(): SyncStatus {
     };
   }, []);
   return status;
-}
-
-/** One line for the status bar: "Synced 09:41 · 3 pending" and the like. */
-export function describeSync(s: SyncStatus): string {
-  const pending = s.pendingOps ? ` · ${s.pendingOps} pending` : '';
-  const held = s.quarantinedOps ? ` · ${s.quarantinedOps} need attention` : '';
-  const review = s.willReview ? ` · ${s.willReview} will be reviewed` : '';
-  switch (s.state) {
-    case 'syncing':
-      return `Syncing…${pending}`;
-    case 'offline':
-      return `Offline${pending}${held}${review}`;
-    case 'error':
-      // 401, or a Microsoft refresh that was refused (T04): only signing in again helps.
-      if (s.lastFailure === 'auth') return `Sign-in needed to sync${pending}`;
-      return `Sync error: ${s.lastError ?? 'unknown'}${pending}${held}`;
-    case 'no_token':
-      return `Not connected${pending}`;
-    case 'idle':
-      return (s.lastSyncAt ? `Synced ${new Date(s.lastSyncAt).toLocaleTimeString()}` : 'Not synced yet') + pending + held + review;
-  }
 }

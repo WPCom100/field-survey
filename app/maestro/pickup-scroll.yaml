@@ -19,4 +19,5 @@ name: Pickup — A scrolls Levels while B's edits arrive
           duration: 600
       - assertVisible:
           id: level.06M
-- assertVisible: Field Survey
+- assertVisible:            # the Levels home (T176: the sidebar has no "Field Survey" title)
+    id: nav.projects

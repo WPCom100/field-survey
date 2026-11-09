@@ -1,6 +1,6 @@
 # R7 step 1 of `rig.sh projects` (T157, rig plan wave 4): two projects on one iPad (T83, T142).
 # A new project PROJECT (06M only) beside "Maestro master" (the seed, B2 … 06): Refresh from server;
-# the home's project chips switch, and Lint, Cable / riser, Dashboard, Rulings and Export follow the
+# Projects switches the project, and Lint, Cable / riser, Dashboard, Rulings and Export follow the
 # chosen project; the new-project form names a two-way numbering share and a chain and Create
 # refuses both; ◀ Projects; Setup's "Open the levels screen ▸".
 appId: productions.luminarytechnology.fieldsurvey
@@ -25,7 +25,7 @@ name: R7 — Projects
     timeout: 120000
 - tapOn: ◀ Levels
 
-# the home's chips switch the project; every sidebar screen follows
+# Projects switches the project (the home's chips went with T176); every sidebar screen follows
 - runFlow:
     file: _projects-follow.yaml
     env:

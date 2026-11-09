@@ -62,7 +62,7 @@ export default function LevelPlanRoute() {
       levelId={levelId}
       resolveSheetUri={resolveSheetUri}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-      status={[describeSync(sync), describeBlobs(blobStatus)].filter(Boolean).join(' · ')}
+      status={describeSync(sync, describeBlobs(blobStatus))}
       reloadKey={syncDataKey(sync)}
       userId={user.id}
       names={names}

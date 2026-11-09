@@ -61,5 +61,5 @@ name: Pickup — B changes the app type
 - extendedWaitUntil:          # B's background sync (5 s) pushes it: nothing pending
     visible:
       id: status.bar
-      text: '(?!.*pending).*Synced.*'
+      text: '(?!.*edits? waiting).*Synced.*'
     timeout: 20000

@@ -2,7 +2,7 @@ import { Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
-import { filterLevels, listProjects, loadProjectHome } from './data';
+import { filterLevels, homeSummary, homeTiles, levelName, levelSubline, listProjects, loadProjectHome } from './data';
 import { loadLevelPlan } from '../plan/data';
 import { DEMO_LEVEL_ID, ensureDemoLevel } from '../plan/demo';
 
@@ -95,5 +95,69 @@ describe('loadProjectHome', () => {
     expect(plan.sheet).toBeNull();
     expect(plan.devices.map((d) => d.id)).toEqual([dev]);
     expect(plan.devices[0]!.pin).toBeNull();
+  });
+});
+
+describe('the shell (T176)', () => {
+  it('surveyed, open and closed punch, shares-numbers, the review and lint counts', async () => {
+    const store = await open();
+    await ensureDemoLevel(store);
+    const [project] = await listProjects(store);
+    const pid = project!.id;
+    const group = uuidv7();
+    const l06 = uuidv7();
+    const l06m = uuidv7();
+    await store.apply(op('level', l06, 'create', pid, { project_id: pid, level: '06', floor_order: 6, numbering_group_id: group }));
+    await store.apply(op('level', l06m, 'create', pid, { project_id: pid, level: '06Q', floor_order: 7, numbering_group_id: group }));
+    const d1 = uuidv7();
+    const d2 = uuidv7();
+    await store.apply(op('device', d1, 'create', pid, { level_id: l06, category: 'Station', status: 'Complete' }));
+    await store.apply(op('device', d2, 'create', pid, { level_id: l06, category: 'Station' }));
+    await store.apply(op('punch_item', uuidv7(), 'create', pid, { level_id: l06, device_id: d1, item: 'a', tracking_status: 'Open' }));
+    await store.apply(op('punch_item', uuidv7(), 'create', pid, { level_id: l06, device_id: d1, item: 'b', tracking_status: 'Closed' }));
+    await store.apply(op('punch_item', uuidv7(), 'create', pid, { level_id: l06, device_id: d2, item: 'c' }));
+    await store.apply(op('review_item', uuidv7(), 'create', pid, { project_id: pid, kind: 'sync_conflict', state: 'open' }));
+    await store.apply(op('finding', uuidv7(), 'create', pid, { project_id: pid, lint_id: 'E1', state: 'open', message: 'x' }));
+    await store.apply(op('finding', uuidv7(), 'create', pid, { project_id: pid, lint_id: 'E2', state: 'dismissed', message: 'y' }));
+
+    const home = (await loadProjectHome(store, pid, ME))!;
+    const six = home.levels.find((x) => x.id === l06)!;
+    expect(six).toMatchObject({ devices: 2, surveyed: 1, openPunch: 2, closedPunch: 1, openItems: 2, sharesWith: [] });
+    expect(home.levels.find((x) => x.id === l06m)!.sharesWith).toEqual(['06']);
+    expect(home.reviewOpen).toBe(1); // no level: counted for the project, not on a row
+    expect(six.reviews).toBe(0);
+    expect(home.lintOpen).toBe(1);
+
+    const tiles = homeTiles(home);
+    expect(tiles.map((t) => t.key)).toEqual(['devices', 'issues', 'punch', 'review']);
+    const demo = home.levels.find((x) => x.id === DEMO_LEVEL_ID)!;
+    expect(tiles[0]).toMatchObject({ value: demo.devices + 2, sub: `${demo.surveyed + 1} surveyed` });
+    expect(tiles[2]).toMatchObject({ value: demo.openPunch + 2, sub: `${demo.closedPunch + 1} closed` });
+    expect(tiles[3]).toMatchObject({ value: 1, sub: 'on 0 levels', tone: 'warning' });
+  });
+
+  it('level names, the line under the code, the summary and the tiles', () => {
+    expect(['B2', '01', '06', '06M', '10', 'R', 'P1'].map(levelName)).toEqual(['Basement 2', 'Level 1', 'Level 6', 'Level 6 mezzanine', 'Level 10', null, null]);
+    expect(levelSubline({ code: '06M', assignedToMe: false, sharesWith: ['06'], inScope: true })).toBe('Level 6 mezzanine · shares numbers with 06');
+    expect(levelSubline({ code: '01', assignedToMe: true, sharesWith: [], inScope: true })).toBe('Level 1 · assigned to me');
+    expect(levelSubline({ code: 'R', assignedToMe: false, sharesWith: [], inScope: false })).toBe('out of scope');
+
+    const lv = (code: string, locked: boolean, extra: Partial<Parameters<typeof homeTiles>[0]['levels'][number]> = {}) => ({
+      id: code, code, floorOrder: null, inScope: true, state: locked ? ('baseline_locked' as const) : ('setup' as const),
+      devices: 10, issueOrNi: 0, openItems: 0, reviews: 0, surveyed: 4, openPunch: 1, closedPunch: 2, cache: 'cached' as const,
+      assignedToMe: false, sharesWith: [], ...extra,
+    });
+    const levels = [lv('B2', true, { issueOrNi: 2 }), lv('B1', true, { reviews: 1 }), lv('01', false, { reviews: 2, issueOrNi: 1 }), lv('07', false)];
+    expect(homeSummary(levels)).toBe('4 levels · B2 to 07 · 2 locked');
+    expect(homeSummary([lv('06M', false)])).toBe('1 level · 06M · 0 locked');
+    expect(homeSummary([])).toBe('0 levels');
+    expect(homeTiles({ levels, reviewOpen: 3 })).toEqual([
+      { key: 'devices', label: 'Devices', value: 40, sub: '16 surveyed', tone: 'text' },
+      { key: 'issues', label: 'Issue or not installed', value: 3, sub: 'on 2 levels', tone: 'danger' },
+      { key: 'punch', label: 'Open punch items', value: 4, sub: '8 closed', tone: 'text' },
+      { key: 'review', label: 'Needs review', value: 3, sub: 'on B1 and 01', tone: 'warning' },
+    ]);
+    expect(homeTiles({ levels: [lv('B2', true, { reviews: 1 }), lv('B1', true, { reviews: 1 }), lv('01', true, { reviews: 1 })], reviewOpen: 3 })[3]!.sub).toBe('on 3 levels');
+    expect(homeTiles({ levels: [lv('B2', true, { reviews: 1 })], reviewOpen: 1 })[3]!.sub).toBe('on B2');
   });
 });

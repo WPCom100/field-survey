@@ -58,5 +58,5 @@ name: Restart — a large push waits offline
 - extendedWaitUntil:
     visible:
       id: status.bar
-      text: 'Offline · \d{4,} pending.*'
+      text: 'Offline · \d{4,} edits waiting.*'
     timeout: 60000

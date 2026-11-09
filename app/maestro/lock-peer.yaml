@@ -8,7 +8,7 @@ name: Lock — B sees the lock, the rule change and the assignment
 - runFlow: _connect.yaml
 - runFlow: _sync.yaml
 - runFlow: _open-project.yaml
-- assertVisible: '06M, 🔒 Locked, .*'     # the Levels row, one element
+- assertVisible: '06M, .*Locked, .*'     # the Levels row, one element ("06M, Level 6 mezzanine · …, Locked, Unlock…, …")
 - tapOn:
     id: nav.setup
 - tapOn:

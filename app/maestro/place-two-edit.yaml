@@ -25,5 +25,5 @@ name: Place two — one unit each, offline
 - extendedWaitUntil:
     visible:
       id: status.bar
-      text: 'Offline · [1-9]\d* pending.*'
+      text: 'Offline · [1-9]\d* edits? waiting.*'
     timeout: 60000

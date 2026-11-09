@@ -7,7 +7,7 @@ name: Restart — nothing refused after the api restart
 - extendedWaitUntil:
     visible:
       id: status.bar
-      text: '(?!.*pending).*Synced.*'
+      text: '(?!.*edits? waiting).*Synced.*'
     timeout: 120000
 - assertNotVisible: ".*need attention.*"
 - tapOn:

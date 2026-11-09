@@ -28,4 +28,4 @@ name: Same user — one field and one ink layer on two iPads, offline
     id: plan.back
 - assertVisible:
     id: status.bar
-    text: 'Offline · [1-9]\d* pending.*'
+    text: 'Offline · [1-9]\d* edits? waiting.*'
