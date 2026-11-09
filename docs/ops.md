@@ -4,7 +4,7 @@ Production (D67 option A): one DigitalOcean Basic Droplet, 2 vCPU / 4 GB (resize
 
 | Thing | Where |
 |---|---|
-| Droplet | DigitalOcean, `142.93.54.143`, Ubuntu 24.04, SSH as `root` with `~/.ssh/field_survey_droplet` on Landry's PC (deploy key, no passphrase; added to `/root/.ssh/authorized_keys`) |
+| Droplet | DigitalOcean, `142.93.54.143`, Ubuntu 24.04, SSH as `root` with `~/.ssh/field_survey_droplet` on Landry's PC (no passphrase; added to `/root/.ssh/authorized_keys`; re-made 2026-11-08 when the old key was gone, pasted in through the DigitalOcean Droplet Console). `~/.ssh/config` has `Host droplet` with that key and `UserKnownHostsFile` = the repo's `server/deploy/known_hosts`, so `ssh droplet` works |
 | Checkout | `/opt/field-survey` (git clone over a read-only GitHub deploy key) |
 | Config | `/opt/field-survey/server/.env` (master copy: `server/.env.production` on Landry's PC, never committed) |
 | DNS | Cloudflare zone `wpcom.cloud`: `A survey → 142.93.54.143`, **DNS only** (grey cloud), so Caddy can get and renew its Let's Encrypt certificate itself |
