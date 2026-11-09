@@ -39,9 +39,9 @@ Every command below runs on the Droplet in `/opt/field-survey/server` unless it 
 8. **Check** from anywhere (PC or iPad Safari for the first line):
    ```
    curl https://survey.wpcom.cloud/health                       # {"status":"ok","commit":…,"migration":…}
-   curl -H "Authorization: Bearer <SURVEY_SHARED_TOKEN>" https://survey.wpcom.cloud/team
+   curl https://survey.wpcom.cloud/auth/config                  # {"mode":"entra",…} since 2026-11-09 (D270)
    ```
-   In the app: first launch asks for the server URL (`https://survey.wpcom.cloud`) and the shared token, then shows the team picker (Landry, Zach, Wiley).
+   In the app: first launch shows Connect to server with `https://survey.wpcom.cloud` filled in (D269); **Sign in with Microsoft** with an ilxlighting.com account. Since 2026-11-09 the server is `AUTH_MODE=entra` (D270): the shared token and the team picker open nothing (`/team` with the token is 401); `AUTH_MODE=both` brings them back (§4.3).
 
 ## 2. Update (D154, T85)
 
