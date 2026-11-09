@@ -22,6 +22,9 @@ sshkey_*
 # tracked; add a new one only on purpose (git add -f) once it is cleared for publishing.
 fixtures/*.pdf
 fixtures/*.xlsx
+# EAS Build drops ignored files from its upload even when tracked; the demo plan bundles this one
+# (app/src/app/demo-plan.tsx), so a production build fails without it (T173, build 17).
+!fixtures/Level_06M_-_Lighting_Composite_vector.pdf
 
 # Mac rig screenshots pulled to the PC
 .rig/
