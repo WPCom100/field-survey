@@ -17,6 +17,13 @@ import { signInWithMicrosoft } from './signin';
 
 type Signed = Identity & { user: TeamMember };
 
+/**
+ * The one production server (docs/ops.md): the Connect screen starts with it filled in, so
+ * "Sign in with Microsoft" works with no typing. Still editable — the Mac rig types its local
+ * e2e server over it (`app/maestro/_connect.yaml`).
+ */
+export const DEFAULT_SERVER_URL = 'https://survey.wpcom.cloud';
+
 const Ctx = createContext<Signed | null>(null);
 const SignOutCtx = createContext<(() => Promise<void>) | null>(null);
 const MicrosoftCtx = createContext<(() => Promise<void>) | null>(null);
@@ -101,7 +108,7 @@ export function IdentityGate({ children }: { children: ReactNode }) {
 }
 
 function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
-  const [serverUrl, setServerUrl] = useState('https://');
+  const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -138,6 +145,8 @@ function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
         onChangeText={setServerUrl}
         autoCapitalize="none"
         autoCorrect={false}
+        keyboardType="url"
+        selectTextOnFocus // a tap selects the whole URL, so typing replaces it (no leftover tail)
         placeholder="Server URL"
         placeholderTextColor="#888"
         testID="connect.serverUrl"

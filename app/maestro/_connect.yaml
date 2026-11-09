@@ -28,7 +28,7 @@ appId: productions.luminarytechnology.fieldsurvey
     commands:
       - tapOn:
           id: connect.serverUrl
-      - eraseText            # the field starts with "https://"
+      - eraseText            # the field starts with the production URL, selected on focus
       - inputText: ${SERVER_URL}
       - tapOn:
           id: connect.token
