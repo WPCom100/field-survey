@@ -32,7 +32,9 @@ appId: productions.luminarytechnology.fieldsurvey
 - pressKey: Enter
 - waitForAnimationToEnd:
     timeout: 5000
-- tapOn: Levels                 # closes the keyboard over Create
+# the iPad keyboard's own key closes it over Create; the "Levels" title the flow tapped before is
+# scrolled off by nine 44-pt rows since T174 (T50)
+- tapOn: Hide keyboard
 - assertNotVisible: own group    # no numbering picker open
 # 06M arrived sharing 06's numbering group and as a split of 06, as the Tower (D33): New project
 # joins a <code>M to its <code> by default (T172, D263)

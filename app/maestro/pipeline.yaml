@@ -41,7 +41,8 @@ name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
 - pressKey: Enter
 - waitForAnimationToEnd:         # the form scrolls itself to the bottom after each Return: a tap
     timeout: 5000                #   meanwhile landed on 01's numbering picker (T158)
-- tapOn: Levels                 # closes the keyboard over Create
+- tapOn: Hide keyboard          # the keyboard's own key closes it over Create (the "Levels"
+                                #   title scrolls off under the 44-pt rows since T174, T50)
 - assertNotVisible: own group    # no numbering picker open (its list's first chip)
 - scrollUntilVisible:
     element:

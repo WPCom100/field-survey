@@ -15,7 +15,7 @@ behaviour disagree, `PLAN.md` wins and the board is corrected.
 | 2 | Status-bar copy | The board's wording: "Synced 14:05" · "Offline · 3 edits waiting · 1 photo waiting · Last synced 13:40" · "Syncing…" · "Sign-in needed to sync". `describeSync` / `describeBlobs` change in T176 together with the flows that assert the old `Offline · N pending` (six today). |
 | 3 | Dark mode | Light only: `userInterfaceStyle: "light"` in `app.json` (closes the 2026-10-11 follow-up, T25-11). It rides on T173's build cycle (D249). Tokens keep a dark theme cheap later. |
 | 4 | Accent | Blue `#1F5FD6`, replacing the two ad-hoc blues (`#1565c0` in 33 files, `#1f6feb`). The Tweaks panel on the canvas still shows the alternatives. |
-| 5 | Timing | Tokens (T174) and the device card (T175) **before the pilot** — T50 depends on T175, so surveyors pilot the card they will keep. The rest (T176–T181, milestone M6b) **after the T53 go/no-go**: the pilot shows what hurts in the field, and the rig makes a later restyle safe. |
+| 5 | Timing | Tokens (T174) and the device card (T175) **before the pilot** — T50 depends on T175, so surveyors pilot the card they will keep. The rest (T176–T181, milestone M6b) was to follow the T53 go/no-go; since **D272** (2026-11-09) it runs now, alongside the pilot, after T183. |
 
 Accepted with the look (new scope): the four summary tiles on the Levels home, per-level sizes on
 Sync, the 72-pt rail on the plan, the Legend popover, one Filter button with a popover, the account
@@ -164,7 +164,7 @@ one, it is filed as a task, not done in passing.
 ## 7. Order
 
 ```
-T173 (builds) → T174 tokens → T175 card → T50…T53 pilot → go/no-go
+T173 (builds) → T174 tokens → T175 card → T50 pilot prep (paused) · T183 → T176…T181 alongside the pilot (D272)
   → T176 shell → T177 plan ─┐
                  T178 sync ─┼→ T181 regression + on-device round
                  T179 review screens ─┤
