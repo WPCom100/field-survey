@@ -66,6 +66,9 @@ def auth_config() -> AuthConfig:
 class TeamMember(BaseModel):
     id: str
     name: str
+    # Retired people (D269) stay in the list so history still names them; the picker and the
+    # assignment columns leave them out. Older iPads ignore the field.
+    retired: bool = False
 
 
 class NewMember(BaseModel):
@@ -74,12 +77,17 @@ class NewMember(BaseModel):
 
 def _team(session: SessionDep) -> list[TeamMember]:
     users = session.scalars(select(User).order_by(User.name)).all()
-    return [TeamMember(id=str(u.id), name=u.name) for u in users if not is_system_user(u)]
+    return [
+        TeamMember(id=str(u.id), name=u.name, retired=u.retired_at is not None)
+        for u in users
+        if not is_system_user(u)
+    ]
 
 
 @app.get("/team", dependencies=[Depends(require_token)])
 def team(session: SessionDep) -> list[TeamMember]:
-    """Names for the interim picker (D69): TEAM_NAMES from .env plus anyone already known."""
+    """Names for the interim picker (D69): TEAM_NAMES from .env plus anyone already known.
+    A retired person stays retired even while TEAM_NAMES still lists them (D269)."""
     for name in settings.team_names:
         upsert_user(session, name)
     return _team(session)
@@ -88,6 +96,9 @@ def team(session: SessionDep) -> list[TeamMember]:
 @app.post("/team", dependencies=[Depends(require_token)], status_code=201)
 def add_team_member(body: NewMember, session: SessionDep) -> TeamMember:
     user = upsert_user(session, body.name)
+    if user.retired_at is not None:  # someone typed a retired name: they are back (D269)
+        user.retired_at = None
+        session.commit()
     return TeamMember(id=str(user.id), name=user.name)
 
 

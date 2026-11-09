@@ -204,6 +204,7 @@ def merge_entra_user(session: Session, ident: EntraIdentity, user_id: uuid.UUID 
         if user.entra_oid is not None:
             raise HTTPException(409, {"error": "not_interim", "id": str(user_id)})
         user.entra_oid = ident.oid
+        user.retired_at = None  # a retired person signing in is back (D269)
     log.info(
         json.dumps({"event": "entra_merge" if user_id else "entra_new", "user": str(user_id or "")})
     )

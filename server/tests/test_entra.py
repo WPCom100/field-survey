@@ -4,6 +4,7 @@ JWKS fetch; no network."""
 import json
 import time
 import uuid
+from datetime import UTC, datetime
 
 import jwt
 import pytest
@@ -407,3 +408,14 @@ def test_auth_config_needs_tenant_and_client(client, monkeypatch, field):
     monkeypatch.setattr(settings, "entra_client_id", CLIENT_ID)
     monkeypatch.setattr(settings, field, "")
     assert client.get("/auth/config").json() == {"mode": "entra", "entra": None}
+
+
+def test_adopting_a_retired_row_restores_it(client, session):
+    """D269: a retired person who signs in with Microsoft and says "Yes, I am …" is back."""
+    zach = interim(session, "Zach")
+    zach.retired_at = datetime.now(UTC)
+    session.commit()
+    r = client.post("/me/merge", json={"user_id": str(zach.id)}, headers=bearer(token()))
+    assert r.status_code == 200, r.text
+    session.refresh(zach)
+    assert zach.entra_oid == OID and zach.retired_at is None

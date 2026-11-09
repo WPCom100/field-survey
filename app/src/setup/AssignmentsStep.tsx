@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { useCurrentUser } from '../identity/IdentityGate';
-import { useTeamNames } from '../identity/useTeamNames';
+import { useTeamMembers } from '../identity/useTeamNames';
 import { AssignmentActions, assigneeColumns, loadAssignments, type AssignmentLevel } from './assignments';
 import { SetupError } from './model';
 import { Btn, Notice, Section, styles as w } from './widgets';
@@ -17,7 +17,7 @@ import { Btn, Notice, Section, styles as w } from './widgets';
 export function AssignmentsStep({ projectId, dataKey }: { projectId: string; dataKey: unknown }) {
   const user = useCurrentUser();
   const [store, setStore] = useState<Store | null>(null);
-  const names = useTeamNames(store);
+  const team = useTeamMembers(store);
   const [levels, setLevels] = useState<AssignmentLevel[] | null>(null);
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export function AssignmentsStep({ projectId, dataKey }: { projectId: string; dat
 
   if (!levels) return <Text style={styles.hint}>Loading…</Text>;
   const people = assigneeColumns(
-    [...names].map(([id, name]) => ({ id, name: id === user.id ? `${name} (you)` : name })),
+    team.map((m) => (m.id === user.id ? { ...m, name: `${m.name} (you)` } : m)),
     levels,
   );
   const plural = (n: number) => `${n} level${n === 1 ? '' : 's'}`;

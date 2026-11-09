@@ -16,7 +16,8 @@ const SERVER_KEY = 'survey.server';
 const ENTRA_KEY = 'survey.entra';
 const REFRESH_KEY = 'survey.entraRefresh';
 
-export type TeamMember = { id: string; name: string };
+/** A person from `GET /team`; `retired` (D269) keeps the name on history but off the picker and Assignments. */
+export type TeamMember = { id: string; name: string; retired?: boolean };
 
 /** A Microsoft sign-in on this iPad: the registration, who it is, and the live session. */
 export type MicrosoftAccount = { config: EntraConfig; oid: string | null; email: string | null; session: EntraTokenSource };

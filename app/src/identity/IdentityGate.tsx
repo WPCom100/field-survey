@@ -191,11 +191,18 @@ function Picker({ identity, onDone }: { identity: Identity; onDone: (u: TeamMemb
   return (
     <View style={styles.center}>
       <Text style={styles.title}>Who is surveying?</Text>
-      {team.map((m) => (
-        <Pressable key={m.id} style={styles.button} onPress={() => choose(m)} testID={`identity.user.${m.name}`}>
-          <Text style={styles.buttonText}>{m.name}</Text>
-        </Pressable>
-      ))}
+      {team
+        .filter((m) => !m.retired) // D269: retired people stay named on history, off the picker
+        .map((m) => (
+          <Pressable
+            key={m.id}
+            style={styles.button}
+            onPress={() => choose({ id: m.id, name: m.name })}
+            testID={`identity.user.${m.name}`}
+          >
+            <Text style={styles.buttonText}>{m.name}</Text>
+          </Pressable>
+        ))}
       <TextInput
         style={styles.input}
         value={newName}

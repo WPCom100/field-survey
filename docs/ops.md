@@ -193,6 +193,7 @@ DigitalOcean → Droplet → Power off → Resize → **CPU and RAM only** (keep
 | Prune old images | `docker image prune -f` after an update |
 | Rotate the shared token | new `SURVEY_SHARED_TOKEN` in `.env`, `docker compose up -d api`, then re-enter it on each iPad |
 | Add a team name | `TEAM_NAMES_CSV` in `.env` or `POST /team` |
+| Retire someone (D269) | `docker compose exec api python -m app.users retire <name> …`: off the team picker and Setup → Assignments, still named on History (nothing is deleted). `list` shows everyone (active / retired, signed in / team picker); `restore <name>` undoes it, as does adding the name in the picker or the person adopting the row at a Microsoft sign-in |
 | Rotate the Claude API key (D189) | new key in the Anthropic Console → `ANTHROPIC_API_KEY` in `server/.env.production` on the PC (and `server/.env` for local runs) → `scp` as in §1.6 → `docker compose up -d worker`; revoke the old key last. `CLAUDE_MODEL` sits beside it (`claude-opus-5-5`; `claude-fable-5-1` to step up) |
 | OCR (tesseract) | in the image via `apt-get install tesseract-ocr` (Dockerfile) and in CI; `docker compose exec worker tesseract --version` to check. On the PC: the UB-Mannheim build at `C:\Program Files\Tesseract-OCR` (or `TESSERACT_CMD`), see §4.1 |
 
@@ -250,8 +251,9 @@ Then, in `server/.env.production` (and `scp` as in §1.6):
    offers **Sign in with Microsoft**.
 2. Each person signs in on the T04 build; the first sign-in offers to merge their picker name
    (same user id, history kept). Check: `docker compose exec postgres psql -U survey -c
-   "select name, email, entra_oid is not null as signed_in from app_user order by name"`.
-3. When every person shows `signed_in`, `AUTH_MODE=entra` and `docker compose up -d api`; the
+   "select name, email, entra_oid is not null as signed_in, retired_at from app_user order by name"`
+   (or `docker compose exec api python -m app.users list`).
+3. When every active (not retired, D269) person shows `signed_in`, `AUTH_MODE=entra` and `docker compose up -d api`; the
    shared token then opens nothing. The Mac rig stays on `token` (`rig.sh signin` steps its local
    server through `both` and `entra` with a fake registration and back). An iPad still on the
    team picker then reads "Sign-in needed to sync" and offers **Sign in with Microsoft**; its edits

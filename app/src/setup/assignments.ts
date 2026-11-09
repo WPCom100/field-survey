@@ -45,17 +45,22 @@ export async function loadAssignments(store: Store, projectId: string): Promise<
 }
 
 /**
- * The people to show as columns: the team list first (in its order), then anyone assigned who is
- * not on it (a name removed from the team keeps its assignments visible, so they can be undone).
+ * The people to show as columns: the team list first (in its order, retired people left out —
+ * D269), then anyone assigned who is not among them (a retired person, or a name gone from the
+ * team, keeps their assignments visible under their name, so they can be undone).
  */
-export function assigneeColumns(team: ReadonlyArray<{ id: string; name: string }>, levels: AssignmentLevel[]): { id: string; name: string }[] {
-  const out = team.map((m) => ({ id: m.id, name: m.name }));
+export function assigneeColumns(
+  team: ReadonlyArray<{ id: string; name: string; retired?: boolean }>,
+  levels: AssignmentLevel[],
+): { id: string; name: string }[] {
+  const out = team.filter((m) => !m.retired).map((m) => ({ id: m.id, name: m.name }));
   const seen = new Set(out.map((m) => m.id));
+  const known = new Map(team.map((m) => [m.id, m.name]));
   for (const l of levels) {
     for (const u of l.userIds) {
       if (seen.has(u)) continue;
       seen.add(u);
-      out.push({ id: u, name: `user …${u.slice(-6)}` });
+      out.push({ id: u, name: known.get(u) ?? `user …${u.slice(-6)}` });
     }
   }
   return out;

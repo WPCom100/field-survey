@@ -81,6 +81,18 @@ describe('level assignments (T97, D168)', () => {
     ]);
   });
 
+  it('columns leave retired people out unless they still hold a level, then by their name (D269)', () => {
+    const team = [
+      { id: ME, name: 'Landry' },
+      { id: ANN, name: 'Ann', retired: true },
+      { id: BOB, name: 'Bob', retired: true },
+    ];
+    expect(assigneeColumns(team, [{ id: 'l', code: '06', inScope: true, userIds: [] }])).toEqual([{ id: ME, name: 'Landry' }]);
+    expect(assigneeColumns(team, [{ id: 'l', code: '06', inScope: true, userIds: [BOB] }])).toEqual([
+      { id: ME, name: 'Landry' }, { id: BOB, name: 'Bob' },
+    ]);
+  });
+
   it("after a sync, the assignee's Levels home shows ● and the filter on their levels only", async () => {
     const server = new FakeServer();
     const { store: landry, pid, ids, actions } = await tower('ipad-landry');

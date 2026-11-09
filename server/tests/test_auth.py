@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app import auth
+from app import auth, users
 from app.config import settings
 from app.main import app
 from app.models import User
@@ -70,3 +70,34 @@ def test_unknown_auth_mode_is_refused(client, monkeypatch):
     monkeypatch.setattr(settings, "auth_mode", "jwt")
     assert client.get("/team", headers=hdr()).status_code == 500
     assert client.get("/health").status_code == 200
+
+
+def test_retired_people_stay_named_but_flagged(client, session):
+    """D269: retired people stay in /team (history still names them) with `retired`; TEAM_NAMES
+    listing them does not bring them back; adding the name in the picker does."""
+    client.get("/team", headers=hdr())  # creates Ann and Bob from TEAM_NAMES
+    assert users.set_retired(session, ["  bob "], True) == ["Bob: retired"]
+    team = {m["name"]: m["retired"] for m in client.get("/team", headers=hdr()).json()}
+    assert team == {"Ann": False, "Bob": True}
+    assert users.set_retired(session, ["Bob"], True) == ["Bob: already retired"]
+    # the edits keep their author: the row is the same and the header still resolves to it
+    bob = session.scalars(select(User).where(User.name == "Bob")).one()
+    assert client.get("/me", headers=hdr(user="Bob")).json()["id"] == str(bob.id)
+    r = client.post("/team", json={"name": "bob"}, headers=hdr())
+    assert r.status_code == 201 and r.json() == {"id": str(bob.id), "name": "Bob", "retired": False}
+    assert not any(m["retired"] for m in client.get("/team", headers=hdr()).json())
+
+
+def test_retire_cli_refuses_unknown_names_and_skips_system_users(client, session):
+    client.get("/team", headers=hdr())
+    auth.system_user(session, "import")
+    session.commit()
+    with pytest.raises(SystemExit, match="No such person: import, Zed"):
+        users.set_retired(session, ["Ann", "import", "Zed"], True)
+    session.expire_all()
+    assert session.scalars(select(User).where(User.retired_at.is_not(None))).first() is None
+    assert users.set_retired(session, ["Ann"], True) == ["Ann: retired"]
+    ann = users.listing(session)[0].split("\t")
+    assert ann[0] == "Ann" and ann[1].startswith("retired 20") and ann[2] == "team picker"
+    assert users.set_retired(session, ["ann"], False) == ["Ann: restored"]
+    assert [line.split("\t")[1] for line in users.listing(session)] == ["active", "active"]

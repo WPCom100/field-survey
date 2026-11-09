@@ -76,6 +76,9 @@ class User(Id, Base):
     email: Mapped[str | None]
     last_seen: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # Retired (D269): off the team picker and the assignment columns, still named on history.
+    # Never deleted — every op keeps its author. `python -m app.users retire|restore`.
+    retired_at: Mapped[datetime | None]
 
 
 class Project(Id, Synced, Base):
