@@ -17,5 +17,6 @@ name: F2 — punch, parts and Conns lists
     file: _open-level.yaml
     env:
       LEVEL: 06M
+- runFlow: _plan-tools.yaml     # T177: Filter, Legend, the rail's sidebar overlay
 - runFlow: _lists-conns.yaml
 - runFlow: _lists-punch.yaml

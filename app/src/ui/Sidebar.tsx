@@ -58,7 +58,11 @@ export const navId = (name: string) => `nav.${name.toLowerCase().replace(/[^a-z]
 
 export type SidebarProps = {
   /** The screen the sidebar sits on (drawn active, takes no tap). */
-  active: NavName;
+  active?: NavName;
+  /** The section the screen belongs to (the plan is under Levels): drawn active, still opens it (T177). */
+  section?: NavName;
+  /** Called before an entry navigates (the plan closes its sidebar overlay, T177). */
+  onNavigate?: () => void;
   /** The project the entries open; none = they are drawn dim and take no tap. */
   projectId: string | null;
   projectName: string | null;
@@ -69,11 +73,15 @@ export type SidebarProps = {
   extra?: ReactNode;
 };
 
-export function Sidebar({ active, projectId, projectName, counts, user, extra }: SidebarProps) {
+export function Sidebar({ active, section, onNavigate, projectId, projectName, counts, user, extra }: SidebarProps) {
   const router = useRouter();
+  const go = (href: Href) => {
+    onNavigate?.();
+    router.push(href);
+  };
   return (
     <View style={styles.root}>
-      <Pressable onPress={() => router.push('/projects')} style={({ pressed }) => [styles.project, pressed && styles.pressed]} testID="nav.projects" accessibilityRole="button" accessibilityHint="Switch, refresh or create a project">
+      <Pressable onPress={() => go('/projects')} style={({ pressed }) => [styles.project, pressed && styles.pressed]} testID="nav.projects" accessibilityRole="button" accessibilityHint="Switch, refresh or create a project">
         <View style={styles.projectText}>
           <Text style={styles.projectName} numberOfLines={1}>
             {projectName ?? 'No project'}
@@ -96,6 +104,8 @@ export function Sidebar({ active, projectId, projectName, counts, user, extra }:
                 icon={e.icon}
                 href={projectId ? e.href(projectId) : null}
                 active={e.name === active}
+                current={e.name === section}
+                onGo={go}
                 count={e.count ? counts?.[e.count] : undefined}
               />
             ))}
@@ -105,8 +115,8 @@ export function Sidebar({ active, projectId, projectName, counts, user, extra }:
       </ScrollView>
 
       <View style={styles.bottom}>
-        <NavItem name="Sync" icon="sync" href="/sync" active={active === 'Sync'} />
-        <Pressable onPress={() => router.push('/sync')} style={({ pressed }) => [styles.item, styles.user, pressed && styles.pressed]} testID="nav.user" accessibilityRole="button" accessibilityLabel={user.label}>
+        <NavItem name="Sync" icon="sync" href="/sync" active={active === 'Sync'} onGo={go} />
+        <Pressable onPress={() => go('/sync')} style={({ pressed }) => [styles.item, styles.user, pressed && styles.pressed]} testID="nav.user" accessibilityRole="button" accessibilityLabel={user.label}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user.name.slice(0, 1).toUpperCase()}</Text>
           </View>
@@ -124,13 +134,13 @@ export function Sidebar({ active, projectId, projectName, counts, user, extra }:
   );
 }
 
-function NavItem({ name, icon, href, active, count }: { name: NavName; icon: IconName; href: Href | null; active: boolean; count?: number }) {
-  const router = useRouter();
-  const fg = active ? color.primary : href ? color.text : color.text3;
+function NavItem({ name, icon, href, active, current, onGo, count }: { name: NavName; icon: IconName; href: Href | null; active: boolean; current?: boolean; onGo: (href: Href) => void; count?: number }) {
+  const lit = active || !!current;
+  const fg = lit ? color.primary : href ? color.text : color.text3;
   const body = (
     <>
       <Icon name={icon} size={20} color={fg} strokeWidth={1.8} />
-      <Text style={[styles.itemText, { color: fg }, active && styles.itemTextActive]} numberOfLines={1}>
+      <Text style={[styles.itemText, { color: fg }, lit && styles.itemTextActive]} numberOfLines={1}>
         {name}
       </Text>
       {count ? (
@@ -148,7 +158,7 @@ function NavItem({ name, icon, href, active, count }: { name: NavName; icon: Ico
     );
   }
   return (
-    <Pressable onPress={() => router.push(href)} style={({ pressed }) => [styles.item, pressed && styles.pressed]} testID={navId(name)} accessibilityRole="link">
+    <Pressable onPress={() => onGo(href)} style={({ pressed }) => [styles.item, current && styles.itemActive, pressed && styles.pressed]} testID={navId(name)} accessibilityRole="link">
       {body}
     </Pressable>
   );

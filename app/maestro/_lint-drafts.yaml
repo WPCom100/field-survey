@@ -35,9 +35,12 @@ appId: productions.luminarytechnology.fieldsurvey
     index: 0
 - extendedWaitUntil:
     visible:
-      id: plan.back
-      text: ◀ 01
+      id: plan.title          # T177: the code is the toolbar's title; ◀ names the screen under the plan
+      text: '01'
     timeout: 15000
+- assertVisible:
+    id: plan.back
+    text: Lint
 - tapOn:
     id: plan.back
 - extendedWaitUntil:

@@ -17,7 +17,8 @@ name: F3 — long-press additions, the card's menu, quick actions
     text: '⤓ Download plan now'
     optional: true
 - extendedWaitUntil:
-    visible: ⊕ Place
+    visible:
+      id: plan.place           # T177: "Place device" in the toolbar, shown once the sheet is drawn
     timeout: 60000
 - runFlow: _additions-add.yaml
 - runFlow: _additions-menu.yaml

@@ -12,6 +12,7 @@ import { labelKind, type GridSet, type GridTap } from '@field-survey/core';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { color, font, hit, radius, space } from '../ui/tokens';
 import { GRID_SET_COLORS } from './drawLayers';
 
 export type GridPanelMode = 'idle' | 'test' | 'calibrate';
@@ -105,7 +106,7 @@ export function GridPanel(props: GridPanelProps) {
                     value={label}
                     onChangeText={setLabel}
                     placeholder="A, H, 9, C., 13.5…"
-                    placeholderTextColor="#888"
+                    placeholderTextColor={color.text3}
                     autoCapitalize="characters"
                     autoCorrect={false}
                     autoFocus
@@ -126,8 +127,8 @@ export function GridPanel(props: GridPanelProps) {
               <Text style={styles.muted}>Dashed rings: the bubbles this set would claim. If one sits beside its printed bubble instead of on it, a tap or a label is wrong: Undo tap.</Text>
             ) : null}
             <Text style={styles.label}>New set</Text>
-            <TextInput style={styles.input} value={newName} onChangeText={setNewName} placeholder="Name (optional, e.g. Walter Tower)" placeholderTextColor="#888" />
-            <TextInput style={styles.input} value={newPrefix} onChangeText={setNewPrefix} placeholder="Prefix for Drawing Position (e.g. WT)" placeholderTextColor="#888" autoCapitalize="characters" autoCorrect={false} />
+            <TextInput style={styles.input} value={newName} onChangeText={setNewName} placeholder="Name (optional, e.g. Walter Tower)" placeholderTextColor={color.text3} />
+            <TextInput style={styles.input} value={newPrefix} onChangeText={setNewPrefix} placeholder="Prefix for Drawing Position (e.g. WT)" placeholderTextColor={color.text3} autoCapitalize="characters" autoCorrect={false} />
             <View style={styles.row}>
               <Pressable style={[styles.btn, !canFinish && styles.btnOff]} disabled={!canFinish} onPress={() => props.onFinishCalibrate(newName.trim(), newPrefix.trim())}>
                 <Text style={styles.btnText}>Finish</Text>
@@ -150,15 +151,15 @@ function SetRow({ index, set, canEdit, onRename, onRemove }: { index: number; se
   const [name, setName] = useState(set.name);
   const [prefix, setPrefix] = useState(set.prefix);
   const dirty = name.trim() !== set.name || prefix.trim() !== set.prefix;
-  const color = GRID_SET_COLORS[index % GRID_SET_COLORS.length]!;
+  const setColor = GRID_SET_COLORS[index % GRID_SET_COLORS.length]!;
   const cols = set.col_labels;
   const rows = set.row_labels;
   const range = (l: typeof cols) => (l.length ? `${l[0]!.label}–${l[l.length - 1]!.label}` : '—');
   return (
-    <View style={[styles.set, { borderLeftColor: color }]}>
+    <View style={[styles.set, { borderLeftColor: setColor }]}>
       <View style={styles.row}>
-        <TextInput style={[styles.input, styles.flex]} value={name} onChangeText={setName} editable={canEdit} placeholder="Name" placeholderTextColor="#888" />
-        <TextInput style={[styles.input, styles.prefix]} value={prefix} onChangeText={setPrefix} editable={canEdit} placeholder="Prefix" placeholderTextColor="#888" autoCapitalize="characters" autoCorrect={false} />
+        <TextInput style={[styles.input, styles.flex]} value={name} onChangeText={setName} editable={canEdit} placeholder="Name" placeholderTextColor={color.text3} />
+        <TextInput style={[styles.input, styles.prefix]} value={prefix} onChangeText={setPrefix} editable={canEdit} placeholder="Prefix" placeholderTextColor={color.text3} autoCapitalize="characters" autoCorrect={false} />
       </View>
       <Text style={styles.setLine}>
         {set.mode === 'auto' ? '● auto' : set.mode === 'manual' ? '● manual' : '○ not usable — calibrate by hand'}
@@ -185,29 +186,29 @@ function SetRow({ index, set, canEdit, onRename, onRemove }: { index: number; se
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
-  head: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8, gap: 3, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  back: { fontSize: 15, color: '#1565c0', fontWeight: '600' },
-  title: { fontSize: 18, fontWeight: '700' },
-  body: { padding: 12, gap: 8, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: '700', color: '#333', marginTop: 6 },
-  muted: { fontSize: 12, color: '#777' },
-  hint: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
-  error: { color: '#b71c1c', fontSize: 13 },
-  result: { fontSize: 16, fontWeight: '700', color: '#111' },
+  head: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: space.sm, gap: 3, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: color.hairline },
+  back: { ...font.calloutBold, color: color.primary },
+  title: { ...font.headline, color: color.text },
+  body: { padding: space.md, gap: space.sm, paddingBottom: 40 },
+  label: { ...font.captionBold, color: color.text2, marginTop: 6 },
+  muted: { ...font.caption, color: color.text3 },
+  hint: { ...font.captionBold, color: color.primary },
+  error: { ...font.caption, color: color.danger },
+  result: { ...font.headline, color: color.text },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 7, fontSize: 15, backgroundColor: '#fff', minWidth: 90 },
+  input: { borderWidth: 1, borderColor: color.border, borderRadius: radius.control, paddingHorizontal: space.sm, minHeight: hit.control, ...font.callout, color: color.text, backgroundColor: color.surface, minWidth: 90 },
   prefix: { width: 90 },
-  set: { borderLeftWidth: 4, paddingLeft: 8, gap: 4, paddingVertical: 4 },
-  setLine: { fontSize: 12, color: '#555' },
-  tap: { fontSize: 13, color: '#222' },
-  pending: { gap: 6, padding: 8, borderRadius: 6, backgroundColor: '#e3f2fd' },
-  btn: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, backgroundColor: '#1565c0' },
-  btnSmall: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: '#1565c0' },
-  btnOn: { backgroundColor: '#0d47a1' },
+  set: { borderLeftWidth: 4, paddingLeft: space.sm, gap: 4, paddingVertical: 4 },
+  setLine: { ...font.caption, color: color.text2 },
+  tap: { ...font.caption, color: color.text },
+  pending: { gap: 6, padding: space.sm, borderRadius: radius.control, backgroundColor: color.primaryTint },
+  btn: { paddingHorizontal: space.md, minHeight: hit.control, justifyContent: 'center', borderRadius: radius.control, backgroundColor: color.primary },
+  btnSmall: { paddingHorizontal: 10, minHeight: hit.small, justifyContent: 'center', borderRadius: radius.control, backgroundColor: color.primary },
+  btnOn: { backgroundColor: color.primaryPressed },
   btnOff: { opacity: 0.4 },
-  btnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  btnTextOn: { color: '#fff' },
-  btnPlain: { paddingHorizontal: 10, paddingVertical: 8 },
-  btnPlainText: { color: '#1565c0', fontSize: 14, fontWeight: '600' },
+  btnText: { ...font.calloutBold, color: color.onPrimary },
+  btnTextOn: { color: color.onPrimary },
+  btnPlain: { paddingHorizontal: 10, minHeight: hit.control, justifyContent: 'center' },
+  btnPlainText: { ...font.calloutBold, color: color.primary },
   disabled: { opacity: 0.4 },
 });

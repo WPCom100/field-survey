@@ -6,27 +6,30 @@
  *
  * Per pin (D64, Phase 3 §2.2): shape = role (T112), fill = status (hollow red for `Not installed`),
  * a glyph inside as the non-colour signal, the ID label below (labels layer), a "+" corner mark
- * for field additions, a camera mark with the photo count (photos layer), a cyan ring when
- * selected, an amber ring while in review (Phase 3 §13). Side B of a pin conflict (T26) is a
+ * for field additions, a camera mark with the photo count (photos layer), an accent ring when
+ * selected (`ring.selected`, the `primary` token since T177; it was cyan), an amber ring while in
+ * review (Phase 3 §13). Side B of a pin conflict (T26) is a
  * dashed outline in the status colour with a "B" glyph. A cluster is a circle in its most urgent member's colour with the member count.
  */
 
 import { PaintStyle, Skia, type SkCanvas, type SkFont, type SkPath } from '@shopify/react-native-skia';
 
+import { ring } from '../ui/tokens';
 import type { PinLayout, RenderPin } from './layout';
 import { pinShape, type PinShapeMap } from './pins';
 
 export const PIN_PX = 26;
-const SELECT = '#00bcd4';
+const SELECT: string = ring.selected;
 const HALO = '#ffffff';
 const INK = '#111111';
-const REVIEW = '#ff8f00';
+const REVIEW: string = ring.review;
 
 export type PinFonts = { glyph: SkFont; label: SkFont; badge: SkFont };
 /** `shapes`: the app library's role → shape (T104); the defaults when absent. */
 export type PinDrawOptions = { labels: boolean; photos: boolean; selectedId: string | null; shapes?: PinShapeMap | null };
 
-function shapeAt(role: string | null, cx: number, cy: number, size: number, shapes?: PinShapeMap | null): SkPath {
+/** The pin's outline at (cx, cy), `size` points across: also the legend's shapes (T177). */
+export function shapeAt(role: string | null, cx: number, cy: number, size: number, shapes?: PinShapeMap | null): SkPath {
   'worklet';
   const shape = pinShape(role, size, shapes);
   const path = Skia.Path.Make();

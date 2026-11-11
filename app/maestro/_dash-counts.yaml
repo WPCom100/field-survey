@@ -75,8 +75,11 @@ appId: productions.luminarytechnology.fieldsurvey
       id: card.close
     timeout: 15000
 - assertVisible:
+    id: plan.title             # T177: the code is the toolbar's title; ◀ names the screen under the plan
+    text: '01'
+- assertVisible:
     id: plan.back
-    text: ◀ 01
+    text: Dashboard
 - tapOn:
     id: plan.back
 - extendedWaitUntil:

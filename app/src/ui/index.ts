@@ -11,3 +11,4 @@ export { Swatch, type SwatchProps } from './Swatch';
 export { Card, Row, RowText, Section, type CardProps, type RowProps, type SectionProps } from './Card';
 export { Banner, Empty, Toast, type BannerProps, type BannerTone, type EmptyProps, type ToastProps } from './Banner';
 export { Sidebar, NAV_GROUPS, navId, type NavName, type SidebarProps } from './Sidebar';
+export { Rail, RAIL_WIDTH, railId, type RailProps } from './Rail';

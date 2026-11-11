@@ -79,6 +79,11 @@ export function isFiltering(f: PlanFilter): boolean {
   return f.categories.length > 0 || f.statuses.length > 0 || f.owners.length > 0 || f.openPunch;
 }
 
+/** The Filter button's count (T177, `docs/ui-plan.md` §6): how many of the four groups narrow the view. */
+export function activeFilterGroups(f: PlanFilter): number {
+  return [f.categories.length > 0, f.statuses.length > 0, f.owners.length > 0, f.openPunch].filter(Boolean).length;
+}
+
 /** Toggle `value` in a multi-select list, keeping the order of `all`. */
 export function toggle<T>(list: readonly T[], value: T, all: readonly T[]): T[] {
   const on = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];

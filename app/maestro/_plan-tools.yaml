@@ -1,0 +1,72 @@
+# T177 on an open plan (06M of a seed copy): the toolbar's words (◀ Levels, the code as the title,
+# "Level 6 mezzanine · n devices"); one Filter button whose count is the groups in use, its popover
+# with Clear; the Legend popover (shape by role, the status swatches, the two rings); the rail's
+# top button opening the full sidebar over the plan and a tap beside it closing it. Leaves the
+# filter cleared (filters persist per level on this iPad).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- assertVisible:
+    id: plan.back
+    text: Levels
+- assertVisible:
+    id: plan.title
+    text: 06M
+- assertVisible: 'Level 6 mezzanine · \d+ devices'
+# Filter: two groups → "2 active", narrows the lists; Clear → back to all
+- tapOn:
+    id: plan.filter
+- assertVisible:
+    id: plan.filter.card
+- tapOn:
+    id: plan.filter.status.Issue
+- assertVisible:
+    id: plan.filter
+    text: 'Filter, 1 active'
+- tapOn:
+    id: plan.filter.owner.EC
+- assertVisible:
+    id: plan.filter
+    text: 'Filter, 2 active'
+- tapOn:
+    point: 10%,92%             # beside the popover: the scrim closes it
+- assertNotVisible:
+    id: plan.filter.card
+- assertVisible:
+    id: plan.side.note
+    text: 'Filtered · .*'
+- tapOn:
+    id: plan.filter
+- tapOn:
+    id: plan.filter.clear
+- assertVisible:
+    id: plan.filter
+    text: Filter
+- tapOn:
+    point: 10%,92%
+- assertVisible:
+    id: plan.side.note
+    text: 'All · .*'
+# Legend: shapes by role and the statuses with the rings
+- tapOn:
+    id: plan.legend
+- assertVisible: Shape is the type
+- assertVisible: Colour is the status
+- assertVisible: Equipment rack
+- assertVisible: In review
+- assertVisible: Selected
+- tapOn:
+    point: 10%,92%
+- assertNotVisible: Shape is the type
+# the rail: its top button shows the full sidebar over the plan; a tap beside it closes it
+- assertVisible:
+    id: rail.needs-review
+- tapOn:
+    id: rail.menu
+- assertVisible:
+    id: nav.projects
+- assertVisible:
+    id: nav.levels
+- tapOn:
+    id: rail.scrim
+- assertNotVisible:
+    id: nav.projects

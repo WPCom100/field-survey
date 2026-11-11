@@ -34,7 +34,9 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: end.other.jump
 - extendedWaitUntil:
-    visible: ◀ 04
+    visible:
+      id: plan.title           # T177: the code is the toolbar's title
+      text: '04'
     timeout: 15000
 - extendedWaitUntil:
     visible: '04-01'

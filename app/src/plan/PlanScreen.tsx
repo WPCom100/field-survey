@@ -65,7 +65,7 @@ import {
   type StrokePoint,
 } from '@field-survey/core';
 import { draftFromSelection, type RulingDraft } from '@field-survey/rules';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -73,13 +73,14 @@ import {
   type LayoutChangeEvent,
   PanResponder,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Pdf, { type PdfRef } from 'react-native-pdf';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedValue } from 'react-native-reanimated';
 
 import { movePin } from '../card/actions';
@@ -90,7 +91,7 @@ import { ItemEditor } from '../items/ItemEditor';
 import { AddDevicePanel } from '../additions/AddDevicePanel';
 import { PlacePanel } from '../placement/PlacePanel';
 import { loadUnplaced, tagProposals, type LevelUnplaced, type Proposal } from '../placement/model';
-import { INK_COLORS, photoMarkAt } from '../ink/geometry';
+import { INK_COLORS, PHOTO_MARK_COLOR, photoMarkAt } from '../ink/geometry';
 import { InkCapture, type InkTool } from '../ink/InkCapture';
 import { createInkBus } from '../ink/touches';
 import { recordStrokes } from '../ink/render';
@@ -104,6 +105,7 @@ import { logTo } from '../log';
 import { LIST_ENTITY } from '../rulings/model';
 import type { PhotoTarget } from '../photo/model';
 import { PhotoFlow, pickFromLibrary, type PhotoRequest } from '../photo/PhotoFlow';
+import { Btn, Chip, Icon, RAIL_WIDTH, Rail, Sidebar, Swatch, color, font, hit, radius, shadow, space, tabular, type IconName } from '../ui';
 
 import { loadLevelPlan, pinLabel, type LevelPlan, type PlanDevice, type PlanSheet } from './data';
 import { PIN_PX } from './drawPins';
@@ -114,6 +116,7 @@ import {
   OWNERS,
   UNSURVEYED,
   STATUS_KEYS,
+  activeFilterGroups,
   isFiltering,
   matchesFilter,
   parsePrefs,
@@ -137,7 +140,9 @@ import {
   type ListRow,
   type Tab,
 } from './lists';
-import { BadgeStrip, Swatch, chipStyles } from './chips';
+import { BadgeStrip, chipStyles } from './chips';
+import { Legend } from './Legend';
+import { levelCaption } from './toolbar';
 import { PinOverlay } from './PinOverlay';
 import { GridPanel, type GridPanelMode } from './GridPanel';
 import type { GridMark } from './drawLayers';
@@ -180,7 +185,16 @@ const REVIEW_B_PIN_ID = '__review_b__';
 /** Grid calibration edits on `sheet.grid_sets` (T45): project setup, not a survey finding. */
 const GRID_EDIT: EditContext = { change_type: 'Master edit', reason: 'Grid calibration' };
 
-type Menu = 'category' | 'status' | 'owner' | 'layers' | null;
+/** The popover open over the plan (T177, `docs/ui-plan.md` §6): one at a time, a tap outside closes it. */
+type Menu = 'filter' | 'layers' | 'legend' | null;
+
+/** What the rail and its sidebar overlay show (T177); the route loads it (`home/useShell.ts`). */
+export type PlanShell = {
+  projectName: string | null;
+  counts: { review?: number; lint?: number };
+  /** The signed-in person: name, the line under it (this iPad), and the row's spoken label. */
+  user: { name: string; sub: string; label: string };
+};
 
 export type PlanScreenProps = {
   store: Store;
@@ -188,7 +202,11 @@ export type PlanScreenProps = {
   /** A `file://` or asset URI for the sheet, or null when its bytes are not on this iPad. */
   resolveSheetUri: (sheet: PlanSheet) => string | null;
   onBack: () => void;
-  /** Right side of the top bar (global status, T18/T25). */
+  /** The back button's word: the screen ◀ returns to (`backLabelFor`); "Levels" by default. */
+  backLabel?: string;
+  /** The 72-pt rail and its sidebar overlay (T177); none on the demo plan. */
+  shell?: PlanShell;
+  /** Replaces the line under the level code (the demo plan's "Demo data — not synced"). */
   status?: string;
   /** Changes when the store may have changed underneath (a sync brought ops): reload. */
   reloadKey?: unknown;
@@ -306,6 +324,11 @@ export function PlanScreen(props: PlanScreenProps) {
   const afterDismiss = useRef<(() => void) | null>(null);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
+  /** The rail's top button: the full sidebar over the screen (T177). */
+  const [navOpen, setNavOpen] = useState(false);
+  /** Where the Filter button sits in the toolbar, for its popover. */
+  const [filterX, setFilterX] = useState(0);
+  const win = useWindowDimensions();
   const [tab, setTab] = useState<Tab>('devices');
   const [lists, setLists] = useState<LevelLists | null>(null);
   const [query, setQuery] = useState('');
@@ -315,7 +338,6 @@ export function PlanScreen(props: PlanScreenProps) {
   const [picked, setPicked] = useState<ReadonlySet<string> | null>(null);
   useEffect(() => setPicked(null), [tab, levelId]);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const insets = useSafeAreaInsets();
 
   const matrix = useSharedValue<Affine | null>(null);
   const vpRef = useRef<PdfViewport | null>(null);
@@ -1017,51 +1039,83 @@ export function PlanScreen(props: PlanScreenProps) {
 
   const filtering = isFiltering(prefs.filter);
   const notOnPlan = visible.length - placed.length;
+  const filterCount = activeFilterGroups(prefs.filter);
+  /** The sheet is on screen: Ink, Place device and Fit / Grid act on it. */
+  const sheetShown = !!plan?.sheet && !!sheetUri && !error;
+  const railW = props.shell ? RAIL_WIDTH : 0;
+  const toggleMenu = (m: Exclude<Menu, null>) => setMenu(menu === m ? null : m);
 
   return (
     <View style={styles.root}>
-      {/* top bar */}
-      <View style={[styles.bar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={onBack} style={styles.back} hitSlop={8} testID="plan.back">
-          <Text style={styles.backText}>◀ {plan?.level.code ?? '…'}</Text>
-        </Pressable>
-        <BarButton label="Category" count={prefs.filter.categories.length} open={menu === 'category'} onPress={() => setMenu(menu === 'category' ? null : 'category')} />
-        <BarButton label="Status" count={prefs.filter.statuses.length} open={menu === 'status'} onPress={() => setMenu(menu === 'status' ? null : 'status')} />
-        <BarButton label="Owner" count={prefs.filter.owners.length} open={menu === 'owner'} onPress={() => setMenu(menu === 'owner' ? null : 'owner')} />
-        <Pressable style={[styles.chip, prefs.filter.openPunch && styles.chipOn]} onPress={() => {
+      {props.shell ? (
+        <Rail
+          section="Levels"
+          projectId={projectId}
+          counts={props.shell.counts}
+          user={props.shell.user}
+          onMenu={() => {
             setMenu(null);
-            setFilter((f) => ({ ...f, openPunch: !f.openPunch }));
-          }}>
-          <Text style={[styles.chipText, prefs.filter.openPunch && styles.chipTextOn]}>{prefs.filter.openPunch ? '☑' : '☐'} Open punch</Text>
-        </Pressable>
-        {filtering ? (
-          <Pressable
-            style={styles.chip}
-            onPress={() => {
-              setMenu(null);
-              setFilter(() => EMPTY_FILTER);
-            }}>
-            <Text style={styles.chipText}>Clear</Text>
-          </Pressable>
-        ) : null}
-        <TextInput
-          style={styles.search}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search"
-          placeholderTextColor="#888"
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-          testID="plan.search"
+            setNavOpen(true);
+          }}
         />
+      ) : null}
+
+      <View style={styles.main}>
+      {/* toolbar (the board): ◀ back · code and name · Search · Filter · Ink · Place device */}
+      <View style={styles.bar}>
+        <Pressable onPress={onBack} style={({ pressed }) => [styles.back, pressed && styles.pressedBg]} hitSlop={4} testID="plan.back" accessibilityRole="button">
+          <Icon name="chevronLeft" size={22} color={color.primary} strokeWidth={2.2} />
+          <Text style={styles.backText} numberOfLines={1}>
+            {props.backLabel ?? 'Levels'}
+          </Text>
+        </Pressable>
+        <View style={styles.barRule} />
+        <View style={styles.titleBox}>
+          <Text style={styles.titleCode} numberOfLines={1} testID="plan.title">
+            {plan?.level.code ?? '…'}
+          </Text>
+          <Text style={styles.titleSub} numberOfLines={1}>
+            {status ?? (plan ? levelCaption(plan.level.code, plan.devices.filter((d) => !d.deleted).length) : ' ')}
+          </Text>
+        </View>
+        <View style={styles.search}>
+          <Icon name="search" size={18} color={color.text3} />
+          <TextInput
+            style={styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search"
+            placeholderTextColor={color.text3}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+            testID="plan.search"
+          />
+        </View>
+        <Pressable
+          onLayout={(e) => setFilterX(e.nativeEvent.layout.x)}
+          onPress={() => toggleMenu('filter')}
+          style={({ pressed }) => [styles.tb, (filterCount > 0 || menu === 'filter') && styles.tbOn, pressed && styles.pressedBg]}
+          testID="plan.filter"
+          accessibilityRole="button"
+          accessibilityLabel={filterCount ? `Filter, ${filterCount} active` : 'Filter'}
+        >
+          <Icon name="filter" size={20} color={filterCount > 0 || menu === 'filter' ? color.primary : color.text} strokeWidth={1.8} />
+          <Text style={[styles.tbText, (filterCount > 0 || menu === 'filter') && styles.tbTextOn]}>Filter</Text>
+          {filterCount ? (
+            <View style={styles.count}>
+              <Text style={styles.countText}>{filterCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
         <View style={styles.spacer} />
-        <BarButton label="Layers" open={menu === 'layers'} onPress={() => setMenu(menu === 'layers' ? null : 'layers')} testID="plan.layers" />
-        {status ? <Text style={styles.status} numberOfLines={1}>{status}</Text> : null}
+        {sheetShown && canInk && !drawing ? <IconBtn icon="ink" label="Ink" onPress={() => startDrawing('pen')} testID="plan.ink" /> : null}
+        {sheetShown && editor && !drawing && !placing ? (
+          <Btn kind="primary" title="Place device" icon={<Icon name="plusCircle" size={20} color={color.onPrimary} />} onPress={startPlacing} testID="plan.place" />
+        ) : null}
       </View>
 
-      <View style={styles.body}>
         {/* plan */}
         <View style={styles.plan} onLayout={onLayout} ref={planRef}>
           {error ? (
@@ -1076,9 +1130,7 @@ export function PlanScreen(props: PlanScreenProps) {
                 Plan not downloaded — {plan.level.code}'s sheet is not on this iPad yet. Use the list on the right; the sheet downloads with the next sync on Wi-Fi.
               </Text>
               {props.blobs && plan.sheet.blob ? (
-                <Pressable style={styles.tool} onPress={downloadSheet} disabled={sheetFetch === 'busy'}>
-                  <Text style={styles.toolText}>{sheetFetch === 'busy' ? 'Downloading…' : '⤓ Download plan now'}</Text>
-                </Pressable>
+                <Btn kind="primary" title={sheetFetch === 'busy' ? 'Downloading…' : '⤓ Download plan now'} onPress={downloadSheet} disabled={sheetFetch === 'busy'} />
               ) : null}
               {sheetFetch && sheetFetch !== 'busy' ? <Text style={styles.centeredText}>{sheetFetch}</Text> : null}
             </View>
@@ -1239,9 +1291,7 @@ export function PlanScreen(props: PlanScreenProps) {
                     {conflictNote ? <Text style={styles.conflictError}>{conflictNote}</Text> : null}
                   </View>
                   {(['A', 'B'] as const).map((choice) => (
-                    <Pressable key={choice} style={[styles.conflictBtn, !editor && { opacity: 0.4 }]} disabled={!editor} onPress={() => void resolvePin(choice)}>
-                      <Text style={styles.conflictBtnText}>Choose {choice}</Text>
-                    </Pressable>
+                    <Btn key={choice} kind="primary" small title={`Choose ${choice}`} disabled={!editor} onPress={() => void resolvePin(choice)} />
                   ))}
                 </View>
               ) : null}
@@ -1266,42 +1316,38 @@ export function PlanScreen(props: PlanScreenProps) {
                   <Text style={styles.moveText}>Pick a device in the list on the right, then tap where it is on the plan — or tap a dashed pin.</Text>
                 </View>
               ) : null}
-              <View style={styles.planTools}>
-                {editor && !drawing && !placing ? (
-                  <Pressable style={styles.tool} onPress={startPlacing} testID="plan.place">
-                    <Text style={styles.toolText}>⊕ Place</Text>
-                  </Pressable>
-                ) : null}
-                {canInk && !drawing ? (
-                  <Pressable style={styles.tool} onPress={() => startDrawing('pen')} testID="plan.ink">
-                    <Text style={styles.toolText}>✎ Ink</Text>
-                  </Pressable>
-                ) : null}
-                {!drawing ? (
-                  <Pressable
-                    style={[styles.tool, gridOpen && styles.toolOn]}
-                    onPress={() => {
-                      if (gridOpen) return closeGrid();
-                      setGridOpen(true);
-                      setCardOpen(false);
-                      setDetail(null);
-                      setAdding(null);
-                    }}>
-                    <Text style={styles.toolText}>⌗ Grid</Text>
-                  </Pressable>
-                ) : null}
-                <Pressable style={styles.tool} onPress={fit}>
-                  <Text style={styles.toolText}>⌖ Fit</Text>
-                </Pressable>
-                {bench && __DEV__ ? (
-                  <Pressable style={styles.tool} onPress={() => setCycles((c) => (c === null ? 0 : null))}>
-                    <Text style={styles.toolText}>{cycles === null ? 'TP-6: 100 zoom cycles' : `cycle ${Math.floor(cycles / 2)}/100 — stop`}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
             </>
           )}
+          {/* floating tools (the board): Fit · Grid · Layers · Legend, bottom-right */}
+          {plan ? (
+            <View style={styles.planTools}>
+              {bench && __DEV__ && sheetShown ? (
+                <Pressable style={styles.bench} onPress={() => setCycles((c) => (c === null ? 0 : null))}>
+                  <Text style={styles.benchText}>{cycles === null ? 'TP-6: 100 zoom cycles' : `cycle ${Math.floor(cycles / 2)}/100 — stop`}</Text>
+                </Pressable>
+              ) : null}
+              {sheetShown ? <IconBtn icon="fit" label="Fit the sheet" onPress={fit} testID="plan.fit" /> : null}
+              {sheetShown && !drawing ? (
+                <IconBtn
+                  icon="grid"
+                  label="Grid reference"
+                  on={gridOpen}
+                  onPress={() => {
+                    if (gridOpen) return closeGrid();
+                    setGridOpen(true);
+                    setCardOpen(false);
+                    setDetail(null);
+                    setAdding(null);
+                  }}
+                  testID="plan.grid"
+                />
+              ) : null}
+              {sheetShown ? <IconBtn icon="layers" label="Layers" on={menu === 'layers'} onPress={() => toggleMenu('layers')} testID="plan.layers" /> : null}
+              <IconBtn icon="legend" label="Legend" on={menu === 'legend'} onPress={() => toggleMenu('legend')} testID="plan.legend" />
+            </View>
+          ) : null}
         </View>
+      </View>
 
         {/* side lists */}
         <View style={styles.side}>
@@ -1500,13 +1546,24 @@ export function PlanScreen(props: PlanScreenProps) {
           ) : null}
           {/* The lists stay mounted under an open card, so their scroll position survives. */}
           <View style={[styles.lists, (placing && plan?.sheet && sheetUri) || adding || detail || gridOpen || (cardOpen && selectedId) ? styles.hidden : null]}>
-          <View style={styles.tabs}>
+          <View style={styles.tabs} accessibilityRole="tablist">
             {TABS.map((t) => {
               const n = t === 'devices' ? visible.length : rowsByTab[t].length;
+              const on = tab === t;
               return (
-                <Pressable key={t} style={[styles.tabBtn, tab === t && styles.tabBtnOn]} onPress={() => setTab(t)} testID={`plan.tab.${t}`}>
-                  <Text style={[styles.tabText, tab === t && styles.tabTextOn]} numberOfLines={1}>
-                    {TAB_LABEL[t]} {n}
+                <Pressable
+                  key={t}
+                  style={[styles.tabBtn, on && styles.tabBtnOn]}
+                  onPress={() => setTab(t)}
+                  testID={`plan.tab.${t}`}
+                  accessibilityRole="tab"
+                  accessibilityLabel={`${TAB_LABEL[t]} ${n}`}
+                >
+                  <Text style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1}>
+                    {TAB_LABEL[t]}
+                  </Text>
+                  <Text style={[styles.tabCount, on && styles.tabTextOn]} numberOfLines={1}>
+                    {n}
                   </Text>
                 </Pressable>
               );
@@ -1517,24 +1574,18 @@ export function PlanScreen(props: PlanScreenProps) {
               <Text style={styles.sideNote} numberOfLines={1}>
                 {picked.size} chosen
               </Text>
-              <Pressable onPress={() => setPicked(new Set(tabData.filter((r) => !('tab' in r ? r.badges.deleted : r.deleted)).map((r) => r.id)))} hitSlop={8} testID="plan.select.all">
-                <Text style={styles.sideLink}>All {tabData.length}</Text>
-              </Pressable>
-              <Pressable
+              <SideLink label={`All ${tabData.length}`} onPress={() => setPicked(new Set(tabData.filter((r) => !('tab' in r ? r.badges.deleted : r.deleted)).map((r) => r.id)))} testID="plan.select.all" />
+              <SideLink
+                label="Apply as ruling…"
                 disabled={!picked.size || !plan}
                 onPress={() => {
                   if (!plan || !props.onApplyAsRuling) return;
                   props.onApplyAsRuling(plan.level.projectId, draftFromSelection(LIST_ENTITY[tab], [...picked], [plan.level.code]), `${TAB_LABEL[tab]} on ${plan.level.code}`);
                   setPicked(null);
                 }}
-                hitSlop={8}
                 testID="plan.select.apply"
-              >
-                <Text style={[styles.sideLink, !picked.size && styles.sideOff]}>Apply as ruling…</Text>
-              </Pressable>
-              <Pressable onPress={() => setPicked(null)} hitSlop={8} testID="plan.select.cancel">
-                <Text style={styles.sideLink}>Cancel</Text>
-              </Pressable>
+              />
+              <SideLink label="Cancel" onPress={() => setPicked(null)} testID="plan.select.cancel" />
             </View>
           ) : (
             <View style={styles.sideHead}>
@@ -1543,19 +1594,9 @@ export function PlanScreen(props: PlanScreenProps) {
                 {tab === 'devices' && plan ? ` of ${plan.devices.length}` : ''}
                 {tab === 'devices' && notOnPlan > 0 ? ` · ${notOnPlan} not on the plan` : ''}
               </Text>
-              {tab === 'devices' && notOnPlan > 0 && editor && sheetUri ? (
-                <Pressable onPress={startPlacing} hitSlop={8} testID="plan.devices.place">
-                  <Text style={styles.sideLink}>Place ▸</Text>
-                </Pressable>
-              ) : null}
-              {props.onApplyAsRuling && userId ? (
-                <Pressable onPress={() => setPicked(new Set())} hitSlop={8} testID="plan.select">
-                  <Text style={styles.sideLink}>Select</Text>
-                </Pressable>
-              ) : null}
-              <Pressable onPress={() => setShowDeleted((v) => !v)} hitSlop={8}>
-                <Text style={styles.sideNote}>{showDeleted ? '☑' : '☐'} Deleted</Text>
-              </Pressable>
+              {tab === 'devices' && notOnPlan > 0 && editor && sheetUri ? <SideLink label="Place ▸" onPress={startPlacing} testID="plan.devices.place" /> : null}
+              {props.onApplyAsRuling && userId ? <SideLink label="Select" onPress={() => setPicked(new Set())} testID="plan.select" /> : null}
+              <Chip small label="Deleted" selected={showDeleted} onPress={() => setShowDeleted((v) => !v)} testID="plan.deleted" accessibilityLabel={showDeleted ? 'Deleted, shown' : 'Deleted, hidden'} />
             </View>
           )}
           <FlatList
@@ -1606,39 +1647,52 @@ export function PlanScreen(props: PlanScreenProps) {
               ) : null
             }
           />
-          <Legend />
           </View>
         </View>
 
-        {menu ? (
-          <>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} />
-            <View style={[styles.menu, menu === 'layers' ? styles.menuRight : null]}>
-              {menu === 'category'
-                ? categories.map((c) => (
-                    <MenuItem key={c} label={c} on={prefs.filter.categories.includes(c)} onPress={() => setFilter((f) => ({ ...f, categories: toggle(f.categories, c, categories) }))} />
-                  ))
-                : null}
-              {menu === 'status'
-                ? STATUS_KEYS.map((s) => (
-                    <MenuItem
-                      key={s}
-                      label={s === NO_STATUS ? UNSURVEYED : s}
-                      swatch={pinStyleFor(s === NO_STATUS ? null : s)}
-                      on={prefs.filter.statuses.includes(s)}
-                      onPress={() => setFilter((f) => ({ ...f, statuses: toggle<StatusKey>(f.statuses, s, STATUS_KEYS) }))}
-                    />
-                  ))
-                : null}
-              {menu === 'owner' ? (
-                <>
-                  {OWNERS.map((o) => (
-                    <MenuItem key={o} label={o} on={prefs.filter.owners.includes(o)} onPress={() => setFilter((f) => ({ ...f, owners: toggle(f.owners, o, OWNERS) }))} />
+      {/* popovers (docs/ui-plan.md §6): a surface card anchored to its button, closed by a tap outside */}
+      {menu ? (
+        <>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} testID="plan.menu.scrim" accessibilityLabel="Close" />
+          {menu === 'filter' ? (
+            <View style={[styles.popover, { top: BAR_H + 4, left: Math.max(8, Math.min(railW + filterX, win.width - FILTER_W - 8)), width: FILTER_W, maxHeight: win.height - BAR_H - 120 }]} testID="plan.filter.card">
+              <ScrollView contentContainerStyle={styles.popoverBody} keyboardShouldPersistTaps="handled">
+                <FilterGroup title="Category" testID="plan.filter.category">
+                  {categories.map((c) => (
+                    <Chip key={c} small label={c} selected={prefs.filter.categories.includes(c)} onPress={() => setFilter((f) => ({ ...f, categories: toggle(f.categories, c, categories) }))} testID={`plan.filter.category.${c}`} />
                   ))}
-                  <Text style={styles.menuNote}>Open punch items and missing parts. EC and ETC each include EC/ETC.</Text>
-                </>
-              ) : null}
-              {menu === 'layers' ? (
+                </FilterGroup>
+                <FilterGroup title="Status" testID="plan.filter.status">
+                  {STATUS_KEYS.map((s) => (
+                    <Chip
+                      key={s}
+                      small
+                      label={s === NO_STATUS ? UNSURVEYED : s}
+                      icon={<Swatch {...pinStyleFor(s === NO_STATUS ? null : s)} size={18} />}
+                      selected={prefs.filter.statuses.includes(s)}
+                      onPress={() => setFilter((f) => ({ ...f, statuses: toggle<StatusKey>(f.statuses, s, STATUS_KEYS) }))}
+                      testID={`plan.filter.status.${s === NO_STATUS ? UNSURVEYED : s}`}
+                    />
+                  ))}
+                </FilterGroup>
+                <FilterGroup title="Owner" note="Open punch items and missing parts. EC and ETC each include EC/ETC." testID="plan.filter.owner">
+                  {OWNERS.map((o) => (
+                    <Chip key={o} small label={o} selected={prefs.filter.owners.includes(o)} onPress={() => setFilter((f) => ({ ...f, owners: toggle(f.owners, o, OWNERS) }))} testID={`plan.filter.owner.${o}`} />
+                  ))}
+                </FilterGroup>
+                <FilterGroup title="Open punch" testID="plan.filter.openPunch">
+                  <Chip small label="Open punch" selected={prefs.filter.openPunch} onPress={() => setFilter((f) => ({ ...f, openPunch: !f.openPunch }))} testID="plan.filter.openPunch.on" />
+                </FilterGroup>
+                <View style={styles.popoverFoot}>
+                  <Btn kind="tertiary" small title="Clear" disabled={!filtering} onPress={() => setFilter(() => EMPTY_FILTER)} testID="plan.filter.clear" />
+                </View>
+              </ScrollView>
+            </View>
+          ) : (
+            <View style={[styles.popover, styles.popoverBody, { bottom: space.lg, left: Math.max(8, railW + size.width - space.lg - hit.target - space.sm - (menu === 'legend' ? LEGEND_W : LAYERS_W)), width: menu === 'legend' ? LEGEND_W : LAYERS_W }]}>
+              {menu === 'legend' ? (
+                <Legend shapes={plan?.shapes} />
+              ) : (
                 <>
                   <MenuItem label="Pins" on={prefs.layers.pins} onPress={() => setLayer('pins')} testID="layer.pins" />
                   <MenuItem label="Labels (device type)" on={prefs.layers.labels} onPress={() => setLayer('labels')} testID="layer.labels" />
@@ -1653,11 +1707,21 @@ export function PlanScreen(props: PlanScreenProps) {
                     testID="layer.boundaries"
                   />
                 </>
-              ) : null}
+              )}
             </View>
-          </>
-        ) : null}
-      </View>
+          )}
+        </>
+      ) : null}
+
+      {/* the rail's top button: the full sidebar over the plan (docs/ui-plan.md §6) */}
+      {navOpen && props.shell ? (
+        <View style={StyleSheet.absoluteFill}>
+          <Pressable style={styles.scrim} onPress={() => setNavOpen(false)} testID="rail.scrim" accessibilityLabel="Close the sidebar" />
+          <View style={styles.overlaySidebar}>
+            <Sidebar section="Levels" projectId={projectId} projectName={props.shell.projectName} counts={props.shell.counts} user={props.shell.user} onNavigate={() => setNavOpen(false)} />
+          </View>
+        </View>
+      ) : null}
       {props.blobs ? (
         <PhotoFlow
           request={photoReq}
@@ -1672,7 +1736,7 @@ export function PlanScreen(props: PlanScreenProps) {
               // "Photo here": a camera mark at the spot in the user's ink layer (D114 (6))
               const base = ink.mine ?? emptyInk();
               if (base) {
-                ink.setMine(withStroke(base, makeStroke({ id: uuidv7(), tool: 'marker', color: '#37474f', width: mark.size, points: [{ ...mark.at, p: 1 }], ref: { kind: 'photo', id: photoId }, at: new Date().toISOString() })));
+                ink.setMine(withStroke(base, makeStroke({ id: uuidv7(), tool: 'marker', color: PHOTO_MARK_COLOR, width: mark.size, points: [{ ...mark.at, p: 1 }], ref: { kind: 'photo', id: photoId }, at: new Date().toISOString() })));
               }
             }
             if (saved) onEdited();
@@ -1685,6 +1749,11 @@ export function PlanScreen(props: PlanScreenProps) {
 
 // ------------------------------------------------------------------ pieces
 
+/** The toolbar's height (the board): the Filter popover opens under it. */
+const BAR_H = 56;
+const FILTER_W = 420;
+const LAYERS_W = 300;
+const LEGEND_W = 360;
 const MENU_W = 250;
 const MENU_H = 230;
 
@@ -1741,7 +1810,7 @@ function PressMenu(props: {
         <PressItem testID="press.note" label="+ Note here" disabled={!props.canInk} onPress={props.onNote} />
         <PressItem testID="press.photo" label={props.deviceLabel ? `+ Photo of ${props.deviceLabel}` : '+ Photo here'} disabled={!props.canEdit || !props.canPhoto} onPress={props.onPhoto} />
         <PressItem testID="press.ink" label="✎ Markup (ink)" disabled={!props.canInk} onPress={props.onInk} />
-        <PressItem testID="press.cancel" label="Cancel" onPress={props.onClose} />
+        <PressItem testID="press.cancel" label="Cancel" onPress={props.onClose} last />
       </View>
     </>
   );
@@ -1815,7 +1884,7 @@ function InkBar(props: {
               value={props.noteText}
               onChangeText={props.onNoteText}
               placeholder="Note text"
-              placeholderTextColor="#888"
+              placeholderTextColor={color.text3}
               autoFocus
               returnKeyType="done"
               onSubmitEditing={props.onPlaceNote}
@@ -1838,9 +1907,9 @@ function InkBar(props: {
   );
 }
 
-function PressItem({ label, onPress, disabled, note, testID }: { label: string; onPress: () => void; disabled?: boolean; note?: string; testID?: string }) {
+function PressItem({ label, onPress, disabled, note, testID, last }: { label: string; onPress: () => void; disabled?: boolean; note?: string; testID?: string; last?: boolean }) {
   return (
-    <Pressable style={styles.pressItem} onPress={disabled ? undefined : onPress} testID={testID}>
+    <Pressable style={({ pressed }) => [styles.pressItem, last && styles.pressItemLast, pressed && !disabled && styles.pressedBg]} onPress={disabled ? undefined : onPress} testID={testID}>
       <Text style={[styles.pressText, disabled && styles.disabled]}>{label}</Text>
       {note ? <Text style={styles.menuNoteInline}>{note}</Text> : null}
     </Pressable>
@@ -1850,37 +1919,54 @@ function PressItem({ label, onPress, disabled, note, testID }: { label: string; 
 function Centered({ text, spinner }: { text?: string; spinner?: boolean }) {
   return (
     <View style={styles.centered}>
-      {spinner ? <ActivityIndicator color="#fff" /> : null}
+      {spinner ? <ActivityIndicator color={color.text3} /> : null}
       {text ? <Text style={styles.centeredText}>{text}</Text> : null}
     </View>
   );
 }
 
-function BarButton({ label, count, open, onPress, testID }: { label: string; count?: number; open: boolean; onPress: () => void; testID?: string }) {
-  const on = !!count;
+/** A 44-pt icon button (the board's `.ib`): the toolbar's Ink, the floating Fit / Grid / Layers / Legend. */
+function IconBtn({ icon, label, onPress, on, testID }: { icon: IconName; label: string; onPress: () => void; on?: boolean; testID: string }) {
   return (
-    <Pressable style={[styles.chip, (on || open) && styles.chipOn]} onPress={onPress} testID={testID}>
-      <Text style={[styles.chipText, (on || open) && styles.chipTextOn]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.ib, on && styles.ibOn, pressed && !on && styles.pressedBg]}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Icon name={icon} size={20} color={on ? color.primary : color.text} strokeWidth={1.8} />
+    </Pressable>
+  );
+}
+
+/** A link in the side panel's header row: Place ▸, Select, All n, Apply as ruling…, Cancel. */
+function SideLink({ label, onPress, disabled, testID }: { label: string; onPress: () => void; disabled?: boolean; testID: string }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} hitSlop={8} style={styles.sideLinkBox} testID={testID} accessibilityRole="button">
+      <Text style={[styles.sideLink, disabled && styles.sideOff]} numberOfLines={1}>
         {label}
-        {count ? ` (${count})` : ''} ▾
       </Text>
     </Pressable>
   );
 }
 
-function MenuItem(props: {
-  label: string;
-  on: boolean;
-  onPress: () => void;
-  swatch?: { fill: string; hollow: boolean; glyph: string };
-  disabled?: boolean;
-  note?: string;
-  testID?: string;
-}) {
+/** One group of the Filter popover: its title, its chips, an optional note under them. */
+function FilterGroup({ title, note, testID, children }: { title: string; note?: string; testID: string; children: ReactNode }) {
   return (
-    <Pressable style={styles.menuItem} onPress={props.disabled ? undefined : props.onPress} testID={props.testID}>
-      <Text style={[styles.menuCheck, props.disabled && styles.disabled]}>{props.on ? '☑' : '☐'}</Text>
-      {props.swatch ? <Swatch {...props.swatch} /> : null}
+    <View style={styles.filterGroup} testID={testID}>
+      <Text style={styles.filterTitle}>{title}</Text>
+      <View style={styles.filterChips}>{children}</View>
+      {note ? <Text style={styles.menuNote}>{note}</Text> : null}
+    </View>
+  );
+}
+
+/** A Layers row: ☑ / ☐ and the layer's name (flows read the box from the row's text). */
+function MenuItem(props: { label: string; on: boolean; onPress: () => void; disabled?: boolean; note?: string; testID?: string }) {
+  return (
+    <Pressable style={({ pressed }) => [styles.menuItem, pressed && !props.disabled && styles.pressedBg]} onPress={props.disabled ? undefined : props.onPress} testID={props.testID}>
+      <Text style={[styles.menuCheck, props.on && styles.menuCheckOn, props.disabled && styles.disabled]}>{props.on ? '☑' : '☐'}</Text>
       <View style={styles.menuLabelBox}>
         <Text style={[styles.menuLabel, props.disabled && styles.disabled]}>{props.label}</Text>
         {props.note ? <Text style={styles.menuNoteInline}>{props.note}</Text> : null}
@@ -1899,9 +1985,9 @@ function togglePick(cur: ReadonlySet<string>, id: string): ReadonlySet<string> {
 function ListRowView({ row, selected, picking, onPress }: { row: ListRow; selected: boolean; picking?: boolean; onPress: () => void }) {
   const st = pinStyleFor(row.tab === 'connections' ? row.endStatus : row.deviceStatus);
   return (
-    <Pressable style={[styles.row, selected && styles.rowSelected, row.badges.deleted && styles.rowDeleted]} onPress={onPress} testID={`plan.row.${row.tab}.${row.label}`}>
-      {picking ? <Text style={styles.pickBox}>{selected ? '☑' : '☐'}</Text> : null}
-      {row.tab === 'connections' ? <Swatch {...st} /> : <Text style={styles.rowNum}>{row.label}</Text>}
+    <Pressable style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && !selected && styles.pressedBg, row.badges.deleted && styles.rowDeleted]} onPress={onPress} testID={`plan.row.${row.tab}.${row.label}`}>
+      {picking ? <Text style={[styles.pickBox, selected && styles.pickBoxOn]}>{selected ? '☑' : '☐'}</Text> : null}
+      {row.tab === 'connections' ? <Swatch {...st} size={20} /> : <Text style={styles.rowNum}>{row.label}</Text>}
       <View style={styles.rowMain}>
         <View style={styles.rowLine}>
           {row.tab === 'connections' ? <Text style={styles.rowId}>{row.label}</Text> : null}
@@ -1917,9 +2003,9 @@ function ListRowView({ row, selected, picking, onPress }: { row: ListRow; select
 function DeviceRow({ device, badges, selected, picking, onPress }: { device: PlanDevice; badges: Badges; selected: boolean; picking?: boolean; onPress: () => void }) {
   const st = pinStyleFor(device.status);
   return (
-    <Pressable style={[styles.row, selected && styles.rowSelected, device.deleted && styles.rowDeleted]} onPress={onPress} testID={`plan.device.${device.label}`}>
-      {picking ? <Text style={styles.pickBox}>{selected ? '☑' : '☐'}</Text> : null}
-      <Swatch {...st} />
+    <Pressable style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && !selected && styles.pressedBg, device.deleted && styles.rowDeleted]} onPress={onPress} testID={`plan.device.${device.label}`}>
+      {picking ? <Text style={[styles.pickBox, selected && styles.pickBoxOn]}>{selected ? '☑' : '☐'}</Text> : null}
+      <Swatch {...st} size={20} />
       <View style={styles.rowMain}>
         <View style={styles.rowLine}>
           <Text style={styles.rowId}>{device.label}</Text>
@@ -1939,149 +2025,175 @@ function DeviceRow({ device, badges, selected, picking, onPress }: { device: Pla
   );
 }
 
-const LEGEND: (string | null)[] = ['Complete', 'Installed, untested', 'Issue', 'Not installed', 'No access', null];
-
-function Legend() {
-  return (
-    <View style={styles.legend}>
-      {LEGEND.map((s) => (
-        <View key={s ?? 'none'} style={styles.legendItem}>
-          <Swatch {...pinStyleFor(s)} />
-          <Text style={styles.legendText}>{s ?? UNSURVEYED}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
+/** The ink bar sits on the plan in a dark translucent strip, as before (T24): the text token at 88 %. */
+const INK_BAR_BG = `${color.text}E0`;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f4f5f7' },
+  root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
+  main: { flex: 1, minWidth: 0 },
   bar: {
+    height: BAR_H,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-    backgroundColor: '#fff',
+    gap: space.sm,
+    paddingLeft: space.sm,
+    paddingRight: space.md,
+    backgroundColor: color.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#c9ccd1',
-    zIndex: 2,
+    borderColor: color.hairline,
   },
-  back: { paddingRight: 8 },
-  backText: { fontSize: 18, fontWeight: '600', color: '#1565c0' },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { fontSize: 14, color: '#222' },
-  chipTextOn: { color: '#fff' },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 2, height: hit.target, paddingLeft: space.xs, paddingRight: space.sm, borderRadius: radius.control, flexShrink: 0, maxWidth: 160 },
+  backText: { ...font.body, color: color.primary, flexShrink: 1 },
+  barRule: { width: StyleSheet.hairlineWidth, height: 24, backgroundColor: color.hairline },
+  titleBox: { flexShrink: 1, minWidth: 48, paddingRight: space.xs },
+  titleCode: { ...font.headline, ...tabular, color: color.text },
+  titleSub: { ...font.caption, lineHeight: 16, color: color.text3 },
+  search: {
+    flex: 1,
+    minWidth: 110,
+    maxWidth: 220,
+    height: hit.target,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: color.hairline,
+    backgroundColor: color.bg,
+  },
+  searchInput: { flex: 1, minWidth: 0, ...font.callout, color: color.text, paddingVertical: 0 },
+  tb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: hit.target,
+    paddingHorizontal: 14,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: color.surface,
+  },
+  tbOn: { backgroundColor: color.primaryTint, borderColor: color.primaryTint },
+  tbText: { ...font.calloutBold, color: color.text },
+  tbTextOn: { color: color.primary },
+  count: { minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: radius.pill, backgroundColor: color.primary, alignItems: 'center', justifyContent: 'center' },
+  countText: { ...font.badge, ...tabular, lineHeight: 16, color: color.onPrimary },
+  ib: {
+    width: hit.target,
+    height: hit.target,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: color.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ibOn: { backgroundColor: color.primaryTint, borderColor: color.primaryTint },
+  pressedBg: { backgroundColor: color.surface2 },
   spacer: { flex: 1 },
-  status: { maxWidth: 260, fontSize: 13, color: '#555' },
-  body: { flex: 1, flexDirection: 'row' },
-  plan: { flex: 72, backgroundColor: '#3a3d42', overflow: 'hidden' },
-  pdf: { flex: 1, backgroundColor: '#3a3d42' },
-  planTools: { position: 'absolute', right: 12, bottom: 12, gap: 8, alignItems: 'flex-end' },
-  tool: { backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
-  toolOn: { backgroundColor: '#1565c0' },
-  toolText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  plan: { flex: 1, backgroundColor: color.surface2, overflow: 'hidden' },
+  pdf: { flex: 1, backgroundColor: color.surface2 },
+  planTools: { position: 'absolute', right: space.lg, bottom: space.lg, gap: 6, alignItems: 'flex-end' },
+  bench: { backgroundColor: color.surface, borderRadius: radius.control, borderWidth: 1, borderColor: color.border, paddingHorizontal: 14, paddingVertical: 10 },
+  benchText: { ...font.calloutBold, color: color.text },
   lists: { flex: 1 },
   hidden: { display: 'none' },
-  dragDot: { position: 'absolute', width: 28, height: 28, borderRadius: 14, borderWidth: 3, borderColor: '#1565c0', backgroundColor: 'rgba(21,101,192,0.25)' },
+  dragDot: { position: 'absolute', width: 28, height: 28, borderRadius: 14, borderWidth: 3, borderColor: color.primary, backgroundColor: color.primaryTint },
   moveBanner: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
+    top: space.md,
+    left: space.md,
+    right: space.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,248,225,0.96)',
+    gap: space.md,
+    padding: space.md,
+    borderRadius: radius.card,
+    backgroundColor: color.warningTint,
+    ...shadow.card,
   },
-  moveText: { flex: 1, fontSize: 15, color: '#333' },
-  moveCancel: { fontSize: 15, fontWeight: '700', color: '#1565c0' },
-  conflictSides: { fontSize: 13, color: '#555', marginTop: 2 },
-  conflictError: { fontSize: 13, color: '#b42318', marginTop: 2 },
-  conflictBtn: { backgroundColor: '#e65100', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9, marginLeft: 8 },
-  conflictBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  side: { flex: 28, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  sideHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
-  sideTitle: { fontSize: 16, fontWeight: '600' },
-  sideNote: { fontSize: 13, color: '#666' },
-  sideLink: { fontSize: 13, color: '#1f6feb', fontWeight: '600' },
+  moveText: { flex: 1, ...font.callout, color: color.text },
+  moveCancel: { ...font.calloutBold, color: color.primary },
+  conflictSides: { ...font.caption, color: color.text2, marginTop: 2 },
+  conflictError: { ...font.caption, color: color.danger, marginTop: 2 },
+  side: { width: '28%', backgroundColor: color.surface, borderLeftWidth: StyleSheet.hairlineWidth, borderColor: color.hairline },
+  sideHead: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, minHeight: hit.target, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: color.hairline },
+  sideNote: { flex: 1, ...font.caption, ...tabular, color: color.text3 },
+  sideLinkBox: { paddingVertical: space.xs },
+  sideLink: { ...font.calloutBold, color: color.primary },
   sideOff: { opacity: 0.4 },
-  pickBox: { fontSize: 18, width: 22 },
-  empty: { padding: 16, color: '#666' },
-  row: { height: ROW_H, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#e3e5e8' },
-  rowSelected: { backgroundColor: '#e0f7fa' },
-  rowMain: { flex: 1 },
+  pickBox: { fontSize: 18, width: 22, color: color.text2 },
+  pickBoxOn: { color: color.primary },
+  empty: { padding: space.lg, ...font.callout, color: color.text3 },
+  row: { height: ROW_H, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: space.md, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: color.hairline },
+  rowSelected: { backgroundColor: color.primaryTint },
+  rowMain: { flex: 1, minWidth: 0 },
   rowLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rowId: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  rowSub: { fontSize: 12, color: '#555', marginTop: 2 },
+  rowId: { ...font.calloutBold, ...tabular, color: color.text },
+  rowSub: { ...font.caption, lineHeight: 16, color: color.text3, marginTop: 1 },
   rowRight: { alignItems: 'flex-end', gap: 2 },
-  rowCount: { fontSize: 12, color: '#444' },
+  rowCount: { ...font.caption, ...tabular, color: color.text2 },
   rowDeleted: { opacity: 0.55 },
-  rowNum: { width: 40, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  rowTitle: { fontSize: 13, color: '#222', marginTop: 1 },
-  search: { minWidth: 150, flexShrink: 1, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
-  tabs: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 3, borderColor: 'transparent' },
-  tabBtnOn: { borderColor: '#1565c0' },
-  tabText: { fontSize: 13, color: '#555', fontWeight: '600' },
-  tabTextOn: { color: '#1565c0' },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 10, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendText: { fontSize: 11, color: '#444' },
-  menu: {
+  rowNum: { width: 40, ...font.calloutBold, ...tabular, color: color.text },
+  rowTitle: { ...font.caption, lineHeight: 16, color: color.text, marginTop: 1 },
+  tabs: { flexDirection: 'row', paddingHorizontal: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: color.hairline },
+  tabBtn: { flex: 1, height: hit.target, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderBottomWidth: 3, borderColor: 'transparent' },
+  tabBtnOn: { borderColor: color.primary },
+  tabText: { ...font.captionBold, color: color.text2 },
+  tabCount: { ...font.caption, ...tabular, color: color.text2 },
+  tabTextOn: { color: color.primary },
+  popover: {
     position: 'absolute',
-    top: 4,
-    left: 90,
-    minWidth: 260,
-    paddingVertical: 6,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: color.surface,
+    borderRadius: radius.card,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#c9ccd1',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    borderColor: color.hairline,
+    ...shadow.card,
   },
-  menuRight: { left: undefined, right: 12 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9 },
-  menuCheck: { fontSize: 18, width: 20 },
+  popoverBody: { padding: space.lg, gap: space.md },
+  popoverFoot: { flexDirection: 'row', justifyContent: 'flex-end' },
+  filterGroup: { gap: space.sm },
+  filterTitle: { ...font.captionBold, color: color.text2 },
+  filterChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: `${color.text}40` },
+  overlaySidebar: { position: 'absolute', top: 0, bottom: 0, left: 0, flexDirection: 'row', ...shadow.card },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: hit.target, paddingHorizontal: space.xs, borderRadius: radius.control },
+  menuCheck: { fontSize: 18, width: 22, color: color.text2 },
+  menuCheckOn: { color: color.primary },
   menuLabelBox: { flexShrink: 1 },
-  menuLabel: { fontSize: 15 },
-  menuNote: { fontSize: 12, color: '#666', paddingHorizontal: 14, paddingTop: 4, paddingBottom: 6, maxWidth: 280 },
-  menuNoteInline: { fontSize: 11, color: '#888' },
-  disabled: { color: '#aaa' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
+  menuLabel: { ...font.callout, color: color.text },
+  menuNote: { ...font.caption, color: color.text3 },
+  menuNoteInline: { ...font.caption, color: color.text3 },
+  disabled: { color: color.text3 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md, padding: space.xxl },
+  centeredText: { ...font.body, color: color.text2, textAlign: 'center' },
   pressHandle: { position: 'absolute', width: PRESS_HANDLE, height: PRESS_HANDLE, alignItems: 'center', justifyContent: 'center' },
-  pressDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 3, borderColor: '#00bcd4', backgroundColor: 'rgba(255,255,255,0.8)' },
+  pressDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 3, borderColor: color.primary, backgroundColor: color.surface },
   pressMenu: {
     position: 'absolute',
-    paddingVertical: 4,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    paddingVertical: space.xs,
+    backgroundColor: color.surface,
+    borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: color.hairline,
+    ...shadow.card,
   },
-  inkBar: { position: 'absolute', top: 8, left: 8, right: 8, padding: 8, gap: 6, borderRadius: 10, backgroundColor: 'rgba(20,22,26,0.88)' },
+  inkBar: { position: 'absolute', top: space.sm, left: space.sm, right: space.sm, padding: space.sm, gap: 6, borderRadius: radius.card, backgroundColor: INK_BAR_BG },
   inkRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  inkBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 6, borderWidth: 1, borderColor: '#555' },
-  inkBtnOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
+  inkBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.control, borderWidth: 1, borderColor: color.text2 },
+  inkBtnOn: { backgroundColor: color.primary, borderColor: color.primary },
   inkBtnOff: { opacity: 0.4 },
-  inkBtnText: { color: '#ddd', fontSize: 13, fontWeight: '600' },
-  inkBtnTextOn: { color: '#fff' },
-  inkDone: { backgroundColor: '#2e7d32', borderColor: '#2e7d32' },
-  inkSep: { width: 1, height: 24, backgroundColor: '#555', marginHorizontal: 2 },
-  inkSwatch: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: '#888' },
-  inkSwatchOn: { borderWidth: 3, borderColor: '#00bcd4' },
-  inkNote: { color: '#ccc', fontSize: 12 },
-  inkErr: { color: '#ff8a80' },
-  inkInput: { flex: 1, minWidth: 200, paddingHorizontal: 8, paddingVertical: 6, fontSize: 15, borderRadius: 6, backgroundColor: '#fff' },
-  pressItem: { paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#eceef1' },
-  pressText: { fontSize: 16, color: '#1565c0', fontWeight: '600' },
-  centeredText: { color: '#fff', fontSize: 16, textAlign: 'center' },
+  inkBtnText: { ...font.captionBold, color: color.surface2 },
+  inkBtnTextOn: { color: color.onPrimary },
+  inkDone: { backgroundColor: color.success, borderColor: color.success },
+  inkSep: { width: 1, height: 24, backgroundColor: color.text2, marginHorizontal: 2 },
+  inkSwatch: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: color.muted },
+  inkSwatchOn: { borderWidth: 3, borderColor: color.primary },
+  inkNote: { ...font.caption, color: color.border },
+  inkErr: { color: color.dangerTint },
+  inkInput: { flex: 1, minWidth: 200, paddingHorizontal: space.sm, paddingVertical: 6, ...font.callout, borderRadius: radius.control, backgroundColor: color.surface, color: color.text },
+  pressItem: { paddingHorizontal: space.lg, minHeight: hit.target, justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: color.hairline },
+  pressItemLast: { borderBottomWidth: 0 },
+  pressText: { ...font.calloutBold, fontSize: 16, color: color.primary },
 });

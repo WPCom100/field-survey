@@ -68,8 +68,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: card.close
     timeout: 15000
 - assertVisible:
-    id: plan.back
-    text: ◀ 06M
+    id: plan.title             # T177: the code is the toolbar's title
+    text: 06M
 - assertVisible: '06M-03.*'
 - tapOn:
     id: plan.back

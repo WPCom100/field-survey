@@ -50,6 +50,9 @@ export function ellipseRect(s: Stroke): { x: number; y: number; width: number; h
 /** Palette of the markup and ink tools: red, yellow, blue, green, black, white. */
 export const INK_COLORS = ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#111111', '#ffffff'] as const;
 
+/** The stroke colour of a "Photo here" camera mark in the ink layer (D114 (6)); stored in the stroke. */
+export const PHOTO_MARK_COLOR = '#37474f';
+
 /**
  * Display transform for a drawing surface of `space` units shown in a view of `view` points,
  * letterboxed (contain): view = space · scale + offset.

@@ -169,6 +169,22 @@ export async function loadProjectHome(store: Store, projectId: string, userId: s
 
 // ------------------------------------------------------------- the shell (T176)
 
+/** What the plan's rail and its sidebar overlay show for a level's project (T177): its name and the two count pills. */
+export async function loadShellNav(store: Store, levelId: string): Promise<{ projectId: string; projectName: string; reviewOpen: number; lintOpen: number } | null> {
+  const level = await store.get<Row>('level', levelId);
+  const projectId = typeof level?.project_id === 'string' ? level.project_id : null;
+  if (!projectId) return null;
+  const pr = await store.get<Row>('project', projectId);
+  if (!pr || pr.deleted_at) return null;
+  const projectCount = async (sql: string) => (await store.db.query<{ n: number }>(sql, [projectId] as never))[0]?.n ?? 0;
+  return {
+    projectId,
+    projectName: String(pr.name),
+    reviewOpen: await projectCount(`SELECT count(*) AS n FROM review_item WHERE deleted_at IS NULL AND state = 'open' AND project_id = ?`),
+    lintOpen: await projectCount(`SELECT count(*) AS n FROM finding WHERE state = 'open' AND project_id = ?`),
+  };
+}
+
 /** "Basement 2", "Level 1", "Level 6 mezzanine" from the level code; null for any other code. */
 export function levelName(code: string): string | null {
   let m = /^B(\d+)$/i.exec(code);
