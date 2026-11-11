@@ -19,6 +19,20 @@ appId: productions.luminarytechnology.fieldsurvey
     id: proposal.accept.Run DMX to CT06LCPB        # the B end's would-be draft (its To text)
 - tapOn:
     id: proposal.accept.Run DMX to equipment rack
+# the item takes the draft's place at the end of the punch list; since T177's full-height side panel
+# the card can settle with it just below the fold, so look down a little before looking up
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        id: card.punch.Run DMX to equipment rack
+    commands:
+      - swipe:
+          start: 86%,75%
+          end: 86%,47%
+          duration: 500
+      - waitForAnimationToEnd:
+          timeout: 2000
 - runFlow:
     file: _side-up.yaml
     env:

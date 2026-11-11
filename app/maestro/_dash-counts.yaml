@@ -44,7 +44,9 @@ appId: productions.luminarytechnology.fieldsurvey
 # as found, before any address is typed (T146, T147)
 - assertVisible: { id: dash.found.fieldAdditions, text: field additions 0 }
 - assertVisible: { id: dash.found.neverFound, text: never found 0 }
-- assertVisible: { id: dash.found.neuronMissing, text: 'Neuron IDs captured 0/170' }   # a fresh copy of the master; the Tower reads n/169
+# a fresh copy of the master: 0/170 while the rig server holds the DaVinci app library (the pipeline
+# flows import it), 0/169 without it, as after a `rig.sh server reset` (T177); the Tower reads n/169
+- assertVisible: { id: dash.found.neuronMissing, text: 'Neuron IDs captured 0/(169|170)' }
 - assertVisible: { id: dash.found.ipMissing, text: IP addresses captured 0/9 }
 - assertVisible: { id: dash.found.dmxMissing, text: DMX addresses captured 0/16 }
 - swipe:                    # back to the top: a cell half under the header takes no tap

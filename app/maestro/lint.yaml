@@ -1,3 +1,6 @@
+# blocked: T185 (2026-11-11): red on T176's and T177's code alike: after a dismiss or a status tap the Lint
+# list or the card shows the change late or not at all while the store syncs. The steps that fail vary
+# (Loading…, "1 dismissed", "Dismissed 1", "✓ Issue"); T185 finds the cause and makes this green again.
 # R1 (T157, rig plan wave 4): the Lint view on a fresh copy of the master.
 # Drafts with no device (T100): the R3c IP and DMX drafts listed per numbering group, why?, Open
 # level ▸, the level filter, Accept and Edit → Save & accept on 01 (both then last on 01's punch

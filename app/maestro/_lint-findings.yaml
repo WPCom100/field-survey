@@ -93,10 +93,15 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: lint.note
     text: 'Dismissed: 06M-03.*'
-- assertVisible: 'Lint \(\d+ open · 1 dismissed.*\)'
-- assertVisible:
-    id: lint.show.dismissed
-    text: Dismissed 1
+# the counts follow the findings' reload, a beat after the note under load (T177: two simulators at once)
+- extendedWaitUntil:
+    visible: 'Lint \(\d+ open · 1 dismissed.*\)'
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: lint.show.dismissed
+      text: Dismissed 1
+    timeout: 15000
 - assertNotVisible: '.*Issue device without open punch item.*'
 - tapOn:
     id: lint.show.dismissed
