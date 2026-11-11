@@ -49,7 +49,7 @@ appId: productions.luminarytechnology.fieldsurvey
       IDRE: '06M-D\d+'
 # + Note here: the ink note box at the spot
 - longPressOn:
-    point: 20%,75%
+    point: 25%,70%             # T177: the rail and the 56-pt toolbar moved the sheet (portrait: x 7–72 %, y 33–75 %)
 - tapOn:
     id: press.note
 - assertVisible: Done

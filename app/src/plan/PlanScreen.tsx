@@ -1606,6 +1606,9 @@ export function PlanScreen(props: PlanScreenProps) {
             keyExtractor={(r) => r.id}
             getItemLayout={(_d, index) => ({ length: ROW_H, offset: ROW_H * index, index })}
             onScrollToIndexFailed={() => {}}
+            // a row takes the tap with the search keyboard up (or minimised on the Simulator), instead of
+            // that tap only closing the keyboard (T177, found by lists.yaml on A)
+            keyboardShouldPersistTaps="handled"
             initialNumToRender={20}
             windowSize={9}
             maxToRenderPerBatch={20}
