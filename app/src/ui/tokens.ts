@@ -66,7 +66,7 @@ export const status = {
   none: NO_STATUS_STYLE,
 } as const;
 
-/** Pin rings: in review (Phase 3 §13), selected (the accent; was cyan — T177 moves `drawPins.ts` onto it). */
+/** Pin rings: in review (Phase 3 §13), selected (the accent; was cyan until T177). `drawPins.ts` reads both. */
 export const ring = {
   review: '#FF8F00',
   selected: color.primary,

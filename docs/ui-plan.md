@@ -100,7 +100,7 @@ controls · 12 cards · pill. Hit target 44 pt: a 36- or 40-pt control gets `hit
 | `Swatch` | `plan/chips.tsx` Swatch | status square with glyph, 20–22 pt; hollow for Not installed |
 | `Card`, `Row`, `Section` | per-screen styles | 12-pt card, 48/52-pt rows with hairlines, collapsible Section with count |
 | `Banner`, `Toast`, `Empty` | `Notice`, inline texts | info / success / warning / danger banners; the dark pill toast; the empty state with one action |
-| `Sidebar`, `Rail`, `StatusStrip` | `index.tsx` sidebar, `components/StatusBar.tsx` | T176 / T177 (T176: `ui/Sidebar.tsx`; the strip stays `components/StatusBar.tsx` over `sync/describe.ts`) |
+| `Sidebar`, `Rail`, `StatusStrip` | `index.tsx` sidebar, `components/StatusBar.tsx` | T176 / T177 (T176: `ui/Sidebar.tsx`; the strip stays `components/StatusBar.tsx` over `sync/describe.ts`; T177: `ui/Rail.tsx`, the sidebar as its overlay) |
 
 `setup/widgets.tsx` and `plan/chips.tsx` keep exporting their names and props over the new
 primitives, so screens change only when their own task comes. Icons: the boards draw them as
@@ -181,7 +181,7 @@ flows they run keep the server up (`mac-rig-two-simulators` in Claude's memory, 
 | T174 tokens and primitives | done | 2026-11-07 | smoke ×2 (A) | nothing; D267 records the readings (icons as Skia path data, dark glyph on the No access yellow, `Notice` as a banner, placeholders in `text3`) |
 | T175 device card | done | 2026-11-08 | ends ×3 (runs 2, 4, 5), lists ×2, additions ×2, chips ×2 (runs 3, 4), lint ×2, photos ×2, setup ×1 — all on A | the side panel is 287 / 334 pt, not the board's 360 (row values 15 pt in an 80-pt label column, Clear inside the address editor, the jump link on its own line); a section header labels itself (iOS reports `expanded` as the value Maestro reads as text); a `Row` is one element (flows assert on it by id); Review drafts' Save & accept under the keyboard → T180; D268 |
 | T176 shell | done | 2026-11-09 | smoke ×2, station-setup ×2, sync-now ×2, offline ×2, projects ×2 (runs 3, 5), resume ×1 — all on A | `Link asChild` drops a Pressable's style function (rows stacked: use `router.push`); several icon paths had a relative `m` after `z` (drawn off the grid; `ui/iconPaths.ts` + test); the identity line now lives in the sidebar's person row; no screen but the home ever had a sidebar (follow-up for Landry); D273 |
-| T177 plan screen | todo | | | |
+| T177 plan screen | done | 2026-11-11 | place ×2 (A, B), lists ×2 (A, B), additions ×2 (A, B), cables ×2 (B, A), ends ×2 (A), dashboard ×2 (B, A), ink ×2 (`rig.sh ink`, A + B), scale-check ×1 (A); lint red → T185 | the back button names the screen it returns to (the board's "◀ Levels" is the home's case); the side lists need `keyboardShouldPersistTaps` (a tap after a search only closed the keyboard); the rail moved the sheet, so percentage taps on the plan moved (portrait x 7–72 %, y 33–75 %); the full-height card settles differently after an Accept; `lint` fails on T176's code too (T185); the side-panel editors and other leftover hexes belong to no task (T184); the rig server past ~70 projects starves screens (reset); D274 |
 | T178 Sync screen | todo | | | |
 | T179 review screens | todo | | | |
 | T180 setup and the rest | todo | | | |
