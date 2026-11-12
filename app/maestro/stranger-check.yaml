@@ -15,9 +15,20 @@ name: Stranger — the Sync screen names the lost user; Re-sign in sends the edi
       id: sync.unknownUser
       text: "The server has no record of this iPad's user, ${USER} .*"
     timeout: 30000
+# the refused rows are in Details, open by itself while edits are refused (T178), at the foot
+- scrollUntilVisible:
+    element:
+      id: sync.refused
+    direction: DOWN
+    timeout: 20000
 - assertVisible:
     id: sync.refused
     text: '.*POST /ops → 422: unknown user .*'
+- scrollUntilVisible:         # the notice and its button are banners under the header
+    element:
+      id: sync.unknownUser.resign
+    direction: UP
+    timeout: 20000
 - tapOn:
     id: sync.unknownUser.resign
 - tapOn:

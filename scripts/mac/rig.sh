@@ -128,7 +128,7 @@ usage: bash scripts/mac/rig.sh <command>
                         (Ann: 06M × Bob, the network-kit Lint flag, R3a owner → ETC), assigned-peer.yaml on
                         B (Bob: only 06M's sheet fetched, his draft reads ETC); the 02 Concourse PDF posted
                         with the worker at RIG_SHEET_CPUS (0.3) CPU while B syncs and opens a plan
-                        (assigned-busy.yaml, the job still running after); assigned-after.yaml (02 ⬇)
+                        (assigned-busy.yaml, the job still running after); assigned-after.yaml (02 Not on iPad)
   riser                 T166: riser-setup.yaml on A (its own pipeline project: two riser cables made on
                         the placed 06M rack, the riser downloaded once, the second opens cached); with the
                         api stopped riser-offline.yaml (a cached crop, a cable accepted with Confirm

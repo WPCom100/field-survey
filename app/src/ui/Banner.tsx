@@ -16,7 +16,7 @@ export type BannerProps = {
   text: string;
   tone?: BannerTone;
   /** A text button at the right ("Retry"). */
-  action?: { label: string; onPress: () => void; testID?: string };
+  action?: { label: string; onPress: () => void; testID?: string; accessibilityLabel?: string };
   /** Replaces the tone's icon; `null` draws none. */
   icon?: IconName | null;
   /** On the message text, so a flow's `id` + `text` selector matches one element (the old `Notice`). */
@@ -41,7 +41,7 @@ export function Banner({ text, tone = 'info', action, icon, testID, style }: Ban
         {text}
       </Text>
       {action ? (
-        <Pressable onPress={action.onPress} testID={action.testID} accessibilityRole="button" hitSlop={space.sm} style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}>
+        <Pressable onPress={action.onPress} testID={action.testID} accessibilityRole="button" accessibilityLabel={action.accessibilityLabel} hitSlop={space.sm} style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}>
           <Text style={[styles.actionText, { color: t.fg }]}>{action.label}</Text>
         </Pressable>
       ) : null}

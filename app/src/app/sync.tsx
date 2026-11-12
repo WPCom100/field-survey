@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { Link } from 'expo-router';
+import { router } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -7,7 +7,7 @@ import { getBlobFiles, getBlobQueue } from '../blobs/queue';
 import { useBlobStatus } from '../blobs/useBlobStatus';
 import { openAppStore } from '../db';
 import { pickProject } from '../home/currentProject';
-import { listProjects } from '../home/data';
+import { levelName, listProjects } from '../home/data';
 import { useIdentity, useMicrosoftSignIn, useSignOut } from '../identity/IdentityGate';
 import { fetchAuthConfig, SignInCancelled } from '../identity/microsoft';
 import { SIGN_IN_NEEDED } from '../identity/session';
@@ -16,22 +16,46 @@ import { lastRulesPass } from '../rules/engine';
 import { getSyncEngine } from '../sync/engine';
 import { loadInstallLabels, saveInstallLabel } from '../sync/install';
 import {
+  connectionTile,
   describeCycle,
+  editsTileSub,
   formatBytes,
   freeUploadedPhotos,
+  levelBytesLine,
+  levelsCaption,
+  levelStateLabel,
   loadServerVersion,
   loadSyncScreen,
+  photosTileSub,
   retryFailedUploads,
+  stamp,
+  storageShares,
   unknownUserNotice,
+  type CachedLevel,
   type SyncScreenData,
+  type TileTone,
 } from '../sync/screen';
 import { checkAndFetch, runningInfo, useUpdateCheckState } from '../sync/useAppUpdates';
 import { describeCheck, describeRunning } from '../sync/updates';
-import { describeSync, useSyncStatus } from '../sync/useSyncStatus';
+import { useSyncStatus } from '../sync/useSyncStatus';
+import { Banner, Btn, Card, color, font, hit, Icon, radius, Section, space, tabular, type BannerTone } from '../ui';
 
-const time = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '—');
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const TONE: Record<TileTone, string> = { text: color.text, success: color.success, warning: color.warning, danger: color.danger };
+/** Two columns (Levels left; account, storage, Details right) from this content width; one below it (portrait). */
+const TWO_COLUMNS = 900;
+/**
+ * VoiceOver label of the screen's Re-sign in buttons. Flows tap the confirm alert's "Re-sign in"
+ * by text (`rightOf: Cancel`); with the board's layout these buttons sit right of the alert too,
+ * so they must not answer to the same text.
+ */
+const RESIGN_LABEL = 'Re-sign in on this iPad';
 
-/** Sync & uploads (T25, Phase 3 §12). Sync and uploads use any network, cellular included (D121). */
+/**
+ * Sync & uploads (T25, Phase 3 §12; the "Sync · Details" board since T178): Sync now, the four
+ * tiles, the levels on this iPad, the account, storage and a Details disclosure for support. Sync
+ * and uploads use any network, cellular included (D121).
+ */
 export default function SyncScreen() {
   const identity = useIdentity();
   const signOut = useSignOut();
@@ -46,8 +70,12 @@ export default function SyncScreen() {
   const [label, setLabel] = useState('');
   const [labelFocused, setLabelFocused] = useState(false);
   const [hasProject, setHasProject] = useState<boolean | null>(null);
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState<{ text: string; tone: BannerTone } | null>(null);
   const [serverVersion, setServerVersion] = useState('');
+  // null: folded, unless edits were refused (then the list is what the screen is for)
+  const [detailsOpen, setDetailsOpen] = useState<boolean | null>(null);
+  const [width, setWidth] = useState(0);
+  const [tileCols, setTileCols] = useState(4);
   const updates = useUpdateCheckState();
   const info = runningInfo();
   const running = describeRunning(info);
@@ -64,11 +92,11 @@ export default function SyncScreen() {
     setProjectId(project?.id ?? null);
     if (!labelFocused) setLabel((await loadInstallLabels(store)).get(store.installId) ?? '');
     setHasProject(!!project);
-    setData(await loadSyncScreen(store, project?.id ?? null));
-  }, [labelFocused]);
+    setData(await loadSyncScreen(store, project?.id ?? null, identity.user.id));
+  }, [labelFocused, identity.user.id]);
 
   useEffect(() => {
-    load().catch((e: unknown) => setNote(String(e)));
+    load().catch((e: unknown) => setNote({ text: String(e), tone: 'danger' }));
   }, [load, sync.lastSyncAt, sync.pendingOps, blobs.photosWaiting, blobs.uploadsFailed, blobs.downloadsPending, blobs.cacheBytes]);
 
   // Re-read when sync state changes, so a deploy shows up once the iPad is online again.
@@ -86,19 +114,24 @@ export default function SyncScreen() {
   const run = (fn: () => Promise<string | void>) => () =>
     fn().then(
       (m) => {
-        if (m) setNote(m);
+        if (m) setNote({ text: m, tone: 'success' });
         return load();
       },
-      (e: unknown) => setNote(String(e)),
+      (e: unknown) => setNote({ text: String(e), tone: 'danger' }),
     );
 
   const seq = Object.values(sync.lastServerSeq).reduce((a, b) => Math.max(a, b), 0);
-  const online = sync.state === 'idle' || sync.state === 'syncing';
   const build = Constants.platform?.ios?.buildNumber ?? '—';
   const version = Constants.expoConfig?.version ?? '—';
   const signedInMicrosoft = !!identity.microsoft;
-  const stranger = data ? unknownUserNotice(data.outbox.quarantined, identity.user, signedInMicrosoft) : null;
+  const refused = data?.outbox.quarantined ?? [];
+  const stranger = data ? unknownUserNotice(refused, identity.user, signedInMicrosoft) : null;
   const needsSignIn = sync.state === 'error' && sync.lastFailure === 'auth';
+  const canMicrosoft = signedInMicrosoft || offersMicrosoft;
+  const showDetails = detailsOpen ?? refused.length > 0;
+  const conn = connectionTile(sync, seq);
+  const pending = data?.outbox.pending ?? sync.pendingOps;
+
   const confirmResign = () =>
     Alert.alert(
       'Re-sign in?',
@@ -120,251 +153,308 @@ export default function SyncScreen() {
       throw e;
     }
   });
-  const canMicrosoft = signedInMicrosoft || offersMicrosoft;
+  const syncNow = run(async () => {
+    await (await getSyncEngine()).requestSync();
+  });
+  const retryRefused = run(async () => {
+    const n = await (await getSyncEngine()).retryQuarantined();
+    return `${plural(n, 'edit')} sent again.`;
+  });
+  const retryUploads = run(async () => {
+    const n = await retryFailedUploads(await openAppStore());
+    await (await getBlobQueue()).requestRun();
+    return `${plural(n, 'upload')} queued again.`;
+  });
+  const downloadAssigned = run(async () => {
+    const q = await getBlobQueue();
+    await q.prefetch();
+    const n = await countQueuedDownloads();
+    await q.requestRun();
+    if (!n) return 'Nothing to download: every plan for your levels is already on this iPad.';
+    return `Downloading ${plural(n, 'file')} for your levels (all in-scope levels when you have no assignment, D97).`;
+  });
+  const freePhotos = () =>
+    Alert.alert('Free photos?', 'Full-size photos the server already has are removed from this iPad and download again when opened.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Free',
+        onPress: run(async () => {
+          const r = await freeUploadedPhotos(await openAppStore(), getBlobFiles());
+          await (await getBlobQueue()).refresh();
+          return `Freed ${plural(r.files, 'photo')} (${formatBytes(r.bytes)}).`;
+        }),
+      },
+    ]);
+  const saveLabel = () => {
+    setLabelFocused(false);
+    if (!projectId) return;
+    void openAppStore()
+      .then((s) => saveInstallLabel(s, projectId, identity.user.id, label))
+      .then(() => load())
+      .catch((e: unknown) => setNote({ text: String(e), tone: 'danger' }));
+  };
+
+  // ---------------------------------------------------------------- the cards
+
+  const account = (
+    <Card style={styles.gap8}>
+      <View style={styles.accountHead}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{(identity.user.name.trim()[0] ?? '?').toUpperCase()}</Text>
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.sec}>{identity.user.name}</Text>
+          <Text style={styles.caption} testID="sync.account">
+            {signedInMicrosoft
+              ? `Signed in with Microsoft${identity.microsoft?.email ? ` · ${identity.microsoft.email}` : ''}`
+              : 'Team picker with the shared token'}
+          </Text>
+        </View>
+        <Btn kind="tertiary" title="Re-sign in" testID="sync.resign" accessibilityLabel={RESIGN_LABEL} onPress={confirmResign} />
+      </View>
+      {offersMicrosoft && !signedInMicrosoft ? (
+        <Btn title="Sign in with Microsoft" testID="sync.microsoft" onPress={signInMicrosoft} />
+      ) : null}
+      <View style={styles.labelRow}>
+        <Text style={styles.labelKey}>This iPad</Text>
+        <TextInput
+          style={[styles.input, !projectId && styles.inputOff]}
+          value={label}
+          placeholder={`iPad …${installId.slice(-6)}`}
+          placeholderTextColor={color.text3}
+          autoCorrect={false}
+          maxLength={40}
+          editable={!!projectId}
+          onChangeText={setLabel}
+          onFocus={() => setLabelFocused(true)}
+          onBlur={saveLabel}
+          testID="sync.label"
+        />
+        <Text style={[styles.caption, styles.flex]}>How Needs review names this iPad.</Text>
+      </View>
+    </Card>
+  );
+
+  const levels = data?.levels ?? [];
+  const levelsCard = (
+    <Card flush>
+      <View style={styles.cardHead}>
+        <Text style={styles.sec}>Levels on this iPad</Text>
+        <Text style={styles.caption}>{levelsCaption(levels)}</Text>
+      </View>
+      {levels.map((l) => (
+        <LevelRow key={l.id} level={l} />
+      ))}
+      {data && !levels.length ? (
+        <Text style={[styles.caption, styles.rowPad]}>
+          {hasProject ? 'This project has no levels yet.' : 'No levels on this iPad yet (a project arrives with setup).'}
+        </Text>
+      ) : null}
+      <View style={[styles.lr, styles.footer]}>
+        <Text style={[styles.caption, styles.flex]}>Plans of your levels; every in-scope level when none is assigned to you.</Text>
+        <Btn kind="tertiary" title="Download assigned levels" disabled={data ? !levels.some((l) => l.cache !== 'no sheet') : false} onPress={downloadAssigned} />
+      </View>
+    </Card>
+  );
+
+  const shares = storageShares(data?.storage ?? { photosBytes: 0, plansBytes: 0, otherBytes: 0, reclaimableBytes: 0 });
+  const storage = data?.storage;
+  const storageCard = (
+    <Card style={styles.gap8}>
+      <View style={styles.headRow}>
+        <Text style={styles.sec}>Storage</Text>
+        <Text style={styles.caption}>{formatBytes(shares.total)} on this iPad</Text>
+      </View>
+      <View
+        style={styles.bar}
+        accessible
+        accessibilityLabel={`Plans ${formatBytes(storage?.plansBytes ?? 0)}, photos ${formatBytes(storage?.photosBytes ?? 0)}, other ${formatBytes(storage?.otherBytes ?? 0)}`}
+      >
+        <View style={{ flex: shares.plans, backgroundColor: color.primary }} />
+        <View style={{ flex: shares.photos, backgroundColor: color.text3 }} />
+        <View style={{ flex: shares.other, backgroundColor: color.border }} />
+      </View>
+      <View style={styles.legend}>
+        <Key fill={color.primary} text={`Plans ${formatBytes(storage?.plansBytes ?? 0)}`} />
+        <Key fill={color.text3} text={`Photos ${formatBytes(storage?.photosBytes ?? 0)}`} />
+        <Key fill={color.border} text={`Other ${formatBytes(storage?.otherBytes ?? 0)}`} />
+        <View style={styles.flex} />
+        <Btn kind="tertiary" small title={`Free uploaded photos (${formatBytes(storage?.reclaimableBytes ?? 0)})`} disabled={!storage?.reclaimableBytes} onPress={freePhotos} />
+      </View>
+    </Card>
+  );
+
+  const detailsCard = (
+    <Card flush>
+      <Section
+        title="Details"
+        open={showDetails}
+        onToggle={setDetailsOpen}
+        right={<Text style={styles.caption}>For support</Text>}
+        testID="sync.details"
+      >
+        <View style={styles.details}>
+          <Detail k="Server">
+            {identity.serverUrl}
+            {serverVersion ? ` · ${serverVersion}` : ''}
+          </Detail>
+          <Detail k="This iPad">{[installId.slice(0, 8), identity.user.name, label.trim() || null].filter(Boolean).join(' · ')}</Detail>
+          <Detail k="App">
+            {version} ({build}) · JS {running.running} · {running.runtime}
+          </Detail>
+          <Detail k="Update" tone={checkLine?.startsWith('Could not') ? 'danger' : undefined}>
+            {checkLine ?? 'Not checked since the app started'}
+          </Detail>
+          <Detail k="Last cycle" testID="sync.timing">
+            {describeCycle(sync.lastCycle, lastRulesPass())}
+          </Detail>
+          {blobs.lastError ? <Detail k="Photo queue">Last error: {blobs.lastError}</Detail> : null}
+          <Detail k="Refused edits" tone={refused.length ? 'danger' : 'muted'}>
+            {refused.length ? `${plural(refused.length, 'edit')} the server refused` : 'None'}
+          </Detail>
+          {refused.map((q) => (
+            <Text key={q.opId} style={styles.refused} testID="sync.refused">
+              {q.what} · {stamp(q.at)} · {q.attempts} {q.attempts === 1 ? 'try' : 'tries'}: {q.error ?? 'unknown error'}
+            </Text>
+          ))}
+          <View style={styles.detailActions}>
+            <Btn
+              title="Export log"
+              icon={<Icon name="export" size={18} color={color.text} />}
+              onPress={run(async () => {
+                const f = exportLog();
+                if (!f) return 'No log yet.';
+                await Share.share({ url: f.uri });
+              })}
+            />
+            <Btn title="Check for update" disabled={!info.enabled || updates.isChecking || updates.isDownloading} onPress={() => void checkAndFetch()} />
+            <Btn kind="tertiary" title="Retry refused edits" testID="sync.retryRefused" disabled={!refused.length} onPress={retryRefused} />
+          </View>
+        </View>
+      </Section>
+    </Card>
+  );
+
+  const failedUploads = data?.failedUploads ?? [];
+  const firstFailed = failedUploads[0];
 
   return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <View style={styles.head}>
-        <Text style={styles.title}>Sync & uploads</Text>
-        <Link href="/" style={styles.link}>
-          ← Levels
-        </Link>
-      </View>
-      <Text style={styles.hint}>
-        Edits never need sign-in or a connection. Sync, setup uploads and exports do. Sync and uploads use whatever network the iPad has, cellular included.
-      </Text>
+    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+      <View style={styles.inner} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={styles.title} accessibilityRole="header">
+              Sync & uploads
+            </Text>
+            <Text style={styles.caption}>Edits never need sign-in or a connection. Sync, uploads and exports do, on any network, cellular included.</Text>
+          </View>
+          <View style={styles.headerActions}>
+            <Btn kind="tertiary" title="← Levels" testID="sync.back" onPress={() => router.navigate('/')} />
+            <Btn kind="primary" title="Sync now" testID="sync.now" icon={<Icon name="sync" size={18} color={color.onPrimary} />} onPress={syncNow} />
+          </View>
+        </View>
 
-      <Section label="Connection">
-        <Text style={styles.value}>
-          {online ? '● Online' : '● Not connected'} · {describeSync(sync)}
-        </Text>
-        <Text style={styles.sub}>
-          Last successful sync {time(sync.lastSyncAt)}
-          {seq ? ` (seq ${seq.toLocaleString()})` : ''}
-        </Text>
-        <Text style={styles.sub} testID="sync.timing">{describeCycle(sync.lastCycle, lastRulesPass())}</Text>
-        {hasProject === false ? (
-          <Text style={styles.sub}>
-            No project on this iPad yet, so there is nothing to push or pull; "Synced" means the server answered. The demo plan never syncs.
-          </Text>
-        ) : null}
-        {sync.nextAttemptAt && !online ? <Text style={styles.sub}>Next try {time(sync.nextAttemptAt)}</Text> : null}
         {needsSignIn ? (
-          <>
-            <Text style={styles.warn} testID="sync.signInNeeded">
-              {SIGN_IN_NEEDED}.{' '}
-              {signedInMicrosoft
+          <Banner
+            tone="warning"
+            testID="sync.signInNeeded"
+            text={`${SIGN_IN_NEEDED}. ${
+              signedInMicrosoft
                 ? 'Your Microsoft sign-in has run out or was refused. Edits are kept on this iPad and sync once you sign in again.'
                 : canMicrosoft
                   ? 'The server no longer takes the team token. Sign in with Microsoft; edits on this iPad are kept and sync afterwards.'
-                  : 'The server refused this iPad\'s token. Re-sign in with the current token; edits on this iPad are kept.'}
-            </Text>
-            {canMicrosoft ? (
-              <Btn label="Sign in with Microsoft" testID="sync.signInNeeded.microsoft" onPress={signInMicrosoft} />
-            ) : (
-              <Btn label="Re-sign in" testID="sync.signInNeeded.resign" onPress={confirmResign} />
-            )}
-          </>
+                  : "The server refused this iPad's token. Re-sign in with the current token; edits on this iPad are kept."
+            }`}
+            action={
+              canMicrosoft
+                ? { label: 'Sign in with Microsoft', onPress: signInMicrosoft, testID: 'sync.signInNeeded.microsoft' }
+                : { label: 'Re-sign in', onPress: confirmResign, testID: 'sync.signInNeeded.resign', accessibilityLabel: RESIGN_LABEL }
+            }
+          />
         ) : null}
-        <Btn
-          label="Sync now"
-          testID="sync.now"
-          onPress={run(async () => {
-            await (await getSyncEngine()).requestSync();
-          })}
-        />
-      </Section>
-
-      <Section label="Pending edits">
-        <Text style={styles.value} testID="sync.pending">
-          {data?.outbox.pending ?? sync.pendingOps}
-          {data?.outbox.oldestAt ? ` · oldest ${time(data.outbox.oldestAt)}` : ''}
-        </Text>
-        <Text style={styles.sub}>Sent in order when online; nothing is lost.</Text>
+        {refused.length ? (
+          <Banner
+            tone="danger"
+            text={`${plural(refused.length, 'edit')} the server refused. The other edits keep syncing; these wait under Details until Retry refused edits.`}
+          />
+        ) : null}
+        {/* the notice and its button before the rows: a lost user refuses hundreds of edits (T160) */}
+        {stranger ? (
+          <Banner
+            tone="danger"
+            testID="sync.unknownUser"
+            text={stranger}
+            action={
+              signedInMicrosoft
+                ? { label: 'Sign in with Microsoft', onPress: signInMicrosoft, testID: 'sync.unknownUser.microsoft' }
+                : { label: 'Re-sign in', onPress: confirmResign, testID: 'sync.unknownUser.resign', accessibilityLabel: RESIGN_LABEL }
+            }
+          />
+        ) : null}
         {data?.outbox.failing ? (
-          <Text style={styles.warn}>
-            {data.outbox.failing} edit{data.outbox.failing === 1 ? '' : 's'} failed to send: {data.outbox.lastError ?? 'unknown error'}
-          </Text>
+          <Banner tone="warning" text={`${plural(data.outbox.failing, 'edit')} failed to send: ${data.outbox.lastError ?? 'unknown error'}`} />
         ) : null}
-        {data?.outbox.quarantined.length ? (
-          <>
-            <Text style={styles.warn}>
-              {data.outbox.quarantined.length} edit{data.outbox.quarantined.length === 1 ? '' : 's'} the server refused. The other edits keep syncing; these wait here until Retry.
-            </Text>
-            {/* the notice and the buttons before the rows: a lost user refuses hundreds of edits (T160) */}
-            {stranger ? (
-              <>
-                <Text style={styles.warn} testID="sync.unknownUser">
-                  {stranger}
-                </Text>
-                {signedInMicrosoft ? (
-                  <Btn label="Sign in with Microsoft" testID="sync.unknownUser.microsoft" onPress={signInMicrosoft} />
-                ) : (
-                  <Btn label="Re-sign in" testID="sync.unknownUser.resign" onPress={confirmResign} />
-                )}
-              </>
-            ) : null}
-            <Btn
-              label="Retry refused edits"
-              testID="sync.retryRefused"
-              onPress={run(async () => {
-                const n = await (await getSyncEngine()).retryQuarantined();
-                return `${n} edit${n === 1 ? '' : 's'} sent again.`;
-              })}
-            />
-            {data.outbox.quarantined.map((q) => (
-              <Text key={q.opId} style={styles.sub} testID="sync.refused">
-                {q.what} · {time(q.at)} · {q.attempts} {q.attempts === 1 ? 'try' : 'tries'}: {q.error ?? 'unknown error'}
+        {firstFailed ? (
+          <Banner
+            tone="danger"
+            text={`Upload failed (${firstFailed.kind}, ${firstFailed.attempts} tries): ${firstFailed.error ?? 'unknown'}${
+              failedUploads.length > 1 ? ` · ${failedUploads.length - 1} more` : ''
+            }`}
+            action={{ label: 'Retry failed uploads', onPress: retryUploads, testID: 'sync.retryUploads' }}
+          />
+        ) : null}
+        {hasProject === false ? (
+          <Banner text={'No project on this iPad yet, so there is nothing to push or pull; "Synced" means the server answered. The demo plan never syncs.'} />
+        ) : null}
+        {note ? <Banner tone={note.tone} text={note.text} testID="sync.note" /> : null}
+
+        <View style={styles.tiles} onLayout={(e) => setTileCols(e.nativeEvent.layout.width >= 4 * 160 + 3 * space.lg ? 4 : 2)}>
+          <Tile label="Connection" cols={tileCols} sub={conn.sub} testID="sync.tile.connection">
+            <View style={styles.connValue}>
+              {conn.icon ? <Icon name={conn.icon} size={22} color={TONE[conn.tone]} strokeWidth={conn.icon === 'check' ? 2.4 : 2} /> : null}
+              <Text style={[styles.connText, { color: TONE[conn.tone] }]} numberOfLines={1}>
+                {conn.value}
               </Text>
-            ))}
-          </>
-        ) : null}
-      </Section>
-
-      <Section label="Photos waiting">
-        <Text style={styles.value}>
-          {blobs.photosWaiting} photo{blobs.photosWaiting === 1 ? '' : 's'} · {blobs.uploadsPending} file{blobs.uploadsPending === 1 ? '' : 's'} (
-          {formatBytes(blobs.uploadBytesPending)}), thumbnails first
-        </Text>
-        {data?.failedUploads.map((f) => (
-          <Text key={f.sha256} style={styles.warn}>
-            Upload failed ({f.kind}, {f.attempts} tries): {f.error ?? 'unknown'}
-          </Text>
-        ))}
-        {blobs.lastError ? <Text style={styles.sub}>Last error: {blobs.lastError}</Text> : null}
-        <Btn
-          label="Retry failed uploads"
-          disabled={!data?.failedUploads.length}
-          onPress={run(async () => {
-            const n = await retryFailedUploads(await openAppStore());
-            await (await getBlobQueue()).requestRun();
-            return `${n} upload${n === 1 ? '' : 's'} queued again.`;
-          })}
-        />
-      </Section>
-
-      <Section label="Review items">
-        <Text style={styles.value}>
-          {data?.openReviews ?? 0} open{sync.willReview ? ` · ${sync.willReview} of my pending edits will be reviewed` : ''}
-        </Text>
-        <Link href="/review" style={styles.link}>
-          Open Needs review →
-        </Link>
-      </Section>
-
-      <Section label="Cached levels">
-        <View style={styles.wrap}>
-          {data?.levels.map((l) => (
-            <Text key={l.id} style={styles.chip}>
-              {l.code} {l.cache === 'cached' ? '✓' : l.cache === 'downloading' ? '…' : '⬇'}
+            </View>
+          </Tile>
+          <Tile label="Edits waiting" cols={tileCols} sub={editsTileSub(data?.outbox.oldestAt ?? null)} testID="sync.tile.edits">
+            <Text style={[styles.tileValue, pending > 0 && { color: color.warning }]} testID="sync.pending">
+              {pending}
             </Text>
-          ))}
-          {data && !data.levels.length ? (
-            <Text style={styles.sub}>{hasProject ? 'No plan sheets yet.' : 'No levels on this iPad yet (a project arrives with setup).'}</Text>
-          ) : null}
+          </Tile>
+          <Tile label="Photos waiting" cols={tileCols} sub={photosTileSub(blobs)} testID="sync.tile.photos">
+            <Text style={[styles.tileValue, blobs.photosWaiting > 0 && { color: color.warning }]} testID="sync.photos">
+              {blobs.photosWaiting}
+            </Text>
+          </Tile>
+          <Tile label="Needs review" cols={tileCols} testID="sync.tile.review">
+            <Text style={[styles.tileValue, (data?.openReviews ?? 0) > 0 && { color: color.warning }]}>{data?.openReviews ?? 0}</Text>
+            {sync.willReview ? <Text style={styles.caption}>{sync.willReview} of my pending edits will be reviewed</Text> : null}
+            <Pressable onPress={() => router.push('/review')} accessibilityRole="link" testID="sync.review" hitSlop={space.sm}>
+              <Text style={styles.link}>Open Needs review</Text>
+            </Pressable>
+          </Tile>
         </View>
-        <Btn
-          label="Download assigned levels"
-          disabled={data ? !data.levels.length : false}
-          onPress={run(async () => {
-            const q = await getBlobQueue();
-            await q.prefetch();
-            const n = await countQueuedDownloads();
-            await q.requestRun();
-            if (!n) return 'Nothing to download: every plan for your levels is already on this iPad.';
-            return `Downloading ${n} file${n === 1 ? '' : 's'} for your levels (all in-scope levels when you have no assignment, D97).`;
-          })}
-        />
-      </Section>
 
-      <Section label="Storage">
-        <Text style={styles.value}>
-          photos {formatBytes(data?.storage.photosBytes ?? 0)} · plans {formatBytes(data?.storage.plansBytes ?? 0)} · other{' '}
-          {formatBytes(data?.storage.otherBytes ?? 0)}
-        </Text>
-        <Btn
-          label={`Free full-size photos already uploaded (${formatBytes(data?.storage.reclaimableBytes ?? 0)})`}
-          disabled={!data?.storage.reclaimableBytes}
-          onPress={() =>
-            Alert.alert('Free photos?', 'Full-size photos the server already has are removed from this iPad and download again when opened.', [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Free',
-                onPress: run(async () => {
-                  const r = await freeUploadedPhotos(await openAppStore(), getBlobFiles());
-                  await (await getBlobQueue()).refresh();
-                  return `Freed ${r.files} photo${r.files === 1 ? '' : 's'} (${formatBytes(r.bytes)}).`;
-                }),
-              },
-            ])
-          }
-        />
-      </Section>
-
-      <Section label="Install">
-        <Text style={styles.value}>
-          {identity.user.name} · app {version} ({build})
-        </Text>
-        <Text style={styles.sub} testID="sync.account">
-          {signedInMicrosoft
-            ? `Signed in with Microsoft${identity.microsoft?.email ? ` (${identity.microsoft.email})` : ''}`
-            : 'Team picker with the shared token'}
-        </Text>
-        <View style={styles.row}>
-          <Text style={styles.value}>This iPad:</Text>
-          <TextInput
-            style={styles.input}
-            value={label}
-            placeholder={`iPad …${installId.slice(-6)}`}
-            autoCorrect={false}
-            maxLength={40}
-            editable={!!projectId}
-            onChangeText={setLabel}
-            onFocus={() => setLabelFocused(true)}
-            onBlur={() => {
-              setLabelFocused(false);
-              if (!projectId) return;
-              void openAppStore()
-                .then((s) => saveInstallLabel(s, projectId, identity.user.id, label))
-                .then(() => load())
-                .catch((e: unknown) => setNote(String(e)));
-            }}
-          />
-        </View>
-        <Text style={styles.sub}>
-          Server {identity.serverUrl}
-          {serverVersion ? ` (${serverVersion})` : ''} · install {installId.slice(0, 8)}
-        </Text>
-        <Text style={styles.sub}>
-          JS {running.running} · {running.runtime}
-        </Text>
-        {checkLine ? <Text style={checkLine.startsWith('Could not') ? styles.warn : styles.sub}>{checkLine}</Text> : null}
-        <View style={styles.row}>
-          <Btn
-            label="Re-sign in"
-            testID="sync.resign"
-            onPress={confirmResign}
-          />
-          {offersMicrosoft && !signedInMicrosoft ? (
-            <Btn label="Sign in with Microsoft" testID="sync.microsoft" onPress={signInMicrosoft} />
-          ) : null}
-          <Btn
-            label="Check for update"
-            disabled={!info.enabled || updates.isChecking || updates.isDownloading}
-            onPress={() => void checkAndFetch()}
-          />
-          <Btn
-            label="Export local log"
-            onPress={run(async () => {
-              const f = exportLog();
-              if (!f) return 'No log yet.';
-              await Share.share({ url: f.uri });
-            })}
-          />
-        </View>
-      </Section>
-
-      {note ? <Text style={styles.note}>{note}</Text> : null}
+        {width >= TWO_COLUMNS ? (
+          <View style={styles.cols}>
+            <View style={styles.col}>{levelsCard}</View>
+            <View style={styles.col}>
+              {account}
+              {storageCard}
+              {detailsCard}
+            </View>
+          </View>
+        ) : (
+          // one column (portrait): the account first, so Re-sign in is on screen without a scroll
+          <>
+            {account}
+            {levelsCard}
+            {storageCard}
+            {detailsCard}
+          </>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -377,39 +467,145 @@ async function countQueuedDownloads(): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
-function Section({ label, children }: { label: string; children: ReactNode }) {
+function Tile({ label, sub, cols, children, testID }: { label: string; sub?: string; cols: number; children: ReactNode; testID: string }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={{ flex: 1, gap: 6 }}>{children}</View>
+    <View style={[styles.tile, { width: cols === 4 ? '21%' : '46%' }]} testID={testID}>
+      <Text style={styles.tileLabel}>{label}</Text>
+      {children}
+      {sub ? <Text style={styles.caption}>{sub}</Text> : null}
     </View>
   );
 }
 
-function Btn({ label, onPress, disabled, testID }: { label: string; onPress: () => void; disabled?: boolean; testID?: string }) {
+const STATE_ICON: Record<CachedLevel['cache'], 'check' | 'download' | null> = { cached: 'check', downloading: 'download', 'not cached': null, 'no sheet': null };
+
+function LevelRow({ level: l }: { level: CachedLevel }) {
+  const name = [levelName(l.code), l.assignedToMe ? 'assigned to me' : null, l.inScope ? null : 'out of scope'].filter(Boolean).join(' · ');
+  const bytes = levelBytesLine(l);
+  const total = l.planBytes + l.photoBytes;
+  const icon = STATE_ICON[l.cache];
+  const on = l.cache === 'cached' || l.cache === 'downloading';
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled && { opacity: 0.4 }]} accessibilityRole="button" testID={testID}>
-      <Text style={styles.btnText}>{label}</Text>
-    </Pressable>
+    <View style={[styles.lr, !l.inScope && styles.outOfScope]}>
+      <Text style={styles.lrCode}>{l.code}</Text>
+      <View style={styles.flex}>
+        {name ? <Text style={styles.lrName}>{name}</Text> : null}
+        {bytes ? <Text style={styles.caption}>{bytes}</Text> : null}
+      </View>
+      <Text style={[styles.caption, tabular, styles.lrSize]}>{total ? formatBytes(total) : '–'}</Text>
+      <View style={styles.lrState}>
+        {icon ? <Icon name={icon} size={16} color={color.text2} strokeWidth={icon === 'check' ? 2.2 : 2} /> : null}
+        <Text style={[styles.lrStateText, !on && { color: color.text3 }]} testID={`sync.level.${l.code}`}>
+          {levelStateLabel(l.cache)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function Detail({ k, children, tone, testID }: { k: string; children: ReactNode; tone?: 'danger' | 'muted'; testID?: string }) {
+  return (
+    <View style={styles.dr}>
+      <Text style={styles.dk}>{k}</Text>
+      <Text style={[styles.dv, tone === 'danger' && { color: color.danger }, tone === 'muted' && { color: color.text3 }]} testID={testID}>
+        {children}
+      </Text>
+    </View>
+  );
+}
+
+function Key({ fill, text }: { fill: string; text: string }) {
+  return (
+    <View style={styles.key}>
+      <View style={[styles.dot, { backgroundColor: fill }]} />
+      <Text style={styles.keyText}>{text}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 24, gap: 14 },
-  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 28, fontWeight: '600' },
-  link: { color: '#1f6feb', fontSize: 16 },
-  hint: { color: '#555', fontSize: 14 },
-  section: { flexDirection: 'row', gap: 16, borderTopWidth: 1, borderTopColor: '#e1e4e8', paddingTop: 12 },
-  label: { width: 150, fontSize: 15, fontWeight: '600', color: '#333' },
-  value: { fontSize: 16 },
-  sub: { fontSize: 13, color: '#666' },
-  warn: { fontSize: 13, color: '#b42318' },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: '#eef1f5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 14 },
-  row: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  input: { flex: 1, maxWidth: 260, borderWidth: 1, borderColor: '#c7c7cc', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 16 },
-  btn: { alignSelf: 'flex-start', backgroundColor: '#1f6feb', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
-  btnText: { color: 'white', fontSize: 15, fontWeight: '600' },
-  note: { color: '#0a5', fontSize: 14 },
+  page: { flex: 1, backgroundColor: color.bg },
+  content: { paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xxl },
+  inner: { gap: 20 },
+  flex: { flex: 1 },
+  gap8: { gap: space.sm },
+  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.lg, flexWrap: 'wrap' },
+  headerText: { flex: 1, minWidth: 280 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  title: { ...font.display, color: color.text },
+  caption: { ...font.caption, color: color.text3 },
+  sec: { ...font.headline, color: color.text },
+  link: { ...font.captionBold, color: color.primary },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: space.lg },
+  tile: {
+    flexGrow: 1,
+    backgroundColor: color.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: color.hairline,
+    borderRadius: radius.card,
+    paddingVertical: space.lg,
+    paddingHorizontal: 20,
+    gap: 2,
+  },
+  tileLabel: { ...font.caption, color: color.text2 },
+  tileValue: { ...font.display, ...tabular, color: color.text },
+  connValue: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 34 },
+  connText: { ...font.title, flexShrink: 1 },
+  cols: { flexDirection: 'row', gap: space.lg, alignItems: 'flex-start' },
+  col: { flex: 1, gap: space.lg },
+  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md, minHeight: 52, paddingHorizontal: 20 },
+  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md, minHeight: 32 },
+  rowPad: { paddingHorizontal: 20, paddingBottom: space.md },
+  lr: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    minHeight: 52,
+    paddingHorizontal: 20,
+    paddingVertical: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.hairline,
+  },
+  footer: { minHeight: hit.target + space.sm },
+  outOfScope: { opacity: 0.55 },
+  lrCode: { ...font.headline, color: color.text, width: 56 },
+  lrName: { ...font.callout, color: color.text2 },
+  lrSize: { minWidth: 64, textAlign: 'right' },
+  lrState: { width: 120, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  lrStateText: { ...font.caption, color: color.text2 },
+  accountHead: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  avatar: { width: 32, height: 32, borderRadius: radius.pill, backgroundColor: color.border, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { ...font.calloutBold, color: color.text },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.hairline,
+    paddingTop: space.sm,
+  },
+  labelKey: { ...font.callout, color: color.text2 },
+  input: {
+    width: 200,
+    height: hit.control,
+    paddingHorizontal: space.md,
+    borderWidth: 1,
+    borderColor: color.border,
+    borderRadius: radius.control,
+    backgroundColor: color.surface,
+    ...font.callout,
+    color: color.text,
+  },
+  inputOff: { backgroundColor: color.surface2, color: color.text3 },
+  bar: { flexDirection: 'row', height: 12, borderRadius: radius.pill, overflow: 'hidden', backgroundColor: color.surface2, marginTop: space.xs },
+  legend: { flexDirection: 'row', alignItems: 'center', gap: space.lg, flexWrap: 'wrap' },
+  key: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { width: 10, height: 10, borderRadius: radius.pill },
+  keyText: { ...font.caption, color: color.text2 },
+  details: { paddingLeft: 26 + space.lg, paddingRight: 20, paddingBottom: space.lg, paddingTop: space.xs, gap: 2 },
+  dr: { flexDirection: 'row', gap: space.md, minHeight: 26, alignItems: 'flex-start', paddingVertical: space.xs },
+  dk: { ...font.caption, color: color.text2, width: 110 },
+  dv: { ...font.caption, ...tabular, color: color.text, flex: 1 },
+  refused: { ...font.caption, color: color.danger, paddingLeft: 110 + space.md, paddingVertical: 2 },
+  detailActions: { flexDirection: 'row', gap: space.sm, flexWrap: 'wrap', marginTop: 10 },
 });

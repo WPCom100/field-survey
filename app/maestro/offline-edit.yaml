@@ -113,7 +113,9 @@ name: Offline — every kind of edit, server stopped
 # the edits wait in the outbox
 - tapOn:
     id: nav.sync
-- assertVisible: '[1-9]\d* · oldest .*'
+- assertVisible:            # the Edits waiting tile (T178)
+    id: sync.pending
+    text: '[1-9]\d*'
 - tapOn: ← Levels
 - assertVisible:
     id: status.bar

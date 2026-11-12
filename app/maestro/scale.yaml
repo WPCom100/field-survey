@@ -34,12 +34,17 @@ name: Scale — the synthetic project's timings
 # the download is done when a cycle pulls nothing: the timing line on a quiet cycle
 - tapOn:
     id: nav.sync
+- runFlow: _sync-timing.yaml
 - extendedWaitUntil:
     visible:
       id: sync.timing
       text: 'Last cycle .* · 0 pushed, 0 pulled.*'
     timeout: 600000
 - assertNotVisible: ".*need attention.*"
+- scrollUntilVisible:
+    element:
+      id: sync.back
+    direction: UP
 - tapOn: ← Levels
 
 # the dense level's plan

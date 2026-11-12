@@ -2,8 +2,8 @@
 # library first, then this flow, then the server's check: every photo once, its blobs uploaded).
 # A new project with the 06M sheet and two stations (06M-S1, 06M-S2). On 06M-S1: 🖼 Library → the
 # picker → Save → Photos (1); the app is killed and relaunched straight away, while the upload may
-# still be queued (T21): after the relaunch it finishes, the Sync screen reads `0 photos` and
-# Retry failed uploads is greyed (T25). The photo is linked to 06M-S2 in its caption sheet: 06M-S2's
+# still be queued (T21): after the relaunch it finishes, the Sync screen's Photos waiting tile reads
+# 0 with "Nothing to upload" and no upload failed (T25, T178). The photo is linked to 06M-S2 in its caption sheet: 06M-S2's
 # card shows it (D128). + Photo here from the long-press menu → the camera stage (no camera on the
 # simulator) → 🖼 Library → the picker → Save: a level photo. Sync: nothing waits.
 appId: productions.luminarytechnology.fieldsurvey
@@ -66,13 +66,16 @@ name: Photos — library photos, upload resume, a link, + Photo here
 - assertVisible: Sync & uploads
 - tapOn:
     id: sync.now
-- extendedWaitUntil:
-    visible: '0 photos · 0 files \(0 B\), thumbnails first'
+- extendedWaitUntil:        # the Photos waiting tile (T178): no photo, no file waiting
+    visible:
+      id: sync.photos
+      text: '0'
     timeout: 60000
-- assertVisible:
-    text: Retry failed uploads
-    enabled: false
+- assertVisible: Nothing to upload
+# nothing failed: no failed-upload banner, so no Retry failed uploads (T178: it shows only then)
 - assertNotVisible: 'Upload failed.*'
+- assertNotVisible:
+    id: sync.retryUploads
 - tapOn: ← Levels
 
 # 2. the card: one photo, nothing waiting; link it to 06M-S2 in its caption sheet
@@ -156,6 +159,9 @@ name: Photos — library photos, upload resume, a link, + Photo here
 - tapOn:
     id: nav.sync
 - extendedWaitUntil:
-    visible: '0 photos · 0 files \(0 B\), thumbnails first'
+    visible:
+      id: sync.photos
+      text: '0'
     timeout: 60000
+- assertVisible: Nothing to upload
 - tapOn: ← Levels

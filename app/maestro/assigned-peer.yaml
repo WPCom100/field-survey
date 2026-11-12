@@ -1,6 +1,7 @@
 # Step 2 of `rig.sh assigned` (T166), on B as Bob after A's assigned.yaml: PROJECT arrives with A's
-# assignment (the Levels home's 06M carries ●) and both display sheets (06M, 03). Sync → Cached
-# levels: 06M's sheet is fetched (✓) and 03's is not (⬇) — only the assigned level (T25, D97).
+# assignment (the Levels home's 06M carries ●) and both display sheets (06M, 03). Sync → Levels on
+# this iPad: 06M's sheet is fetched (On iPad) and 03's is not (Not on iPad) — only the assigned
+# level (T25, D97).
 # T102 "Second iPad": 06M-04's open "Run DMX to … CT04LCPA" draft reads ETC on B, after B's own
 # rules run with A's changed Run item owner; the Rules tab reads "1 set away".
 appId: productions.luminarytechnology.fieldsurvey
@@ -19,9 +20,13 @@ name: Assigned — B fetches the assigned level's sheet only; B's draft follows 
 - tapOn:
     id: nav.sync
 - extendedWaitUntil:
-    visible: 06M ✓
+    visible:
+      id: sync.level.06M
+      text: On iPad
     timeout: 120000
-- assertVisible: 03 ⬇
+- assertVisible:
+    id: sync.level.03
+    text: Not on iPad
 - tapOn: ← Levels
 
 # B's draft follows the owner A set

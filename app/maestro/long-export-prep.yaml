@@ -32,12 +32,17 @@ name: Long export — SCALE on this iPad
 # cycle moves nothing
 - tapOn:
     id: nav.sync
+- runFlow: _sync-timing.yaml
 - extendedWaitUntil:
     visible:
       id: sync.timing
       text: 'Last cycle .* · 0 pushed, 0 pulled.*'
     timeout: 900000
 - assertNotVisible: ".*need attention.*"
+- scrollUntilVisible:
+    element:
+      id: sync.back
+    direction: UP
 - tapOn: ← Levels
 - assertVisible:
     id: level.06M

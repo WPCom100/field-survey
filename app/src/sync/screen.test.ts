@@ -7,12 +7,21 @@ import { listProjects } from '../home/data';
 import { ensureDemoLevel } from '../plan/demo';
 import {
   carryOver,
+  connectionTile,
   describeCycle,
+  editsTileSub,
   formatBytes,
   freeUploadedPhotos,
+  groupDigits,
+  levelBytesLine,
+  levelsCaption,
+  levelStateLabel,
   loadServerVersion,
   loadSyncScreen,
+  photosTileSub,
   retryFailedUploads,
+  stamp,
+  storageShares,
   unknownUserNotice,
   type QuarantinedEdit,
 } from './screen';
@@ -89,6 +98,107 @@ describe('loadSyncScreen', () => {
     const d = await loadSyncScreen(await open(), null);
     expect(d.outbox.pending).toBe(0);
     expect(d.levels).toEqual([]);
+  });
+});
+
+describe('Levels on this iPad (T178)', () => {
+  it('lists every live level in floor order with its plan and photo bytes on disk, state and assignment', async () => {
+    const store = await open();
+    const lv = (id: string, code: string, order: number, sheet: string | null, inScope = 1) =>
+      store.db.exec(`INSERT INTO level (id, project_id, level, floor_order, numbering_group_id, in_scope, display_sheet_id) VALUES (?, 'p', ?, ?, 'g', ?, ?)`, [
+        id,
+        code,
+        order,
+        inScope,
+        sheet,
+      ]);
+    const sh = (id: string, level: string, blob: string, kind = 'display') =>
+      store.db.exec(`INSERT INTO sheet (id, level_id, kind, blob) VALUES (?, ?, ?, ?)`, [id, level, kind, blob]);
+    await lv('l2', '02', 2, 's2');
+    await lv('l1', 'B1', 1, 's1');
+    await lv('l3', '03', 3, 's3');
+    await lv('l4', '07', 4, null, 0);
+    await lv('lx', '09', 5, null);
+    await store.db.exec(`UPDATE level SET deleted_at = '2026-01-01' WHERE id = 'lx'`);
+    await lv('other', 'B1', 1, null);
+    await store.db.exec(`UPDATE level SET project_id = 'q' WHERE id = 'other'`);
+    await sh('s1', 'l1', 'sheetB1');
+    await sh('s1src', 'l1', 'srcB1', 'source');
+    await sh('s2', 'l2', 'sheet02');
+    await sh('s3', 'l3', 'sheet03');
+    await addBlob(store, 'sheetB1', 'sheet', 4000, 'complete');
+    await addBlob(store, 'srcB1', 'sheet', 1000, 'complete');
+    // 02's sheet is known but not on disk, and queued; 03's is unknown to the blob table
+    await store.db.exec(`INSERT INTO blob (sha256, size, mime, upload_state, kind) VALUES ('sheet02', 9000, 'x', 'complete', 'sheet')`);
+    await store.db.exec(`INSERT INTO blob_queue (sha256, direction, kind, state, attempts, created_at) VALUES ('sheet02', 'download', 'sheet', 'queued', 0, '2026-01-01')`);
+    // photos: B1 has one with image + thumb (the thumb shared with a second photo), a deleted one does not count
+    await addBlob(store, 'img', 'image', 700, 'complete');
+    await addBlob(store, 'th', 'thumb', 30, 'complete');
+    await addBlob(store, 'gone', 'image', 5000, 'complete');
+    await store.db.exec(
+      `INSERT INTO photo (id, level_id, image_blob, thumb_blob, deleted_at) VALUES
+       ('p1', 'l1', 'img', 'th', NULL), ('p2', 'l1', NULL, 'th', NULL), ('p3', 'l1', 'gone', NULL, '2026-01-01'), ('p4', 'l2', NULL, 'th', NULL)`,
+    );
+    await store.db.exec(`INSERT INTO assignment (level_id, user_id) VALUES ('l2', 'ann'), ('l3', 'bob')`);
+
+    const d = await loadSyncScreen(store, 'p', 'ann');
+    expect(d.levels).toEqual([
+      { id: 'l1', code: 'B1', cache: 'cached', inScope: true, assignedToMe: false, planBytes: 5000, photoBytes: 730, sheetBytes: 4000 },
+      { id: 'l2', code: '02', cache: 'downloading', inScope: true, assignedToMe: true, planBytes: 0, photoBytes: 30, sheetBytes: 9000 },
+      { id: 'l3', code: '03', cache: 'not cached', inScope: true, assignedToMe: false, planBytes: 0, photoBytes: 0, sheetBytes: null },
+      { id: 'l4', code: '07', cache: 'no sheet', inScope: false, assignedToMe: false, planBytes: 0, photoBytes: 0, sheetBytes: null },
+    ]);
+    expect((await loadSyncScreen(store, 'p')).levels.every((l) => !l.assignedToMe)).toBe(true);
+    expect(levelsCaption(d.levels)).toBe('1 of 4 levels on this iPad · 6 KB'); // 5,000 + 730 + 30 B
+    expect(d.levels.map(levelBytesLine)).toEqual(['plan 5 KB · photos 730 B', 'plan 9 KB, downloading · photos 30 B', 'plan not downloaded', '']);
+    expect(d.levels.map((l) => levelStateLabel(l.cache))).toEqual(['On iPad', 'Downloading…', 'Not on iPad', 'No sheet yet']);
+  });
+});
+
+describe('the board copy (T178)', () => {
+  const now = new Date(2026, 10, 11, 15, 0);
+  const at = (h: number, m: number, day = 11) => new Date(2026, 10, day, h, m).toISOString();
+  const base = { lastSyncAt: null, lastFailure: null, lastError: null, nextAttemptAt: null } as const;
+
+  it('stamps today with the time and another day with the date too; groups digits', () => {
+    expect(stamp(at(14, 5), now)).toBe('14:05');
+    expect(stamp(at(9, 3, 9), now)).toBe('Nov 9, 09:03');
+    expect(groupDigits(12345)).toBe('12,345');
+    expect(groupDigits(999)).toBe('999');
+    expect(groupDigits(1234567)).toBe('1,234,567');
+  });
+
+  it('the Connection tile says the state, its tone and when', () => {
+    expect(connectionTile({ ...base, state: 'idle', lastSyncAt: at(14, 5) }, 12345, now)).toEqual({
+      value: 'Synced',
+      sub: '14:05 · server sequence 12,345',
+      tone: 'success',
+      icon: 'check',
+    });
+    expect(connectionTile({ ...base, state: 'idle' }, 0, now).value).toBe('Not synced yet');
+    expect(connectionTile({ ...base, state: 'offline', lastSyncAt: at(13, 40), nextAttemptAt: at(15, 10) }, 3, now)).toEqual({
+      value: 'Offline',
+      sub: 'Last synced 13:40 · next try 15:10',
+      tone: 'warning',
+      icon: 'offline',
+    });
+    expect(connectionTile({ ...base, state: 'error', lastFailure: 'auth' }, 0, now)).toMatchObject({ value: 'Sign-in needed', sub: 'Never synced', tone: 'warning' });
+    expect(connectionTile({ ...base, state: 'error', lastError: 'HTTP 500' }, 0, now)).toMatchObject({ value: 'Sync error', sub: 'HTTP 500 · Never synced', tone: 'danger' });
+    expect(connectionTile({ ...base, state: 'syncing' }, 0, now).value).toBe('Syncing…');
+    expect(connectionTile({ ...base, state: 'no_token' }, 0, now).value).toBe('Not connected');
+  });
+
+  it('the Edits and Photos tiles say what waits', () => {
+    expect(editsTileSub(null, now)).toBe('Sent in order when online. Nothing is lost.');
+    expect(editsTileSub(at(9, 3, 9), now)).toBe('Oldest Nov 9, 09:03 · sent in order when online');
+    expect(photosTileSub({ uploadsPending: 0, uploadBytesPending: 0 })).toBe('Nothing to upload');
+    expect(photosTileSub({ uploadsPending: 3, uploadBytesPending: 1.4 * 1024 ** 2 })).toBe('3 files · 1.4 MB · thumbnails go first');
+    expect(photosTileSub({ uploadsPending: 1, uploadBytesPending: 2048 })).toBe('1 file · 2 KB · thumbnails go first');
+  });
+
+  it('the storage bar shares add up to one, and are zero with nothing stored', () => {
+    expect(storageShares({ plansBytes: 75, photosBytes: 20, otherBytes: 5, reclaimableBytes: 10 })).toEqual({ plans: 0.75, photos: 0.2, other: 0.05, total: 100 });
+    expect(storageShares({ plansBytes: 0, photosBytes: 0, otherBytes: 0, reclaimableBytes: 0 })).toEqual({ plans: 0, photos: 0, other: 0, total: 0 });
   });
 });
 

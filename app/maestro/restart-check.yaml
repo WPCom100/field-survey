@@ -1,6 +1,6 @@
 # O6 step 2 of `rig.sh restart` (T159), on A after the api restart in the middle of the push and
 # every op is on the server: nothing refused (no "need attention", the Sync screen lists no
-# refused edit, Pending edits 0). `rig.sh` then checks the server's numbering.
+# refused edit, Edits waiting 0). `rig.sh` then checks the server's numbering.
 appId: productions.luminarytechnology.fieldsurvey
 name: Restart — nothing refused after the api restart
 ---
