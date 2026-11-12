@@ -16,7 +16,7 @@ import {
   type RulingField,
   type RulingPreview,
 } from '@field-survey/rules';
-import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -47,6 +47,7 @@ import {
 } from '../rulings/model';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { Btn as UiBtn, Chip as UiChip, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
 
 type Mode = { kind: 'idle' } | { kind: 'edit'; draft: RulingDraft; source: string | null } | { kind: 'preview'; draft: RulingDraft; preview: RulingPreview; skip: ReadonlySet<string>; back: 'edit' | 'detail' } | { kind: 'detail'; id: string };
 
@@ -151,14 +152,17 @@ export default function RulingsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.head}>
-        <Text style={styles.title}>{title}</Text>
-        <Link href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.link}>
-          ← Levels
-        </Link>
-        <View style={{ flex: 1 }} />
-        <Btn label="+ New ruling" onPress={() => setMode({ kind: 'edit', draft: emptyDraft(), source: null })} disabled={!engine} testID="rulings.new" />
-      </View>
+      <PageHeader
+        title={title}
+        caption="One decision applied to every matching record, previewed before anything changes."
+        actions={
+          <>
+            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
+            <Btn label="+ New ruling" onPress={() => setMode({ kind: 'edit', draft: emptyDraft(), source: null })} disabled={!engine} testID="rulings.new" />
+          </>
+        }
+        style={styles.header}
+      />
       <View style={styles.body}>
         <FlatList
           style={styles.list}
@@ -294,7 +298,7 @@ function EditorPanel({
     <>
       <Text style={styles.panelTitle} testID="rulings.editor.title">New ruling{source ? ` · from ${source}` : ''}</Text>
       <Label text="Reason" />
-      <TextInput style={styles.input} value={d.text} onChangeText={(text) => onChange({ ...d, text })} placeholder="0-10V rows read Fixtures (the Change Log's Reason)" testID="rulings.reason" />
+      <TextInput style={styles.input} placeholderTextColor={color.text3} value={d.text} onChangeText={(text) => onChange({ ...d, text })} placeholder="0-10V rows read Fixtures (the Change Log's Reason)" testID="rulings.reason" />
 
       <Label text="Scope" />
       <View style={styles.wrap}>
@@ -335,7 +339,7 @@ function EditorPanel({
       </View>
       {a.kind === 'item' ? (
         <View style={styles.block}>
-          <TextInput style={styles.input} value={a.item} onChangeText={(item) => setAction({ item })} placeholder="Item text (short; qualifiers go in Notes)" testID="rulings.item" />
+          <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.item} onChangeText={(item) => setAction({ item })} placeholder="Item text (short; qualifiers go in Notes)" testID="rulings.item" />
           <View style={styles.wrap}>
             {vocab.PUNCH_TYPE.map((t) => (
               <Chip key={t} label={t} on={a.type === t} onPress={() => setAction({ type: t })} />
@@ -346,7 +350,7 @@ function EditorPanel({
               <Chip key={o} label={o} on={a.owner === o} onPress={() => setAction({ owner: o })} />
             ))}
           </View>
-          <TextInput style={styles.input} value={a.notes ?? ''} onChangeText={(notes) => setAction({ notes })} placeholder="Notes (optional)" />
+          <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.notes ?? ''} onChangeText={(notes) => setAction({ notes })} placeholder="Notes (optional)" />
         </View>
       ) : (
         <View style={styles.block}>
@@ -355,15 +359,15 @@ function EditorPanel({
             <ValueInput field={fieldOf(entity, a.field, cables ?? undefined)} value={a.value} onChange={(value) => setAction({ value })} placeholder="New value" testID="rulings.value" />
           ) : a.kind === 'rename' ? (
             <>
-              <TextInput style={styles.input} value={a.from} onChangeText={(from) => setAction({ from })} placeholder="Old phrase (the whole value or one ; phrase)" testID="rulings.rename.from" />
-              <TextInput style={styles.input} value={a.to} onChangeText={(to) => setAction({ to })} placeholder="New phrase" testID="rulings.rename.to" />
+              <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.from} onChangeText={(from) => setAction({ from })} placeholder="Old phrase (the whole value or one ; phrase)" testID="rulings.rename.from" />
+              <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.to} onChangeText={(to) => setAction({ to })} placeholder="New phrase" testID="rulings.rename.to" />
             </>
           ) : a.kind === 'reword' ? (
             <Text style={styles.sub}>
               Each record gets what its rule now words (Setup → Rules as it stands). A field changed by hand, or one no rule words any more, is left as it is; the preview names them.
             </Text>
           ) : (
-            <TextInput style={styles.input} value={a.text} onChangeText={(text) => setAction({ text })} placeholder="Phrase to append (once, after '; ')" testID="rulings.append" />
+            <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.text} onChangeText={(text) => setAction({ text })} placeholder="Phrase to append (once, after '; ')" testID="rulings.append" />
           )}
         </View>
       )}
@@ -408,7 +412,7 @@ function ConditionRow({
     <View style={styles.cond}>
       <View style={styles.condHead}>
         <Text style={styles.sub}>{first ? 'Where' : 'AND'}</Text>
-        <View style={{ flex: 1 }} />
+        <View style={styles.flex} />
         <Pressable onPress={onRemove} accessibilityRole="button">
           <Text style={styles.link}>✕ remove</Text>
         </Pressable>
@@ -446,7 +450,7 @@ function FieldChips({ fields, value, onPick, idPrefix }: { fields: readonly Ruli
 function ValueInput({ field, value, onChange, placeholder, append, testID }: { field: RulingField | null; value: string; onChange: (v: string) => void; placeholder: string; append?: boolean; testID?: string }) {
   return (
     <>
-      {field?.strict ? null : <TextInput style={styles.input} value={value} onChangeText={onChange} placeholder={placeholder} autoCapitalize="none" testID={testID} />}
+      {field?.strict ? null : <TextInput style={styles.input} placeholderTextColor={color.text3} value={value} onChangeText={onChange} placeholder={placeholder} autoCapitalize="none" testID={testID} />}
       {field?.options?.length ? (
         <View style={styles.wrap}>
           {field.options.map((o) => {
@@ -484,18 +488,18 @@ function PreviewPanel({
       <Text style={styles.panelTitle}>{mode.draft.text.trim()}</Text>
       <View style={styles.btnRow}>
         <Text style={styles.value} testID="rulings.preview.title">{previewTitle(p, ticked)}</Text>
-        <View style={{ flex: 1 }} />
+        <View style={styles.flex} />
         <Btn label={ticked === p.rows.length ? 'Untick all' : 'Tick all'} onPress={() => onAll(ticked !== p.rows.length)} secondary disabled={!p.rows.length} />
         <Btn label={busy ? 'Applying…' : `Apply ${ticked}`} onPress={onApply} disabled={busy || (!ticked && !!mode.draft.id) || (!ticked && !mode.draft.standing)} testID="rulings.apply" />
         <Btn label="Back" onPress={onBack} secondary testID="rulings.back" />
       </View>
       <View style={[styles.tr, styles.th]}>
         <Text style={styles.cTick}> </Text>
-        <Text style={styles.cLvl}>Lvl</Text>
-        <Text style={styles.cRef}>Ref</Text>
-        <Text style={styles.cField}>Field</Text>
-        <Text style={styles.cVal}>Was</Text>
-        <Text style={styles.cVal}>Now</Text>
+        <Text style={[styles.cLvl, styles.thText]}>Lvl</Text>
+        <Text style={[styles.cRef, styles.thText]}>Ref</Text>
+        <Text style={[styles.cField, styles.thText]}>Field</Text>
+        <Text style={[styles.cVal, styles.thText]}>Was</Text>
+        <Text style={[styles.cVal, styles.thText]}>Now</Text>
       </View>
       <FlatList
         style={styles.table}
@@ -596,9 +600,9 @@ function DetailPanel({
       </View>
       {deleting ? (
         <View style={styles.block}>
-          <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="Why delete it? (what it changed stays)" testID="rulings.delete.reason" />
+          <TextInput style={styles.input} placeholderTextColor={color.text3} value={reason} onChangeText={setReason} placeholder="Why delete it? (what it changed stays)" testID="rulings.delete.reason" />
           <View style={styles.btnRow}>
-            <Btn label="Delete" onPress={() => onDelete(reason)} disabled={!reason.trim()} testID="rulings.delete.ok" />
+            <Btn label="Delete" kind="destructive" onPress={() => onDelete(reason)} disabled={!reason.trim()} testID="rulings.delete.ok" />
             <Btn label="Cancel" onPress={() => setDeleting(false)} secondary />
           </View>
         </View>
@@ -638,72 +642,81 @@ function Label({ text }: { text: string }) {
   return <Text style={styles.label}>{text}</Text>;
 }
 
+/** The screen's chips and buttons over the UI system's (T179): `on` is a selected chip; a button is primary unless `secondary`. */
 function Chip({ label, on, onPress, small, testID }: { label: string; on: boolean; onPress: () => void; small?: boolean; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, small && styles.chipSmall, on && styles.chipOn]} testID={testID}>
-      <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
-    </Pressable>
-  );
+  return <UiChip label={label} selected={on} onPress={onPress} small={small} testID={testID} />;
 }
 
-function Btn({ label, onPress, disabled, secondary, small, testID }: { label: string; onPress: () => void; disabled?: boolean; secondary?: boolean; small?: boolean; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, secondary && styles.btn2, small && styles.btnSmall, disabled && styles.off]} accessibilityRole="button" testID={testID}>
-      <Text style={secondary ? styles.btn2Text : styles.btnText}>{label}</Text>
-    </Pressable>
-  );
+function Btn({
+  label,
+  onPress,
+  disabled,
+  secondary,
+  small,
+  kind,
+  testID,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  secondary?: boolean;
+  small?: boolean;
+  kind?: 'destructive';
+  testID?: string;
+}) {
+  return <UiBtn title={label} onPress={onPress} disabled={disabled} small={small} kind={kind ?? (secondary ? 'secondary' : 'primary')} testID={testID} />;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingVertical: 12 },
-  title: { fontSize: 24, fontWeight: '600' },
-  link: { color: '#1f6feb', fontSize: 16 },
-  body: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e1e4e8' },
-  list: { width: '34%', flexGrow: 0, borderRightWidth: 1, borderRightColor: '#e1e4e8' },
-  row: { paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
-  rowOn: { backgroundColor: '#dce8fb' },
-  rowTitle: { fontSize: 15, fontWeight: '600' },
-  rowSub: { fontSize: 13, color: '#666', marginTop: 2 },
-  empty: { fontSize: 15, color: '#666', padding: 16 },
+  root: { flex: 1, backgroundColor: color.bg },
+  header: { paddingBottom: space.md },
+  flex: { flex: 1 },
+  link: { ...font.callout, color: color.primary },
+  body: {
+    flex: 1,
+    flexDirection: 'row',
+    marginHorizontal: PAGE_GUTTER,
+    marginBottom: space.lg,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    borderRadius: radius.card,
+    overflow: 'hidden',
+  },
+  list: { width: '34%', flexGrow: 0, borderRightWidth: 1, borderRightColor: color.hairline },
+  row: { paddingVertical: 10, paddingHorizontal: space.lg, borderBottomWidth: 1, borderBottomColor: color.hairline, gap: 2 },
+  rowOn: { backgroundColor: color.primaryTint },
+  rowTitle: { ...font.calloutBold, color: color.text },
+  rowSub: { ...font.caption, color: color.text3 },
+  empty: { ...font.callout, color: color.text3, padding: space.lg },
   panel: { flex: 1 },
-  panelBody: { padding: 16, gap: 10 },
-  panelTitle: { fontSize: 18, fontWeight: '600' },
-  label: { fontSize: 13, fontWeight: '700', color: '#555', marginTop: 6, textTransform: 'uppercase' },
-  value: { fontSize: 16 },
-  sub: { fontSize: 13, color: '#666' },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  hscroll: { gap: 8, paddingVertical: 2 },
-  block: { gap: 8 },
-  cond: { gap: 6, borderWidth: 1, borderColor: '#e1e4e8', borderRadius: 8, padding: 10 },
+  panelBody: { padding: space.lg, gap: 10 },
+  panelTitle: { ...font.headline, color: color.text },
+  label: { ...font.captionBold, color: color.text2, marginTop: 6, textTransform: 'uppercase' },
+  value: { ...font.body, color: color.text },
+  sub: { ...font.caption, color: color.text3 },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' },
+  hscroll: { gap: space.sm, paddingVertical: 6 },
+  block: { gap: space.sm },
+  cond: { gap: 6, borderWidth: 1, borderColor: color.hairline, borderRadius: radius.control, padding: 10 },
   condHead: { flexDirection: 'row', alignItems: 'center' },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipSmall: { paddingHorizontal: 10, paddingVertical: 4 },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111' },
-  chipTextOn: { color: '#fff' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, padding: 10, fontSize: 16, minHeight: 44 },
+  input: fieldStyles.input,
   problems: { gap: 2 },
-  problem: { color: '#b3261e', fontSize: 14 },
-  btnRow: { flexDirection: 'row', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
-  btn: { backgroundColor: '#1f6feb', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
-  btn2: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#1f6feb' },
-  btnSmall: { paddingHorizontal: 10, paddingVertical: 6 },
-  off: { opacity: 0.4 },
-  btnText: { color: 'white', fontSize: 15, fontWeight: '600' },
-  btn2Text: { color: '#1f6feb', fontSize: 15, fontWeight: '600' },
-  note: { color: '#0a5', fontSize: 14 },
-  prop: { gap: 4, borderBottomWidth: 1, borderBottomColor: '#eef0f3', paddingVertical: 8 },
-  previewRoot: { flex: 1, padding: 16, gap: 10 },
+  problem: { ...font.callout, color: color.danger },
+  btnRow: { flexDirection: 'row', gap: space.sm, alignItems: 'center', flexWrap: 'wrap' },
+  note: { ...font.callout, color: color.success },
+  prop: { gap: space.xs, borderBottomWidth: 1, borderBottomColor: color.hairline, paddingVertical: space.sm },
+  previewRoot: { flex: 1, padding: space.lg, gap: 10 },
   table: { flex: 1 },
-  tr: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
-  th: { borderBottomColor: '#c9ccd1' },
+  tr: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm, paddingHorizontal: space.sm, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  th: { backgroundColor: color.surface2, borderBottomColor: color.border, borderTopLeftRadius: radius.control, borderTopRightRadius: radius.control },
+  thText: { ...font.captionBold, color: color.text2 },
   trOff: { opacity: 0.45 },
-  cTick: { width: 24, fontSize: 18 },
-  cLvl: { width: 44, fontSize: 14 },
-  cRef: { width: 110, fontSize: 14 },
-  cField: { width: 90, fontSize: 14, color: '#555' },
-  cVal: { flex: 1, fontSize: 14 },
+  cTick: { width: 24, fontSize: 18, color: color.text },
+  cLvl: { width: 44, ...font.callout, ...tabular, color: color.text },
+  cRef: { width: 110, ...font.callout, ...tabular, color: color.text },
+  cField: { width: 90, ...font.callout, color: color.text2 },
+  cVal: { flex: 1, ...font.callout, color: color.text },
   now: { fontWeight: '600' },
-  footer: { gap: 4, paddingVertical: 12 },
+  footer: { gap: space.xs, paddingVertical: space.md },
 });

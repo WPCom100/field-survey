@@ -1,6 +1,6 @@
 import type { Store } from '@field-survey/core';
 import { draftFromSeed } from '@field-survey/rules';
-import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -16,6 +16,7 @@ import { useRulesVersion } from '../rules/useRulesVersion';
 import { handRuling } from '../rulings/handoff';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { Btn, Chip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 
 /** Reasons offered as chips; any text is accepted. */
 const REASON_CHIPS = ['Checked on site: correct as is', 'Known; handled outside the app', 'Master is right; rule does not apply'];
@@ -133,25 +134,24 @@ export default function LintScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.head}>
-        <Text style={styles.title}>{title}</Text>
-        <Link href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.link}>
-          ← Levels
-        </Link>
-      </View>
-      <View style={styles.filters}>
-        <Text style={styles.filterLabel}>Level</Text>
-        <Chip label="All" on={!levelId} onPress={() => setLevelId(null)} testID="lint.level.all" />
+      <PageHeader
+        title={title}
+        caption="The rules' findings on this project. A finding you dismiss comes back when its facts change."
+        actions={<Btn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />}
+      />
+      <FilterRow style={styles.filters}>
+        <FilterLabel text="Level" />
+        <Chip small label="All" selected={!levelId} onPress={() => setLevelId(null)} testID="lint.level.all" />
         {view?.levels.map((l) => (
-          <Chip key={l.id} label={l.code} on={levelId === l.id} onPress={() => setLevelId(l.id)} testID={`lint.level.${l.code}`} />
+          <Chip small key={l.id} label={l.code} selected={levelId === l.id} onPress={() => setLevelId(l.id)} testID={`lint.level.${l.code}`} />
         ))}
-        <Text style={[styles.filterLabel, styles.gap]}>Group by</Text>
-        <Chip label="Check" on={groupBy === 'check'} onPress={() => setGroupBy('check')} testID="lint.groupBy.check" />
-        <Chip label="Level" on={groupBy === 'level'} onPress={() => setGroupBy('level')} testID="lint.groupBy.level" />
-        <Text style={[styles.filterLabel, styles.gap]}>Show</Text>
-        <Chip label="Open" on={!dismissed} onPress={() => setDismissed(false)} testID="lint.show.open" />
-        <Chip label={`Dismissed ${view?.dismissed ?? 0}`} on={dismissed} onPress={() => setDismissed(true)} testID="lint.show.dismissed" />
-      </View>
+        <FilterLabel text="Group by" gap />
+        <Chip small label="Check" selected={groupBy === 'check'} onPress={() => setGroupBy('check')} testID="lint.groupBy.check" />
+        <Chip small label="Level" selected={groupBy === 'level'} onPress={() => setGroupBy('level')} testID="lint.groupBy.level" />
+        <FilterLabel text="Show" gap />
+        <Chip small label="Open" selected={!dismissed} onPress={() => setDismissed(false)} testID="lint.show.open" />
+        <Chip small label={`Dismissed ${view?.dismissed ?? 0}`} selected={dismissed} onPress={() => setDismissed(true)} testID="lint.show.dismissed" />
+      </FilterRow>
 
       <View style={styles.body}>
         <FlatList
@@ -292,11 +292,11 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
       {r.hint ? <Text style={styles.hint}>Suggested: {r.hint}</Text> : null}
       {r.state === 'dismissed' ? <Text style={styles.sub}>Dismissed: {r.dismissedReason ?? '(no reason)'}</Text> : null}
       <View style={styles.btnRow}>
-        {r.levelId ? <Btn label={r.deviceId ? 'Open card ▸' : 'Open level ▸'} onPress={openCard} testID="lint.openCard" /> : null}
+        {r.levelId ? <Btn title={r.deviceId ? 'Open card ▸' : 'Open level ▸'} onPress={openCard} testID="lint.openCard" /> : null}
         {r.state === 'open' ? (
-          <Btn label="Dismiss…" onPress={() => setDismissing(true)} disabled={!canEdit || dismissing} testID="lint.dismiss" />
+          <Btn title="Dismiss…" onPress={() => setDismissing(true)} disabled={!canEdit || dismissing} testID="lint.dismiss" />
         ) : (
-          <Btn label="Reopen" onPress={() => onAct('reopen', r)} disabled={!canEdit} testID="lint.reopen" />
+          <Btn title="Reopen" onPress={() => onAct('reopen', r)} disabled={!canEdit} testID="lint.reopen" />
         )}
       </View>
       {dismissing ? (
@@ -304,14 +304,14 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
           <Text style={styles.sideTitle}>Why dismiss it?</Text>
           <View style={styles.btnRow}>
             {REASON_CHIPS.map((c) => (
-              <Chip key={c} label={c} on={reason === c} onPress={() => setReason(c)} />
+              <Chip key={c} label={c} selected={reason === c} onPress={() => setReason(c)} />
             ))}
           </View>
-          <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="Reason (required)" multiline testID="lint.reason" />
+          <TextInput style={styles.input} placeholderTextColor={color.text3} value={reason} onChangeText={setReason} placeholder="Reason (required)" multiline testID="lint.reason" />
           <Text style={styles.sub}>Dismissed findings come back if their facts change (D178).</Text>
           <View style={styles.btnRow}>
-            <Btn label="Dismiss" disabled={!reason.trim()} onPress={() => onAct('dismiss', r, reason)} testID="lint.dismiss.ok" />
-            <Btn label="Cancel" onPress={() => setDismissing(false)} />
+            <Btn kind="primary" title="Dismiss" disabled={!reason.trim()} onPress={() => onAct('dismiss', r, reason)} testID="lint.dismiss.ok" />
+            <Btn title="Cancel" onPress={() => setDismissing(false)} />
           </View>
         </View>
       ) : null}
@@ -319,62 +319,45 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
   );
 }
 
-function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
-      <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function Btn({ label, onPress, disabled, testID }: { label: string; onPress: () => void; disabled?: boolean; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled && styles.off]} accessibilityRole="button" testID={testID}>
-      <Text style={styles.btnText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingTop: 16 },
-  title: { fontSize: 24, fontWeight: '600' },
-  link: { color: '#1f6feb', fontSize: 16 },
-  filters: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingVertical: 10 },
-  filterLabel: { fontSize: 14, color: '#555' },
-  gap: { marginLeft: 16 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111' },
-  chipTextOn: { color: '#fff' },
-  body: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e1e4e8' },
-  list: { width: '46%', flexGrow: 0, borderRightWidth: 1, borderRightColor: '#e1e4e8' },
-  groupHead: { paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#f4f5f7', borderBottomWidth: 1, borderBottomColor: '#e1e4e8' },
-  groupTitle: { fontSize: 15, fontWeight: '700', color: '#333' },
-  groupHeadDraft: { backgroundColor: '#f3ecfb' },
-  draftBox: { paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#eef0f3', gap: 4 },
-  groupTitleLocal: { fontSize: 15, fontWeight: '700', color: '#333', padding: 12, backgroundColor: '#fff4e5' },
-  seeds: { paddingHorizontal: 16, paddingVertical: 6, gap: 6, backgroundColor: '#fafbfc' },
-  seedRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  seedText: { fontSize: 14, flex: 1 },
+  root: { flex: 1, backgroundColor: color.bg },
+  link: { ...font.callout, color: color.primary },
+  filters: { paddingBottom: space.md },
+  body: {
+    flex: 1,
+    flexDirection: 'row',
+    marginHorizontal: PAGE_GUTTER,
+    marginBottom: space.lg,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    borderRadius: radius.card,
+    overflow: 'hidden',
+  },
+  list: { width: '46%', flexGrow: 0, borderRightWidth: 1, borderRightColor: color.hairline },
+  groupHead: { minHeight: 44, justifyContent: 'center', paddingVertical: space.sm, paddingHorizontal: space.md, backgroundColor: color.surface2, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  groupTitle: { ...font.calloutBold, color: color.text2 },
+  groupHeadDraft: { backgroundColor: color.primaryTint },
+  draftBox: { paddingVertical: space.sm, paddingHorizontal: space.md, borderBottomWidth: 1, borderBottomColor: color.hairline, gap: space.xs },
+  groupTitleLocal: { ...font.calloutBold, color: color.warning, padding: space.md, backgroundColor: color.warningTint },
+  seeds: { paddingHorizontal: space.lg, paddingVertical: 6, gap: 6, backgroundColor: color.bg },
+  seedRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  seedText: { ...font.callout, color: color.text, flex: 1 },
   grow: { flex: 1 },
-  row: { paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
-  rowOn: { backgroundColor: '#dce8fb' },
-  rowTitle: { fontSize: 15, fontWeight: '600' },
-  rowSub: { fontSize: 13, color: '#666', marginTop: 2 },
-  empty: { fontSize: 15, color: '#666', padding: 16 },
+  row: { paddingVertical: 10, paddingHorizontal: space.lg, borderBottomWidth: 1, borderBottomColor: color.hairline, gap: 2 },
+  rowOn: { backgroundColor: color.primaryTint },
+  rowTitle: { ...font.calloutBold, color: color.text },
+  rowSub: { ...font.caption, color: color.text3 },
+  empty: { ...font.callout, color: color.text3, padding: space.lg },
   panel: { flex: 1 },
-  panelBody: { padding: 16, gap: 12 },
-  panelTitle: { fontSize: 18, fontWeight: '600' },
-  value: { fontSize: 16 },
-  sub: { fontSize: 13, color: '#666' },
-  hint: { fontSize: 14, color: '#0b5394' },
-  sideTitle: { fontSize: 15, fontWeight: '700' },
-  dismiss: { gap: 8, borderWidth: 1, borderColor: '#e1e4e8', borderRadius: 8, padding: 12 },
-  btnRow: { flexDirection: 'row', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
-  btn: { alignSelf: 'flex-start', backgroundColor: '#1f6feb', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
-  off: { opacity: 0.4 },
-  btnText: { color: 'white', fontSize: 15, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, padding: 10, fontSize: 16, minHeight: 44 },
-  note: { color: '#0a5', fontSize: 14 },
+  panelBody: { padding: space.lg, gap: space.md },
+  panelTitle: { ...font.headline, color: color.text },
+  value: { ...font.body, color: color.text },
+  sub: { ...font.caption, color: color.text3 },
+  hint: { ...font.callout, color: color.primary },
+  sideTitle: { ...font.calloutBold, color: color.text },
+  dismiss: { gap: space.sm, borderWidth: 1, borderColor: color.hairline, borderRadius: radius.control, padding: space.md },
+  btnRow: { flexDirection: 'row', gap: space.sm, alignItems: 'center', flexWrap: 'wrap' },
+  input: fieldStyles.input,
+  note: { ...font.callout, color: color.success },
 });

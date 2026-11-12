@@ -1,6 +1,6 @@
 import { Editor, vocab, type BlobQueue, type Store } from '@field-survey/core';
 import { draftFromSelection } from '@field-survey/rules';
-import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -19,6 +19,7 @@ import { pinStyleFor } from '../plan/pins';
 import { handRuling } from '../rulings/handoff';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { Btn as UiBtn, Chip as UiChip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, Swatch, color, font, hitSlopTo, radius, space, tabular } from '../ui';
 
 type Item = { type: 'group'; key: string; title: string; count: number; collapsed: boolean } | { type: 'row'; key: string; row: CableRow };
 
@@ -129,47 +130,47 @@ export default function CablesScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.head}>
-        <Text style={styles.title}>{title}</Text>
-        <Link href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.link}>
-          ← Levels
-        </Link>
-        <View style={styles.flex} />
-        {picked ? (
+      <PageHeader
+        title={title}
+        caption="Every cable of the project with both ends; the project's consistency checks along the bottom."
+        actions={
           <>
-            <Btn label={`All ${shown.length}`} onPress={() => setPicked(new Set(shown.map((r) => r.id)))} testID="cables.select.all" />
-            <Btn label={`Apply as ruling… (${picked.size})`} disabled={!picked.size} onPress={applyAsRuling} testID="cables.select.apply" />
-            <Btn label="Cancel" plain onPress={() => setPicked(null)} testID="cables.select.cancel" />
+            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
+            {picked ? (
+              <>
+                <Btn label={`All ${shown.length}`} onPress={() => setPicked(new Set(shown.map((r) => r.id)))} testID="cables.select.all" />
+                <Btn label={`Apply as ruling… (${picked.size})`} disabled={!picked.size} onPress={applyAsRuling} testID="cables.select.apply" />
+                <Btn label="Cancel" plain onPress={() => setPicked(null)} testID="cables.select.cancel" />
+              </>
+            ) : (
+              <Btn label="Select" plain onPress={() => setPicked(new Set())} testID="cables.select" />
+            )}
           </>
-        ) : (
-          <Btn label="Select" plain onPress={() => setPicked(new Set())} testID="cables.select" />
-        )}
-      </View>
-      <View style={styles.filters}>
-        <Text style={styles.filterLabel}>Group by</Text>
+        }
+      />
+      <FilterRow style={styles.filters}>
+        <FilterLabel text="Group by" />
         <Chip label="Vertical" on={groupBy === 'vertical'} onPress={() => setGroupBy('vertical')} testID="cables.groupBy.vertical" />
         <Chip label="Level" on={groupBy === 'level'} onPress={() => setGroupBy('level')} testID="cables.groupBy.level" />
         <Chip label="Code" on={groupBy === 'code'} onPress={() => setGroupBy('code')} testID="cables.groupBy.code" />
-        <Text style={[styles.filterLabel, styles.gap]}>Level</Text>
+        <FilterLabel text="Level" gap />
         <Chip label="All" on={!filter.levelId} onPress={() => set({ levelId: null })} testID="cables.level.all" />
         {data?.levels.map((l) => (
           <Chip key={l.id} label={l.code} on={filter.levelId === l.id} onPress={() => set({ levelId: l.id })} testID={`cables.level.${l.code}`} />
         ))}
-      </View>
-      <View style={styles.filters}>
-        <Text style={styles.filterLabel}>Code</Text>
+        <FilterLabel text="Code" gap />
         <Chip label="All" on={!filter.code} onPress={() => set({ code: null })} testID="cables.code.all" />
         {presentCodes.map((c) => (
           <Chip key={c} label={c} on={filter.code === c} onPress={() => set({ code: c })} testID={`cables.code.${c}`} />
         ))}
-        <Text style={[styles.filterLabel, styles.gap]}>Status</Text>
+        <FilterLabel text="Status" gap />
         <Chip label="All" on={!filter.status} onPress={() => set({ status: null })} testID="cables.status.all" />
         {STATUSES.map((s) => (
           <Chip key={s} label={s} on={filter.status === s} onPress={() => set({ status: s })} testID={`cables.status.${s}`} />
         ))}
-        <Text style={[styles.filterLabel, styles.gap]}>Checks</Text>
+        <FilterLabel text="Checks" gap />
         <Chip label="☑ only" on={!!filter.check} onPress={() => set({ check: filter.check ? null : 'any' })} testID="cables.checkOnly" />
-      </View>
+      </FilterRow>
 
       <View style={styles.body}>
         <View style={styles.list}>
@@ -262,7 +263,7 @@ export default function CablesScreen() {
       <View style={styles.footer}>
         <Text style={styles.footerLabel}>Consistency checks (project)</Text>
         {CABLE_CHECKS.map((k) => (
-          <Pressable key={k.id} onPress={() => set({ check: filter.check === k.id ? null : k.id })} style={[styles.count, filter.check === k.id && styles.countOn]} testID={`cables.check.${k.id}`}>
+          <Pressable key={k.id} onPress={() => set({ check: filter.check === k.id ? null : k.id })} hitSlop={hitSlopTo(28)} style={[styles.count, filter.check === k.id && styles.countOn]} testID={`cables.check.${k.id}`}>
             <Text style={[styles.countText, filter.check === k.id && styles.countTextOn, !!data?.totals[k.id] && filter.check !== k.id && styles.countWarn]}>
               {k.title} {data?.totals[k.id] ?? '…'}
             </Text>
@@ -298,11 +299,16 @@ function CableLine({ row: r, on, picked, onPress }: { row: CableRow; on: boolean
 }
 
 function StatusText({ value }: { value: string }) {
-  const st = pinStyleFor(value === UNSURVEYED || value.startsWith('⚠') ? null : value);
+  // D64: the swatch with its glyph carries the colour, the word stays (a mismatch is a warning, no swatch).
+  const warn = value.startsWith('⚠');
+  const st = pinStyleFor(value === UNSURVEYED || warn ? null : value);
   return (
-    <Text style={[styles.cStatus, { color: value.startsWith('⚠') ? '#e65100' : st.fill }]} numberOfLines={1}>
-      {value}
-    </Text>
+    <View style={styles.cStatus}>
+      {warn ? null : <Swatch {...st} size={14} />}
+      <Text style={[styles.cStatusText, warn && styles.warn]} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -333,73 +339,70 @@ function CableChecks({ row: r, names, canEdit, onConfirm, projectId }: { row: Ca
   );
 }
 
+/** The screen's chips and buttons over the UI system's (T179): small chips; a `plain` button is secondary, the others primary. */
 function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
-      <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
-    </Pressable>
-  );
+  return <UiChip small label={label} selected={on} onPress={onPress} testID={testID} />;
 }
 
 function Btn({ label, onPress, disabled, plain, small, testID }: { label: string; onPress: () => void; disabled?: boolean; plain?: boolean; small?: boolean; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, plain && styles.btnPlain, small && styles.btnSmall, disabled && styles.off]} accessibilityRole="button" testID={testID}>
-      <Text style={[styles.btnText, plain && styles.btnTextPlain, small && styles.btnTextSmall]}>{label}</Text>
-    </Pressable>
-  );
+  return <UiBtn small={small} title={label} onPress={onPress} disabled={disabled} kind={plain ? 'secondary' : 'primary'} testID={testID} />;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  flex: { flex: 1 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 16 },
-  title: { fontSize: 24, fontWeight: '600' },
-  link: { color: '#1f6feb', fontSize: 16 },
-  filters: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, paddingHorizontal: 20, paddingTop: 8 },
-  filterLabel: { fontSize: 14, color: '#555' },
-  gap: { marginLeft: 14 },
-  chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111', fontSize: 13 },
-  chipTextOn: { color: '#fff', fontSize: 13 },
-  body: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e1e4e8', marginTop: 10 },
-  list: { width: '62%', borderRightWidth: 1, borderRightColor: '#e1e4e8' },
+  root: { flex: 1, backgroundColor: color.bg },
+  filters: { paddingBottom: space.md },
+  body: {
+    flex: 1,
+    flexDirection: 'row',
+    marginHorizontal: PAGE_GUTTER,
+    marginBottom: space.md,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    borderRadius: radius.card,
+    overflow: 'hidden',
+  },
+  list: { width: '62%', borderRightWidth: 1, borderRightColor: color.hairline },
   panel: { flex: 1 },
-  panelBody: { padding: 8, gap: 8 },
-  th: { backgroundColor: '#fafbfc', borderBottomWidth: 1, borderBottomColor: '#e1e4e8' },
-  thText: { fontWeight: '700', color: '#444' },
-  tr: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
-  rowOn: { backgroundColor: '#dce8fb' },
-  tick: { width: 22, fontSize: 18 },
-  cCode: { width: 56, fontSize: 14, fontWeight: '600' },
-  cEnd: { flex: 3, fontSize: 14, fontVariant: ['tabular-nums'] },
-  cStatus: { flex: 2, fontSize: 13 },
-  cChecks: { width: 54, fontSize: 13, textAlign: 'right' },
-  warn: { color: '#e65100', fontWeight: '700' },
-  ok: { color: '#2e7d32' },
-  groupHead: { paddingVertical: 9, paddingHorizontal: 12, backgroundColor: '#f4f5f7', borderBottomWidth: 1, borderBottomColor: '#e1e4e8' },
-  groupTitle: { fontSize: 15, fontWeight: '700', color: '#333' },
-  groupCount: { fontSize: 13, fontWeight: '400', color: '#777' },
-  empty: { fontSize: 15, color: '#666', padding: 16 },
-  section: { marginHorizontal: 8, marginTop: 8, padding: 10, gap: 6, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: '#d6d9de' },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#333' },
-  finding: { fontSize: 13, color: '#e65100' },
-  okText: { fontSize: 13, color: '#2e7d32', fontWeight: '600' },
-  muted: { fontSize: 12, color: '#777' },
-  btnRow: { flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  btn: { backgroundColor: '#1f6feb', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#1f6feb' },
-  btnPlain: { backgroundColor: '#fff' },
-  btnSmall: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  btnText: { color: 'white', fontSize: 15, fontWeight: '600' },
-  btnTextPlain: { color: '#1f6feb' },
-  btnTextSmall: { fontSize: 13 },
-  off: { opacity: 0.4 },
-  note: { color: '#0a5', fontSize: 14, padding: 8 },
-  footer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#e1e4e8', backgroundColor: '#fafbfc' },
-  footerLabel: { fontSize: 13, fontWeight: '700', color: '#444', marginRight: 6 },
-  count: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#d6d9de' },
-  countOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  countText: { fontSize: 13, color: '#333' },
-  countTextOn: { color: '#fff' },
-  countWarn: { color: '#e65100', fontWeight: '600' },
+  panelBody: { padding: space.sm, gap: space.sm },
+  th: { backgroundColor: color.surface2, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  thText: { ...font.captionBold, color: color.text2 },
+  tr: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm, paddingHorizontal: space.md, gap: space.sm, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  rowOn: { backgroundColor: color.primaryTint },
+  tick: { width: 22, fontSize: 18, color: color.text },
+  cCode: { width: 56, ...font.calloutBold, fontSize: 14, lineHeight: 18, color: color.text },
+  cEnd: { flex: 3, ...font.callout, fontSize: 14, lineHeight: 18, ...tabular, color: color.text },
+  cStatus: { flex: 2, flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  cStatusText: { ...font.caption, color: color.text2, flexShrink: 1 },
+  cChecks: { width: 54, ...font.caption, textAlign: 'right' },
+  warn: { color: color.warning, fontWeight: '700' },
+  ok: { color: color.success },
+  groupHead: { paddingVertical: 6, paddingHorizontal: space.md, backgroundColor: color.bg, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  groupTitle: { ...font.calloutBold, color: color.text2 },
+  groupCount: { ...font.caption, color: color.text3 },
+  empty: { ...font.callout, color: color.text3, padding: space.lg },
+  section: { marginHorizontal: space.sm, marginTop: space.sm, padding: space.md, gap: 6, borderRadius: radius.control, borderWidth: 1, borderColor: color.hairline, backgroundColor: color.surface },
+  sectionTitle: { ...font.captionBold, color: color.text },
+  finding: { ...font.caption, color: color.warning },
+  okText: { ...font.captionBold, color: color.success },
+  muted: { ...font.caption, fontSize: 12, color: color.text3 },
+  btnRow: { flexDirection: 'row', gap: space.sm, alignItems: 'center', flexWrap: 'wrap' },
+  note: { ...font.callout, color: color.success, padding: space.sm },
+  footer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderTopWidth: 1,
+    borderTopColor: color.hairline,
+    backgroundColor: color.surface,
+  },
+  footerLabel: { ...font.captionBold, color: color.text2, marginRight: 6 },
+  count: { height: 28, justifyContent: 'center', paddingHorizontal: space.sm, borderRadius: radius.pill, borderWidth: 1, borderColor: color.border, backgroundColor: color.surface },
+  countOn: { backgroundColor: color.primaryTint, borderColor: color.primaryTint },
+  countText: { ...font.caption, color: color.text },
+  countTextOn: { color: color.primary, fontWeight: '600' },
+  countWarn: { color: color.warning, fontWeight: '600' },
 });

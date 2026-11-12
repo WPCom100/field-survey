@@ -1,6 +1,6 @@
 import { vocab, type Store } from '@field-survey/core';
 import { draftFromSelection } from '@field-survey/rules';
-import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -26,6 +26,7 @@ import { listProjects } from '../home/data';
 import { handRuling } from '../rulings/handoff';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { Btn as UiBtn, Chip as UiChip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
 
 type Panel = { kind: 'drill'; drill: Drill } | { kind: 'search' } | null;
 
@@ -126,36 +127,38 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.head}>
-        <Text style={styles.title}>Dashboard</Text>
-        <Link href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.link}>
-          ← Levels
-        </Link>
-        <Text style={styles.muted}>{asOf}</Text>
-        <View style={styles.flex} />
-        <TextInput
-          style={styles.search}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search the project: ID, tag, room, item, notes, Neuron ID, IP, DMX"
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          testID="dash.search"
-        />
-      </View>
-      <View style={styles.filters}>
-        <Text style={styles.filterLabel}>Levels</Text>
+      <PageHeader
+        title="Dashboard"
+        caption={asOf}
+        actions={
+          <>
+            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
+            <TextInput
+              style={styles.search}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search the project: ID, tag, room, item, notes, Neuron ID, IP, DMX"
+              placeholderTextColor={color.text3}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              testID="dash.search"
+            />
+          </>
+        }
+      />
+      <FilterRow>
+        <FilterLabel text="Levels" />
         <Chip label="All" on={!filter.levelId} onPress={() => setFilter((f) => ({ ...f, levelId: null }))} testID="dash.level.all" />
         {data?.levels.map((l) => (
           <Chip key={l.id} label={l.code} on={filter.levelId === l.id} onPress={() => setFilter((f) => ({ ...f, levelId: l.id }))} testID={`dash.level.${l.code}`} />
         ))}
-        <Text style={[styles.filterLabel, styles.gap]}>Owner</Text>
+        <FilterLabel text="Owner" gap />
         <Chip label="All" on={!filter.owner} onPress={() => setFilter((f) => ({ ...f, owner: null }))} testID="dash.owner.all" />
         {vocab.OWNER.map((o) => (
           <Chip key={o} label={o} on={filter.owner === o} onPress={() => setFilter((f) => ({ ...f, owner: o }))} testID={`dash.owner.${o}`} />
         ))}
-      </View>
+      </FilterRow>
 
       <View style={styles.body}>
         <ScrollView style={styles.main} contentContainerStyle={styles.mainBody}>
@@ -370,81 +373,58 @@ function CountLink({ text, on, onPress, testID }: { text: string; on: boolean; o
   );
 }
 
+/** The screen's chips and buttons over the UI system's (T179): small chips; a `plain` button is secondary, the others primary. */
 function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
-      <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
-    </Pressable>
-  );
+  return <UiChip small label={label} selected={on} onPress={onPress} testID={testID} />;
 }
 
 function Btn({ label, onPress, disabled, plain, testID }: { label: string; onPress: () => void; disabled?: boolean; plain?: boolean; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, plain && styles.btnPlain, disabled && styles.off]} accessibilityRole="button" testID={testID}>
-      <Text style={[styles.btnText, plain && styles.btnTextPlain]}>{label}</Text>
-    </Pressable>
-  );
+  return <UiBtn small title={label} onPress={onPress} disabled={disabled} kind={plain ? 'secondary' : 'primary'} testID={testID} />;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  flex: { flex: 1 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 16 },
-  title: { fontSize: 24, fontWeight: '600' },
-  link: { color: '#1f6feb', fontSize: 16 },
-  search: { width: 380, borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 15 },
-  filters: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, paddingHorizontal: 20, paddingTop: 8 },
-  filterLabel: { fontSize: 14, color: '#555' },
-  gap: { marginLeft: 14 },
-  chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111', fontSize: 13 },
-  chipTextOn: { color: '#fff', fontSize: 13 },
-  body: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e1e4e8', marginTop: 10 },
+  root: { flex: 1, backgroundColor: color.bg },
+  search: { ...fieldStyles.input, ...font.callout, width: 380 },
+  body: { flex: 1, flexDirection: 'row', marginTop: space.md, borderTopWidth: 1, borderTopColor: color.hairline },
   main: { flex: 1 },
-  mainBody: { padding: 16, gap: 18 },
-  section: { gap: 6 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: '#222' },
-  sectionRow: { flexDirection: 'row', gap: 16, flexWrap: 'wrap' },
-  grid: { borderWidth: StyleSheet.hairlineWidth, borderColor: '#d6d9de', borderRadius: 4, alignSelf: 'flex-start' },
-  tr: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e1e4e8' },
-  th: { backgroundColor: '#fafbfc' },
-  thText: { fontWeight: '700', color: '#444', fontSize: 12 },
+  mainBody: { paddingHorizontal: PAGE_GUTTER, paddingVertical: space.lg, gap: space.lg },
+  section: { gap: space.sm },
+  sectionTitle: { ...font.headline, color: color.text },
+  sectionRow: { flexDirection: 'row', gap: space.lg, flexWrap: 'wrap' },
+  grid: { backgroundColor: color.surface, borderWidth: 1, borderColor: color.hairline, borderRadius: radius.card, overflow: 'hidden', alignSelf: 'flex-start' },
+  tr: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.hairline },
+  th: { backgroundColor: color.surface2 },
+  thText: { ...font.captionBold, fontSize: 12, color: color.text2 },
   thCell: { textAlign: 'center' },
-  totalRow: { backgroundColor: '#f4f5f7' },
-  keyCell: { width: 64, paddingHorizontal: 8, paddingVertical: 7, fontSize: 14 },
-  dateCell: { width: 86, paddingHorizontal: 4, fontSize: 12, color: '#555', textAlign: 'center' },
+  totalRow: { backgroundColor: color.bg },
+  keyCell: { width: 72, paddingHorizontal: space.sm, paddingVertical: 7, ...font.callout, color: color.text },
+  dateCell: { width: 86, paddingHorizontal: space.xs, ...font.caption, fontSize: 12, color: color.text2, textAlign: 'center' },
   cell: { width: 70, paddingVertical: 7, alignItems: 'center', justifyContent: 'center' },
-  cellOn: { backgroundColor: '#1565c0', borderRadius: 4 },
-  cellText: { fontSize: 14, color: '#1f6feb', fontVariant: ['tabular-nums'], textAlign: 'center' },
-  cellTextOn: { color: '#fff' },
-  zero: { color: '#9aa0a6' },
+  cellOn: { backgroundColor: color.primary, borderRadius: radius.swatch },
+  cellText: { ...font.callout, ...tabular, color: color.primary, textAlign: 'center' },
+  cellTextOn: { color: color.onPrimary },
+  zero: { color: color.text3 },
   bold: { fontWeight: '700' },
   line: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
-  lineLabel: { fontSize: 15, fontWeight: '700', color: '#222' },
-  lineText: { fontSize: 15, color: '#222' },
-  linkText: { color: '#1f6feb' },
-  countLink: { paddingHorizontal: 4, paddingVertical: 2 },
+  lineLabel: { ...font.calloutBold, color: color.text },
+  lineText: { ...font.callout, color: color.text },
+  linkText: { color: color.primary },
+  countLink: { paddingHorizontal: space.xs, paddingVertical: 2 },
   readiness: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  surveying: { color: '#2e7d32', fontWeight: '600' },
-  ready: { color: '#1565c0', fontWeight: '600' },
-  setup: { color: '#e65100' },
-  muted: { fontSize: 13, color: '#777' },
-  empty: { fontSize: 15, color: '#666', padding: 16 },
-  panel: { width: '40%', borderLeftWidth: 1, borderLeftColor: '#e1e4e8' },
-  panelHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, padding: 10, borderBottomWidth: 1, borderBottomColor: '#e1e4e8', backgroundColor: '#fafbfc' },
-  panelTitle: { flex: 1, minWidth: 160, fontSize: 15, fontWeight: '700', color: '#333' },
-  groupTitle: { fontSize: 14, fontWeight: '700', color: '#333', paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#f4f5f7' },
-  groupCount: { fontWeight: '400', color: '#777' },
-  listRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
-  tick: { width: 22, fontSize: 18 },
-  listLevel: { width: 40, fontSize: 13, color: '#555' },
-  listLabel: { width: 84, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  listText: { flex: 1, fontSize: 13, color: '#333' },
-  chev: { fontSize: 14, color: '#9aa0a6' },
-  btn: { backgroundColor: '#1f6feb', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#1f6feb' },
-  btnPlain: { backgroundColor: '#fff' },
-  btnText: { color: 'white', fontSize: 13, fontWeight: '600' },
-  btnTextPlain: { color: '#1f6feb' },
-  off: { opacity: 0.4 },
+  surveying: { color: color.success, fontWeight: '600' },
+  ready: { color: color.primary, fontWeight: '600' },
+  setup: { color: color.warning },
+  muted: { ...font.caption, color: color.text3 },
+  empty: { ...font.callout, color: color.text3, padding: space.lg },
+  panel: { width: '40%', backgroundColor: color.surface, borderLeftWidth: 1, borderLeftColor: color.hairline },
+  panelHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, padding: 10, borderBottomWidth: 1, borderBottomColor: color.hairline, backgroundColor: color.surface2 },
+  panelTitle: { flex: 1, minWidth: 160, ...font.calloutBold, color: color.text },
+  groupTitle: { ...font.captionBold, color: color.text2, paddingVertical: space.sm, paddingHorizontal: space.md, backgroundColor: color.surface2 },
+  groupCount: { fontWeight: '400', color: color.text3 },
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 44, paddingVertical: 9, paddingHorizontal: space.md, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  tick: { width: 22, fontSize: 18, color: color.text },
+  listLevel: { width: 40, ...font.caption, color: color.text2 },
+  listLabel: { width: 84, ...font.calloutBold, ...tabular, color: color.text },
+  listText: { flex: 1, ...font.caption, color: color.text2 },
+  chev: { fontSize: 14, color: color.muted },
 });

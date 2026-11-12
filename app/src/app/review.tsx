@@ -1,5 +1,5 @@
 import { LIBRARY_STREAM, Editor, linkPunchDevice, resolutionReason, setPunchEnd, type ResolveChoice, type Store } from '@field-survey/core';
-import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -26,6 +26,7 @@ import {
 } from '../review/model';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { Btn, Chip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, ring, space, tabular } from '../ui';
 
 const CHOICE_LABEL: Record<ResolveChoice['choice'], string> = { A: 'Choose A', B: 'Choose B', combine: 'Combine', value: 'Set value' };
 
@@ -235,32 +236,31 @@ export default function NeedsReviewScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.head}>
-        <Text style={styles.title}>{projectId === LIBRARY_STREAM ? 'App library — needs review' : 'Needs review'} ({total})</Text>
-        <ScrollView horizontal contentContainerStyle={styles.chips} showsHorizontalScrollIndicator={false}>
-          {list?.tabs.map((t) => (
-            <Chip key={t.kind} label={`${t.label}${t.kind === 'all' ? '' : ` ${t.count}`}`} on={kind === t.kind} onPress={() => setKind(t.kind)} testID={`review.tab.${t.kind}`} />
-          ))}
-        </ScrollView>
-        {projectId === LIBRARY_STREAM ? (
-          <Link href={{ pathname: '/library', params: { scope: 'app' } }} style={styles.link}>
-            ← Library
-          </Link>
-        ) : (
-          <Link href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.link}>
-            ← Levels
-          </Link>
-        )}
-      </View>
-      <View style={styles.filters}>
-        <Text style={styles.filterLabel}>Level</Text>
-        <Chip label="All" on={!levelId} onPress={() => setLevelId(null)} />
-        {list?.levels.map((l) => (
-          <Chip key={l.id} label={l.code} on={levelId === l.id} onPress={() => setLevelId(l.id)} testID={`review.level.${l.code}`} />
+      <PageHeader
+        title={`${projectId === LIBRARY_STREAM ? 'App library — needs review' : 'Needs review'} (${total})`}
+        caption="Items waiting for a person's decision, by kind and level. Nothing is overwritten while one waits."
+        actions={
+          projectId === LIBRARY_STREAM ? (
+            <Btn kind="tertiary" title="← Library" onPress={() => router.navigate({ pathname: '/library', params: { scope: 'app' } })} />
+          ) : (
+            <Btn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
+          )
+        }
+      />
+      <ScrollView horizontal style={styles.tabs} contentContainerStyle={styles.chips} showsHorizontalScrollIndicator={false}>
+        {list?.tabs.map((t) => (
+          <Chip key={t.kind} label={`${t.label}${t.kind === 'all' ? '' : ` ${t.count}`}`} selected={kind === t.kind} onPress={() => setKind(t.kind)} testID={`review.tab.${t.kind}`} />
         ))}
-        <Text style={[styles.filterLabel, { marginLeft: 16 }]}>Sort</Text>
-        <Chip label={sort === 'oldest' ? 'Oldest first' : 'Newest first'} on={false} onPress={() => setSort(sort === 'oldest' ? 'newest' : 'oldest')} />
-      </View>
+      </ScrollView>
+      <FilterRow style={styles.filters}>
+        <FilterLabel text="Level" />
+        <Chip small label="All" selected={!levelId} onPress={() => setLevelId(null)} />
+        {list?.levels.map((l) => (
+          <Chip small key={l.id} label={l.code} selected={levelId === l.id} onPress={() => setLevelId(l.id)} testID={`review.level.${l.code}`} />
+        ))}
+        <FilterLabel text="Sort" gap />
+        <Chip small label={sort === 'oldest' ? 'Oldest first' : 'Newest first'} onPress={() => setSort(sort === 'oldest' ? 'newest' : 'oldest')} />
+      </FilterRow>
 
       <View style={styles.body}>
         <FlatList
@@ -286,7 +286,7 @@ export default function NeedsReviewScreen() {
             ) : null
           }
         />
-        <ScrollView style={styles.panel} contentContainerStyle={{ padding: 16, gap: 12 }}>
+        <ScrollView style={styles.panel} contentContainerStyle={styles.panelBody}>
           {/* the last action's line, above the next item: under its device list it was out of sight (T154) */}
           {note ? (
             <Text style={styles.note} testID="review.note">
@@ -404,27 +404,28 @@ function Panel({ detail: d, canEdit, onResolve }: { detail: ReviewDetail; canEdi
       {d.resolvable ? (
         <>
           {d.pins ? (
-            <Btn label="Resolve on the plan ▸ (A solid, B dashed)" onPress={() => openOnPlan(true)} disabled={!d.row.levelId} />
+            <Btn title="Resolve on the plan ▸ (A solid, B dashed)" onPress={() => openOnPlan(true)} disabled={!d.row.levelId} />
           ) : null}
           <View style={styles.btnRow}>
-            <Btn label="Choose A" onPress={() => onResolve({ choice: 'A' })} disabled={!canEdit} testID="review.choose.A" />
-            <Btn label="Choose B" onPress={() => onResolve({ choice: 'B' })} disabled={!canEdit} testID="review.choose.B" />
+            <Btn kind="primary" title="Choose A" onPress={() => onResolve({ choice: 'A' })} disabled={!canEdit} testID="review.choose.A" />
+            <Btn kind="primary" title="Choose B" onPress={() => onResolve({ choice: 'B' })} disabled={!canEdit} testID="review.choose.B" />
             {d.choices.includes('combine') ? (
-              <Btn label={combine === null ? 'Combine ▸' : 'Combine ▾'} onPress={() => setCombine(combine === null ? (d.combine ?? '') : null)} disabled={!canEdit} />
+              <Btn title={combine === null ? 'Combine ▸' : 'Combine ▾'} onPress={() => setCombine(combine === null ? (d.combine ?? '') : null)} disabled={!canEdit} />
             ) : null}
           </View>
           {combine !== null ? (
-            <View style={{ gap: 8 }}>
+            <View style={styles.block}>
               <Text style={styles.sub}>Combined text (pre-filled "A; B", A first — edit as needed)</Text>
               <TextInput style={styles.input} value={combine} onChangeText={setCombine} multiline />
-              <Btn label="Save combined" disabled={!combine.trim()} onPress={() => onResolve({ choice: 'combine', text: combine })} />
+              <Btn kind="primary" title="Save combined" disabled={!combine.trim()} onPress={() => onResolve({ choice: 'combine', text: combine })} />
             </View>
           ) : null}
           {d.choices.includes('value') ? (
             <View style={styles.btnRow}>
-              <TextInput style={[styles.input, { width: 120 }]} value={value} onChangeText={setValue} keyboardType="numeric" placeholder="Value" />
+              <TextInput style={[styles.input, styles.valueInput]} placeholderTextColor={color.text3} value={value} onChangeText={setValue} keyboardType="numeric" placeholder="Value" />
               <Btn
-                label="Set value"
+                kind="primary"
+                title="Set value"
                 disabled={!canEdit || !Number.isFinite(Number(value)) || value.trim() === ''}
                 onPress={() => onResolve({ choice: 'value', value: Number(value) })}
               />
@@ -508,10 +509,10 @@ function PunchDevicePanel(props: {
             that is really about a room or several devices can stay unlinked: the export then keeps the master&apos;s text.
           </Text>
           <View style={styles.btnRow}>
-            <Btn label="Create device ▸" onPress={() => setCreating(true)} testID="review.createDevice" />
+            <Btn title="Create device ▸" onPress={() => setCreating(true)} testID="review.createDevice" />
           </View>
           <Text style={styles.sideTitle}>Link to a device on {r.levelCode}</Text>
-          <TextInput testID="review.filter" style={styles.input} value={filter} onChangeText={setFilter} placeholder="Filter: ID, model, room" autoCorrect={false} autoCapitalize="none" />
+          <TextInput testID="review.filter" style={styles.input} placeholderTextColor={color.text3} value={filter} onChangeText={setFilter} placeholder="Filter: ID, model, room" autoCorrect={false} autoCapitalize="none" />
           {shown.length === 0 ? <Text style={styles.sub}>No device matches.</Text> : null}
           {shown.map((x) => (
             <Pressable key={x.id} onPress={() => props.onLink(x.id, x.label, true)} style={styles.pick} accessibilityRole="button" testID={`review.link.${x.label}`}>
@@ -562,7 +563,7 @@ function PunchEndPanel(props: { detail: ReviewDetail; review: PunchEndReview; ca
             </Pressable>
           ))}
           <View style={styles.btnRow}>
-            <Btn label="Keep on the device" onPress={() => props.onPut(null, null)} disabled={!props.canEdit} testID="review.keep" />
+            <Btn title="Keep on the device" onPress={() => props.onPut(null, null)} disabled={!props.canEdit} testID="review.keep" />
           </View>
         </>
       )}
@@ -589,60 +590,49 @@ function Side(props: { letter: string; title: string; side: ReviewDetail['a']; v
   );
 }
 
-function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
-      <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function Btn({ label, onPress, disabled, testID }: { label: string; onPress: () => void; disabled?: boolean; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled && { opacity: 0.4 }]} accessibilityRole="button" testID={testID}>
-      <Text style={styles.btnText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingTop: 16 },
-  title: { fontSize: 24, fontWeight: '600' },
-  link: { color: '#1f6feb', fontSize: 16 },
-  chips: { gap: 8, alignItems: 'center' },
-  filters: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingVertical: 10 },
-  filterLabel: { fontSize: 14, color: '#555' },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111' },
-  chipTextOn: { color: '#fff' },
-  body: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e1e4e8' },
-  list: { width: '42%', flexGrow: 0, borderRightWidth: 1, borderRightColor: '#e1e4e8' },
+  root: { flex: 1, backgroundColor: color.bg },
+  link: { ...font.callout, color: color.primary },
+  tabs: { flexGrow: 0, marginTop: space.md },
+  chips: { gap: space.sm, alignItems: 'center', paddingHorizontal: PAGE_GUTTER },
+  filters: { paddingBottom: space.md },
+  body: {
+    flex: 1,
+    flexDirection: 'row',
+    marginHorizontal: PAGE_GUTTER,
+    marginBottom: space.lg,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    borderRadius: radius.card,
+    overflow: 'hidden',
+  },
+  list: { width: '42%', flexGrow: 0, borderRightWidth: 1, borderRightColor: color.hairline },
   panel: { flex: 1 },
-  row: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
-  rowOn: { backgroundColor: '#dce8fb' },
-  rowTitle: { fontSize: 15, fontWeight: '600' },
-  rowSub: { fontSize: 13, color: '#666', marginTop: 2 },
-  dot: { color: '#e65100' },
-  sectionHead: { fontSize: 14, fontWeight: '700', color: '#444', padding: 12, backgroundColor: '#f4f5f7' },
-  finding: { fontSize: 14, marginTop: 2 },
-  empty: { fontSize: 15, color: '#666', padding: 16 },
-  panelTitle: { fontSize: 18, fontWeight: '600' },
-  sides: { flexDirection: 'row', gap: 12 },
-  side: { flex: 1, borderWidth: 2, borderColor: '#9aa0a8', borderRadius: 8, padding: 12, gap: 6 },
+  panelBody: { padding: space.lg, gap: space.md },
+  row: { paddingVertical: space.md, paddingHorizontal: space.lg, borderBottomWidth: 1, borderBottomColor: color.hairline, gap: 2 },
+  rowOn: { backgroundColor: color.primaryTint },
+  rowTitle: { ...font.calloutBold, color: color.text },
+  rowSub: { ...font.caption, color: color.text3 },
+  dot: { color: ring.review },
+  sectionHead: { ...font.captionBold, color: color.text2, paddingVertical: space.sm, paddingHorizontal: space.lg, backgroundColor: color.surface2 },
+  finding: { ...font.callout, color: color.text },
+  empty: { ...font.callout, color: color.text3, padding: space.lg },
+  panelTitle: { ...font.headline, color: color.text },
+  sides: { flexDirection: 'row', gap: space.md },
+  side: { flex: 1, borderWidth: 2, borderColor: color.muted, borderRadius: radius.control, padding: space.md, gap: 6 },
   sideB: { borderStyle: 'dashed' },
-  sideTitle: { fontSize: 15, fontWeight: '700' },
-  value: { fontSize: 16 },
-  sub: { fontSize: 13, color: '#666' },
-  flag: { fontSize: 14, color: '#b42318', fontWeight: '600' },
-  btnRow: { flexDirection: 'row', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
-  btn: { alignSelf: 'flex-start', backgroundColor: '#1f6feb', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
-  btnText: { color: 'white', fontSize: 15, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, padding: 10, fontSize: 16, minHeight: 44 },
-  note: { color: '#0a5', fontSize: 14 },
-  form: { height: 620, borderWidth: 1, borderColor: '#e1e4e8', borderRadius: 8, overflow: 'hidden' },
-  pick: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
-  pickId: { fontSize: 15, fontWeight: '700', minWidth: 72, fontVariant: ['tabular-nums'] },
-  pickText: { fontSize: 15, flex: 1 },
+  sideTitle: { ...font.calloutBold, color: color.text },
+  value: { ...font.body, color: color.text },
+  sub: { ...font.caption, color: color.text3 },
+  flag: { ...font.calloutBold, color: color.danger },
+  btnRow: { flexDirection: 'row', gap: space.sm, alignItems: 'center', flexWrap: 'wrap' },
+  block: { gap: space.sm },
+  input: fieldStyles.input,
+  valueInput: { width: 120 },
+  note: { ...font.callout, color: color.success },
+  form: { height: 620, borderWidth: 1, borderColor: color.hairline, borderRadius: radius.control, overflow: 'hidden' },
+  pick: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44, paddingVertical: space.sm, paddingHorizontal: space.sm, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  pickId: { ...font.calloutBold, ...tabular, color: color.text, minWidth: 72 },
+  pickText: { ...font.callout, color: color.text2, flex: 1 },
 });
