@@ -1,5 +1,7 @@
 import { type ReactNode, createContext, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+
+import { Btn, color, fieldStyles, font, space } from '../ui';
 
 import {
   type Identity,
@@ -148,7 +150,7 @@ function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
         keyboardType="url"
         selectTextOnFocus // a tap selects the whole URL, so typing replaces it (no leftover tail)
         placeholder="Server URL"
-        placeholderTextColor="#888"
+        placeholderTextColor={color.text3}
         testID="connect.serverUrl"
       />
       <TextInput
@@ -159,17 +161,13 @@ function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
         autoCorrect={false}
         secureTextEntry
         placeholder="Team token"
-        placeholderTextColor="#888"
+        placeholderTextColor={color.text3}
         testID="connect.token"
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable style={styles.button} onPress={submit} testID="connect.submit">
-        <Text style={styles.buttonText}>Connect</Text>
-      </Pressable>
+      <Btn title="Connect" kind="primary" onPress={submit} style={styles.button} testID="connect.submit" />
       <Text style={styles.or}>or, on a server with Microsoft sign-in (no token needed)</Text>
-      <Pressable style={[styles.button, styles.microsoft]} onPress={microsoft} disabled={busy} testID="connect.microsoft">
-        <Text style={styles.buttonText}>{busy ? 'Signing in…' : 'Sign in with Microsoft'}</Text>
-      </Pressable>
+      <Btn title={busy ? 'Signing in…' : 'Sign in with Microsoft'} onPress={microsoft} disabled={busy} style={styles.button} testID="connect.microsoft" />
     </View>
   );
 }
@@ -194,49 +192,37 @@ function Picker({ identity, onDone }: { identity: Identity; onDone: (u: TeamMemb
       {team
         .filter((m) => !m.retired) // D269: retired people stay named on history, off the picker
         .map((m) => (
-          <Pressable
-            key={m.id}
-            style={styles.button}
-            onPress={() => choose({ id: m.id, name: m.name })}
-            testID={`identity.user.${m.name}`}
-          >
-            <Text style={styles.buttonText}>{m.name}</Text>
-          </Pressable>
+          <Btn key={m.id} title={m.name} kind="primary" onPress={() => choose({ id: m.id, name: m.name })} style={styles.button} testID={`identity.user.${m.name}`} />
         ))}
       <TextInput
         style={styles.input}
         value={newName}
         onChangeText={setNewName}
         placeholder="Not listed? Add your name"
-        placeholderTextColor="#888"
+        placeholderTextColor={color.text3}
         testID="identity.newName"
       />
       {newName.trim() ? (
-        <Pressable
-          style={styles.button}
+        <Btn
+          title="Add and continue"
+          kind="primary"
           onPress={() => addTeamMember(identity, newName.trim()).then(choose, (e) => setError(String(e)))}
+          style={styles.button}
           testID="identity.add"
-        >
-          <Text style={styles.buttonText}>Add and continue</Text>
-        </Pressable>
+        />
       ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
 
-// Explicit light colours: the app's screens are light-only, and with the iPad in dark mode the
-// window behind this screen is black, so default text (black) vanished (T25-11, 2026-10-11).
+// Explicit light colours (the tokens): the app's screens are light-only, and with the iPad in dark
+// mode the window behind this screen is black, so default text (black) vanished (T25-11, 2026-10-11).
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, backgroundColor: '#ffffff' },
-  title: { fontSize: 28, fontWeight: '600', color: '#111' },
-  input: {
-    borderWidth: 1, borderColor: '#999', borderRadius: 8, padding: 12, width: 360, fontSize: 18,
-    color: '#111', backgroundColor: '#ffffff',
-  },
-  button: { backgroundColor: '#1f6feb', borderRadius: 8, padding: 14, width: 360, alignItems: 'center' },
-  buttonText: { color: 'white', fontSize: 18, fontWeight: '600' },
-  error: { color: '#c00' },
-  or: { color: '#555', marginTop: 8 },
-  microsoft: { backgroundColor: '#2f2f2f' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md, padding: space.xl, backgroundColor: color.bg },
+  title: { ...font.display, color: color.text },
+  input: { ...fieldStyles.input, width: 360 },
+  button: { width: 360, alignSelf: 'center' },
+  error: { ...font.callout, color: color.danger },
+  or: { ...font.callout, color: color.text2, marginTop: space.sm },
 });

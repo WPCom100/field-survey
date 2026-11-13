@@ -62,10 +62,17 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: add.model
 - inputText: CT04LCPB
+- pressKey: Enter          # T184: Room sits under the keyboard in the restyled panel; a tap there typed a key
+- waitForAnimationToEnd
 - tapOn:
     id: add.room
 - inputText: Elec XX04-1E01
 - tapOn: Create device for this punch item   # closes the keyboard (hideKeyboard fails on the iPad one)
+- waitForAnimationToEnd
+- swipe:                   # Add device is the panel's last control, under the card's lower edge (still "visible" to Maestro)
+    start: 70%, 75%
+    end: 70%, 45%
+- waitForAnimationToEnd
 - tapOn:
     id: add.submit
 - extendedWaitUntil:

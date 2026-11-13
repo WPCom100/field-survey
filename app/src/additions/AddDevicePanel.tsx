@@ -13,6 +13,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 
 import { chipStyles } from '../plan/chips';
 import { DEVICE_CATEGORIES } from '../plan/pins';
+import { Btn, color, fieldStyles, font, hit, hitSlopTo, radius, space, tabular } from '../ui';
 import { addFieldDevice, libraryChoices, matchModel, searchChoices, type LibraryChoice } from './model';
 
 /** Chips shown at once: the app library holds about 500 placeable types after the DaVinci import. */
@@ -91,7 +92,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onCancel} hitSlop={8} disabled={saving} testID="add.cancel">
+        <Pressable onPress={props.onCancel} hitSlop={8} disabled={saving} testID="add.cancel" style={styles.backBtn}>
           <Text style={styles.back}>◀ Cancel</Text>
         </Pressable>
         <Text style={styles.title}>{props.title ?? 'Add device (field addition)'}</Text>
@@ -156,7 +157,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
             if (t) setTypeId(null);
           }}
           placeholder="Search the types, or type a new model (e.g. ERP-RTO)"
-          placeholderTextColor="#888"
+          placeholderTextColor={color.text3}
           autoCapitalize="characters"
           autoCorrect={false}
         />
@@ -176,24 +177,29 @@ export function AddDevicePanel(props: AddDeviceProps) {
         </View>
 
         <Text style={styles.label}>Drawing Position (optional)</Text>
-        <TextInput style={styles.input} value={drawingPosition} onChangeText={setDrawingPosition} placeholder="e.g. Grid B-C / 9-8" placeholderTextColor="#888" autoCorrect={false} />
+        <TextInput style={styles.input} value={drawingPosition} onChangeText={setDrawingPosition} placeholder="e.g. Grid B-C / 9-8" placeholderTextColor={color.text3} autoCorrect={false} />
         {props.defaults?.drawingPosition ? <Text style={styles.muted}>From the grid at the pin; edit if the drawing says otherwise.</Text> : null}
 
         <Text style={styles.label}>Room / Location (optional)</Text>
-        <TextInput testID="add.room" style={styles.input} value={room} onChangeText={setRoom} placeholder="e.g. XX06M-1E05 Elec Rm" placeholderTextColor="#888" />
+        <TextInput testID="add.room" style={styles.input} value={room} onChangeText={setRoom} placeholder="e.g. XX06M-1E05 Elec Rm" placeholderTextColor={color.text3} />
         {props.defaults?.room ? <Text style={styles.muted}>The room code printed nearest the pin.</Text> : null}
 
-        <Pressable style={[styles.addBtn, (!ready || saving) && styles.addBusy]} onPress={add} disabled={!ready || saving} testID="add.submit">
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.addText}>Add device</Text>}
-        </Pressable>
+        <Btn title="Add device" kind="primary" onPress={add} disabled={!ready} loading={saving} style={styles.addBtn} testID="add.submit" />
       </ScrollView>
     </View>
   );
 }
 
+/** The system's small chip (32 pt, `hitSlop` to 44) with a DRAFT badge after the label. */
 function Chip({ label, on, onPress, badge, testID }: { label: string; on: boolean; onPress: () => void; badge?: string; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={hitSlopTo(32)}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && !on && styles.chipPressed]}
+      testID={testID}>
       <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>
         {label}
       </Text>
@@ -203,25 +209,25 @@ function Chip({ label, on, onPress, badge, testID }: { label: string; on: boolea
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: color.surface },
   flex: { flex: 1 },
-  head: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8, gap: 3, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  back: { fontSize: 15, color: '#1565c0', fontWeight: '600' },
-  title: { fontSize: 18, fontWeight: '700' },
-  body: { padding: 12, gap: 8, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: '700', color: '#333', marginTop: 4 },
-  muted: { fontSize: 12, color: '#777' },
-  note: { fontSize: 12, color: '#6a1b9a' },
-  warn: { fontSize: 12, color: '#e65100' },
-  error: { color: '#b71c1c', fontSize: 13 },
+  head: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: space.sm, gap: 3, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  backBtn: { alignSelf: 'flex-start', minHeight: hit.small, justifyContent: 'center' },
+  back: { ...font.calloutBold, color: color.primary },
+  title: { ...font.headline, color: color.text },
+  body: { padding: space.md, gap: space.sm, paddingBottom: 40 },
+  label: { ...font.captionBold, color: color.text2, marginTop: space.xs },
+  muted: { ...font.caption, color: color.text3 },
+  note: { ...font.caption, color: color.primary },
+  error: { ...font.caption, color: color.danger },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { fontSize: 13, color: '#222' },
-  chipTextOn: { color: '#fff', fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 7, fontSize: 15, backgroundColor: '#fff' },
-  idPreview: { fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  addBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 12, borderRadius: 8, backgroundColor: '#1565c0' },
-  addBusy: { opacity: 0.5 },
-  addText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: space.xs, maxWidth: '100%', height: 32, paddingHorizontal: 10, borderRadius: radius.pill, borderWidth: 1, borderColor: color.border, backgroundColor: color.surface },
+  chipOn: { backgroundColor: color.primaryTint, borderColor: color.primaryTint },
+  chipPressed: { backgroundColor: color.surface2 },
+  chipText: { ...font.caption, color: color.text, flexShrink: 1 },
+  chipTextOn: { color: color.primary, fontWeight: '600' },
+  // 36 pt as the side-panel editors (D279 (5)): at 44 the Room box slid under the keyboard
+  input: { ...fieldStyles.input, minHeight: hit.small, paddingHorizontal: space.sm, paddingVertical: 7, ...font.callout },
+  idPreview: { ...font.headline, ...tabular, color: color.text },
+  addBtn: { marginTop: space.md, alignSelf: 'stretch' },
 });

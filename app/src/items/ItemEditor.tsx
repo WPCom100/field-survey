@@ -16,6 +16,7 @@ import { appendPhrase } from '../card/actions';
 import type { HistoryEntry, JumpTarget } from '../card/model';
 import { chipStyles } from '../plan/chips';
 import { useReload } from '../sync/useReload';
+import { Btn, Chip, color, fieldStyles, font, hit, radius, space, status as statusFills, tabular, tinted } from '../ui';
 import { setItemNotes, setItemOwner, setPartStatus, setTrackingStatus, type ItemKind } from './actions';
 import { loadItem, type ItemView } from './model';
 
@@ -41,15 +42,22 @@ export type ItemEditorProps = {
 
 type Run = (fn: (e: Editor) => Promise<unknown>) => void;
 
-/** Fill per status: Closed / Installed read done (green), In progress / Ordered / On site under way (purple). */
+/**
+ * Fill per status, borrowed from the D64 device statuses: Open / Needed read as Issue (red), In
+ * progress / Ordered / On site under way as Installed, untested (purple), Closed / Installed done
+ * as Complete (green).
+ */
+const ISSUE = statusFills.style.Issue.fill;
+const UNDER_WAY = statusFills.style['Installed, untested'].fill;
+const DONE = statusFills.style.Complete.fill;
 const STATUS_FILL: Readonly<Record<string, string>> = {
-  Open: '#c62828',
-  'In progress': '#6a1b9a',
-  Closed: '#2e7d32',
-  Needed: '#c62828',
-  Ordered: '#6a1b9a',
-  'On site': '#6a1b9a',
-  Installed: '#2e7d32',
+  Open: ISSUE,
+  'In progress': UNDER_WAY,
+  Closed: DONE,
+  Needed: ISSUE,
+  Ordered: UNDER_WAY,
+  'On site': UNDER_WAY,
+  Installed: DONE,
 };
 
 export function ItemEditor(props: ItemEditorProps) {
@@ -92,7 +100,7 @@ export function ItemEditor(props: ItemEditorProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onBack} hitSlop={8} testID="item.back">
+        <Pressable onPress={props.onBack} hitSlop={8} testID="item.back" style={styles.backBtn}>
           <Text style={styles.back}>◀ {props.backLabel}</Text>
         </Pressable>
         <View style={styles.headLine}>
@@ -108,12 +116,12 @@ export function ItemEditor(props: ItemEditorProps) {
         </Text>
         {view.device ? (
           canJump(view.device.jump) ? (
-            <Pressable onPress={() => props.onJump(view.device!.jump!)} style={styles.btn} testID="item.device">
-              <Text style={styles.btnText}>
-                {view.device.label}
-                {view.device.jump.sameLevel ? '' : ' (another level)'} ▸
-              </Text>
-            </Pressable>
+            <Btn
+              title={`${view.device.label}${view.device.jump.sameLevel ? '' : ' (another level)'} ▸`}
+              small
+              onPress={() => props.onJump(view.device!.jump!)}
+              testID="item.device"
+            />
           ) : (
             <Text style={styles.muted}>
               Device {view.device.label}
@@ -132,23 +140,18 @@ export function ItemEditor(props: ItemEditorProps) {
           <View style={styles.rowWrap}>
             {statuses.map((s) => {
               const on = view.status === s;
-              const fill = STATUS_FILL[s] ?? '#1565c0';
               return (
-                <Pressable
+                <Option
                   key={s}
-                  disabled={statusLocked || on}
+                  label={s}
+                  on={on}
+                  fill={STATUS_FILL[s] ?? color.primary}
+                  locked={statusLocked}
                   onPress={() =>
                     run((e) => (kind === 'punch' ? setTrackingStatus(e, view.id, s as vocab.TrackingStatus) : setPartStatus(e, view.id, s as vocab.PartStatus)))
                   }
-                  style={[styles.statusBtn, on && { backgroundColor: fill, borderColor: fill }, statusLocked && !on && styles.off]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: on, disabled: statusLocked }}
-                  testID={`item.status.${s}`}>
-                  <Text style={[styles.statusText, on && styles.onText]}>
-                    {on ? '✓ ' : ''}
-                    {s}
-                  </Text>
-                </Pressable>
+                  testID={`item.status.${s}`}
+                />
               );
             })}
           </View>
@@ -181,9 +184,7 @@ export function ItemEditor(props: ItemEditorProps) {
                 <View style={styles.rowWrap}>
                   {g.devices.map((d) =>
                     canJump(d.jump) ? (
-                      <Pressable key={d.label} onPress={() => props.onJump(d.jump!)} style={styles.link} testID={`item.missing.${d.label}`}>
-                        <Text style={styles.linkText}>{d.label} ▸</Text>
-                      </Pressable>
+                      <Chip key={d.label} label={`${d.label} ▸`} small selected onPress={() => props.onJump(d.jump!)} testID={`item.missing.${d.label}`} />
                     ) : (
                       <Text key={d.label} style={styles.unlinked}>
                         {d.label}
@@ -205,19 +206,7 @@ export function ItemEditor(props: ItemEditorProps) {
             {vocab.OWNER.map((o) => {
               const on = view.owner === o;
               return (
-                <Pressable
-                  key={o}
-                  disabled={readOnly || on}
-                  onPress={() => run((e) => setItemOwner(e, kind, view.id, o))}
-                  style={[styles.statusBtn, on && styles.optionOn, readOnly && !on && styles.off]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: on, disabled: readOnly }}
-                  testID={`item.owner.${o}`}>
-                  <Text style={[styles.statusText, on && styles.onText]}>
-                    {on ? '✓ ' : ''}
-                    {o}
-                  </Text>
-                </Pressable>
+                <Option key={o} label={o} on={on} fill={color.primary} locked={readOnly} onPress={() => run((e) => setItemOwner(e, kind, view.id, o))} testID={`item.owner.${o}`} />
               );
             })}
           </View>
@@ -271,7 +260,7 @@ function NotesField(props: { value: string | null; marks: string; readOnly: bool
         {props.marks ? <Text style={styles.marks}> {props.marks}</Text> : null}
       </Text>
       <TextInput
-        style={[styles.input, styles.multi]}
+        style={[styles.input, styles.multi, props.readOnly && fieldStyles.off]}
         value={draft}
         editable={!props.readOnly}
         onChangeText={edit}
@@ -281,7 +270,7 @@ function NotesField(props: { value: string | null; marks: string; readOnly: bool
           commit(typed.current);
         }}
         placeholder="Notes"
-        placeholderTextColor="#888"
+        placeholderTextColor={color.text3}
         multiline
         submitBehavior="blurAndSubmit"
         returnKeyType="done"
@@ -291,25 +280,20 @@ function NotesField(props: { value: string | null; marks: string; readOnly: bool
       {!props.readOnly && chips.length ? (
         <View style={styles.rowWrap}>
           {chips.map((p) => (
-            <Pressable
+            <Chip
               key={p}
+              label={p}
+              small
               style={styles.phrase}
               testID={`item.notes.chip.${p}`}
               onPress={() => {
                 const next = appendPhrase(typed.current, p);
                 edit(next);
                 commit(next);
-              }}>
-              <Text style={styles.phraseText} numberOfLines={1}>
-                {p}
-              </Text>
-            </Pressable>
+              }}
+            />
           ))}
-          {props.phrases.length > CHIPS_SHOWN ? (
-            <Pressable style={styles.phrase} onPress={() => setMore((m) => !m)}>
-              <Text style={styles.phraseMore}>{more ? 'less ▴' : `more (${props.phrases.length - CHIPS_SHOWN}) ▾`}</Text>
-            </Pressable>
-          ) : null}
+          {props.phrases.length > CHIPS_SHOWN ? <Chip label={more ? 'less ▴' : `more (${props.phrases.length - CHIPS_SHOWN}) ▾`} small onPress={() => setMore((m) => !m)} /> : null}
         </View>
       ) : null}
     </View>
@@ -321,7 +305,7 @@ function History({ history, names }: { history: HistoryEntry[]; names: ReadonlyM
   const pad = (n: number) => String(n).padStart(2, '0');
   return (
     <View style={styles.section}>
-      <Pressable onPress={() => setOpen((o) => !o)} hitSlop={4} testID="item.history">
+      <Pressable onPress={() => setOpen((o) => !o)} hitSlop={4} style={styles.historyHead} testID="item.history">
         <Text style={styles.label}>
           {open ? '▾' : '▸'} History ({history.length})
         </Text>
@@ -354,44 +338,63 @@ function History({ history, names }: { history: HistoryEntry[]; names: ReadonlyM
   );
 }
 
+/**
+ * One choice of Tracking / Part status or Owner. The current one reads "✓ <value>" (what the flows
+ * assert) in its colour over the pale tint, as the device card's status buttons (T175), and is the
+ * disabled one.
+ */
+function Option({ label, on, fill, locked, onPress, testID }: { label: string; on: boolean; fill: string; locked: boolean; onPress: () => void; testID: string }) {
+  const t = tinted(fill, color.text);
+  return (
+    <Pressable
+      disabled={locked || on}
+      onPress={onPress}
+      style={({ pressed }) => [styles.statusBtn, on && { backgroundColor: t.bg, borderColor: fill, borderWidth: 1.5 }, pressed && styles.pressed, locked && !on && styles.off]}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: on, disabled: locked }}
+      testID={testID}>
+      <Text style={[styles.statusText, on && { color: t.fg, fontWeight: '600' }]}>
+        {on ? '✓ ' : ''}
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: color.surface },
   flex: { flex: 1 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg },
   scroll: { paddingBottom: 40 },
-  head: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8, gap: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  back: { fontSize: 15, color: '#1565c0', fontWeight: '600' },
-  headLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  headId: { fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  title: { fontSize: 15, fontWeight: '600', color: '#222' },
-  error: { color: '#b71c1c', fontSize: 13, paddingHorizontal: 12, paddingVertical: 4 },
-  muted: { fontSize: 12, color: '#777' },
-  ruleNote: { fontSize: 12, color: '#5d4037' },
-  section: { marginHorizontal: 8, marginTop: 8, padding: 10, gap: 6, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: '#d6d9de' },
-  review: { borderColor: '#e65100', borderWidth: 2 },
+  head: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: space.sm, gap: space.xs, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  backBtn: { alignSelf: 'flex-start', minHeight: hit.small, justifyContent: 'center' },
+  back: { ...font.calloutBold, color: color.primary },
+  headLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.sm },
+  headId: { ...font.headline, ...tabular, color: color.text },
+  title: { ...font.calloutBold, color: color.text },
+  error: { ...font.caption, color: color.danger, paddingHorizontal: space.md, paddingVertical: space.xs },
+  muted: { ...font.caption, color: color.text3 },
+  ruleNote: { ...font.caption, color: color.text2 },
+  section: { marginHorizontal: space.sm, marginTop: space.sm, padding: 10, gap: 6, borderRadius: radius.card, borderWidth: 1, borderColor: color.hairline, backgroundColor: color.surface },
+  review: { borderColor: color.warning, borderWidth: 2 },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  statusBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
-  statusText: { fontSize: 13, color: '#222' },
-  onText: { color: '#fff', fontWeight: '700' },
-  optionOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  off: { opacity: 0.4 },
-  field: { gap: 4 },
-  label: { fontSize: 12, fontWeight: '700', color: '#444' },
-  marks: { fontSize: 11, color: '#e65100', fontWeight: '400' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 14, backgroundColor: '#fff' },
+  statusBtn: { minHeight: hit.small, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.control, borderWidth: 1, borderColor: color.border, backgroundColor: color.surface },
+  statusText: { ...font.caption, color: color.text },
+  pressed: { backgroundColor: color.surface2 },
+  off: { opacity: 0.45 },
+  field: { gap: space.xs },
+  label: { ...font.captionBold, color: color.text2 },
+  marks: { ...font.caption, color: color.warning },
+  // the panel is 287 pt in portrait: 15-pt boxes rather than the 17-pt Field (as the end editor)
+  input: { ...fieldStyles.input, minHeight: hit.small, paddingHorizontal: space.sm, paddingVertical: 6, ...font.callout },
   multi: { minHeight: 48, textAlignVertical: 'top' },
-  phrase: { maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, backgroundColor: '#eef2f7' },
-  phraseText: { fontSize: 12, color: '#1f3b63' },
-  phraseMore: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
-  btn: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0', backgroundColor: '#fff' },
-  btnText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
-  missingGroup: { gap: 4 },
-  missingLevel: { fontSize: 12, fontWeight: '600', color: '#333' },
-  link: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, backgroundColor: '#e3f2fd' },
-  linkText: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
-  unlinked: { fontSize: 12, color: '#555', paddingHorizontal: 4 },
-  hist: { paddingVertical: 4, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#e0e0e0', gap: 1 },
-  histHead: { fontSize: 12, fontWeight: '600', color: '#333' },
-  histBody: { fontSize: 12, color: '#444' },
-  histWhy: { fontSize: 11, color: '#777' },
+  phrase: { maxWidth: '100%' },
+  missingGroup: { gap: space.xs },
+  missingLevel: { ...font.captionBold, color: color.text2 },
+  unlinked: { ...font.caption, color: color.text2, paddingHorizontal: space.xs },
+  historyHead: { minHeight: hit.small, justifyContent: 'center' },
+  hist: { paddingVertical: space.xs, borderTopWidth: 1, borderTopColor: color.hairline, gap: 1 },
+  histHead: { ...font.captionBold, color: color.text2 },
+  histBody: { ...font.caption, color: color.text },
+  histWhy: { ...font.caption, color: color.text3 },
 });

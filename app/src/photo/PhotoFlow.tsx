@@ -55,6 +55,7 @@ import { discardPhoto, preparePhoto, type PreparedPhoto } from './capture';
 import { MarkupCanvas, type MarkupTool } from './MarkupCanvas';
 import { hasLink, linkOptions, toggleLink, type LinkOption } from './links';
 import { captionPhrases, createPhoto, loadPhoto, newPhotoFields, updatePhoto, type ExistingPhoto, type PhotoFields, type PhotoTarget } from './model';
+import { Btn, Chip, color, fieldStyles, font, hit, hitSlopTo, radius, space } from '../ui';
 
 export type PhotoRequest =
   | { kind: 'camera'; target: PhotoTarget; title: string }
@@ -169,7 +170,7 @@ function Flow({
     case 'busy':
       return (
         <View style={styles.center}>
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={color.onPrimary} />
           <Text style={styles.centerText}>{stage.text}</Text>
         </View>
       );
@@ -177,9 +178,7 @@ function Flow({
       return (
         <View style={styles.center}>
           <Text style={styles.centerText}>{stage.text}</Text>
-          <Pressable style={styles.darkBtn} onPress={() => onClose(false)}>
-            <Text style={styles.darkBtnText}>Close</Text>
-          </Pressable>
+          <Btn title="Close" onPress={() => onClose(false)} />
         </View>
       );
     case 'edit-new':
@@ -225,27 +224,19 @@ function CameraStage({ title, onShot, onLibrary, onCancel }: { title: string; on
     }
   };
 
-  if (!permission) return <View style={styles.center}><ActivityIndicator color="#fff" /></View>;
+  if (!permission) return <View style={styles.center}><ActivityIndicator color={color.onPrimary} /></View>;
   if (!permission.granted) {
     return (
       <View style={styles.center}>
         <Text style={styles.centerText}>Field Survey needs the camera to take photos. Allow it in Settings, or pick from the library.</Text>
         <View style={styles.rowWrap}>
           {permission.canAskAgain ? (
-            <Pressable style={styles.darkBtn} onPress={() => void requestPermission()}>
-              <Text style={styles.darkBtnText}>Allow camera</Text>
-            </Pressable>
+            <Btn title="Allow camera" kind="primary" onPress={() => void requestPermission()} />
           ) : (
-            <Pressable style={styles.darkBtn} onPress={() => void Linking.openSettings()}>
-              <Text style={styles.darkBtnText}>Open Settings</Text>
-            </Pressable>
+            <Btn title="Open Settings" kind="primary" onPress={() => void Linking.openSettings()} />
           )}
-          <Pressable style={styles.darkBtn} onPress={onLibrary}>
-            <Text style={styles.darkBtnText}>🖼 Library</Text>
-          </Pressable>
-          <Pressable style={styles.darkBtn} onPress={onCancel}>
-            <Text style={styles.darkBtnText}>Cancel</Text>
-          </Pressable>
+          <Btn title="🖼 Library" onPress={onLibrary} />
+          <Btn title="Cancel" onPress={onCancel} />
         </View>
       </View>
     );
@@ -262,7 +253,7 @@ function CameraStage({ title, onShot, onLibrary, onCancel }: { title: string; on
       </View>
       <View style={styles.camSide}>
         <Pressable onPress={shoot} disabled={!ready || shooting} style={[styles.shutter, (!ready || shooting) && styles.shutterBusy]} accessibilityLabel="Take photo">
-          {shooting ? <ActivityIndicator color="#000" /> : null}
+          {shooting ? <ActivityIndicator color={color.text} /> : null}
         </Pressable>
         <Pressable onPress={onLibrary} hitSlop={10} style={styles.camLib}>
           <Text style={styles.camText}>🖼 Library</Text>
@@ -311,7 +302,7 @@ function PhotoEditor(props: {
   };
   const original = useRef<string | null>(null);
   const [tool, setTool] = useState<MarkupTool>('pen');
-  const [color, setColor] = useState<string>(INK_COLORS[0]);
+  const [inkColor, setInkColor] = useState<string>(INK_COLORS[0]);
   const [textAt, setTextAt] = useState<StrokePoint | null>(null);
   const [textValue, setTextValue] = useState('');
   const [saving, setSaving] = useState(false);
@@ -439,7 +430,7 @@ function PhotoEditor(props: {
   const placeText = () => {
     if (!list || !textAt || !textValue.trim()) return;
     const size = Math.max(list.width, list.height) / 30;
-    change(withStroke(list, makeStroke({ id: uuidv7(), tool: 'text', color, width: size, points: [textAt], text: textValue, at: new Date().toISOString() })));
+    change(withStroke(list, makeStroke({ id: uuidv7(), tool: 'text', color: inkColor, width: size, points: [textAt], text: textValue, at: new Date().toISOString() })));
     setTextAt(null);
     setTextValue('');
   };
@@ -457,7 +448,7 @@ function PhotoEditor(props: {
         )
       }>
       <View style={[styles.head, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => props.onDone(false)} hitSlop={8} disabled={saving}>
+        <Pressable onPress={() => props.onDone(false)} hitSlop={8} disabled={saving} style={styles.headBack}>
           <Text style={styles.headLink}>◀ {existing ? 'Close' : 'Cancel'}</Text>
         </Pressable>
         <Text style={styles.headTitle} numberOfLines={1}>
@@ -466,9 +457,7 @@ function PhotoEditor(props: {
         {readOnly ? (
           <View style={{ width: 60 }} />
         ) : (
-          <Pressable onPress={save} disabled={saving || !fields} testID="photo.save" style={[styles.saveBtn, (saving || !fields) && styles.saveBusy]}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save</Text>}
-          </Pressable>
+          <Btn title="Save" kind="primary" onPress={save} disabled={!fields} loading={saving} style={styles.saveBtn} testID="photo.save" />
         )}
       </View>
       <View style={styles.body}>
@@ -479,7 +468,7 @@ function PhotoEditor(props: {
               list={list}
               onChange={change}
               tool={tool}
-              color={color}
+              color={inkColor}
               lineWidth={lineWidth}
               onTextAt={(p) => setTextAt(p)}
               readOnly={readOnly}
@@ -497,29 +486,23 @@ function PhotoEditor(props: {
           {fields ? (
             <>
               <Text style={styles.label}>Subject</Text>
-              <TextInput style={styles.input} value={fields.subject ?? ''} onChangeText={(t) => set({ subject: t })} placeholder="e.g. ERP interior" placeholderTextColor="#888" editable={!readOnly} />
+              <TextInput style={styles.input} value={fields.subject ?? ''} onChangeText={(t) => set({ subject: t })} placeholder="e.g. ERP interior" placeholderTextColor={color.text3} editable={!readOnly} />
               <Text style={styles.label}>What it shows</Text>
               <TextInput
                 style={[styles.input, styles.multi]}
                 value={fields.whatItShows ?? ''}
                 onChangeText={(t) => set({ whatItShows: t })}
                 placeholder="Caption"
-                placeholderTextColor="#888"
+                placeholderTextColor={color.text3}
                 multiline
                 editable={!readOnly}
               />
               {readOnly ? null : (
                 <View style={styles.rowWrap}>
                   {chips.map((p) => (
-                    <Pressable key={p} style={styles.phrase} onPress={() => set({ whatItShows: fields.whatItShows?.trim() ? `${fields.whatItShows.trim()}; ${p}` : p })}>
-                      <Text style={styles.phraseText} numberOfLines={1}>{p}</Text>
-                    </Pressable>
+                    <Chip key={p} label={p} small style={styles.phrase} onPress={() => set({ whatItShows: fields.whatItShows?.trim() ? `${fields.whatItShows.trim()}; ${p}` : p })} />
                   ))}
-                  {phrases.length > CHIPS_SHOWN ? (
-                    <Pressable style={styles.phrase} onPress={() => setMoreChips((m) => !m)}>
-                      <Text style={styles.phraseMore}>{moreChips ? 'less ▴' : `more (${phrases.length - CHIPS_SHOWN}) ▾`}</Text>
-                    </Pressable>
-                  ) : null}
+                  {phrases.length > CHIPS_SHOWN ? <Chip label={moreChips ? 'less ▴' : `more (${phrases.length - CHIPS_SHOWN}) ▾`} small onPress={() => setMoreChips((m) => !m)} /> : null}
                 </View>
               )}
               <Text style={styles.label}>Linked</Text>
@@ -541,7 +524,7 @@ function PhotoEditor(props: {
                 </>
               ) : null}
               <Text style={styles.label}>Location</Text>
-              <TextInput style={styles.input} value={fields.location ?? ''} onChangeText={(t) => set({ location: t })} placeholder="Room / location" placeholderTextColor="#888" editable={!readOnly} />
+              <TextInput style={styles.input} value={fields.location ?? ''} onChangeText={(t) => set({ location: t })} placeholder="Room / location" placeholderTextColor={color.text3} editable={!readOnly} />
             </>
           ) : (
             <ActivityIndicator />
@@ -567,13 +550,13 @@ function PhotoEditor(props: {
               </View>
               <View style={styles.rowWrap}>
                 {INK_COLORS.map((c) => (
-                  <Pressable key={c} onPress={() => setColor(c)} style={[styles.swatch, { backgroundColor: c }, color === c && styles.swatchOn]} accessibilityLabel={`Colour ${c}`} />
+                  <Pressable key={c} onPress={() => setInkColor(c)} hitSlop={hitSlopTo(30)} style={[styles.swatch, { backgroundColor: c }, inkColor === c && styles.swatchOn]} accessibilityLabel={`Colour ${c}`} />
                 ))}
               </View>
               {tool === 'text' ? (
                 textAt ? (
                   <View style={styles.rowWrap}>
-                    <TextInput style={[styles.input, styles.flex]} value={textValue} onChangeText={setTextValue} placeholder="Text to place" placeholderTextColor="#888" autoFocus onSubmitEditing={placeText} returnKeyType="done" />
+                    <TextInput style={[styles.input, styles.flex]} value={textValue} onChangeText={setTextValue} placeholder="Text to place" placeholderTextColor={color.text3} autoFocus onSubmitEditing={placeText} returnKeyType="done" />
                     <LinkChip label="Place" on={false} disabled={!textValue.trim()} onPress={placeText} />
                   </View>
                 ) : (
@@ -589,54 +572,42 @@ function PhotoEditor(props: {
   );
 }
 
+/** A link or markup-tool chip: the system's small chip, every one `photo.chip` (the flows pick one by its text). */
 function LinkChip({ label, on, onPress, disabled }: { label: string; on: boolean; onPress: () => void; disabled?: boolean }) {
-  return (
-    <Pressable disabled={disabled} onPress={onPress} testID="photo.chip" style={[styles.chip, on && styles.chipOn, disabled && styles.chipDisabled]}>
-      <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
+  return <Chip label={label} small selected={on} disabled={disabled} onPress={onPress} style={styles.phrase} testID="photo.chip" />;
 }
 
+// The camera, the photo and its busy / error screens sit on the dark of the toast (the text colour);
+// overlays on the camera are that colour translucent.
+const DARK = color.text;
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 32, backgroundColor: '#1d1f22' },
-  centerText: { color: '#fff', fontSize: 16, textAlign: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.lg, padding: space.xxl, backgroundColor: DARK },
+  centerText: { ...font.body, color: color.onPrimary, textAlign: 'center' },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  darkBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: '#3a3d42' },
-  darkBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  camera: { flex: 1, backgroundColor: '#000' },
-  camTop: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10, backgroundColor: 'rgba(0,0,0,0.35)' },
-  camText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  camera: { flex: 1, backgroundColor: DARK },
+  camTop: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10, backgroundColor: `${DARK}59` },
+  camText: { ...font.headline, color: color.onPrimary },
   camSide: { position: 'absolute', right: 28, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', gap: 28 },
-  shutter: { width: 78, height: 78, borderRadius: 39, backgroundColor: '#fff', borderWidth: 6, borderColor: 'rgba(255,255,255,0.45)', alignItems: 'center', justifyContent: 'center' },
+  shutter: { width: 78, height: 78, borderRadius: 39, backgroundColor: color.surface, borderWidth: 6, borderColor: `${color.surface}73`, alignItems: 'center', justifyContent: 'center' },
   shutterBusy: { opacity: 0.6 },
-  camLib: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.45)' },
-  editor: { flex: 1, width: '100%', backgroundColor: '#f4f5f7' },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingBottom: 10, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  headLink: { fontSize: 17, color: '#1565c0', fontWeight: '600' },
-  headTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700' },
-  saveBtn: { minWidth: 70, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: '#1565c0' },
-  saveBusy: { opacity: 0.6 },
-  saveText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  camLib: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.control, backgroundColor: `${DARK}73` },
+  editor: { flex: 1, width: '100%', backgroundColor: color.bg },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md, paddingHorizontal: space.lg, paddingBottom: 10, backgroundColor: color.surface, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  headBack: { minHeight: hit.target, justifyContent: 'center' },
+  headLink: { ...font.headline, color: color.primary },
+  headTitle: { flex: 1, textAlign: 'center', ...font.headline, color: color.text },
+  saveBtn: { minWidth: 70 },
   body: { flex: 1, flexDirection: 'row', overflow: 'hidden' },
-  imageArea: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: '#1d1f22' },
-  panel: { flexGrow: 0, flexShrink: 0, backgroundColor: '#fff', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  panelBody: { padding: 14, gap: 8, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: '700', color: '#333', marginTop: 6 },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 7, fontSize: 15, backgroundColor: '#fff' },
+  imageArea: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: DARK },
+  panel: { flexGrow: 0, flexShrink: 0, backgroundColor: color.surface, borderLeftWidth: 1, borderLeftColor: color.hairline },
+  panelBody: { padding: 14, gap: space.sm, paddingBottom: 40 },
+  label: { ...font.captionBold, color: color.text2, marginTop: 6 },
+  input: { ...fieldStyles.input, paddingHorizontal: space.sm, paddingVertical: 7, ...font.callout },
   multi: { minHeight: 64, textAlignVertical: 'top' },
-  muted: { fontSize: 12, color: '#777' },
-  error: { color: '#b71c1c', fontSize: 13 },
-  phrase: { maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, backgroundColor: '#eef2f7' },
-  phraseText: { fontSize: 12, color: '#1f3b63' },
-  phraseMore: { fontSize: 12, color: '#1565c0', fontWeight: '600' },
-  chip: { maxWidth: '100%', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipDisabled: { opacity: 0.45 },
-  chipText: { fontSize: 13, color: '#222' },
-  chipTextOn: { color: '#fff', fontWeight: '600' },
-  swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: '#999' },
-  swatchOn: { borderWidth: 3, borderColor: '#00bcd4' },
+  muted: { ...font.caption, color: color.text3 },
+  error: { ...font.caption, color: color.danger },
+  phrase: { maxWidth: '100%' },
+  swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: color.muted },
+  swatchOn: { borderWidth: 3, borderColor: color.primary },
 });

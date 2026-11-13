@@ -16,7 +16,7 @@
 
 import type { BlobQueue, Store } from '@field-survey/core';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, StyleSheet, Text, View } from 'react-native';
 import Pdf, { type PdfRef } from 'react-native-pdf';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
@@ -37,6 +37,7 @@ import {
   type PdfViewport,
   type Rect,
 } from '../plan/viewport';
+import { Btn, color, font, radius, space } from '../ui';
 import { riserBlobOf, type RiserRef } from './model';
 
 const PAD = 0.15; // margin around a sheet-form bbox, as a share of its size
@@ -116,9 +117,7 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
     body = (
       <View style={styles.gap}>
         <Text style={styles.error} testID="riser.problem">{source.problem}</Text>
-        <Pressable style={styles.btn} onPress={() => setTick((n) => n + 1)} testID="riser.retry">
-          <Text style={styles.btnText}>Try again</Text>
-        </Pressable>
+        <Btn title="Try again" small onPress={() => setTick((n) => n + 1)} testID="riser.retry" />
       </View>
     );
   else if (!source) body = <Text style={styles.muted}>Loading…</Text>;
@@ -127,9 +126,13 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
       <View style={styles.gap}>
         <Text style={styles.muted} testID="riser.missing">Riser not downloaded.</Text>
         {blobs && source.blob ? (
-          <Pressable style={styles.btn} onPress={download} disabled={fetching === 'busy'} testID="riser.download">
-            <Text style={styles.btnText}>{fetching === 'busy' ? 'Downloading…' : fetching ? '⤓ Try again' : '⤓ Download riser'}</Text>
-          </Pressable>
+          <Btn
+            title={fetching === 'busy' ? 'Downloading…' : fetching ? '⤓ Try again' : '⤓ Download riser'}
+            small
+            onPress={download}
+            disabled={fetching === 'busy'}
+            testID="riser.download"
+          />
         ) : null}
         {fetching && fetching !== 'busy' ? <Text style={styles.error}>{fetching}</Text> : null}
       </View>
@@ -144,9 +147,7 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
             <RiserPdf uri={uri} page={source.page} riser={riser} onError={onPdfError} />
           </View>
         )}
-        <Pressable style={styles.btn} onPress={() => setBig(true)} testID="riser.enlarge">
-          <Text style={styles.btnText}>⤢ Enlarge</Text>
-        </Pressable>
+        <Btn title="⤢ Enlarge" small onPress={() => setBig(true)} testID="riser.enlarge" />
       </View>
     );
 
@@ -162,9 +163,7 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
                 Riser crop{source.title ? ` · ${source.title}` : ''}
               </Text>
               <Text style={styles.muted}>Pinch to zoom · drag to pan</Text>
-              <Pressable style={[styles.btn, styles.push]} onPress={() => setBig(false)} testID="riser.close">
-                <Text style={styles.btnText}>Close</Text>
-              </Pressable>
+              <Btn title="Close" small onPress={() => setBig(false)} style={styles.push} testID="riser.close" />
             </View>
             <RiserPdf uri={uri} page={source.page} riser={riser} onError={onPdfError} />
           </View>
@@ -232,19 +231,18 @@ function RiserPdf({ uri, page, riser, onError }: { uri: string; page: number; ri
 }
 
 const styles = StyleSheet.create({
-  section: { marginHorizontal: 8, marginTop: 8, padding: 10, gap: 6, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: '#d6d9de' },
-  title: { fontSize: 14, fontWeight: '700', color: '#333' },
-  muted: { fontSize: 12, color: '#777' },
-  error: { fontSize: 13, color: '#b71c1c' },
+  section: { marginHorizontal: space.sm, marginTop: space.sm, padding: 10, gap: 6, borderRadius: radius.card, borderWidth: 1, borderColor: color.hairline, backgroundColor: color.surface },
+  title: { ...font.calloutBold, color: color.text },
+  muted: { ...font.caption, color: color.text3 },
+  error: { ...font.caption, color: color.danger },
   gap: { gap: 6 },
-  frame: { height: 220, borderRadius: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#c9ccd1' },
+  frame: { height: 220, borderRadius: radius.swatch, overflow: 'hidden', borderWidth: 1, borderColor: color.border },
   pdfBox: { flex: 1, overflow: 'hidden' },
-  pdf: { flex: 1, backgroundColor: '#f4f5f7' },
-  mark: { position: 'absolute', borderWidth: 2, borderColor: '#d32f2f', borderRadius: 2 },
-  modal: { flex: 1, backgroundColor: '#fff' },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#d6d9de' },
-  barTitle: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: '#333' },
+  pdf: { flex: 1, backgroundColor: color.bg },
+  // the bubble's outline over the riser page
+  mark: { position: 'absolute', borderWidth: 2, borderColor: color.danger, borderRadius: 2 },
+  modal: { flex: 1, backgroundColor: color.surface },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  barTitle: { flexShrink: 1, ...font.calloutBold, color: color.text },
   push: { marginLeft: 'auto' },
-  btn: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0', backgroundColor: '#fff' },
-  btnText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
 });

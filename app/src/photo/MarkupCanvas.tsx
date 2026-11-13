@@ -23,6 +23,7 @@ import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-ha
 
 import { containTransform } from '../ink/geometry';
 import { recordStroke, recordStrokes } from '../ink/render';
+import { color } from '../ui';
 import { useDrawGesture, type DrawPoint } from '../ink/useDrawGesture';
 
 export type MarkupTool = Extract<StrokeTool, 'pen' | 'arrow' | 'ellipse' | 'text'> | 'erase';
@@ -126,5 +127,6 @@ export function MarkupCanvas({ imageUri, list, onChange, tool, color, lineWidth,
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, minWidth: 0, backgroundColor: '#1d1f22' },
+  // dark behind the photo, as the toast (the text colour)
+  root: { flex: 1, minWidth: 0, backgroundColor: color.text },
 });

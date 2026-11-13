@@ -48,11 +48,22 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: placeholder.manage
 - extendedWaitUntil:
-    visible:
-      id: vocab.placeholder.remove.Maestro spare
+    visible: 'Placeholders · \d+'
     timeout: 10000
+# T180's taller Vocabulary page puts the Spare group (the last) below the fold; the refusal is a
+# banner above the scroll, which moves the list down again
+- scrollUntilVisible:
+    element:
+      id: vocab.placeholder.remove.Maestro spare
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - tapOn:
     id: vocab.placeholder.remove.Maestro spare
 - assertVisible: 1 connection end still uses this placeholder.
+- scrollUntilVisible:
+    element:
+      id: vocab.placeholder.remove.Maestro spare
+    direction: DOWN
 - assertVisible:
     id: vocab.placeholder.remove.Maestro spare

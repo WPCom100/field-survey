@@ -7,8 +7,9 @@
 import { OpError, type Editor, type Store } from '@field-survey/core';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Btn, Chip, color, fieldStyles, font, radius, space } from '../ui';
 import { addPlaceholder, loadPlaceholders, type PlaceholderEntry } from './model';
 
 export function PlaceholderPicker(props: { store: Store; editor: Editor; currentLabel: string | null; onPick: (placeholderId: string) => Promise<unknown>; onClose: () => void }) {
@@ -46,44 +47,28 @@ export function PlaceholderPicker(props: { store: Store; editor: Editor; current
       <Text style={styles.title}>Choose a placeholder</Text>
       <View style={styles.wrap}>
         {(items ?? []).map((p) => (
-          <Pressable key={p.id} onPress={() => pick(p.id)} style={[styles.chip, p.label === props.currentLabel && styles.chipOn]} testID={`placeholder.pick.${p.label}`}>
-            <Text style={p.label === props.currentLabel ? styles.chipTextOn : styles.chipText}>{p.label}</Text>
-          </Pressable>
+          <Chip key={p.id} label={p.label} small selected={p.label === props.currentLabel} onPress={() => pick(p.id)} testID={`placeholder.pick.${p.label}`} />
         ))}
         {items && !items.length ? <Text style={styles.muted}>None yet. Add one below, or load the standard list under Manage.</Text> : null}
       </View>
       <View style={styles.wrap}>
-        <TextInput value={text} onChangeText={setText} placeholder="New placeholder" placeholderTextColor="#888" style={styles.input} onSubmitEditing={add} testID="placeholder.new" />
-        <Pressable onPress={add} disabled={!text.trim()} style={[styles.btn, !text.trim() && styles.off]} testID="placeholder.add">
-          <Text style={styles.btnText}>Add & use</Text>
-        </Pressable>
+        <TextInput value={text} onChangeText={setText} placeholder="New placeholder" placeholderTextColor={color.text3} style={styles.input} onSubmitEditing={add} testID="placeholder.new" />
+        <Btn title="Add & use" kind="primary" onPress={add} disabled={!text.trim()} testID="placeholder.add" />
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.wrap}>
-        <Pressable onPress={() => router.push({ pathname: '/vocabulary', params: { project: editor.projectId, tab: 'placeholders' } })} testID="placeholder.manage">
-          <Text style={styles.link}>Manage…</Text>
-        </Pressable>
-        <Pressable onPress={props.onClose}>
-          <Text style={styles.link}>Cancel</Text>
-        </Pressable>
+        <Btn title="Manage…" kind="tertiary" small onPress={() => router.push({ pathname: '/vocabulary', params: { project: editor.projectId, tab: 'placeholders' } })} testID="placeholder.manage" />
+        <Btn title="Cancel" kind="tertiary" small onPress={props.onClose} />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  box: { gap: 8, borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, padding: 10 },
-  title: { fontSize: 14, fontWeight: '700' },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111' },
-  chipTextOn: { color: '#fff' },
-  muted: { fontSize: 13, color: '#666' },
-  input: { flexGrow: 1, minWidth: 160, borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, padding: 10, fontSize: 16, minHeight: 44 },
-  btn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#1565c0' },
-  btnText: { color: '#fff', fontWeight: '600' },
-  off: { opacity: 0.4 },
-  link: { color: '#1f6feb', fontSize: 15 },
-  error: { color: '#b3261e', fontSize: 14 },
+  box: { gap: space.sm, borderWidth: 1, borderColor: color.border, borderRadius: radius.control, padding: 10, backgroundColor: color.surface },
+  title: { ...font.calloutBold, color: color.text },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' },
+  muted: { ...font.caption, color: color.text3 },
+  input: { ...fieldStyles.input, flexGrow: 1, minWidth: 160 },
+  error: { ...font.caption, color: color.danger },
 });

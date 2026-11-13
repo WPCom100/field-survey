@@ -23,6 +23,7 @@ import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-nati
 
 import { handRuling } from '../rulings/handoff';
 import { Btn, ChipPicker, Notice, styles as w } from '../setup/widgets';
+import { Chip, color, font, hit, radius, space } from '../ui';
 import { engineFor } from './engine';
 
 /**
@@ -347,9 +348,7 @@ function Chips({ options, value, onPick, labels, testID }: { options: readonly s
   return (
     <View style={styles.chips}>
       {options.map((o) => (
-        <Pressable key={o} onPress={() => o !== value && onPick(o)} style={[styles.chip, o === value && styles.chipOn]} accessibilityRole="radio" accessibilityState={{ selected: o === value }} testID={testID ? `${testID}.${o}` : undefined}>
-          <Text style={[styles.chipText, o === value && styles.chipTextOn]}>{labels?.[o] ?? o}</Text>
-        </Pressable>
+        <Chip key={o} label={labels?.[o] ?? o} small selected={o === value} onPress={() => o !== value && onPick(o)} testID={testID ? `${testID}.${o}` : undefined} />
       ))}
     </View>
   );
@@ -379,32 +378,28 @@ function TextBox({ value, onCommit, testID }: { value: string; onCommit: (v: str
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 12 },
-  hint: { fontSize: 13, color: '#666', maxWidth: 820 },
-  link: { color: '#1f6feb', fontSize: 14 },
-  retrofit: { gap: 6, padding: 10, borderRadius: 8, backgroundColor: '#fff8e6', alignItems: 'flex-start' },
-  small: { fontSize: 12, color: '#777' },
-  group: { gap: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#e6e8ec' },
-  groupTitle: { fontSize: 17, fontWeight: '700' },
-  ruleText: { fontSize: 13, color: '#555', maxWidth: 820 },
-  param: { gap: 6, padding: 10, borderRadius: 8, backgroundColor: '#f7f8fa' },
-  paramSet: { backgroundColor: '#eef4fd', borderLeftWidth: 3, borderLeftColor: '#1f6feb' },
-  paramHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  label: { fontSize: 15, fontWeight: '600' },
-  badge: { fontSize: 12, fontWeight: '600', color: '#1f6feb' },
-  badgeDraft: { fontSize: 12, fontWeight: '600', color: '#b26a00' },
-  changes: { fontSize: 13, color: '#555' },
+  root: { gap: space.md },
+  hint: { ...font.caption, color: color.text3, maxWidth: 820 },
+  link: { ...font.callout, color: color.primary },
+  retrofit: { gap: 6, padding: 10, borderRadius: radius.control, backgroundColor: color.warningTint, alignItems: 'flex-start' },
+  small: { ...font.caption, color: color.text3 },
+  group: { gap: space.sm, paddingVertical: 10, borderTopWidth: 1, borderTopColor: color.hairline },
+  groupTitle: { ...font.headline, color: color.text },
+  ruleText: { ...font.caption, color: color.text2, maxWidth: 820 },
+  param: { gap: 6, padding: 10, borderRadius: radius.control, backgroundColor: color.bg },
+  paramSet: { backgroundColor: color.primaryTint, borderLeftWidth: 3, borderLeftColor: color.primary },
+  paramHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
+  label: { ...font.calloutBold, color: color.text },
+  badge: { ...font.captionBold, color: color.primary },
+  badgeDraft: { ...font.captionBold, color: color.warning },
+  changes: { ...font.caption, color: color.text2 },
   actions: { flexDirection: 'row', gap: 6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { minHeight: 36, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 18, borderWidth: 1, borderColor: '#c9ced6', backgroundColor: '#fff' },
-  chipOn: { backgroundColor: '#1f6feb', borderColor: '#1f6feb' },
-  chipText: { fontSize: 14, color: '#222' },
-  chipTextOn: { color: '#fff', fontWeight: '600' },
   table: { gap: 6 },
-  codeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  code: { width: 110, fontSize: 14, fontWeight: '600' },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  code: { width: 110, ...font.calloutBold, color: color.text },
   dim: { opacity: 0.55 },
-  clear: { fontSize: 20, color: '#1f6feb', width: 22, textAlign: 'center' },
-  toggle: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
-  toggleText: { fontSize: 14 },
+  clear: { fontSize: 20, color: color.primary, width: 22, textAlign: 'center' },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: hit.target },
+  toggleText: { ...font.callout, color: color.text },
 });

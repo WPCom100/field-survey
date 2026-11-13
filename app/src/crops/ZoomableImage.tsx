@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
 import { isDoubleTap, MAX_ZOOM, MIN_ZOOM, tapZoomRect, type Tap } from './model';
+import { color } from '../ui';
 
 /**
  * An image that pinches, pans and double-taps to zoom (T129): an enlarged source crop. The red
@@ -63,5 +64,5 @@ export function ZoomableImage({ uri, accessibilityLabel }: { uri: string; access
 }
 
 const styles = StyleSheet.create({
-  frame: { flex: 1, backgroundColor: '#f3f5f8' },
+  frame: { flex: 1, backgroundColor: color.bg },
 });
