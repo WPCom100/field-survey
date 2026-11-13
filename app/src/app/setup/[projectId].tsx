@@ -129,7 +129,7 @@ export default function ProjectSetupScreen() {
           <Text style={styles.stepText}>Rules</Text>
         </Pressable>
         <View style={{ flex: 1 }} />
-        <Pressable onPress={() => router.push({ pathname: '/', params: { project: projectId } })} testID="setup.home">
+        <Pressable onPress={() => router.dismissTo({ pathname: '/', params: { project: projectId } })} testID="setup.home">
           <Text style={styles.back}>Open the levels screen ▸</Text>
         </Pressable>
       </View>

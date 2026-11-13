@@ -15,6 +15,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { appendPhrase } from '../card/actions';
 import type { HistoryEntry, JumpTarget } from '../card/model';
 import { chipStyles } from '../plan/chips';
+import { useReload } from '../sync/useReload';
 import { setItemNotes, setItemOwner, setPartStatus, setTrackingStatus, type ItemKind } from './actions';
 import { loadItem, type ItemView } from './model';
 
@@ -56,16 +57,15 @@ export function ItemEditor(props: ItemEditorProps) {
   const [view, setView] = useState<ItemView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    loadItem(store, kind, id, levelId).then(
-      (v) => active && (v ? setView(v) : setError(kind === 'punch' ? 'This punch item is not on this iPad.' : 'This part is not on this iPad.')),
-      (e: unknown) => active && setError(String(e)),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, kind, id, levelId, reloadKey]);
+  // T185: an edit's reload is never thrown away by a pull or a rules run that lands during it
+  useReload({
+    name: 'item',
+    subject: `${kind}|${id}|${levelId}`,
+    reloadKey,
+    load: () => loadItem(store, kind, id, levelId),
+    apply: (v) => (v ? setView(v) : setError(kind === 'punch' ? 'This punch item is not on this iPad.' : 'This part is not on this iPad.')),
+    fail: (e) => setError(String(e)),
+  });
 
   const run: Run = useCallback(
     (fn) => {

@@ -349,7 +349,7 @@ export default function SyncScreen() {
             <Text style={styles.caption}>Edits never need sign-in or a connection. Sync, uploads and exports do, on any network, cellular included.</Text>
           </View>
           <View style={styles.headerActions}>
-            <Btn kind="tertiary" title="← Levels" testID="sync.back" onPress={() => router.navigate('/')} />
+            <Btn kind="tertiary" title="← Levels" testID="sync.back" onPress={() => router.dismissTo('/')} />
             <Btn kind="primary" title="Sync now" testID="sync.now" icon={<Icon name="sync" size={18} color={color.onPrimary} />} onPress={syncNow} />
           </View>
         </View>

@@ -103,6 +103,7 @@ import { ruleDecider } from '../rules/engine';
 import { useRulesVersion } from '../rules/useRulesVersion';
 import { logTo } from '../log';
 import { LIST_ENTITY } from '../rulings/model';
+import { useReload } from '../sync/useReload';
 import type { PhotoTarget } from '../photo/model';
 import { PhotoFlow, pickFromLibrary, type PhotoRequest } from '../photo/PhotoFlow';
 import { Btn, Chip, Icon, RAIL_WIDTH, Rail, Sidebar, Swatch, color, font, hit, radius, shadow, space, tabular, type IconName } from '../ui';
@@ -346,22 +347,25 @@ export function PlanScreen(props: PlanScreenProps) {
   const listRef = useRef<FlatList<PlanDevice | ListRow>>(null);
 
   // --- data and stored prefs
-  useEffect(() => {
-    let active = true;
-    (async () => {
+  // T185: an edit's reload is never thrown away by a pull or a rules run that lands during it
+  useReload({
+    name: 'plan',
+    subject: `${levelId}|${showDeleted}`,
+    reloadKey: `${String(reloadKey)}|${edits}`,
+    load: async () => {
       const p = await loadLevelPlan(store, levelId, { includeDeleted: showDeleted });
-      if (!active) return;
       console.log(`[plan] loaded ${p?.devices.length ?? 'no'} devices, sheet ${p?.sheet ? 'yes' : 'no'}`);
-      if (!p) return setError('This level is not on this iPad.');
+      if (!p) return null;
       const l = await loadLevelLists(store, p.level.projectId, levelId, p.level.code, p.devices, { includeDeleted: showDeleted });
-      if (!active) return;
-      setPlan(p);
-      setLists(l);
-    })().catch((e: unknown) => active && setError(String(e)));
-    return () => {
-      active = false;
-    };
-  }, [store, levelId, reloadKey, showDeleted, edits]);
+      return { p, l };
+    },
+    apply: (v) => {
+      if (!v) return setError('This level is not on this iPad.');
+      setPlan(v.p);
+      setLists(v.l);
+    },
+    fail: (e) => setError(String(e)),
+  });
 
   // --- a pin conflict to resolve here (T26)
   const [pinConflict, setPinConflict] = useState<PinConflict | null>(null);
@@ -420,7 +424,7 @@ export function PlanScreen(props: PlanScreenProps) {
   // Accept / Edit / Reject of rule drafts on the card (T33); read-only without an editor.
   const decider = useMemo(() => (editor ? ruleDecider(store, editor.projectId, editor.userId) : NOT_WIRED), [store, editor]);
   // The rule engine wrote or decided proposal rows: the card reloads its drafts.
-  const rulesVersion = useRulesVersion();
+  const rulesVersion = useRulesVersion(projectId); // this project's runs only (T185)
 
   /**
    * Choose A / Choose B on the pin conflict: confirmed with the auto-filled reason (D123), one

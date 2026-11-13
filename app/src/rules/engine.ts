@@ -43,14 +43,29 @@ export function engineFor(store: Store, projectId: string, userId: string): Rule
 // --- a version counter screens reload on after a run or a decision changed proposal rows
 
 let version = 0;
+/** All per-project bumps: the no-project version moves with them too. */
+let total = 0;
+/** Bumps of one project only (a pass that wrote there, T185): `rulesVersion(p)` adds them. */
+const perProject = new Map<string, number>();
 const listeners = new Set<() => void>();
 
-export function rulesVersion(): number {
-  return version;
+/**
+ * Without a project: changes after every bump. With one: after a bump for every project (a
+ * decision, a dismiss) or for that project, not when a pass wrote only to another project
+ * (T185: an iPad runs the rules of every project it holds, a teammate's included).
+ */
+export function rulesVersion(projectId?: string | null): number {
+  return projectId ? version + (perProject.get(projectId) ?? 0) : version + total;
 }
 
-export function bumpRulesVersion(): void {
-  version++;
+/** No projects: a bump for every project. */
+export function bumpRulesVersion(projects?: readonly string[]): void {
+  if (projects) {
+    for (const p of projects) {
+      perProject.set(p, (perProject.get(p) ?? 0) + 1);
+      total++;
+    }
+  } else version++;
   for (const l of listeners) l();
 }
 
@@ -109,16 +124,18 @@ export function startRules(store: Store, userId: string, projectIds: () => Promi
       projects = [...new Set([...projects, ...(await projectIds())])];
     }
     let wrote = 0;
+    const wroteTo: string[] = [];
     for (const p of projects) {
       try {
         const r = await engineFor(store, p, userId).run();
         wrote += r.ops;
+        if (r.ops) wroteTo.push(p);
       } catch (e) {
         log('error', 'run_failed', { project: p, error: String((e as Error)?.message ?? e) });
       }
     }
     last = { at: new Date().toISOString(), projects: projects.length, ms: Date.now() - t0, ops: wrote };
-    if (wrote) bumpRulesVersion();
+    if (wroteTo.length) bumpRulesVersion(wroteTo);
   });
   projectIds().then(
     (ids) => trigger.request(ids),

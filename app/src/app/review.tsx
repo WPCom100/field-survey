@@ -243,7 +243,7 @@ export default function NeedsReviewScreen() {
           projectId === LIBRARY_STREAM ? (
             <Btn kind="tertiary" title="← Library" onPress={() => router.navigate({ pathname: '/library', params: { scope: 'app' } })} />
           ) : (
-            <Btn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
+            <Btn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
           )
         }
       />

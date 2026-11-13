@@ -131,7 +131,7 @@ export default function VocabularyScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Link href={{ pathname: '/', params: projectId ? { project: projectId } : {} }} style={styles.link}>
+        <Link dismissTo href={{ pathname: '/', params: projectId ? { project: projectId } : {} }} style={styles.link}>
           ◀ Levels
         </Link>
         <Text style={styles.title}>Vocabulary</Text>

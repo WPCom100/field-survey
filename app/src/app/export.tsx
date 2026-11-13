@@ -262,7 +262,7 @@ export default function ExportScreen() {
           </Pressable>
         ))}
         <View style={{ flex: 1 }} />
-        <Link href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.back}>
+        <Link dismissTo href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.back}>
           ← Levels
         </Link>
       </View>

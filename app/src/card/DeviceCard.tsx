@@ -34,6 +34,7 @@ import { UNSURVEYED } from '../plan/filters';
 import type { Badges } from '../plan/lists';
 import { pinStyleFor } from '../plan/pins';
 import { UNPLACE_REASON, unplaceDevice } from '../placement/actions';
+import { useReload } from '../sync/useReload';
 import {
   BADGE,
   Badge,
@@ -141,16 +142,15 @@ export function DeviceCard(props: DeviceCardProps) {
   const [open, setOpen] = useState<Record<SectionKey, boolean>>(SECTIONS_OPEN);
   const fold = (k: SectionKey) => ({ open: open[k], onToggle: (v: boolean) => setOpen((o) => ({ ...o, [k]: v })) });
 
-  useEffect(() => {
-    let active = true;
-    loadDeviceCard(store, deviceId).then(
-      (c) => active && setCard(c),
-      (e: unknown) => active && setError(String(e)),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, deviceId, reloadKey]);
+  // T185: an edit's reload is never thrown away by a pull or a rules run that lands during it
+  useReload({
+    name: 'card',
+    subject: deviceId,
+    reloadKey,
+    load: () => loadDeviceCard(store, deviceId),
+    apply: setCard,
+    fail: (e) => setError(String(e)),
+  });
 
   /** Run one edit; refresh on success, show the reason on refusal. */
   const run = useCallback(

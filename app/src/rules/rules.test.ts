@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { loadDeviceCard } from '../card/model';
 import { loadLevelPlan } from '../plan/data';
 import { DEMO_LEVEL_ID, ensureDemoCardExtras, ensureDemoLevel } from '../plan/demo';
-import { engineFor, lastRulesPass, ruleDecider, startRules } from './engine';
+import { bumpRulesVersion, engineFor, lastRulesPass, ruleDecider, rulesVersion, startRules, subscribeRules } from './engine';
 
 const ME = uuidv7();
 
@@ -130,5 +130,23 @@ describe('startRules over the app library stream (T131)', () => {
     expect(pass).toMatchObject({ projects: 1, ops: 0 });
     expect(pass.ms).toBeGreaterThanOrEqual(0);
     stop();
+  });
+});
+
+describe('rulesVersion per project (T185)', () => {
+  it("a pass that wrote to another project leaves this one's version alone; a decision moves every one", () => {
+    let told = 0;
+    const off = subscribeRules(() => told++);
+    const a0 = rulesVersion('a');
+    const b0 = rulesVersion('b');
+    const all0 = rulesVersion();
+    bumpRulesVersion(['b']); // the rules wrote to a teammate's project only
+    expect(rulesVersion('a')).toBe(a0);
+    expect(rulesVersion('b')).not.toBe(b0);
+    expect(rulesVersion()).not.toBe(all0);
+    bumpRulesVersion(); // a decision or a dismiss: every screen reloads
+    expect(rulesVersion('a')).not.toBe(a0);
+    expect(told).toBe(2);
+    off();
   });
 });

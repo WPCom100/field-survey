@@ -135,7 +135,7 @@ export default function CablesScreen() {
         caption="Every cable of the project with both ends; the project's consistency checks along the bottom."
         actions={
           <>
-            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
+            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
             {picked ? (
               <>
                 <Btn label={`All ${shown.length}`} onPress={() => setPicked(new Set(shown.map((r) => r.id)))} testID="cables.select.all" />

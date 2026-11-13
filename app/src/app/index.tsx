@@ -21,7 +21,8 @@ import { BaselineDialog } from '../setup/BaselineDialog';
 import { loadLockTable, type LockLevel } from '../setup/lock';
 import { homeIdentityLine, installName, loadInstallLabels } from '../sync/install';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { syncDataKey } from '../sync/dataKey';
+import { projectDataKey } from '../sync/dataKey';
+import { useReload } from '../sync/useReload';
 import { Banner, Btn, Empty, Icon, Sidebar, color, font, radius, space, tabular, type IconName } from '../ui';
 
 /** The Plan column (the board): the display sheet on this iPad, on its way, not yet, or none. */
@@ -36,11 +37,12 @@ export default function ProjectHomeScreen() {
   const user = useCurrentUser();
   const router = useRouter();
   const sync = useSyncStatus();
-  const rules = useRulesVersion();
-  const dataKey = syncDataKey(sync);
   const { project: wanted } = useLocalSearchParams<{ project?: string }>();
   const [projects, setProjects] = useState<HomeProject[]>([]);
   const [projectId, setProjectId] = useState<string | null>(typeof wanted === 'string' && wanted ? wanted : null);
+  // this project's pulls and rules runs only (T185); with no project yet, every pull
+  const rules = useRulesVersion(projectId);
+  const dataKey = projectDataKey(sync, projectId);
 
   // The Projects screen and project creation open the home on a given project (T41).
   useEffect(() => {
@@ -57,38 +59,39 @@ export default function ProjectHomeScreen() {
   const [tileCols, setTileCols] = useState(4);
 
   // Reload after each sync: pulls change counts, reviews, assignments and the sheet cache; after
-  // each rules run: the Lint pill.
-  useEffect(() => {
-    let live = true;
-    (async () => {
+  // each rules run: the Lint pill. Through useReload (T185): never while another screen covers the
+  // home (it sits under every one of them), and a reload in progress is never thrown away.
+  useReload({
+    name: 'home',
+    subject: `${projectId ?? ''}|${typeof wanted === 'string' ? wanted : ''}|${user.id}|${user.name}`,
+    reloadKey: `${dataKey}|${sync.pendingOps}|${reload}|${rules}`,
+    load: async () => {
       const store = await openAppStore();
       const list = await listProjects(store);
-      if (!live) return;
-      setProjects(list);
       const labels = await loadInstallLabels(store);
-      setWho({
+      const who = {
         label: homeIdentityLine(user.name, store.installId, labels),
         sub: `This iPad: ${installName(store.installId, labels)}${labels.has(store.installId) ? '' : ' (name it on the Sync screen)'}`,
-      });
+      };
       const known = list.map((p) => p.id);
-      if (awaitingProject(known, typeof wanted === 'string' ? wanted : null, projectId)) {
-        // just created: it arrives with the next sync, which re-runs this effect (dataKey)
-        setHome(null);
-        return;
-      }
+      // just created: it arrives with the next sync, which reloads (dataKey)
+      if (awaitingProject(known, typeof wanted === 'string' ? wanted : null, projectId)) return { list, who, awaiting: true as const };
       const id = pickProject(known, projectId);
-      if (id !== projectId) setProjectId(id);
-      rememberProject(id);
       const next = id ? await loadProjectHome(store, id, user.id) : null;
       const table = id ? await loadLockTable(store, id) : [];
-      if (!live) return;
-      setHome(next);
-      setLocks(new Map(table.map((l) => [l.id, l])));
-    })().catch((e: unknown) => console.warn('[home] load', e));
-    return () => {
-      live = false;
-    };
-  }, [projectId, wanted, user.id, user.name, dataKey, sync.pendingOps, reload, rules]);
+      return { list, who, awaiting: false as const, id, next, table };
+    },
+    apply: (v) => {
+      setProjects(v.list);
+      setWho(v.who);
+      if (v.awaiting) return setHome(null);
+      if (v.id !== projectId) setProjectId(v.id);
+      rememberProject(v.id);
+      setHome(v.next);
+      setLocks(new Map(v.table.map((l) => [l.id, l])));
+    },
+    fail: (e) => console.warn('[home] load', e),
+  });
   const waiting = awaitingProject(
     projects.map((p) => p.id),
     typeof wanted === 'string' ? wanted : null,

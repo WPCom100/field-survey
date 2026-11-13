@@ -102,6 +102,13 @@ appId: productions.luminarytechnology.fieldsurvey
     env:
       LEVEL: 06M
       DEVICE: 06M-02
+# the Rules tab's Enter only minimises the keyboard: the next touch drops the card's keyboard
+# inset, the page jumps and that press is cancelled (T183's trap; T185 saw Quick actions stay
+# folded). Take that touch with the header's plain model line first.
+- tapOn:
+    id: card.model
+- waitForAnimationToEnd:
+    timeout: 3000
 - runFlow:
     file: _side-down.yaml
     env:

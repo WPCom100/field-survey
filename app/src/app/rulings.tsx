@@ -157,7 +157,7 @@ export default function RulingsScreen() {
         caption="One decision applied to every matching record, previewed before anything changes."
         actions={
           <>
-            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
+            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
             <Btn label="+ New ruling" onPress={() => setMode({ kind: 'edit', draft: emptyDraft(), source: null })} disabled={!engine} testID="rulings.new" />
           </>
         }

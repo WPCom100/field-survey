@@ -18,6 +18,7 @@ import type { JumpTarget } from '../card/model';
 import { PhotoStrip } from '../photo/PhotoStrip';
 import { chipStyles } from '../plan/chips';
 import { pinStyleFor } from '../plan/pins';
+import { useReload } from '../sync/useReload';
 import { PlaceholderPicker } from '../vocab/PlaceholderPicker';
 import { setCableTermKit, setEndNote, setEndPlaceholder, setEndStatus, setEndText } from './actions';
 import { CABLE_NAME, loadCableEnds, type CableView, type EndView } from './model';
@@ -55,16 +56,15 @@ export function EndEditor(props: EndEditorProps) {
   /** The reason being typed for ⋯ → Delete… / Restore… (T138). */
   const [pending, setPending] = useState<{ kind: 'delete' | 'restore'; reason: string } | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    loadCableEnds(store, endId).then(
-      (v) => active && (v ? setView(v) : setError('This connection is not on this iPad.')),
-      (e: unknown) => active && setError(String(e)),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, endId, reloadKey]);
+  // T185: an edit's reload is never thrown away by a pull or a rules run that lands during it
+  useReload({
+    name: 'end',
+    subject: endId,
+    reloadKey,
+    load: () => loadCableEnds(store, endId),
+    apply: (v) => (v ? setView(v) : setError('This connection is not on this iPad.')),
+    fail: (e) => setError(String(e)),
+  });
 
   const run: Run = useCallback(
     async (fn) => {

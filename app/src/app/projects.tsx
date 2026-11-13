@@ -78,7 +78,7 @@ export default function ProjectsScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.top}>
-        <Link href="/" style={styles.back}>
+        <Link dismissTo href="/" style={styles.back}>
           ◀ Levels
         </Link>
         <Text style={styles.title}>Projects</Text>
@@ -107,7 +107,7 @@ export default function ProjectsScreen() {
               <Text style={styles.actionText}>Setup ▸</Text>
             </Pressable>
             <Pressable
-              onPress={() => router.push({ pathname: '/', params: { project: p.id } })}
+              onPress={() => router.dismissTo({ pathname: '/', params: { project: p.id } })}
               style={[styles.action, styles.actionPrimary]}
               testID={`projects.open.${p.name}`}
             >

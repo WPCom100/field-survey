@@ -14,7 +14,8 @@ import { logTo } from '../log';
 import { bumpRulesVersion, engineFor, ruleDecider } from '../rules/engine';
 import { useRulesVersion } from '../rules/useRulesVersion';
 import { handRuling } from '../rulings/handoff';
-import { syncDataKey } from '../sync/dataKey';
+import { projectDataKey } from '../sync/dataKey';
+import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { Btn, Chip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 
@@ -37,10 +38,11 @@ export default function LintScreen() {
   const params = useLocalSearchParams<{ project?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
-  const dataKey = syncDataKey(sync);
-  const rulesKey = useRulesVersion();
   const [store, setStore] = useState<Store | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  // this project's pulls and rules runs only (T185)
+  const dataKey = projectDataKey(sync, projectId);
+  const rulesKey = useRulesVersion(projectId);
   const [levelId, setLevelId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<'check' | 'level'>('check');
   const [dismissed, setDismissed] = useState(false);
@@ -61,22 +63,19 @@ export default function LintScreen() {
   }, [params.project]);
   useFocusEffect(useCallback(() => setTick((n) => n + 1), []));
 
-  useEffect(() => {
-    if (!store || !projectId) return;
-    let active = true;
-    loadLintView(store, projectId, { levelId, groupBy, dismissed }).then(
-      (v) => {
-        if (!active) return;
-        setView(v);
-        const ids = v.groups.flatMap((g) => g.rows.map((r) => r.id));
-        setSelected((cur) => (cur && ids.includes(cur) ? cur : (ids[0] ?? null)));
-      },
-      (e: unknown) => active && setNote(String(e)),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, projectId, levelId, groupBy, dismissed, tick, dataKey, rulesKey]);
+  // T185: a pull or a rules run during a load no longer throws it away (useReload)
+  useReload({
+    name: 'lint',
+    subject: store && projectId ? `${projectId}|${levelId ?? ''}|${groupBy}|${dismissed}` : null,
+    reloadKey: `${tick}|${dataKey}|${rulesKey}`,
+    load: () => loadLintView(store!, projectId!, { levelId, groupBy, dismissed }),
+    apply: (v) => {
+      setView(v);
+      const ids = v.groups.flatMap((g) => g.rows.map((r) => r.id));
+      setSelected((cur) => (cur && ids.includes(cur) ? cur : (ids[0] ?? null)));
+    },
+    fail: (e) => setNote(String(e)),
+  });
 
   const items = useMemo<Item[]>(() => {
     const out: Item[] = [];
@@ -137,7 +136,7 @@ export default function LintScreen() {
       <PageHeader
         title={title}
         caption="The rules' findings on this project. A finding you dismiss comes back when its facts change."
-        actions={<Btn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />}
+        actions={<Btn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />}
       />
       <FilterRow style={styles.filters}>
         <FilterLabel text="Level" />

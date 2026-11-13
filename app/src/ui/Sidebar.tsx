@@ -29,6 +29,11 @@ type Entry = { name: NavName; icon: IconName; href: (projectId: string) => Href;
 
 const at = (pathname: string) => (project: string) => ({ pathname, params: { project } }) as Href;
 
+/** The Levels home (`/`), with or without params. */
+export function isHome(href: Href): boolean {
+  return typeof href === 'string' ? href === '/' : (href as { pathname?: string }).pathname === '/';
+}
+
 /** The two groups, in the board's order. */
 export const NAV_GROUPS: { title: string; entries: Entry[] }[] = [
   {
@@ -77,7 +82,10 @@ export function Sidebar({ active, section, onNavigate, projectId, projectName, c
   const router = useRouter();
   const go = (href: Href) => {
     onNavigate?.();
-    router.push(href);
+    // Levels goes back to the home under everything (T185): a pushed copy would stay mounted and
+    // reload on every pull, in the store's one queue, under whatever is open
+    if (isHome(href)) router.dismissTo(href);
+    else router.push(href);
   };
   return (
     <View style={styles.root}>

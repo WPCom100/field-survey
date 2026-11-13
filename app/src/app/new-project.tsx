@@ -123,7 +123,7 @@ export default function NewProjectScreen() {
       const created = await createProject(identity, store, body);
       const engine = await getSyncEngine();
       await engine.requestSync(); // pulls the new project, its levels and copies
-      router.replace({ pathname: '/', params: { project: created.id } });
+      router.dismissTo({ pathname: '/', params: { project: created.id } });
     } catch (e) {
       setError(createFailureText(e));
       setBusy(false);

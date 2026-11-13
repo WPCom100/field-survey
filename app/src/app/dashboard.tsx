@@ -132,7 +132,7 @@ export default function DashboardScreen() {
         caption={asOf}
         actions={
           <>
-            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.navigate(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
+            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
             <TextInput
               style={styles.search}
               value={query}

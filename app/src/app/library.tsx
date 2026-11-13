@@ -61,7 +61,7 @@ export default function LibraryRoute() {
               ◀ Projects
             </Link>
           ) : (
-            <Link href={{ pathname: '/', params: projectId ? { project: projectId } : {} }} style={styles.link}>
+            <Link dismissTo href={{ pathname: '/', params: projectId ? { project: projectId } : {} }} style={styles.link}>
               ◀ Levels
             </Link>
           )

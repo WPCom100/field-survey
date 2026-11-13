@@ -22,6 +22,25 @@ appId: productions.luminarytechnology.fieldsurvey
       ID: proposal.accept.Run DMX to equipment rack
 - tapOn:
     id: proposal.accept.Run DMX to equipment rack
+# T185: wait for the card's reload (a second or more while the store syncs) before looking: the
+# item takes the draft's place, often just below the fold, so look down a little before looking up
+# (as _ends-wire); looking up at once scrolled it out of reach
+- extendedWaitUntil:
+    notVisible:
+      id: proposal.accept.Run DMX to equipment rack
+    timeout: 15000
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        id: card.punch.Run DMX to equipment rack
+    commands:
+      - swipe:
+          start: 86%,75%
+          end: 86%,47%
+          duration: 500
+      - waitForAnimationToEnd:
+          timeout: 2000
 - runFlow:
     file: _side-up.yaml
     env:

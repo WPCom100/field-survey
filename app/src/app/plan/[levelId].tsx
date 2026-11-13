@@ -12,7 +12,7 @@ import type { PlanSheet } from '../../plan/data';
 import { PlanScreen } from '../../plan/PlanScreen';
 import { backLabelFor } from '../../plan/toolbar';
 import { handRuling } from '../../rulings/handoff';
-import { syncDataKey } from '../../sync/dataKey';
+import { projectDataKey } from '../../sync/dataKey';
 import { useSyncStatus } from '../../sync/useSyncStatus';
 
 /**
@@ -32,7 +32,17 @@ export default function LevelPlanRoute() {
   const [blobs, setBlobs] = useState<BlobQueue | null>(null);
   const sync = useSyncStatus();
   const names = useTeamNames(store);
-  const shell = useShell(store, levelId, user, syncDataKey(sync));
+  // the level's project, so the plan reloads on its own project's pulls only (T185)
+  const [projectId, setProjectId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!store || !levelId) return;
+    store.get<{ project_id?: unknown }>('level', levelId).then(
+      (l) => setProjectId(typeof l?.project_id === 'string' ? l.project_id : null),
+      () => setProjectId(null),
+    );
+  }, [store, levelId]);
+  const dataKey = projectDataKey(sync, projectId);
+  const shell = useShell(store, levelId, user, dataKey);
   // The back button returns to the screen under the plan in the Stack and says which (T177).
   const navigation = useNavigation();
   const backLabel = useMemo(() => {
@@ -74,7 +84,7 @@ export default function LevelPlanRoute() {
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       backLabel={backLabel}
       shell={shell}
-      reloadKey={syncDataKey(sync)}
+      reloadKey={dataKey}
       userId={user.id}
       names={names}
       resolveBlobUri={resolveBlobUri}
