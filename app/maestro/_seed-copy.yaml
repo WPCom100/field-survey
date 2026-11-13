@@ -24,10 +24,14 @@ appId: productions.luminarytechnology.fieldsurvey
 - runFlow: _pick-wait.yaml
 - tapOn:
     point: "${typeof SEED_AT === 'undefined' ? PICK_1 : SEED_AT}"   # the workbook: the one file, else SEED_AT (place.yaml)
+# the preview's first line, then its match line (below the fold since T180's cards)
 - extendedWaitUntil:
-    visible:
-      id: seed.matched
+    visible: 'Floors: B2, B1, 01, 02, 03, 04, 06, 06M .*'
     timeout: 60000
+- scrollUntilVisible:
+    element:
+      id: seed.matched
+    direction: DOWN
 - assertVisible: 'Devices: 210 rows'
 - scrollUntilVisible:
     element:

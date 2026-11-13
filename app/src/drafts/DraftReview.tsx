@@ -7,6 +7,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { openAppStore } from '../db';
 import { useIdentity } from '../identity/IdentityGate';
 import { Btn, Notice, styles as w } from '../setup/widgets';
+import { Chip as UiChip, color, font, radius, space, tabular } from '../ui';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import {
@@ -222,7 +223,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
       <Notice text={notice} testID="drafts.notice" />
 
       <View style={styles.body}>
-        <ScrollView style={styles.left} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView style={styles.left} contentContainerStyle={styles.leftBody}>
           {tab === 'devices' ? <DeviceTable rows={devices} selected={selected} onSelect={(id) => (setSelected(id), setAdding(false))} /> : <CableTable rows={cables} selected={selected} onSelect={(id) => (setSelected(id), setAdding(false))} />}
           <Text style={styles.h2}>Mismatch list ({level.code})</Text>
           {mismatches.length ? (
@@ -236,7 +237,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
           )}
           {tab === 'devices' ? <Excluded batches={batches} data={data} level={level.levelId} levelCode={level.code} run={run} editor={editor} projectId={projectId} /> : null}
         </ScrollView>
-        <ScrollView style={styles.panel} contentContainerStyle={{ padding: 14, gap: 10, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+        <ScrollView style={styles.panel} contentContainerStyle={{ padding: space.lg, gap: 10, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
           {adding ? (
             tab === 'devices' ? (
               <AddDevice levels={data.levels} levelId={level.levelId} onAdd={(f) => run(() => addDeviceDraft(editor, projectId, f).then((id) => (setSelected(id), setAdding(false), 'Draft added')))} />
@@ -258,12 +259,9 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
 
 type Run = (fn: () => Promise<unknown>, done?: string) => Promise<void>;
 
+/** The screen's chips on the system's `Chip` (T180); `dim` = an out-of-scope level. */
 function Chip({ label, on, onPress, dim, testID }: { label: string; on?: boolean; onPress: () => void; dim?: boolean; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
-      <Text style={[styles.chipText, on && styles.chipTextOn, dim && !on && styles.dimText]}>{label}</Text>
-    </Pressable>
-  );
+  return <UiChip small label={label} selected={!!on} onPress={onPress} testID={testID} style={dim && !on ? styles.chipDim : undefined} />;
 }
 
 function StateCell({ state, flagged, extra }: { state: string; flagged: boolean; extra?: string }) {
@@ -338,7 +336,7 @@ function CableTable({ rows, selected, onSelect }: { rows: CableDraftRow[]; selec
 
 function Radio({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={styles.radio}>
+    <Pressable onPress={onPress} style={styles.radio} accessibilityRole="radio" accessibilityState={{ checked: on }}>
       <Text style={[styles.radioText, on && styles.radioOn]}>
         {on ? '◉' : '○'} {label}
       </Text>
@@ -369,7 +367,7 @@ function RejectForm({ onReject }: { onReject: (reason: string) => void }) {
           <Chip key={r} label={r} on={reason === r} onPress={() => setReason(r)} />
         ))}
       </View>
-      <TextInput style={w.input} value={reason} onChangeText={setReason} placeholder="Reason" placeholderTextColor="#9aa0a8" testID="draft.reject.reason" />
+      <TextInput style={w.input} value={reason} onChangeText={setReason} placeholder="Reason" placeholderTextColor={color.text3} testID="draft.reject.reason" />
       <View style={styles.btnRow}>
         <Btn title="Reject" small disabled={!reason.trim()} onPress={() => onReject(reason)} testID="draft.reject.submit" />
         <Btn title="Cancel" small onPress={() => setOpen(false)} />
@@ -484,8 +482,11 @@ function EditDevice({ d, levels, onSave }: { d: DeviceDraftRow; levels: DraftRev
   const [qty, setQty] = useState(d.qty != null ? String(d.qty) : '');
   const [name, setName] = useState(d.name ?? '');
   const [levelId, setLevelId] = useState<string | null>(d.levelId);
+  // Save & accept leads the form, so it stays above the keyboard while a field is typed in (T175 → T180:
+  // at the end of the form it fell under the keyboard in portrait)
   return (
     <View style={styles.form}>
+      <Btn title="Save & accept" testID="draft.save" primary small onPress={() => onSave({ model, category, qty: qty.trim() ? Number(qty) : null, name: name || null, levelId })} />
       <Text style={w.label}>Model</Text>
       <TextInput style={w.input} value={model} onChangeText={setModel} autoCapitalize="characters" autoCorrect={false} testID="draft.edit.model" />
       {d.candidates.length > 1 ? (
@@ -520,7 +521,6 @@ function EditDevice({ d, levels, onSave }: { d: DeviceDraftRow; levels: DraftRev
             <Chip key={l.key} label={l.code} on={levelId === l.levelId} onPress={() => setLevelId(l.levelId)} />
           ))}
       </View>
-      <Btn title="Save & accept" testID="draft.save" primary small onPress={() => onSave({ model, category, qty: qty.trim() ? Number(qty) : null, name: name || null, levelId })} />
     </View>
   );
 }
@@ -617,7 +617,7 @@ function CablePanel({
           <Text style={styles.dim}>Confirm endpoint = you checked both ends against the riser crop (D6). Unconfirmed cables show ⚑ in the cable view.</Text>
         </>
       ) : c.committed ? (
-        <Pressable onPress={() => router.push({ pathname: '/cables', params: { project: projectId } })}>
+        <Pressable onPress={() => router.push({ pathname: '/cables', params: { project: projectId } })} hitSlop={space.sm}>
           <Text style={styles.link}>Its cable is made{c.confirmed ? ', endpoints confirmed' : ' (unconfirmed ⚑)'}. Open Cable / riser ▸</Text>
         </Pressable>
       ) : c.state === 'rejected' ? (
@@ -643,7 +643,7 @@ function EndpointPicker({ c, side, data, onPick }: { c: CableDraftRow; side: Sid
   const options = endpointOptions(data, c, side, q).slice(0, 40);
   return (
     <View style={styles.form}>
-      <TextInput style={w.input} value={q} onChangeText={setQ} placeholder="Search devices, drafts, placeholders (any level)" placeholderTextColor="#9aa0a8" autoCorrect={false} testID="draft.cable.search" />
+      <TextInput style={w.input} value={q} onChangeText={setQ} placeholder="Search devices, drafts, placeholders (any level)" placeholderTextColor={color.text3} autoCorrect={false} testID="draft.cable.search" />
       {options.map((e) => (
         <Pressable key={`${e.kind}:${e.id}`} onPress={() => onPick(e)} style={styles.option} testID="draft.cable.option">
           <Text style={styles.optionText}>
@@ -670,7 +670,7 @@ function AddDevice({ levels, levelId, onAdd }: { levels: DraftReviewData['levels
       <Text style={styles.h2}>Add a device draft by hand</Text>
       <Text style={styles.dim}>For a floor surveyed before its BOM and riser are extracted (K12). It is reviewed like any other draft.</Text>
       <Text style={w.label}>Model</Text>
-      <TextInput style={w.input} value={model} onChangeText={setModel} autoCapitalize="characters" autoCorrect={false} placeholder="PI1002" placeholderTextColor="#9aa0a8" testID="drafts.new.model" />
+      <TextInput style={w.input} value={model} onChangeText={setModel} autoCapitalize="characters" autoCorrect={false} placeholder="PI1002" placeholderTextColor={color.text3} testID="drafts.new.model" />
       <Text style={w.label}>Category</Text>
       <View style={styles.chips}>
         {DEVICE_CATEGORIES.map((c) => (
@@ -726,9 +726,9 @@ function AddCable({
         ))}
       </View>
       <Text style={w.label}>From (as written)</Text>
-      <TextInput style={w.input} value={from} onChangeText={setFrom} autoCorrect={false} placeholder="CT02LCPA" placeholderTextColor="#9aa0a8" testID="drafts.new.from" />
+      <TextInput style={w.input} value={from} onChangeText={setFrom} autoCorrect={false} placeholder="CT02LCPA" placeholderTextColor={color.text3} testID="drafts.new.from" />
       <Text style={w.label}>To (as written)</Text>
-      <TextInput style={w.input} value={to} onChangeText={setTo} autoCorrect={false} placeholder="UFMP4 Level 03" placeholderTextColor="#9aa0a8" testID="drafts.new.to" />
+      <TextInput style={w.input} value={to} onChangeText={setTo} autoCorrect={false} placeholder="UFMP4 Level 03" placeholderTextColor={color.text3} testID="drafts.new.to" />
       <Text style={w.label}>Far end level</Text>
       <View style={styles.chips}>
         <Chip label="same level" on={toLevel === null} onPress={() => setToLevel(null)} />
@@ -753,7 +753,7 @@ function Excluded({ batches, data, level, levelCode, run, editor, projectId }: {
   const levelFor = (l: ExcludedRow) => data.levels.find((x) => x.code === l.levelCode)?.levelId ?? level;
   return (
     <View style={{ marginTop: 14 }}>
-      <Pressable onPress={() => setOpen((o) => !o)}>
+      <Pressable onPress={() => setOpen((o) => !o)} style={styles.fold}>
         <Text style={styles.h2}>
           Excluded BOM lines ({here.length} here, {all.length} in all) {open ? '▾' : '▸'}
         </Text>
@@ -783,53 +783,52 @@ function Excluded({ batches, data, level, levelCode, run, editor, projectId }: {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 14, gap: 6 },
-  pad: { padding: 20, gap: 8 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  h1: { fontSize: 20, fontWeight: '600' },
-  h2: { fontSize: 16, fontWeight: '700', marginTop: 6 },
-  counts: { fontSize: 14, color: '#444' },
+  // the page's padding stays near the old 14 pt: the device table is tight in portrait
+  root: { flex: 1, paddingHorizontal: space.md, paddingVertical: space.md, gap: space.sm },
+  pad: { paddingHorizontal: space.xl, paddingVertical: space.lg, gap: space.sm },
+  header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  h1: { ...font.title, color: color.text },
+  h2: { ...font.headline, color: color.text, marginTop: 6 },
+  counts: { ...font.callout, ...tabular, color: color.text2 },
   levels: { flexGrow: 0 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, backgroundColor: '#eef1f5' },
-  chipOn: { backgroundColor: '#1565c0' },
-  chipText: { fontSize: 13, color: '#333' },
-  chipTextOn: { color: '#fff', fontWeight: '600' },
-  sep: { color: '#bbb' },
-  body: { flex: 1, flexDirection: 'row', gap: 12, marginTop: 6 },
-  left: { flex: 3 },
-  panel: { flex: 2, backgroundColor: '#f8f9fb', borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: '#d5d9e0' },
-  thead: { flexDirection: 'row', gap: 6, paddingVertical: 4, borderBottomWidth: 1, borderColor: '#d5d9e0' },
-  tr: { flexDirection: 'row', gap: 6, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#e3e5e8', alignItems: 'center' },
-  trOn: { backgroundColor: '#e3edfb' },
-  cModel: { flex: 3, fontSize: 14 },
-  cName: { flex: 2, fontSize: 13, color: '#444' },
-  cCat: { flex: 2, fontSize: 13, color: '#444' },
-  cQty: { width: 44, fontSize: 14 },
-  cConf: { width: 44, fontSize: 14 },
-  cSrc: { width: 46, fontSize: 13, color: '#555' },
-  cState: { width: 92, fontSize: 12 },
-  cCode: { width: 50, fontSize: 14, fontWeight: '600' },
-  cFrom: { flex: 3, fontSize: 13 },
-  cTo: { flex: 4, fontSize: 13 },
-  mismatch: { fontSize: 14, color: '#8a5300', paddingVertical: 3 },
-  kv: { fontSize: 14 },
-  k: { fontWeight: '700', color: '#555' },
-  warn: { color: '#b26a00' },
-  red: { color: '#c62828' },
-  green: { color: '#2e7d32' },
-  dim: { fontSize: 13, color: '#777' },
-  dimText: { color: '#999' },
-  link: { fontSize: 14, color: '#1565c0' },
-  btnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' },
-  form: { gap: 6, padding: 10, borderRadius: 6, backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  radio: { paddingVertical: 6 },
-  radioText: { fontSize: 15 },
-  radioOn: { fontWeight: '700', color: '#1565c0' },
-  end: { gap: 4 },
-  endText: { fontSize: 15 },
-  option: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#e3e5e8' },
-  optionText: { fontSize: 14 },
-  excluded: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#e3e5e8' },
-  exText: { flex: 1, fontSize: 13 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' },
+  chipDim: { opacity: 0.6 },
+  sep: { ...font.callout, color: color.muted },
+  body: { flex: 1, flexDirection: 'row', gap: space.sm, marginTop: 6 },
+  left: { flex: 3, backgroundColor: color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: color.hairline },
+  leftBody: { paddingBottom: 40, paddingHorizontal: space.sm },
+  panel: { flex: 2, backgroundColor: color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: color.hairline },
+  thead: { flexDirection: 'row', gap: 6, paddingVertical: 6, paddingHorizontal: space.sm, marginTop: space.sm, marginBottom: 2, borderRadius: radius.control, backgroundColor: color.surface2, borderBottomWidth: 1, borderColor: color.hairline },
+  tr: { flexDirection: 'row', gap: 6, minHeight: 44, paddingVertical: 9, borderBottomWidth: 1, borderColor: color.hairline, alignItems: 'center' },
+  trOn: { backgroundColor: color.primaryTint },
+  cModel: { flex: 3, ...font.callout, color: color.text },
+  cName: { flex: 2, ...font.caption, color: color.text2 },
+  cCat: { flex: 2, ...font.caption, color: color.text2 },
+  cQty: { width: 44, ...font.callout, ...tabular, color: color.text },
+  cConf: { width: 44, ...font.callout, ...tabular, color: color.text },
+  cSrc: { width: 46, ...font.caption, color: color.text2 },
+  cState: { width: 92, ...font.caption, color: color.text },
+  cCode: { width: 50, ...font.calloutBold, color: color.text },
+  cFrom: { flex: 3, ...font.caption, color: color.text },
+  cTo: { flex: 4, ...font.caption, color: color.text },
+  mismatch: { ...font.callout, color: color.warning, paddingVertical: space.xs },
+  kv: { ...font.callout, color: color.text },
+  k: { fontWeight: '600', color: color.text2 },
+  warn: { color: color.warning },
+  red: { color: color.danger },
+  green: { color: color.success },
+  dim: { ...font.caption, color: color.text3 },
+  link: { ...font.callout, color: color.primary },
+  btnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'flex-end' },
+  form: { gap: space.sm, padding: space.md, borderRadius: radius.control, backgroundColor: color.bg, borderWidth: 1, borderColor: color.hairline },
+  radio: { minHeight: 44, justifyContent: 'center' },
+  radioText: { ...font.callout, color: color.text },
+  radioOn: { fontWeight: '600', color: color.primary },
+  end: { gap: space.xs },
+  endText: { ...font.callout, color: color.text },
+  option: { minHeight: 44, justifyContent: 'center', paddingVertical: space.sm, borderBottomWidth: 1, borderColor: color.hairline },
+  optionText: { ...font.callout, color: color.text },
+  fold: { minHeight: 44, justifyContent: 'center' },
+  excluded: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 6, borderBottomWidth: 1, borderColor: color.hairline },
+  exText: { flex: 1, ...font.caption, color: color.text },
 });

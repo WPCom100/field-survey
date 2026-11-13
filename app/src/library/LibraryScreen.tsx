@@ -38,6 +38,7 @@ import {
 } from './model';
 import { loadSuggestions, type Suggestion } from '../suggestions/model';
 import { SuggestionList, SuggestionsPane } from './SuggestionEditor';
+import { Banner, Btn, Chip, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 
 /** One row of the virtualised list: a group's header, or a type. */
 type Item = { kind: 'head'; group: LibraryGroup; total: LibraryGroup | null; collapsed: boolean } | { kind: 'type'; type: LibraryType };
@@ -149,42 +150,37 @@ export function LibraryScreen(props: {
 
   return (
     <View style={styles.root}>
-      <View style={styles.head}>
-        {props.header}
-        <Text style={styles.title}>
-          {scope ? 'Device-type library' : 'App device-type library'} <Text style={styles.sub}>({types.filter((t) => t.state !== 'rejected').length} types{view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})</Text>
-        </Text>
-        {view?.inReview && props.onOpenReview ? (
-          <Pressable onPress={props.onOpenReview} testID="library.review">
-            <Text style={styles.review}>{view.inReview} in review ▸</Text>
-          </Pressable>
-        ) : null}
-        <Pressable disabled={!editor} onPress={() => setPane({ kind: 'new' })} style={[styles.btn, !editor && styles.off]} testID="library.new">
-          <Text style={styles.btnText}>+ New type</Text>
-        </Pressable>
-        <Pressable disabled={!editor} onPress={() => setPane({ kind: 'copy' })} style={[styles.btnGhost, !editor && styles.off]} testID="library.copy">
-          <Text style={styles.link}>Copy from…</Text>
-        </Pressable>
-        <Pressable onPress={() => setPane({ kind: 'suggestions' })} style={styles.btnGhost} testID="library.suggestions">
-          <Text style={styles.link}>Suggestions…</Text>
-        </Pressable>
-      </View>
-      {note ? <Text style={[styles.note, !note.error && styles.noteOk]} testID="library.note">{note.text}</Text> : null}
+      <PageHeader
+        title={`${scope ? 'Device-type library' : 'App device-type library'} (${types.filter((t) => t.state !== 'rejected').length} types${view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})`}
+        caption={scope ? "This project's device types: what the plan offers and what the rules key on." : 'What every new project copies: the accepted types and their suggestion chips.'}
+        actions={
+          <>
+            {props.header}
+            {view?.inReview && props.onOpenReview ? <Btn kind="tertiary" title={`${view.inReview} in review ▸`} onPress={props.onOpenReview} testID="library.review" /> : null}
+            <Btn title="Suggestions…" onPress={() => setPane({ kind: 'suggestions' })} testID="library.suggestions" />
+            <Btn title="Copy from…" disabled={!editor} onPress={() => setPane({ kind: 'copy' })} testID="library.copy" />
+            <Btn kind="primary" title="+ New type" disabled={!editor} onPress={() => setPane({ kind: 'new' })} testID="library.new" />
+          </>
+        }
+      />
+      {note ? <Banner tone={note.error ? 'danger' : 'success'} text={note.text} testID="library.note" style={styles.note} /> : null}
       <View style={styles.split}>
         <View style={styles.list}>
           <View style={styles.filters}>
             <View style={styles.row}>
-              <TextInput value={query} onChangeText={setQuery} placeholder="Search model, alias or name" testID="library.search" placeholderTextColor="#888" autoCorrect={false} autoCapitalize="none" clearButtonMode="while-editing" style={[styles.input, styles.grow]} />
+              <TextInput value={query} onChangeText={setQuery} placeholder="Search model, alias or name" testID="library.search" placeholderTextColor={color.text3} autoCorrect={false} autoCapitalize="none" clearButtonMode="while-editing" style={[styles.input, styles.grow]} />
               <Text style={styles.sub}>Drafts only</Text>
-              <Switch value={draftsOnly} onValueChange={setDraftsOnly} />
+              <Switch value={draftsOnly} onValueChange={setDraftsOnly} trackColor={{ true: color.primary }} />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrapLine} keyboardShouldPersistTaps="handled">
               {[null, ...all.map((g) => g.key)].map((k) => (
-                <Pressable key={k ?? 'all'} onPress={() => setGroup(group === k ? null : k)} style={[styles.chip, group === k && styles.chipOn]}>
-                  <Text style={group === k ? styles.chipTextOn : styles.chipText}>
-                    {k ?? 'All'} ({k ? (all.find((g) => g.key === k)?.types.length ?? 0) : types.length})
-                  </Text>
-                </Pressable>
+                <Chip
+                  key={k ?? 'all'}
+                  small
+                  selected={group === k}
+                  onPress={() => setGroup(group === k ? null : k)}
+                  label={`${k ?? 'All'} (${k ? (all.find((g) => g.key === k)?.types.length ?? 0) : types.length})`}
+                />
               ))}
             </ScrollView>
           </View>
@@ -260,7 +256,7 @@ function GroupHead(props: { item: Extract<Item, { kind: 'head' }>; filtered: boo
         </Text>
       </Pressable>
       {props.canEdit && whole.drafts > 0 && group.key !== REJECTED_GROUP ? (
-        <Pressable onPress={() => props.onAcceptAll(whole)} hitSlop={6}>
+        <Pressable onPress={() => props.onAcceptAll(whole)} hitSlop={space.md}>
           <Text style={styles.linkSmall}>Accept all {whole.drafts}</Text>
         </Pressable>
       ) : null}
@@ -304,9 +300,11 @@ function NewType(props: { scope: string | null; run: RunFn; onCreated: (id: stri
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>New device type</Text>
       <Text style={styles.sub}>It starts as a draft: usable on the plan at once, flagged until someone accepts it.</Text>
-      <TextInput value={model} onChangeText={setModel} placeholder="Model (as the BOM spells it)" placeholderTextColor="#888" style={styles.input} autoFocus testID="library.new.model" />
+      <TextInput value={model} onChangeText={setModel} placeholder="Model (as the BOM spells it)" placeholderTextColor={color.text3} style={styles.input} autoFocus testID="library.new.model" />
       <Chips options={CATEGORIES} value={category} onPick={setCategory} testID="library.new.category" />
-      <Pressable
+      <Btn
+        kind="primary"
+        title="Add draft"
         disabled={!model.trim()}
         onPress={() => {
           let id = '';
@@ -316,9 +314,8 @@ function NewType(props: { scope: string | null; run: RunFn; onCreated: (id: stri
             }, `Added ${model.trim()} as a draft.`)
             .then((ok) => ok && props.onCreated(id));
         }}
-        style={[styles.btn, styles.self, !model.trim() && styles.off]} testID="library.new.add">
-        <Text style={styles.btnText}>Add draft</Text>
-      </Pressable>
+        testID="library.new.add"
+      />
     </View>
   );
 }
@@ -341,25 +338,32 @@ function CopyFrom(props: { store: Store; scope: string | null; run: RunFn; onDon
       {sources && !sources.length ? <Text style={styles.sub}>Nothing to copy: no other library on this iPad has accepted types.</Text> : null}
       <View style={styles.wrap}>
         {(sources ?? []).map((s) => (
-          <Pressable key={s.id ?? 'app'} onPress={() => { setFrom(s.id); setPicked(new Set()); }} style={[styles.chip, from === s.id && styles.chipOn]} testID={`library.copy.source.${s.name}`}>
-            <Text style={from === s.id ? styles.chipTextOn : styles.chipText}>{s.name} ({s.types.length})</Text>
-          </Pressable>
+          <Chip
+            key={s.id ?? 'app'}
+            selected={from === s.id}
+            label={`${s.name} (${s.types.length})`}
+            onPress={() => {
+              setFrom(s.id);
+              setPicked(new Set());
+            }}
+            testID={`library.copy.source.${s.name}`}
+          />
         ))}
       </View>
       {source ? (
         <>
-          <Pressable onPress={() => setPicked(picked.size === source.types.length ? new Set() : new Set(source.types.map((t) => t.id)))}>
-            <Text style={styles.link}>{picked.size === source.types.length ? 'Untick all' : `Tick all ${source.types.length}`}</Text>
-          </Pressable>
+          <Btn kind="tertiary" small title={picked.size === source.types.length ? 'Untick all' : `Tick all ${source.types.length}`} onPress={() => setPicked(picked.size === source.types.length ? new Set() : new Set(source.types.map((t) => t.id)))} />
           {source.types.map((t) => (
-            <Pressable key={t.id} onPress={() => setPicked(toggle(picked, t.id))} style={styles.row} testID={`library.copy.type.${t.model}`}>
+            <Pressable key={t.id} onPress={() => setPicked(toggle(picked, t.id))} style={[styles.row, styles.tickRow]} testID={`library.copy.type.${t.model}`}>
               <Text style={styles.check}>{picked.has(t.id) ? '☑' : '☐'}</Text>
               <Text style={[styles.value, styles.grow]}>
                 {t.model} <Text style={styles.sub}>{t.category ?? ''}{t.defaultCables.length ? ` · ${t.defaultCables.map((c) => c.code).join(', ')}` : ''}</Text>
               </Text>
             </Pressable>
           ))}
-          <Pressable
+          <Btn
+            kind="primary"
+            title={`Copy ${picked.size || ''}`}
             disabled={!picked.size}
             onPress={() => {
               let msg = '';
@@ -368,9 +372,8 @@ function CopyFrom(props: { store: Store; scope: string | null; run: RunFn; onDon
                 msg = `Copied ${out.copied} type${out.copied === 1 ? '' : 's'}${out.skipped.length ? `; already here: ${out.skipped.join(', ')}` : ''}.`;
               }, () => msg).then((ok) => ok && props.onDone());
             }}
-            style={[styles.btn, styles.self, !picked.size && styles.off]} testID="library.copy.go">
-            <Text style={styles.btnText}>Copy {picked.size || ''}</Text>
-          </Pressable>
+            testID="library.copy.go"
+          />
         </>
       ) : null}
     </View>
@@ -435,14 +438,14 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
               {t.description ? <Text style={styles.desc}>{t.description}</Text> : null}
               {t.accessoryOnly ? <Text style={styles.sub}>Accessory only: listed as other types' accessory, never offered as a device.</Text> : null}
               {t.datasheetUrl ? (
-                <Pressable onPress={() => void Linking.openURL(t.datasheetUrl!)}>
+                <Pressable onPress={() => void Linking.openURL(t.datasheetUrl!)} hitSlop={space.md} style={styles.self}>
                   <Text style={styles.link}>Datasheet ↗</Text>
                 </Pressable>
               ) : null}
             </View>
           ) : null}
           <Field label="Model">
-            <TextInput value={model} onChangeText={setModel} editable={!ro} style={styles.input} />
+            <TextInput value={model} onChangeText={setModel} editable={!ro} style={[styles.input, ro && fieldStyles.off]} />
           </Field>
           <Field label="Category">
             <Chips options={CATEGORIES} value={category} onPick={ro ? undefined : setCategory} testID="library.category" />
@@ -450,21 +453,31 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
           <Field label="Role" hint="What its devices are to the rules, the ID scheme, the Punch List Device text and the pin shape (T112). Category default = the role the category names, if any.">
             <View style={styles.wrap}>
               {([null, ...ROLES] as const).map((v) => (
-                <Pressable key={v ?? 'default'} disabled={ro} onPress={() => setRole(v)} style={[styles.chip, role === v && styles.chipOn]} accessibilityState={{ selected: role === v }} testID={`library.role.${v ?? 'default'}`}>
-                  <Text style={role === v ? styles.chipTextOn : styles.chipText}>{v === null ? `Category default (${ROLE_LABELS[roleOfCategory(category)]})` : ROLE_LABELS[v]}</Text>
-                </Pressable>
+                <Chip
+                  key={v ?? 'default'}
+                  disabled={ro}
+                  onPress={() => setRole(v)}
+                  selected={role === v}
+                  label={v === null ? `Category default (${ROLE_LABELS[roleOfCategory(category)]})` : ROLE_LABELS[v]}
+                  testID={`library.role.${v ?? 'default'}`}
+                />
               ))}
             </View>
           </Field>
           <Field label="Aliases (BOM)" hint="Comma-separated. A device whose Device text is the model or an alias is of this type.">
-            <TextInput value={aliases} onChangeText={setAliases} editable={!ro} testID="library.aliases" placeholder="P-NSPS-D, P-NSPS-D-KIT" placeholderTextColor="#888" style={styles.input} />
+            <TextInput value={aliases} onChangeText={setAliases} editable={!ro} testID="library.aliases" placeholder="P-NSPS-D, P-NSPS-D-KIT" placeholderTextColor={color.text3} style={[styles.input, ro && fieldStyles.off]} />
           </Field>
           <Field label="ID scheme" hint="Level-number: 06M-04. Level-tag: 06M-S16 for stations, 06M-D3 for sensors. The server assigns the ID either way.">
             <View style={styles.wrap}>
               {([null, 'level_number', 'level_tag'] as const).map((v) => (
-                <Pressable key={v ?? 'default'} disabled={ro} onPress={() => setScheme(v)} style={[styles.chip, scheme === v && styles.chipOn]} accessibilityState={{ selected: scheme === v }} testID={`library.scheme.${v ?? 'default'}`}>
-                  <Text style={scheme === v ? styles.chipTextOn : styles.chipText}>{v === null ? 'Category default' : v === 'level_number' ? 'Level-number' : 'Level-tag (S/D)'}</Text>
-                </Pressable>
+                <Chip
+                  key={v ?? 'default'}
+                  disabled={ro}
+                  onPress={() => setScheme(v)}
+                  selected={scheme === v}
+                  label={v === null ? 'Category default' : v === 'level_number' ? 'Level-number' : 'Level-tag (S/D)'}
+                  testID={`library.scheme.${v ?? 'default'}`}
+                />
               ))}
             </View>
           </Field>
@@ -479,16 +492,14 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
             <Field key={label} label={label} hint={hint}>
               <View style={styles.wrap}>
                 {([null, true, false] as const).map((v) => (
-                  <Pressable
+                  <Chip
                     key={String(v)}
                     disabled={ro}
                     onPress={() => set(v)}
-                    style={[styles.chip, value === v && styles.chipOn]}
-                    accessibilityState={{ selected: value === v }}
+                    selected={value === v}
+                    label={v === null ? 'By the wires' : v ? 'Needed' : 'Not needed'}
                     testID={`library.${key}.${v === null ? 'wires' : v ? 'needed' : 'not'}`}
-                  >
-                    <Text style={value === v ? styles.chipTextOn : styles.chipText}>{v === null ? 'By the wires' : v ? 'Needed' : 'Not needed'}</Text>
-                  </Pressable>
+                  />
                 ))}
               </View>
             </Field>
@@ -509,11 +520,11 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
           <Field label="Optional accessories">
             {accessories.map((a, i) => (
               <View key={i} style={styles.row}>
-                <TextInput value={a.model} editable={!ro} onChangeText={(v) => setAccessories(replace(accessories, i, { ...a, model: v }))} placeholder="Model" placeholderTextColor="#888" style={[styles.input, styles.grow]} testID={`library.acc.${i}.model`} />
+                <TextInput value={a.model} editable={!ro} onChangeText={(v) => setAccessories(replace(accessories, i, { ...a, model: v }))} placeholder="Model" placeholderTextColor={color.text3} style={[styles.input, styles.grow]} testID={`library.acc.${i}.model`} />
                 <Text style={styles.sub}>expected</Text>
                 <TextInput value={a.expected_qty == null ? '' : String(a.expected_qty)} editable={!ro} onChangeText={(v) => setAccessories(replace(accessories, i, { ...a, expected_qty: toQty(v) }))} keyboardType="number-pad" style={[styles.input, styles.qty]} testID={`library.acc.${i}.qty`} />
                 {!ro ? (
-                  <Pressable onPress={() => setAccessories(accessories.filter((_, j) => j !== i))}>
+                  <Pressable onPress={() => setAccessories(accessories.filter((_, j) => j !== i))} hitSlop={space.md}>
                     <Text style={styles.danger}>Remove</Text>
                   </Pressable>
                 ) : null}
@@ -521,11 +532,11 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
             ))}
             {!ro ? (
               <View style={styles.wrap}>
-                <Pressable onPress={() => setAccessories([...accessories, { model: '', expected_qty: 1 }])} testID="library.acc.add">
+                <Pressable onPress={() => setAccessories([...accessories, { model: '', expected_qty: 1 }])} hitSlop={space.md} testID="library.acc.add">
                   <Text style={styles.link}>+ add</Text>
                 </Pressable>
                 {roleOf({ role, category }, null) === 'nsps' && !accessories.some((a) => a.model === NSPS_POWER_SUPPLY.model) ? (
-                  <Pressable onPress={() => setAccessories([...accessories, NSPS_POWER_SUPPLY])} testID="library.acc.nsps">
+                  <Pressable onPress={() => setAccessories([...accessories, NSPS_POWER_SUPPLY])} hitSlop={space.md} testID="library.acc.nsps">
                     <Text style={styles.link}>+ {NSPS_POWER_SUPPLY.model} (expected 1, D52)</Text>
                   </Pressable>
                 ) : null}
@@ -537,12 +548,12 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
       </ScrollView>
       {props.canEdit ? (
         <View style={[styles.actions, styles.footer]}>
-          <Pressable disabled={!dirty} onPress={() => void save()} style={[styles.btn, !dirty && styles.off]} testID="library.save">
-            <Text style={styles.btnText}>Save</Text>
-          </Pressable>
+          <Btn kind={dirty ? 'primary' : 'secondary'} title="Save" disabled={!dirty} onPress={() => void save()} testID="library.save" />
           {t.state === 'draft' ? (
             <>
-              <Pressable
+              <Btn
+                kind="primary"
+                title="Accept draft"
                 disabled={dirty}
                 onPress={() =>
                   void props.run(
@@ -550,33 +561,29 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
                     t.defaultCables.length ? `Accepted. The rules will offer its default cables to ${t.devices} device${t.devices === 1 ? '' : 's'} as drafts.` : 'Accepted.',
                   )
                 }
-                style={[styles.btnOk, dirty && styles.off]}
-                testID="library.accept">
-                <Text style={styles.btnText}>Accept draft</Text>
-              </Pressable>
-              <Pressable onPress={() => void props.run((e) => rejectType(e, t.id), 'Rejected: the type leaves the pickers; its devices keep it.')} testID="library.reject">
+                testID="library.accept"
+              />
+              <Pressable onPress={() => void props.run((e) => rejectType(e, t.id), 'Rejected: the type leaves the pickers; its devices keep it.')} hitSlop={space.md} testID="library.reject">
                 <Text style={styles.danger}>Reject</Text>
               </Pressable>
             </>
           ) : (
-            <Pressable onPress={() => void props.run((e) => reopenType(e, t.id), 'Back to draft.')} testID="library.reopen">
-              <Text style={styles.link}>Back to draft</Text>
-            </Pressable>
+            <Btn kind="tertiary" title="Back to draft" onPress={() => void props.run((e) => reopenType(e, t.id), 'Back to draft.')} testID="library.reopen" />
           )}
           {t.projectId && t.state === 'accepted' && props.libraryEditor ? (
             t.promotedAs ? (
               <Text style={styles.sub}>In the app library ✓</Text>
             ) : (
-              <Pressable
+              <Btn
+                kind="tertiary"
+                title="Promote to app library"
                 disabled={dirty}
                 onPress={() => {
                   const lib = props.libraryEditor!;
                   void props.run((_e, s) => promoteType(lib, s, t.id), `Promoted: ${t.model} is in the app library; new projects copy it.`);
                 }}
-                style={dirty && styles.off}
-                testID="library.promote">
-                <Text style={styles.link}>Promote to app library</Text>
-              </Pressable>
+                testID="library.promote"
+              />
             )
           ) : null}
           {dirty ? <Text style={styles.sub}>{t.state === 'draft' ? 'Unsaved changes: save before accepting.' : 'Unsaved changes.'}</Text> : null}
@@ -597,9 +604,7 @@ function CableList(props: { list: LibraryCable[]; codes: readonly string[]; onCh
           <View key={i} style={styles.cable}>
             <View style={styles.wrap}>
               {codes.map((code) => (
-                <Pressable key={code} onPress={() => set({ code })} style={[styles.chipSmall, c.code === code && styles.chipOn]} accessibilityState={{ selected: c.code === code }} testID={`${tid}.${i}.code.${code}`}>
-                  <Text style={c.code === code ? styles.chipTextOn : styles.chipText}>{code}</Text>
-                </Pressable>
+                <Chip key={code} small onPress={() => set({ code })} selected={c.code === code} label={code} testID={`${tid}.${i}.code.${code}`} />
               ))}
             </View>
             <LabeledInput label="From" value={c.from ?? ''} onChange={(v) => set({ from: v })} placeholder="empty = the device's name" testID={`${tid}.${i}.from`} />
@@ -607,18 +612,18 @@ function CableList(props: { list: LibraryCable[]; codes: readonly string[]; onCh
             <LabeledInput label="Far end" value={c.far ?? ''} onChange={(v) => set({ far: v })} placeholder="a placeholder, e.g. 120v Power" testID={`${tid}.${i}.far`} />
             <View style={styles.row}>
               <Text style={styles.sub}>Single row</Text>
-              <Switch value={c.single_row} onValueChange={(v) => set({ single_row: v })} testID={`${tid}.${i}.single`} />
+              <Switch value={c.single_row} onValueChange={(v) => set({ single_row: v })} trackColor={{ true: color.primary }} testID={`${tid}.${i}.single`} />
               <Text style={styles.sub}>Qty</Text>
-              <TextInput value={c.qty == null ? '' : String(c.qty)} onChangeText={(v) => set({ qty: toQty(v) })} placeholder="—" placeholderTextColor="#888" keyboardType="number-pad" style={[styles.input, styles.qty]} />
+              <TextInput value={c.qty == null ? '' : String(c.qty)} onChangeText={(v) => set({ qty: toQty(v) })} placeholder="—" placeholderTextColor={color.text3} keyboardType="number-pad" style={[styles.input, styles.qty]} />
               <View style={styles.grow} />
-              <Pressable onPress={() => onChange(list.filter((_, j) => j !== i))}>
+              <Pressable onPress={() => onChange(list.filter((_, j) => j !== i))} hitSlop={space.md}>
                 <Text style={styles.danger}>Remove</Text>
               </Pressable>
             </View>
           </View>
         );
       })}
-      <Pressable onPress={() => onChange([...list, blankCable()])} testID={`${tid}.add`}>
+      <Pressable onPress={() => onChange([...list, blankCable()])} hitSlop={space.md} style={styles.self} testID={`${tid}.add`}>
         <Text style={styles.link}>+ add cable</Text>
       </Pressable>
     </View>
@@ -629,7 +634,7 @@ function LabeledInput(props: { label: string; value: string; onChange: (v: strin
   return (
     <View style={styles.row}>
       <Text style={[styles.sub, styles.inputLabel]}>{props.label}</Text>
-      <TextInput value={props.value} onChangeText={props.onChange} placeholder={props.placeholder} placeholderTextColor="#888" style={[styles.input, styles.grow]} testID={props.testID} />
+      <TextInput value={props.value} onChangeText={props.onChange} placeholder={props.placeholder} placeholderTextColor={color.text3} style={[styles.input, styles.grow]} testID={props.testID} />
     </View>
   );
 }
@@ -657,74 +662,70 @@ function Chips(props: { options: readonly string[]; value: string | null; onPick
   return (
     <View style={styles.wrap}>
       {props.options.map((o) => (
-        <Pressable
+        <Chip
           key={o}
           disabled={!props.onPick}
           onPress={() => props.onPick?.(props.value === o ? null : o)}
-          style={[styles.chip, props.value === o && styles.chipOn]}
-          accessibilityState={{ selected: props.value === o }}
+          selected={props.value === o}
+          label={o}
           testID={props.testID ? `${props.testID}.${o}` : undefined}
-        >
-          <Text style={props.value === o ? styles.chipTextOn : styles.chipText}>{o}</Text>
-        </Pressable>
+        />
       ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingVertical: 12 },
-  title: { fontSize: 24, fontWeight: '600', flex: 1 },
-  link: { color: '#1f6feb', fontSize: 16 },
+  root: { flex: 1, backgroundColor: color.bg },
+  link: { ...font.callout, color: color.primary },
   source: { gap: 2, paddingBottom: 6 },
-  desc: { fontSize: 14, color: '#333' },
-  danger: { color: '#b3261e', fontSize: 16 },
-  review: { color: '#9a6700', fontSize: 16, fontWeight: '600' },
-  note: { paddingHorizontal: 20, paddingBottom: 8, color: '#b3261e', fontSize: 14 },
-  noteOk: { color: '#1a7f37' },
-  split: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e1e4e8' },
+  desc: { ...font.callout, color: color.text2 },
+  danger: { ...font.calloutBold, color: color.danger },
+  note: { marginHorizontal: PAGE_GUTTER, marginTop: space.sm },
+  split: {
+    flex: 1,
+    flexDirection: 'row',
+    marginHorizontal: PAGE_GUTTER,
+    marginTop: space.md,
+    marginBottom: space.lg,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    borderRadius: radius.card,
+    overflow: 'hidden',
+  },
   // the list keeps a third of the screen at most, so the editor gets the rest (T125)
-  list: { width: '34%', maxWidth: 380, borderRightWidth: 1, borderRightColor: '#e1e4e8' },
-  listBody: { paddingHorizontal: 16, paddingBottom: 16, gap: 2 },
-  filters: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, gap: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e1e4e8' },
-  wrapLine: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 2 },
-  groupHead: { paddingTop: 12 },
-  linkSmall: { color: '#1f6feb', fontSize: 14, fontWeight: '600' },
+  list: { width: '34%', maxWidth: 380, borderRightWidth: 1, borderRightColor: color.hairline },
+  listBody: { paddingHorizontal: space.md, paddingBottom: space.lg, gap: 2 },
+  filters: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: 6, gap: 6, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  wrapLine: { flexDirection: 'row', gap: space.sm, alignItems: 'center', paddingVertical: 6 },
+  groupHead: { paddingTop: space.md },
+  linkSmall: { ...font.captionBold, color: color.primary },
   pane: { flex: 1 },
-  paneBody: { padding: 20, gap: 16 },
-  groupTitle: { fontSize: 15, fontWeight: '700', color: '#444' },
-  typeRow: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, minHeight: 44 },
-  typeRowOn: { backgroundColor: '#e8f0fe' },
-  typeModel: { fontSize: 16 },
-  dim: { color: '#999' },
-  section: { gap: 12 },
-  sectionTitle: { fontSize: 19, fontWeight: '600' },
+  paneBody: { padding: 20, gap: space.lg },
+  groupTitle: { ...font.calloutBold, color: color.text2 },
+  typeRow: { paddingVertical: space.sm, paddingHorizontal: 10, borderRadius: radius.control, minHeight: 44 },
+  typeRowOn: { backgroundColor: color.primaryTint },
+  typeModel: { ...font.body, color: color.text },
+  dim: { color: color.text3 },
+  section: { gap: space.md },
+  sectionTitle: { ...font.title, color: color.text },
   field: { gap: 6 },
-  label: { fontSize: 15, fontWeight: '600' },
-  sub: { fontSize: 13, color: '#666', fontWeight: '400' },
-  draft: { fontSize: 12, color: '#9a6700', fontWeight: '700' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  label: { ...font.captionBold, color: color.text2 },
+  sub: { ...font.caption, color: color.text3, fontWeight: '400' },
+  draft: { ...font.badge, color: color.warning },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: space.xs },
+  tickRow: { minHeight: 44 },
   grow: { flex: 1 },
   self: { alignSelf: 'flex-start' },
-  value: { fontSize: 16 },
-  check: { fontSize: 22 },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, padding: 10, fontSize: 16, minHeight: 44 },
+  value: { ...font.body, color: color.text },
+  check: { fontSize: 22, color: color.text2 },
+  input: fieldStyles.input,
   qty: { width: 64, textAlign: 'center' },
   cables: { gap: 10 },
-  cable: { gap: 6, padding: 10, borderWidth: 1, borderColor: '#e1e4e8', borderRadius: 8 },
-  actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 16, paddingTop: 8 },
-  footer: { paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#e1e4e8', backgroundColor: '#fff' },
+  cable: { gap: 6, padding: 10, borderWidth: 1, borderColor: color.hairline, borderRadius: radius.control, backgroundColor: color.bg },
+  actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.lg, paddingTop: space.sm },
+  footer: { paddingHorizontal: 20, paddingVertical: space.md, borderTopWidth: 1, borderTopColor: color.hairline, backgroundColor: color.surface },
   inputLabel: { width: 64 },
-  btn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#1565c0' },
-  btnOk: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#1a7f37' },
-  btnGhost: { paddingHorizontal: 8, paddingVertical: 10 },
-  btnText: { color: '#fff', fontWeight: '600' },
-  off: { opacity: 0.4 },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipSmall: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111' },
-  chipTextOn: { color: '#fff' },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' },
 });

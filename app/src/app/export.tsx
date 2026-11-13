@@ -1,4 +1,4 @@
-import { Link, useLocalSearchParams } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -48,6 +48,7 @@ import { useIdentity } from '../identity/IdentityGate';
 import { getSyncEngine } from '../sync/engine';
 import { describeSync, useSyncStatus } from '../sync/useSyncStatus';
 import { Btn, Check, Notice, Section } from '../setup/widgets';
+import { Btn as UiBtn, Chip as UiChip, color, font, radius, space, tabular } from '../ui';
 
 type Pane = 'workbook' | 'pdf' | 'history';
 
@@ -257,14 +258,19 @@ export default function ExportScreen() {
         <Text style={styles.brand}>Export</Text>
         <Text style={styles.project}>{projectName}</Text>
         {(['workbook', 'pdf', 'history'] as Pane[]).map((p) => (
-          <Pressable key={p} onPress={() => setPane(p)} style={[styles.navItem, pane === p && styles.navActive]} testID={`export.pane.${p}`}>
-            <Text style={styles.navText}>{p === 'workbook' ? KIND_LABEL.xlsx : p === 'pdf' ? KIND_LABEL.floor_pdf : 'History'}</Text>
+          <Pressable
+            key={p}
+            onPress={() => setPane(p)}
+            style={({ pressed }) => [styles.navItem, pane === p && styles.navActive, pressed && pane !== p && styles.navPressed]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: pane === p }}
+            testID={`export.pane.${p}`}
+          >
+            <Text style={[styles.navText, pane === p && styles.navTextActive]}>{p === 'workbook' ? KIND_LABEL.xlsx : p === 'pdf' ? KIND_LABEL.floor_pdf : 'History'}</Text>
           </Pressable>
         ))}
         <View style={{ flex: 1 }} />
-        <Link dismissTo href={projectId ? { pathname: '/', params: { project: projectId } } : '/'} style={styles.back}>
-          ← Levels
-        </Link>
+        <UiBtn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
       </View>
 
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
@@ -372,12 +378,9 @@ export default function ExportScreen() {
   );
 }
 
+/** The screen's level chips on the system's `Chip` (T180). */
 function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]} testID={testID}>
-      <Text style={on ? styles.chipTextOn : styles.chipText}>{label}</Text>
-    </Pressable>
-  );
+  return <UiChip small label={label} selected={on} onPress={onPress} testID={testID} />;
 }
 
 function JobCard({
@@ -418,7 +421,7 @@ function JobCard({
         </View>
       ) : null}
       {diff ? (
-        <Pressable onPress={() => setOpen(!open)} disabled={!detail.length}>
+        <Pressable onPress={() => setOpen(!open)} disabled={!detail.length} hitSlop={space.sm}>
           <Text style={styles.cardLine}>
             {diff}
             {detail.length ? (open ? ' ▾' : ' ▸') : ''}
@@ -438,38 +441,36 @@ function JobCard({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: '#ffffff' },
-  nav: { width: 220, backgroundColor: '#f3f5f8', borderRightWidth: 1, borderRightColor: '#d5d9e0', padding: 12, paddingTop: 48, gap: 2 },
-  brand: { fontSize: 20, fontWeight: '700', color: '#1f3864' },
-  project: { fontSize: 13, color: '#5a6270', marginBottom: 12 },
-  navItem: { paddingVertical: 10, paddingHorizontal: 8, borderRadius: 6 },
-  navActive: { backgroundColor: '#dde5f2' },
-  navText: { fontSize: 15, color: '#1b2430' },
-  back: { fontSize: 15, color: '#1f5fbf', paddingVertical: 10 },
+  root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
+  nav: { width: 220, backgroundColor: color.surface2, borderRightWidth: 1, borderRightColor: color.hairline, padding: space.md, paddingTop: space.xl, gap: 2 },
+  brand: { ...font.display, color: color.text },
+  project: { ...font.caption, color: color.text3, marginBottom: space.md },
+  navItem: { minHeight: 44, justifyContent: 'center', paddingVertical: 10, paddingHorizontal: space.md, borderRadius: radius.control },
+  navActive: { backgroundColor: color.primaryTint },
+  navPressed: { backgroundColor: color.border },
+  navText: { ...font.callout, color: color.text },
+  navTextActive: { color: color.primary, fontWeight: '600' },
+  back: { ...font.callout, color: color.primary, paddingVertical: 10 },
   main: { flex: 1 },
-  mainContent: { padding: 20, paddingTop: 48, gap: 12 },
+  mainContent: { paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xl, gap: space.md },
   statusRow: { gap: 2 },
-  status: { fontSize: 15, fontWeight: '600', color: '#1b2430' },
-  statusHint: { fontSize: 13, color: '#5a6270' },
-  label: { fontSize: 13, fontWeight: '700', color: '#5a6270', marginTop: 10 },
-  value: { fontSize: 15, color: '#1b2430' },
-  hint: { fontSize: 13, color: '#5a6270' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  chip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: '#b8c0cc', backgroundColor: '#ffffff' },
-  chipOn: { backgroundColor: '#1f3864', borderColor: '#1f3864' },
-  chipText: { fontSize: 14, color: '#1b2430' },
-  chipTextOn: { fontSize: 14, color: '#ffffff' },
-  fixed: { fontSize: 15, color: '#8a919c', paddingVertical: 8, paddingRight: 8 },
-  gate: { fontSize: 14, marginTop: 6 },
-  gateOk: { color: '#2e7d32' },
-  gateNo: { color: '#b26a00' },
-  row: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' },
-  card: { borderWidth: 1, borderColor: '#d5d9e0', borderRadius: 8, padding: 12, gap: 3, marginTop: 10 },
-  cardTime: { fontSize: 14, fontWeight: '700', color: '#1b2430' },
-  cardFile: { fontSize: 14, color: '#1b2430' },
-  cardLine: { fontSize: 13, color: '#3a4250' },
-  detail: { fontSize: 12, color: '#5a6270', marginLeft: 12 },
-  failed: { color: '#c62828' },
-  progress: { fontSize: 14, fontWeight: '600', color: '#1f3864' },
-  onIpad: { fontSize: 13, color: '#2e7d32' },
+  status: { ...font.calloutBold, color: color.text },
+  statusHint: { ...font.caption, color: color.text3 },
+  label: { ...font.captionBold, color: color.text2, marginTop: 10 },
+  value: { ...font.callout, ...tabular, color: color.text },
+  hint: { ...font.caption, color: color.text3 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' },
+  fixed: { ...font.callout, color: color.text3, paddingVertical: space.sm, paddingRight: space.sm },
+  gate: { ...font.callout, marginTop: 6 },
+  gateOk: { color: color.success },
+  gateNo: { color: color.warning },
+  row: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: space.sm, flexWrap: 'wrap' },
+  card: { borderWidth: 1, borderColor: color.hairline, borderRadius: radius.control, backgroundColor: color.bg, paddingVertical: space.md, paddingHorizontal: space.lg, gap: 3, marginTop: 10 },
+  cardTime: { ...font.calloutBold, ...tabular, color: color.text },
+  cardFile: { ...font.callout, color: color.text },
+  cardLine: { ...font.caption, color: color.text2 },
+  detail: { ...font.caption, color: color.text3, marginLeft: space.md },
+  failed: { color: color.danger },
+  progress: { ...font.calloutBold, ...tabular, color: color.primary },
+  onIpad: { ...font.caption, color: color.success },
 });

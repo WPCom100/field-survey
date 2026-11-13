@@ -1,5 +1,5 @@
 import { Editor, LIBRARY_STREAM, type Store } from '@field-survey/core';
-import { Link } from 'expo-router';
+import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -8,6 +8,8 @@ import { useCurrentUser } from '../identity/IdentityGate';
 import { RuleParamsEditor } from '../rules/RuleParamsEditor';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { Notice } from '../setup/widgets';
+import { Btn, PageHeader, PAGE_GUTTER, color, font, space } from '../ui';
 
 /**
  * App-level rule defaults (T102, D176 (2), (4)), opened from the Projects list beside the
@@ -25,25 +27,26 @@ export default function RuleDefaultsRoute() {
   const editor = useMemo(() => (store ? new Editor(store, { projectId: LIBRARY_STREAM, userId: user.id }) : null), [store, user.id]);
   return (
     <View style={styles.root}>
-      <View style={styles.top}>
-        <Link href="/projects" style={styles.link}>
-          ◀ Projects
-        </Link>
-        <Text style={styles.title}>Rule defaults</Text>
-      </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <PageHeader
+        title="Rule defaults"
+        caption="What a new project's Rules start from. A change is a draft until accepted."
+        actions={<Btn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} />}
+      />
+      {error ? (
+        <View style={styles.notice}>
+          <Notice text={error} error />
+        </View>
+      ) : null}
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        {store && editor ? <RuleParamsEditor store={store} editor={editor} scope={null} dataKey={syncDataKey(sync)} /> : <Text>Loading…</Text>}
+        {store && editor ? <RuleParamsEditor store={store} editor={editor} scope={null} dataKey={syncDataKey(sync)} /> : <Text style={styles.loading}>Loading…</Text>}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 16, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
-  title: { fontSize: 22, fontWeight: '700' },
-  link: { color: '#1f6feb', fontSize: 16 },
-  body: { padding: 16, paddingBottom: 80 },
-  error: { padding: 12, color: '#b3261e' },
+  root: { flex: 1, backgroundColor: color.bg },
+  body: { paddingHorizontal: PAGE_GUTTER, paddingTop: space.lg, paddingBottom: 80 },
+  loading: { ...font.callout, color: color.text3 },
+  notice: { paddingHorizontal: PAGE_GUTTER },
 });

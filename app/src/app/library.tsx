@@ -1,5 +1,5 @@
 import { Editor, LIBRARY_STREAM, type Store } from '@field-survey/core';
-import { Link, router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
@@ -11,6 +11,7 @@ import { useTeamNames } from '../identity/useTeamNames';
 import { LibraryScreen } from '../library/LibraryScreen';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { Btn, color, font, space } from '../ui';
 
 /**
  * The device-type library (Phase 3 §10): a project's (T48, `?project=`) or the app library
@@ -57,13 +58,9 @@ export default function LibraryRoute() {
         onOpenReview={reviewOf ? () => router.push({ pathname: '/review', params: { project: reviewOf } }) : undefined}
         header={
           app ? (
-            <Link href="/projects" style={styles.link}>
-              ◀ Projects
-            </Link>
+            <Btn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} />
           ) : (
-            <Link dismissTo href={{ pathname: '/', params: projectId ? { project: projectId } : {} }} style={styles.link}>
-              ◀ Levels
-            </Link>
+            <Btn kind="tertiary" title="◀ Levels" onPress={() => router.dismissTo({ pathname: '/', params: projectId ? { project: projectId } : {} })} />
           )
         }
       />
@@ -72,6 +69,5 @@ export default function LibraryRoute() {
 }
 
 const styles = StyleSheet.create({
-  link: { color: '#1f6feb', fontSize: 16 },
-  error: { padding: 12, color: '#b3261e', backgroundColor: '#fff' },
+  error: { ...font.callout, padding: space.md, color: color.danger, backgroundColor: color.dangerTint },
 });

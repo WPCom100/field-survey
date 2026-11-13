@@ -13,6 +13,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: newProject.name
 - inputText: ${output.project}
+- pressKey: Enter          # closes the Name keyboard: since T180's cards the Add level field sits under it
+- waitForAnimationToEnd
 - tapOn:
     id: newProject.levelCode
 - inputText: 06M

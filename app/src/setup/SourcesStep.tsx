@@ -7,6 +7,7 @@ import { useIdentity } from '../identity/IdentityGate';
 import { ExtractionSources } from './ExtractionSources';
 import { FloorPlans } from './FloorPlans';
 import { Btn, ChipPicker, Notice, Section } from './widgets';
+import { color, font, radius, space } from '../ui';
 import {
   KIND_LABEL,
   fieldLabel,
@@ -243,18 +244,18 @@ export function SourcesStep({ projectId }: { projectId: string }) {
 }
 
 const styles = StyleSheet.create({
-  hint: { fontSize: 13, color: '#666' },
-  row: { flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  file: { fontSize: 14, color: '#333' },
-  line: { fontSize: 14 },
-  dim: { fontSize: 13, color: '#888' },
-  ok: { fontSize: 14, color: '#2e7d32' },
-  warn: { fontSize: 14, color: '#b26a00' },
-  warnText: { color: '#b26a00' },
-  check: { fontSize: 13, color: '#555' },
-  tab: { gap: 6, marginBottom: 10 },
-  tabTitle: { fontSize: 15, fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  hint: { ...font.caption, color: color.text3 },
+  row: { flexDirection: 'row', gap: space.sm, alignItems: 'center', flexWrap: 'wrap' },
+  file: { ...font.callout, color: color.text2 },
+  line: { ...font.callout, color: color.text },
+  dim: { ...font.caption, color: color.text3 },
+  ok: { ...font.callout, color: color.success },
+  warn: { ...font.callout, color: color.warning },
+  warnText: { color: color.warning },
+  check: { ...font.caption, color: color.text2 },
+  tab: { gap: 6, marginBottom: 10, padding: space.md, backgroundColor: color.bg, borderRadius: radius.control },
+  tabTitle: { ...font.calloutBold, color: color.text },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   cell: { width: 220, gap: 3 },
-  fieldName: { fontSize: 12, color: '#555' },
+  fieldName: { ...font.caption, color: color.text2 },
 });

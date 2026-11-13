@@ -8,6 +8,7 @@ import { useIdentity } from '../identity/IdentityGate';
 import { getImport, isFinished, type FilePart } from './imports';
 import { nativeUploadPart } from './upload-native';
 import { Btn, Check, Notice, Section } from './widgets';
+import { color, font, space } from '../ui';
 
 const PDF = 'application/pdf';
 const JSON_MIME = 'application/json';
@@ -177,11 +178,11 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
 }
 
 const styles = StyleSheet.create({
-  hint: { fontSize: 13, color: '#666' },
+  hint: { ...font.caption, color: color.text3 },
   gap: { marginTop: 10 },
-  row: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#e3e5e8' },
-  kind: { width: 60, fontSize: 15, fontWeight: '700' },
-  file: { fontSize: 14 },
-  line: { fontSize: 13, color: '#444' },
-  warn: { color: '#b26a00' },
+  row: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: space.sm, borderBottomWidth: 1, borderColor: color.hairline },
+  kind: { width: 60, ...font.calloutBold, color: color.text },
+  file: { ...font.callout, color: color.text },
+  line: { ...font.caption, color: color.text2 },
+  warn: { color: color.warning },
 });

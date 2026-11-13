@@ -47,6 +47,8 @@ name: R7 — Projects
 - tapOn:
     id: newProject.name
 - inputText: ${PROJECT} refused
+- pressKey: Enter          # closes the Name keyboard: since T180's cards the Add level field sits under it
+- waitForAnimationToEnd
 - runFlow:
     file: _projects-level.yaml
     env:
@@ -62,6 +64,11 @@ name: R7 — Projects
     id: newProject.share.06.06M
 - tapOn:
     id: newProject.share.06M
+# wait for the option: run 4 (2026-11-09) sent the next tap while the picker was still opening (T180)
+- extendedWaitUntil:
+    visible:
+      id: newProject.share.06M.06
+    timeout: 5000
 - tapOn:
     id: newProject.share.06M.06
 - assertVisible: 'Levels 06 and 06M share numbering with each other\. .*'

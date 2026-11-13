@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { chipStyles } from '../plan/chips';
+import { Btn as UiBtn, Chip as UiChip, color, fieldStyles, font, radius, space, tabular } from '../ui';
 import { flagNotOnSheet, moveDraft, placeItem, unplaceDevice, type PlaceResult } from './actions';
 import { TAGGED_ROLES, itemLine, itemsIn, rolesIn, type LevelUnplaced, type PlaceScope, type UnplacedItem } from './model';
 
@@ -87,7 +88,7 @@ export function PlacePanel(props: PlacePanelProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onClose} hitSlop={8} testID="place.done">
+        <Pressable onPress={props.onClose} hitSlop={space.md} style={styles.backHit} testID="place.done">
           <Text style={styles.back}>◀ Done placing</Text>
         </Pressable>
         <Text style={styles.title}>Place devices — {props.levelCode}</Text>
@@ -313,13 +314,13 @@ function Selected(props: {
           {tagged ? (
             <>
               <Text style={styles.label}>Panel tag</Text>
-              <TextInput style={styles.input} value={panel} onChangeText={setPanel} placeholder="e.g. CT06LCPA" placeholderTextColor="#888" autoCapitalize="characters" autoCorrect={false} />
+              <TextInput style={styles.input} value={panel} onChangeText={setPanel} placeholder="e.g. CT06LCPA" placeholderTextColor={color.text3} autoCapitalize="characters" autoCorrect={false} />
             </>
           ) : null}
           <Text style={styles.label}>Drawing Position</Text>
-          <TextInput style={styles.input} value={dp} onChangeText={(t) => { typed.current.dp = true; setDp(t); }} placeholder="e.g. Grid B-C / 9-8" placeholderTextColor="#888" autoCorrect={false} />
+          <TextInput style={styles.input} value={dp} onChangeText={(t) => { typed.current.dp = true; setDp(t); }} placeholder="e.g. Grid B-C / 9-8" placeholderTextColor={color.text3} autoCorrect={false} />
           <Text style={styles.label}>Room / Location</Text>
-          <TextInput style={styles.input} value={room} onChangeText={(t) => { typed.current.room = true; setRoom(t); }} placeholder="e.g. Elec Rm XX06M-1E05" placeholderTextColor="#888" />
+          <TextInput style={styles.input} value={room} onChangeText={(t) => { typed.current.room = true; setRoom(t); }} placeholder="e.g. Elec Rm XX06M-1E05" placeholderTextColor={color.text3} />
           <View style={styles.rowWrap}>
             <Btn
               label={props.busy ? 'Placing…' : 'Place ✓'}
@@ -337,56 +338,38 @@ function Selected(props: {
   );
 }
 
-function Chip({ label, on, onPress, small, testID }: { label: string; on: boolean; onPress: () => void; small?: boolean; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, small && styles.chipSmall, on && styles.chipOn]} testID={testID}>
-      <Text style={[styles.chipText, small && styles.chipTextSmall, on && styles.chipTextOn]} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
+/** The panel's chips and buttons on the system's primitives (T180); every chip is the 32-pt one. */
+function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; small?: boolean; testID?: string }) {
+  return <UiChip small label={label} selected={on} onPress={onPress} testID={testID} />;
 }
 
+/** Placing… shows the spinner (`loading`) while the button waits. */
 function Btn({ label, onPress, primary, disabled, testID }: { label: string; onPress: () => void; primary?: boolean; disabled?: boolean; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, primary && styles.btnPrimary, disabled && styles.btnOff]} testID={testID}>
-      {primary && disabled && label.endsWith('…') ? <ActivityIndicator color="#fff" /> : <Text style={[styles.btnText, primary && styles.btnTextPrimary]}>{label}</Text>}
-    </Pressable>
-  );
+  return <UiBtn small title={label} kind={primary ? 'primary' : 'secondary'} onPress={onPress} disabled={disabled} loading={!!primary && !!disabled && label.endsWith('…')} testID={testID} />;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  head: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8, gap: 5, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  back: { fontSize: 15, color: '#1565c0', fontWeight: '600' },
-  title: { fontSize: 18, fontWeight: '700' },
-  muted: { fontSize: 12, color: '#777' },
-  note: { fontSize: 12, color: '#6a1b9a' },
-  warn: { fontSize: 12, color: '#e65100' },
+  root: { flex: 1, backgroundColor: color.surface },
+  head: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: space.sm, gap: 6, borderBottomWidth: 1, borderColor: color.hairline },
+  backHit: { alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' },
+  back: { ...font.calloutBold, color: color.primary },
+  title: { ...font.headline, color: color.text },
+  muted: { ...font.caption, color: color.text3 },
+  note: { ...font.caption, color: color.primary },
+  warn: { ...font.caption, color: color.warning },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff' },
-  chipSmall: { paddingHorizontal: 8, paddingVertical: 4 },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { fontSize: 13, color: '#222' },
-  chipTextSmall: { fontSize: 12 },
-  chipTextOn: { color: '#fff', fontWeight: '600' },
-  selected: { padding: 12, gap: 6, backgroundColor: '#f1f6fd', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  selTitle: { fontSize: 16, fontWeight: '700' },
-  label: { fontSize: 13, fontWeight: '700', color: '#333', marginTop: 2 },
-  idText: { fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 7, fontSize: 15, backgroundColor: '#fff' },
-  handle: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 6, backgroundColor: '#37474f' },
-  handleText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  btn: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 6, borderWidth: 1, borderColor: '#c9ccd1', backgroundColor: '#fff', minWidth: 60, alignItems: 'center' },
-  btnPrimary: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  btnOff: { opacity: 0.5 },
-  btnText: { fontSize: 14, color: '#1565c0', fontWeight: '600' },
-  btnTextPrimary: { color: '#fff' },
-  list: { padding: 8, gap: 4, paddingBottom: 40 },
-  row: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: '#d6d9de', gap: 3 },
-  rowOn: { backgroundColor: '#dce8fb', borderColor: '#1565c0' },
+  selected: { padding: space.md, gap: 6, backgroundColor: color.primaryTint, borderBottomWidth: 1, borderColor: color.hairline },
+  selTitle: { ...font.headline, color: color.text },
+  label: { ...font.captionBold, color: color.text2, marginTop: 2 },
+  idText: { ...font.headline, ...tabular, color: color.text },
+  input: fieldStyles.input,
+  handle: { minHeight: 36, justifyContent: 'center', paddingHorizontal: space.md, borderRadius: radius.control, backgroundColor: color.text },
+  handleText: { ...font.captionBold, color: color.onPrimary },
+  list: { padding: space.sm, gap: space.xs, paddingBottom: 40 },
+  row: { minHeight: 44, paddingHorizontal: 10, paddingVertical: space.sm, borderRadius: radius.control, borderWidth: 1, borderColor: color.hairline, gap: 3 },
+  rowOn: { backgroundColor: color.primaryTint, borderColor: color.primary },
   lastText: { flex: 1 },
-  lastRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#eef7ee', borderColor: '#9ccc9c' },
-  rowText: { fontSize: 14, fontWeight: '600', color: '#222' },
-  rowSub: { fontSize: 12, color: '#666' },
+  lastRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: color.successTint, borderColor: color.success },
+  rowText: { ...font.calloutBold, color: color.text },
+  rowSub: { ...font.caption, color: color.text3 },
 });

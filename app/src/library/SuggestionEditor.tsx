@@ -17,6 +17,7 @@ import {
   type SuggestionTarget,
 } from '../suggestions/model';
 import { CATEGORIES } from './model';
+import { Chip, color, fieldStyles, font, radius, space } from '../ui';
 
 type RunFn = (fn: (e: Editor, s: Store) => Promise<unknown>, done?: string | (() => string)) => Promise<boolean>;
 
@@ -63,14 +64,12 @@ export function SuggestionList(props: {
         <View style={styles.group}>
           <View style={styles.wrap}>
             {targets.map(({ target: tg, label }) => (
-              <Pressable key={tg} onPress={() => setTarget(tg)} style={[styles.chip, target === tg && styles.chipOn]} accessibilityState={{ selected: target === tg }} testID={`sugg.target.${tg}`}>
-                <Text style={target === tg ? styles.chipTextOn : styles.chipText}>{label}</Text>
-              </Pressable>
+              <Chip key={tg} small onPress={() => setTarget(tg)} selected={target === tg} label={label} testID={`sugg.target.${tg}`} />
             ))}
           </View>
           <View style={styles.row}>
-            <TextInput value={text} onChangeText={setText} placeholder="Phrase, as the surveyor would type it" placeholderTextColor="#888" style={[styles.input, styles.grow]} onSubmitEditing={add} testID="sugg.input" />
-            <Pressable disabled={!text.trim()} onPress={add} style={!text.trim() && styles.off} testID="sugg.add">
+            <TextInput value={text} onChangeText={setText} placeholder="Phrase, as the surveyor would type it" placeholderTextColor={color.text3} style={[styles.input, styles.grow]} onSubmitEditing={add} testID="sugg.input" />
+            <Pressable disabled={!text.trim()} onPress={add} hitSlop={space.md} style={!text.trim() && styles.off} testID="sugg.add">
               <Text style={styles.link}>+ add</Text>
             </Pressable>
           </View>
@@ -94,24 +93,24 @@ function ChipRow(props: { row: Suggestion; canEdit: boolean; run: RunFn; library
         <>
           {r.state === 'draft' ? (
             <>
-              <Pressable onPress={() => void props.run((e) => acceptSuggestion(e, r.id), 'Accepted.')} hitSlop={6} testID={`sugg.accept.${r.text}`}>
+              <Pressable onPress={() => void props.run((e) => acceptSuggestion(e, r.id), 'Accepted.')} hitSlop={space.md} testID={`sugg.accept.${r.text}`}>
                 <Text style={styles.ok}>Accept</Text>
               </Pressable>
-              <Pressable onPress={() => void props.run((e) => rejectSuggestion(e, r.id), 'Rejected: it leaves the chips.')} hitSlop={6} testID={`sugg.reject.${r.text}`}>
+              <Pressable onPress={() => void props.run((e) => rejectSuggestion(e, r.id), 'Rejected: it leaves the chips.')} hitSlop={space.md} testID={`sugg.reject.${r.text}`}>
                 <Text style={styles.danger}>Reject</Text>
               </Pressable>
             </>
           ) : r.state === 'rejected' ? (
-            <Pressable onPress={() => void props.run((e) => reopenSuggestion(e, r.id), 'Back to draft.')} hitSlop={6} testID={`sugg.reopen.${r.text}`}>
+            <Pressable onPress={() => void props.run((e) => reopenSuggestion(e, r.id), 'Back to draft.')} hitSlop={space.md} testID={`sugg.reopen.${r.text}`}>
               <Text style={styles.link}>Back to draft</Text>
             </Pressable>
           ) : null}
           {r.projectId && r.state === 'accepted' && lib ? (
-            <Pressable onPress={() => void props.run((_e, s) => promoteSuggestion(lib, s, r.id), `Promoted: the app library offers "${r.text}".`)} hitSlop={6} testID={`sugg.promote.${r.text}`}>
+            <Pressable onPress={() => void props.run((_e, s) => promoteSuggestion(lib, s, r.id), `Promoted: the app library offers "${r.text}".`)} hitSlop={space.md} testID={`sugg.promote.${r.text}`}>
               <Text style={styles.link}>Promote</Text>
             </Pressable>
           ) : null}
-          <Pressable onPress={() => void props.run((e) => removeSuggestion(e, r.id), 'Removed.')} hitSlop={6} testID={`sugg.remove.${r.text}`}>
+          <Pressable onPress={() => void props.run((e) => removeSuggestion(e, r.id), 'Removed.')} hitSlop={space.md} testID={`sugg.remove.${r.text}`}>
             <Text style={styles.danger}>Remove</Text>
           </Pressable>
         </>
@@ -146,6 +145,7 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
                   n = await loadStandardSuggestions(e, s);
                 }, () => (n ? `Added ${n} standard suggestion${n === 1 ? '' : 's'} as drafts.` : 'The standard suggestions are all here already.'));
               }}
+              hitSlop={space.md}
               testID="sugg.loadStandard">
               <Text style={styles.link}>Load standard suggestions</Text>
             </Pressable>
@@ -157,6 +157,7 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
                   n = await copyAppSuggestions(e, s, props.library!);
                 }, () => (n ? `Copied ${n} chip${n === 1 ? '' : 's'} from the app library.` : 'Nothing new in the app library (accepted category and code chips only).'));
               }}
+              hitSlop={space.md}
               testID="sugg.copyApp">
               <Text style={styles.link}>Copy from app library</Text>
             </Pressable>
@@ -184,36 +185,27 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
 
 function Pick(props: { on: boolean; label: string; n: number; onPress: () => void; testID: string }) {
   return (
-    <Pressable onPress={props.onPress} style={[styles.chip, props.on && styles.chipOn]} accessibilityState={{ selected: props.on }} testID={props.testID}>
-      <Text style={props.on ? styles.chipTextOn : styles.chipText}>
-        {props.label}
-        {props.n ? ` (${props.n})` : ''}
-      </Text>
-    </Pressable>
+    <Chip small onPress={props.onPress} selected={props.on} label={`${props.label}${props.n ? ` (${props.n})` : ''}`} testID={props.testID} />
   );
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 12 },
-  title: { fontSize: 19, fontWeight: '600' },
-  heading: { fontSize: 17, fontWeight: '600', paddingTop: 6 },
-  box: { gap: 10, padding: 10, borderWidth: 1, borderColor: '#e1e4e8', borderRadius: 8 },
-  group: { gap: 4 },
-  label: { fontSize: 15, fontWeight: '600' },
-  sub: { fontSize: 13, color: '#666' },
-  value: { fontSize: 16 },
-  dim: { color: '#999' },
-  draft: { fontSize: 12, color: '#9a6700', fontWeight: '700' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 4 },
+  section: { gap: space.md },
+  title: { ...font.title, color: color.text },
+  heading: { ...font.headline, color: color.text, paddingTop: 6 },
+  box: { gap: 10, padding: space.md, borderWidth: 1, borderColor: color.hairline, borderRadius: radius.control, backgroundColor: color.surface },
+  group: { gap: space.xs },
+  label: { ...font.captionBold, color: color.text2 },
+  sub: { ...font.caption, color: color.text3 },
+  value: { ...font.body, color: color.text },
+  dim: { color: color.text3 },
+  draft: { ...font.badge, color: color.warning },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: space.xs, minHeight: 44 },
   grow: { flex: 1 },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, padding: 10, fontSize: 16, minHeight: 44 },
-  link: { color: '#1f6feb', fontSize: 16 },
-  ok: { color: '#1a7f37', fontSize: 16, fontWeight: '600' },
-  danger: { color: '#b3261e', fontSize: 16 },
-  off: { opacity: 0.4 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111' },
-  chipTextOn: { color: '#fff' },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' },
+  input: fieldStyles.input,
+  link: { ...font.callout, color: color.primary },
+  ok: { ...font.calloutBold, color: color.success },
+  danger: { ...font.callout, color: color.danger },
+  off: { opacity: 0.45 },
 });

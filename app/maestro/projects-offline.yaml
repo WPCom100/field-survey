@@ -16,6 +16,8 @@ name: R7 — a refusal while the server is stopped
 - tapOn:
     id: newProject.name
 - inputText: ${PROJECT} offline
+- pressKey: Enter          # closes the Name keyboard: since T180's cards the Add level field sits under it
+- waitForAnimationToEnd
 - runFlow:
     file: _projects-level.yaml
     env:

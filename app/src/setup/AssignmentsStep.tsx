@@ -8,6 +8,7 @@ import { useTeamMembers } from '../identity/useTeamNames';
 import { AssignmentActions, assigneeColumns, loadAssignments, type AssignmentLevel } from './assignments';
 import { SetupError } from './model';
 import { Btn, Notice, Section, styles as w } from './widgets';
+import { color, font, radius, space } from '../ui';
 
 /**
  * Setup → Assignments (T97, D168): levels down, team names across; tap a cell to assign or
@@ -99,7 +100,7 @@ export function AssignmentsStep({ projectId, dataKey }: { projectId: string; dat
                   testID={`assign.${l.code}.${p.name}`}
                   onPress={() => void run((a) => a.set(l.id, p.id, !on))}
                 >
-                  <Text style={styles.box}>{on ? '☑' : '☐'}</Text>
+                  <Text style={[styles.box, on && { color: color.primary }]}>{on ? '☑' : '☐'}</Text>
                 </Pressable>
               );
             })}
@@ -122,16 +123,16 @@ export function AssignmentsStep({ projectId, dataKey }: { projectId: string; dat
 }
 
 const styles = StyleSheet.create({
-  hint: { fontSize: 13, color: '#666', maxWidth: 760 },
-  head: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
+  hint: { ...font.caption, color: color.text3, maxWidth: 760 },
+  head: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, paddingVertical: 6, paddingHorizontal: space.sm, backgroundColor: color.surface2, borderRadius: radius.control },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.xs, paddingHorizontal: space.sm, borderBottomWidth: 1, borderBottomColor: color.hairline },
   rowDim: { opacity: 0.6 },
   cLevel: { width: 100 },
   cPerson: { width: 120 },
-  code: { fontSize: 17, fontWeight: '600' },
-  small: { fontSize: 11, color: '#777' },
-  cell: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
-  cellOn: { backgroundColor: '#dce8fb' },
-  box: { fontSize: 22 },
-  bulk: { gap: 4, alignItems: 'center' },
+  code: { ...font.headline, color: color.text },
+  small: { ...font.caption, color: color.text3 },
+  cell: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control },
+  cellOn: { backgroundColor: color.primaryTint },
+  box: { fontSize: 22, color: color.text2 },
+  bulk: { gap: space.xs, alignItems: 'center' },
 });

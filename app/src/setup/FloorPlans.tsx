@@ -11,6 +11,7 @@ import { getImport, isFinished, type FilePart, type ImportBatch } from './import
 import { nativeUploadPart } from './upload-native';
 import { loadLevelSheets, sheetJobLine, startSheetImport, type LevelSheets, type SheetKind } from './sheets';
 import { Btn, Notice, Section } from './widgets';
+import { color, font, radius, space } from '../ui';
 
 const PDF = 'application/pdf';
 
@@ -141,17 +142,17 @@ export function FloorPlans({ projectId }: { projectId: string }) {
 }
 
 const styles = StyleSheet.create({
-  hint: { fontSize: 13, color: '#666' },
-  label: { fontSize: 12, color: '#555', fontWeight: '700' },
-  head: { flexDirection: 'row', gap: 8, paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#c9ccd1' },
-  row: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#e3e5e8' },
-  cLvl: { width: 48, fontSize: 15, fontWeight: '700' },
-  cDisplay: { flex: 3, gap: 4 },
-  cGrid: { flex: 2, gap: 4 },
-  cSource: { flex: 3, gap: 4 },
-  cell: { fontSize: 14 },
-  dim: { fontSize: 14, color: '#888' },
-  ok: { color: '#2e7d32' },
-  warn: { color: '#b26a00' },
-  job: { fontSize: 13, color: '#333' },
+  hint: { ...font.caption, color: color.text3 },
+  label: { ...font.captionBold, color: color.text2 },
+  head: { flexDirection: 'row', gap: space.sm, paddingVertical: 6, paddingHorizontal: space.sm, backgroundColor: color.surface2, borderRadius: radius.control },
+  row: { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start', paddingVertical: space.sm, paddingHorizontal: space.sm, borderBottomWidth: 1, borderColor: color.hairline },
+  cLvl: { width: 48, ...font.calloutBold, color: color.text },
+  cDisplay: { flex: 3, gap: space.xs },
+  cGrid: { flex: 2, gap: space.xs },
+  cSource: { flex: 3, gap: space.xs },
+  cell: { ...font.callout, color: color.text },
+  dim: { ...font.callout, color: color.text3 },
+  ok: { color: color.success },
+  warn: { color: color.warning },
+  job: { ...font.caption, color: color.text2 },
 });

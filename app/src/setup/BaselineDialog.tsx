@@ -11,6 +11,7 @@ import { openAppStore } from '../db';
 import { BaselineActions, lockQuestion, lockWarnings, type LockLevel } from './lock';
 import { SetupError } from './model';
 import { Btn, styles as w } from './widgets';
+import { color, font, radius, shadow, space } from '../ui';
 
 /** iOS presents a Modal in portrait unless told otherwise, and the app is landscape-only. */
 const ORIENTATIONS = ['landscape-left', 'landscape-right'] as const;
@@ -70,7 +71,7 @@ export function BaselineDialog({
                 value={reason}
                 onChangeText={setReason}
                 placeholder="Why unlock? (kept in the history)"
-                placeholderTextColor="#9aa0a8"
+                placeholderTextColor={color.text3}
                 autoFocus
                 testID="lock.reason"
               />
@@ -99,10 +100,11 @@ export function BaselineDialog({
 }
 
 const styles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
-  box: { width: 480, backgroundColor: '#fff', borderRadius: 12, padding: 20, gap: 12 },
-  title: { fontSize: 19, fontWeight: '700' },
-  body: { fontSize: 15, color: '#333' },
-  error: { fontSize: 14, color: '#c62828' },
-  buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  // the plan's scrim (T177): the text colour at 25 %
+  scrim: { flex: 1, backgroundColor: `${color.text}40`, alignItems: 'center', justifyContent: 'center' },
+  box: { width: 480, backgroundColor: color.surface, borderRadius: radius.card, padding: space.xl, gap: space.md, ...shadow.card },
+  title: { ...font.title, color: color.text },
+  body: { ...font.callout, color: color.text2 },
+  error: { ...font.callout, color: color.danger },
+  buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: space.sm, marginTop: space.xs },
 });

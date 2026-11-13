@@ -1,4 +1,4 @@
-import { Link, router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -15,6 +15,7 @@ import { loadLockTable, lockWarnings, type LockLevel } from '../../setup/lock';
 import { loadPlacementProgress, type PlacementProgress } from '../../placement/model';
 import { useSyncStatus } from '../../sync/useSyncStatus';
 import { syncDataKey } from '../../sync/dataKey';
+import { Btn as UiBtn, color, font, radius, space, tabular } from '../../ui';
 
 type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock' | 'assignments' | 'rules';
 const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'place', 'lock', 'assignments', 'rules'];
@@ -97,39 +98,21 @@ export default function ProjectSetupScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.side}>
-        <Link href="/projects" style={styles.back}>
-          ◀ Projects
-        </Link>
+        <UiBtn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} style={styles.backBtn} />
         <Text style={styles.sideTitle} numberOfLines={2}>
           {setup.project.name}
         </Text>
-        <Pressable onPress={() => setStep('project')} testID="setup.step.project" style={[styles.step, step === 'project' && styles.stepOn]}>
-          <Text style={styles.stepText}>1 Project</Text>
-        </Pressable>
-        <Pressable onPress={() => setStep('levels')} testID="setup.step.levels" style={[styles.step, step === 'levels' && styles.stepOn]}>
-          <Text style={styles.stepText}>2 Levels</Text>
-        </Pressable>
-        <Pressable onPress={() => setStep('sources')} testID="setup.step.sources" style={[styles.step, step === 'sources' && styles.stepOn]}>
-          <Text style={styles.stepText}>3 Sources</Text>
-        </Pressable>
-        <Pressable onPress={() => setStep('drafts')} testID="setup.step.drafts" style={[styles.step, step === 'drafts' && styles.stepOn]}>
-          <Text style={styles.stepText}>4 Review drafts</Text>
-        </Pressable>
-        <Pressable onPress={() => setStep('place')} testID="setup.step.place" style={[styles.step, step === 'place' && styles.stepOn]}>
-          <Text style={styles.stepText}>5 Place devices</Text>
-        </Pressable>
-        <Pressable onPress={() => setStep('lock')} testID="setup.step.lock" style={[styles.step, step === 'lock' && styles.stepOn]}>
-          <Text style={styles.stepText}>6 Lock baseline</Text>
-        </Pressable>
+        <StepItem id="project" label="1 Project" step={step} onPick={setStep} />
+        <StepItem id="levels" label="2 Levels" step={step} onPick={setStep} />
+        <StepItem id="sources" label="3 Sources" step={step} onPick={setStep} />
+        <StepItem id="drafts" label="4 Review drafts" step={step} onPick={setStep} />
+        <StepItem id="place" label="5 Place devices" step={step} onPick={setStep} />
+        <StepItem id="lock" label="6 Lock baseline" step={step} onPick={setStep} />
         <View style={styles.sideRule} />
-        <Pressable onPress={() => setStep('assignments')} testID="setup.step.assignments" style={[styles.step, step === 'assignments' && styles.stepOn]}>
-          <Text style={styles.stepText}>Assignments</Text>
-        </Pressable>
-        <Pressable onPress={() => setStep('rules')} testID="setup.step.rules" style={[styles.step, step === 'rules' && styles.stepOn]}>
-          <Text style={styles.stepText}>Rules</Text>
-        </Pressable>
+        <StepItem id="assignments" label="Assignments" step={step} onPick={setStep} />
+        <StepItem id="rules" label="Rules" step={step} onPick={setStep} />
         <View style={{ flex: 1 }} />
-        <Pressable onPress={() => router.dismissTo({ pathname: '/', params: { project: projectId } })} testID="setup.home">
+        <Pressable onPress={() => router.dismissTo({ pathname: '/', params: { project: projectId } })} hitSlop={space.sm} style={styles.homeLink} testID="setup.home">
           <Text style={styles.back}>Open the levels screen ▸</Text>
         </Pressable>
       </View>
@@ -177,6 +160,22 @@ export default function ProjectSetupScreen() {
 }
 
 type Run = (fn: (a: SetupActions) => Promise<unknown>, done?: string) => () => Promise<void>;
+
+/** One step in the side list: the sidebar's look (active = the accent tint, the label in the accent). */
+function StepItem({ id, label, step, onPick }: { id: Step; label: string; step: Step; onPick: (s: Step) => void }) {
+  const on = step === id;
+  return (
+    <Pressable
+      onPress={() => onPick(id)}
+      testID={`setup.step.${id}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      style={({ pressed }) => [styles.step, on && styles.stepOn, pressed && !on && styles.stepPressed]}
+    >
+      <Text style={[styles.stepText, on && styles.stepTextOn]}>{label}</Text>
+    </Pressable>
+  );
+}
 
 function ProjectStep({ setup, run }: { setup: ProjectSetup; run: Run }) {
   const p = setup.project;
@@ -394,6 +393,7 @@ function LevelsStep({
           <Text style={w.label}>Add level</Text>
           <TextInput
             style={w.input}
+            placeholderTextColor={color.text3}
             value={newCode}
             onChangeText={typeCode}
             placeholder="06M"
@@ -419,7 +419,7 @@ function LevelsStep({
       <View style={w.row}>
         <View style={{ width: 200 }}>
           <Text style={w.label}>Add range…</Text>
-          <TextInput style={w.input} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onFocus={toBottom} />
+          <TextInput style={w.input} placeholderTextColor={color.text3} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onFocus={toBottom} />
         </View>
         <Btn
           title="Add range (out of scope)"
@@ -447,7 +447,7 @@ function DateCell({ value, onSave, testID }: { value: string | null; onSave: (te
   };
   return (
     <TextInput
-      style={[w.input, styles.cDate, bad && { borderColor: '#c62828' }]}
+      style={[w.input, styles.cDate, bad && styles.bad]}
       value={text}
       onChangeText={(t) => {
         setText(t);
@@ -455,7 +455,7 @@ function DateCell({ value, onSave, testID }: { value: string | null; onSave: (te
       }}
       onBlur={commit}
       placeholder="YYYY-MM-DD"
-      placeholderTextColor="#9aa0a8"
+      placeholderTextColor={color.text3}
       autoCorrect={false}
       autoCapitalize="none"
       keyboardType="numbers-and-punctuation"
@@ -533,35 +533,39 @@ function LevelRow({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: '#fff' },
-  side: { width: 220, backgroundColor: '#f3f5f8', borderRightWidth: 1, borderRightColor: '#d5d9e0', padding: 12, gap: 4 },
-  back: { fontSize: 15, color: '#1565c0', marginBottom: 8 },
-  sideTitle: { fontSize: 17, fontWeight: '700', marginBottom: 8 },
-  step: { paddingVertical: 9, paddingHorizontal: 10, borderRadius: 6 },
-  stepOn: { backgroundColor: '#dce8fb' },
-  stepText: { fontSize: 15 },
-  stepDim: { color: '#9aa0a8' },
-  sideRule: { height: 1, backgroundColor: '#d5d9e0', marginVertical: 6 },
-  hint: { fontSize: 13, color: '#666' },
-  main: { padding: 20, gap: 8 },
-  empty: { fontSize: 15, color: '#666', padding: 20 },
-  head: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
+  root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
+  side: { width: 220, backgroundColor: color.surface2, borderRightWidth: 1, borderRightColor: color.hairline, padding: space.md, gap: 2 },
+  backBtn: { marginLeft: -space.md, marginBottom: space.xs },
+  back: { ...font.callout, color: color.primary },
+  homeLink: { minHeight: 44, justifyContent: 'center' },
+  sideTitle: { ...font.headline, color: color.text, marginBottom: space.sm },
+  step: { minHeight: 44, justifyContent: 'center', paddingVertical: space.sm, paddingHorizontal: space.md, borderRadius: radius.control },
+  stepOn: { backgroundColor: color.primaryTint },
+  stepPressed: { backgroundColor: color.border },
+  stepText: { ...font.callout, color: color.text },
+  stepTextOn: { color: color.primary, fontWeight: '600' },
+  sideRule: { height: 1, backgroundColor: color.hairline, marginVertical: 6 },
+  hint: { ...font.caption, color: color.text3 },
+  main: { paddingHorizontal: space.xl, paddingVertical: space.lg, gap: space.sm },
+  empty: { ...font.callout, color: color.text3, padding: 20 },
+  head: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, paddingVertical: 6, paddingHorizontal: space.sm, marginHorizontal: -space.sm, backgroundColor: color.surface2, borderRadius: radius.control },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: color.hairline },
   rowDim: { opacity: 0.6 },
-  cN: { width: 28, fontSize: 14, color: '#555' },
+  cN: { width: 28, ...font.callout, ...tabular, color: color.text3 },
   cCode: { width: 80 },
-  code: { fontSize: 17, fontWeight: '600' },
-  small: { fontSize: 11, color: '#777' },
+  code: { ...font.headline, color: color.text },
+  small: { ...font.caption, color: color.text3 },
   cScope: { width: 110 },
-  cGroup: { width: 230, gap: 4 },
-  groupText: { fontSize: 14 },
+  cGroup: { width: 230, gap: space.xs },
+  groupText: { ...font.callout, color: color.text },
   groupBtns: { flexDirection: 'row', gap: 6 },
   cPick: { width: 130 },
   cDate: { width: 112 },
-  cSheet: { width: 140, fontSize: 13, color: '#555' },
+  bad: { borderColor: color.danger, borderWidth: 2 },
+  cSheet: { width: 140, ...font.caption, color: color.text2 },
   cActions: { flex: 1 },
-  cLockNum: { width: 82, fontSize: 15 },
-  cLockState: { width: 170, fontSize: 14 },
-  cFar: { flex: 1, fontSize: 14, color: '#777' },
+  cLockNum: { width: 82, ...font.callout, ...tabular, color: color.text },
+  cLockState: { width: 170, ...font.callout, ...tabular, color: color.text },
+  cFar: { flex: 1, ...font.callout, color: color.text3 },
   actions: { flexDirection: 'row', gap: 6, justifyContent: 'flex-end' },
 });

@@ -1,15 +1,16 @@
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { listProjects, type HomeProject } from '../home/data';
 import { useIdentity } from '../identity/IdentityGate';
 import { fetchProjects, type ServerProject } from '../setup/api';
-import { Btn, Notice } from '../setup/widgets';
+import { Notice } from '../setup/widgets';
 import { getSyncEngine } from '../sync/engine';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { syncDataKey } from '../sync/dataKey';
+import { Btn, Card, PageHeader, PAGE_GUTTER, color, font, space, tabular } from '../ui';
 
 /**
  * Projects (Phase 3 §2.1 "Projects"): what is on this iPad plus what the server lists. A
@@ -77,54 +78,48 @@ export default function ProjectsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.top}>
-        <Link dismissTo href="/" style={styles.back}>
-          ◀ Levels
-        </Link>
-        <Text style={styles.title}>Projects</Text>
-        <View style={{ flex: 1 }} />
-        <Btn title="Device-type library" onPress={() => router.push({ pathname: '/library', params: { scope: 'app' } })} testID="projects.library" />
-        <Btn title="Rule defaults" onPress={() => router.push('/rule-defaults')} />
-        <Btn title={busy ? 'Refreshing…' : 'Refresh from server'} onPress={() => void refresh()} disabled={busy} testID="projects.refresh" />
-        <Btn title="+ New project" primary onPress={() => router.push('/new-project')} testID="projects.new" />
+      <PageHeader
+        title="Projects"
+        caption="The projects on this iPad, and any the server lists that are still downloading."
+        actions={
+          <>
+            <Btn kind="tertiary" title="◀ Levels" onPress={() => router.dismissTo('/')} />
+            <Btn title="Device-type library" onPress={() => router.push({ pathname: '/library', params: { scope: 'app' } })} testID="projects.library" />
+            <Btn title="Rule defaults" onPress={() => router.push('/rule-defaults')} />
+            <Btn title={busy ? 'Refreshing…' : 'Refresh from server'} onPress={() => void refresh()} disabled={busy} testID="projects.refresh" />
+            <Btn title="+ New project" kind="primary" onPress={() => router.push('/new-project')} testID="projects.new" />
+          </>
+        }
+      />
+      <View style={styles.notices}>
+        <Notice text={error} error />
+        <Notice text={notice} />
       </View>
-      <Notice text={error} error />
-      <Notice text={notice} />
       <ScrollView contentContainerStyle={styles.list}>
-        {local.length === 0 ? (
-          <Text style={styles.empty}>No project on this iPad yet. Refresh from the server, or create one.</Text>
-        ) : null}
+        {local.length === 0 ? <Text style={styles.empty}>No project on this iPad yet. Refresh from the server, or create one.</Text> : null}
         {local.map((p) => (
-          <View key={p.id} style={styles.card}>
-            <View style={{ flex: 1 }}>
+          <Card key={p.id} style={styles.card}>
+            <View style={styles.grow}>
               <Text style={styles.name}>{p.name}</Text>
               <Text style={styles.sub}>
                 {p.site ? `${p.site} · ` : ''}
                 {levels.get(p.id) ?? 0} level{levels.get(p.id) === 1 ? '' : 's'}
               </Text>
             </View>
-            <Pressable onPress={() => router.push({ pathname: '/setup/[projectId]', params: { projectId: p.id } })} style={styles.action}>
-              <Text style={styles.actionText}>Setup ▸</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => router.dismissTo({ pathname: '/', params: { project: p.id } })}
-              style={[styles.action, styles.actionPrimary]}
-              testID={`projects.open.${p.name}`}
-            >
-              <Text style={[styles.actionText, styles.actionTextPrimary]}>Open</Text>
-            </Pressable>
-          </View>
+            <Btn title="Setup ▸" onPress={() => router.push({ pathname: '/setup/[projectId]', params: { projectId: p.id } })} />
+            <Btn title="Open" kind="primary" onPress={() => router.dismissTo({ pathname: '/', params: { project: p.id } })} testID={`projects.open.${p.name}`} />
+          </Card>
         ))}
         {pending.map((p) => (
-          <View key={p.id} style={[styles.card, styles.cardPending]}>
-            <View style={{ flex: 1 }}>
+          <Card key={p.id} style={[styles.card, styles.cardPending]}>
+            <View style={styles.grow}>
               <Text style={styles.name}>{p.name}</Text>
               <Text style={styles.sub}>
                 {p.site ? `${p.site} · ` : ''}
                 {p.levels.length} level{p.levels.length === 1 ? '' : 's'} · downloading from the server…
               </Text>
             </View>
-          </View>
+          </Card>
         ))}
       </ScrollView>
     </View>
@@ -132,18 +127,13 @@ export default function ProjectsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
-  back: { fontSize: 15, color: '#1565c0' },
-  title: { fontSize: 24, fontWeight: '600' },
-  list: { padding: 16, gap: 10 },
-  empty: { fontSize: 15, color: '#666' },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderWidth: 1, borderColor: '#d5d9e0', borderRadius: 8 },
-  cardPending: { opacity: 0.6, borderStyle: 'dashed' },
-  name: { fontSize: 18, fontWeight: '600' },
-  sub: { fontSize: 14, color: '#555', marginTop: 2 },
-  action: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0' },
-  actionPrimary: { backgroundColor: '#1565c0' },
-  actionText: { color: '#1565c0', fontWeight: '600' },
-  actionTextPrimary: { color: '#fff' },
+  root: { flex: 1, backgroundColor: color.bg },
+  notices: { paddingHorizontal: PAGE_GUTTER, paddingTop: space.sm, gap: space.xs },
+  list: { paddingHorizontal: PAGE_GUTTER, paddingVertical: space.lg, gap: space.md },
+  empty: { ...font.callout, color: color.text3 },
+  card: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  cardPending: { borderStyle: 'dashed', borderColor: color.border, backgroundColor: color.bg },
+  grow: { flex: 1 },
+  name: { ...font.headline, color: color.text },
+  sub: { ...font.callout, ...tabular, color: color.text3, marginTop: 2 },
 });

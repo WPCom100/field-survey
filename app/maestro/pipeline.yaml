@@ -17,6 +17,8 @@ name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
 - tapOn:
     id: newProject.name
 - inputText: ${PROJECT}
+- pressKey: Enter          # closes the Name keyboard: since T180's cards the Add level field sits under it
+- waitForAnimationToEnd
 # B2, B1, 01–04, 06, 06M: one level at a time (Add range makes out-of-scope levels), each added
 # with Return: the "+ Add level" button slides under the keyboard as the table grows (T154). The
 # field keeps focus after Return, so it is tapped once: re-tapped, it sits under the keyboard by the

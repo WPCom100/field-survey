@@ -1,13 +1,14 @@
 /**
  * Small form pieces shared by the project setup screens (T41). Since T174 (D266) they are the UI
- * system's primitives (`app/src/ui`) under their old names and props, so the screens that import
- * them change only when their own task comes (T180). Light theme only (app.json).
+ * system's primitives (`app/src/ui`) under their old names and props; T180 put the setup, export
+ * and new-project screens on them. Light theme only (app.json).
  */
 
 import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Banner } from '../ui/Banner';
+import { Card } from '../ui/Card';
 import { Btn as UiBtn } from '../ui/Btn';
 import { Chip } from '../ui/Chip';
 import { Field as UiField, fieldStyles } from '../ui/Field';
@@ -149,12 +150,17 @@ export const LEVEL_HELP = {
   splitOf: 'A part of another floor drawn on its own sheet (06M of 06); it is listed right after it.',
 } as const;
 
-/** A page section: a title over its content (the shell's page pattern, `docs/ui-plan.md` §4). */
+/**
+ * A page section: a title over its content in a card (the shell's page pattern, `docs/ui-plan.md`
+ * §4: "forms as Fields in a card"; T180).
+ */
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
+      <Text style={styles.sectionTitle} accessibilityRole="header">
+        {title}
+      </Text>
+      <Card>{children}</Card>
     </View>
   );
 }
@@ -192,7 +198,7 @@ export const styles = StyleSheet.create({
   pickerItem: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: color.surface2 },
   pickerItemText: { ...font.caption, color: color.text },
   pickerItemOn: { fontWeight: '600', color: color.primary },
-  section: { gap: space.md, marginBottom: space.xl },
+  section: { gap: space.sm, marginBottom: space.xl },
   sectionTitle: { ...font.title, color: color.text },
   notice: { marginTop: space.xs, alignSelf: 'stretch' },
   noticeError: { color: color.danger },

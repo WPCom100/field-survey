@@ -28,6 +28,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - eraseText: 20
 - inputText: DIN
 - assertVisible: '◌ P-NSPS-D \(draft, 02\)  · 0.90  · riser: PARADIGM P-NSPS-DIN'
+- pressKey: Enter          # closes the keyboard: since T180's panel the results can sit under it
+- waitForAnimationToEnd
 - tapOn: '◌ P-NSPS-D \(draft, 02\)  · 0.90  · riser: PARADIGM P-NSPS-DIN'
 - extendedWaitUntil:
     visible:

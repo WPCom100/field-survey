@@ -6,6 +6,7 @@ import { ZoomableImage } from '../crops/ZoomableImage';
 import type { Identity } from '../identity/api';
 import { authHeaders, batchFor, cropUrl, type Batch } from './api';
 import type { DraftSource } from './model';
+import { color, font, radius, space } from '../ui';
 
 /**
  * The source crops of a draft (Phase 3 §3.3): one PNG per source — the BOM line, the riser symbol
@@ -65,7 +66,7 @@ function BigCrop({ identity, batch, source, onClose }: { identity: Identity; bat
             {source.label}
           </Text>
           <Text style={styles.hint}>Pinch to zoom · drag to pan · double-tap to zoom / fit</Text>
-          <Pressable style={[styles.btn, styles.push]} onPress={onClose} accessibilityRole="button">
+          <Pressable style={[styles.btn, styles.push]} onPress={onClose} hitSlop={4} accessibilityRole="button">
             <Text style={styles.btnText}>Close</Text>
           </Pressable>
         </View>
@@ -87,7 +88,7 @@ function Failed({ message, retry }: { message: string; retry: () => void }) {
   return (
     <View style={styles.failed}>
       <Text style={styles.error}>{message}</Text>
-      <Pressable style={styles.btn} onPress={retry} accessibilityRole="button">
+      <Pressable style={styles.btn} onPress={retry} hitSlop={4} accessibilityRole="button">
         <Text style={styles.btnText}>Try again</Text>
       </Pressable>
     </View>
@@ -96,19 +97,19 @@ function Failed({ message, retry }: { message: string; retry: () => void }) {
 
 const styles = StyleSheet.create({
   list: { gap: 10 },
-  crop: { gap: 4 },
-  label: { fontSize: 12, fontWeight: '700', color: '#555' },
-  small: { width: '100%', height: 170, backgroundColor: '#f3f5f8', borderRadius: 4 },
-  loading: { textAlign: 'center', textAlignVertical: 'center', lineHeight: 170, color: '#888', fontSize: 13 },
-  hint: { fontSize: 11, color: '#888' },
-  dim: { fontSize: 13, color: '#888' },
-  error: { fontSize: 13, color: '#b71c1c' },
-  failed: { gap: 6, padding: 8, borderRadius: 4, backgroundColor: '#fdf1f1' },
-  modal: { flex: 1, backgroundColor: '#fff' },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#d6d9de' },
-  barTitle: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: '#333' },
-  pad: { padding: 16 },
+  crop: { gap: space.xs },
+  label: { ...font.captionBold, color: color.text2 },
+  small: { width: '100%', height: 170, backgroundColor: color.surface2, borderRadius: radius.swatch },
+  loading: { textAlign: 'center', textAlignVertical: 'center', lineHeight: 170, color: color.text3, fontSize: 13 },
+  hint: { ...font.caption, color: color.text3 },
+  dim: { ...font.caption, color: color.text3 },
+  error: { ...font.caption, color: color.danger },
+  failed: { gap: 6, padding: space.sm, borderRadius: radius.swatch, backgroundColor: color.dangerTint },
+  modal: { flex: 1, backgroundColor: color.surface },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: 10, borderBottomWidth: 1, borderColor: color.hairline },
+  barTitle: { flexShrink: 1, ...font.calloutBold, color: color.text },
+  pad: { padding: space.lg },
   push: { marginLeft: 'auto' },
-  btn: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#1565c0', backgroundColor: '#fff' },
-  btnText: { fontSize: 13, color: '#1565c0', fontWeight: '600' },
+  btn: { alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center', paddingHorizontal: space.md, borderRadius: radius.control, borderWidth: 1, borderColor: color.border, backgroundColor: color.surface },
+  btnText: { ...font.captionBold, color: color.primary },
 });

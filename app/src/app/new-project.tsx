@@ -1,6 +1,6 @@
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { listProjects, type HomeProject } from '../home/data';
@@ -9,6 +9,7 @@ import { createProject, fetchProjects, type NewLevel, type NewProjectBody } from
 import { DEFAULT_EXPORT_TITLE, SetupError, addDraftLevels, createFailureText, normLevelCode, parseLevelRange, shareProblem } from '../setup/model';
 import { Btn, Check, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../setup/widgets';
 import { getSyncEngine } from '../sync/engine';
+import { Btn as UiBtn, color, font, radius, space, tabular } from '../ui';
 
 type DraftLevel = { code: string; inScope: boolean; shareWith: string | null; splitOf: string | null };
 
@@ -133,12 +134,10 @@ export default function NewProjectScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.side}>
-        <Link href="/projects" style={styles.back}>
-          ◀ Projects
-        </Link>
+        <UiBtn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} style={styles.back} />
         <Text style={styles.sideTitle}>New project</Text>
         {['1 Project', '2 Levels', '3 Sources', '4 Review drafts', '5 Place devices', '6 Lock baseline'].map((s, i) => (
-          <Text key={s} style={[styles.step, i > 1 && styles.stepDim]}>
+          <Text key={s} style={[styles.step, i < 2 && styles.stepOn, i > 1 && styles.stepDim]}>
             {s}
             {i < 2 ? '  ●' : ''}
           </Text>
@@ -210,6 +209,7 @@ export default function NewProjectScreen() {
               <Text style={w.label}>Add level</Text>
               <TextInput
                 style={w.input}
+                placeholderTextColor={color.text3}
                 value={newCode}
                 onChangeText={setNewCode}
                 placeholder="06M"
@@ -225,7 +225,7 @@ export default function NewProjectScreen() {
             <Btn title="+ Add level" onPress={addLevel} testID="newProject.addLevel" />
             <View style={{ width: 200 }}>
               <Text style={w.label}>Add range…</Text>
-              <TextInput style={w.input} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onFocus={toBottom} onSubmitEditing={addRange} />
+              <TextInput style={w.input} placeholderTextColor={color.text3} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onFocus={toBottom} onSubmitEditing={addRange} />
             </View>
             <Btn title="Add range" onPress={addRange} />
           </View>
@@ -234,9 +234,7 @@ export default function NewProjectScreen() {
 
         <Notice text={error} error />
         <View style={[w.row, { justifyContent: 'flex-end' }]}>
-          <Pressable onPress={() => router.back()} style={styles.cancel}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </Pressable>
+          <UiBtn title="Cancel" onPress={() => router.back()} />
           <Btn title={busy ? 'Creating…' : 'Create project'} primary onPress={() => void create()} disabled={busy} testID="newProject.create" />
         </View>
       </ScrollView>
@@ -245,24 +243,23 @@ export default function NewProjectScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: '#fff' },
-  side: { width: 220, backgroundColor: '#f3f5f8', borderRightWidth: 1, borderRightColor: '#d5d9e0', padding: 12, gap: 6 },
-  back: { fontSize: 15, color: '#1565c0', marginBottom: 8 },
-  sideTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  step: { fontSize: 15, paddingVertical: 6 },
-  stepDim: { color: '#9aa0a8' },
-  hint: { fontSize: 13, color: '#666' },
-  main: { padding: 20, gap: 8 },
-  flags: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  levelsHead: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e6e8ec' },
-  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
-  cN: { width: 28, fontSize: 14, color: '#555' },
+  root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
+  side: { width: 220, backgroundColor: color.surface2, borderRightWidth: 1, borderRightColor: color.hairline, padding: space.md, gap: space.xs },
+  back: { marginLeft: -space.md, marginBottom: space.sm },
+  sideTitle: { ...font.headline, color: color.text, marginBottom: space.sm },
+  step: { ...font.callout, color: color.text2, paddingVertical: 10, paddingHorizontal: space.md, borderRadius: radius.control },
+  stepOn: { color: color.text },
+  stepDim: { color: color.text3 },
+  hint: { ...font.caption, color: color.text3 },
+  main: { paddingHorizontal: space.xl, paddingVertical: space.lg, gap: space.sm },
+  flags: { flexDirection: 'row', flexWrap: 'wrap', gap: space.lg },
+  levelsHead: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  levelRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: color.hairline },
+  cN: { width: 28, ...font.callout, ...tabular, color: color.text3 },
   cCode: { width: 70 },
-  code: { fontSize: 17, fontWeight: '600' },
+  code: { ...font.headline, color: color.text },
   cScope: { width: 80 },
   cPick: { width: 190 },
   cActions: { flex: 1 },
   actions: { flexDirection: 'row', gap: 6, justifyContent: 'flex-end' },
-  cancel: { paddingHorizontal: 14, paddingVertical: 9 },
-  cancelText: { color: '#555', fontSize: 15 },
 });

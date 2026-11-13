@@ -31,6 +31,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: draft.cable.search
 - inputText: P-NSPS-D
+- pressKey: Enter          # closes the keyboard: since T180's panel the results can sit under it
+- waitForAnimationToEnd
 - tapOn: '◌ P-NSPS-D \(draft, 03\).*'
 - extendedWaitUntil:
     visible:

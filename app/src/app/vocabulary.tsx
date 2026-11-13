@@ -1,5 +1,5 @@
 import { Editor, LIBRARY_STREAM, OpError, ROLE, ROLE_LABEL, type Role, type Store } from '@field-survey/core';
-import { Link, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -10,6 +10,7 @@ import { useCurrentUser } from '../identity/IdentityGate';
 import { PIN_SHAPE_LABEL, PIN_SHAPE_NAMES, type PinShapeMap } from '../plan/pins';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
+import { Banner, Btn, Chip, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 import {
   acceptValue,
   addPair,
@@ -130,60 +131,54 @@ export default function VocabularyScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.head}>
-        <Link dismissTo href={{ pathname: '/', params: projectId ? { project: projectId } : {} }} style={styles.link}>
-          ◀ Levels
-        </Link>
-        <Text style={styles.title}>Vocabulary</Text>
-        {!app ? (
-          <Pressable
-            disabled={!editor || !projectId}
-            onPress={() =>
-              run(async (e, s) => {
-                const n = await copyAppVocab(e, s, projectId!);
-                setNote(n ? `Copied ${n} value${n === 1 ? '' : 's'} from the app library.` : 'This project already has every accepted app value.');
-              })
-            }
-            style={styles.btnPlain}>
-            <Text style={styles.link}>Copy from app library</Text>
-          </Pressable>
-        ) : null}
-        <Pressable
-          disabled={!editor}
-          onPress={() =>
-            run(async (e, s) => {
-              const n = await loadStandard(e, s);
-              const what = app ? `${n.values} draft${n.values === 1 ? '' : 's'} to the app library` : `${n.values} value${n.values === 1 ? '' : 's'} and ${n.placeholders} placeholder${n.placeholders === 1 ? '' : 's'}`;
-              setNote(n.values || n.placeholders ? `Added ${what}.` : 'Everything standard is already here.');
-            })
-          }
-          style={styles.btn}
-          testID="vocab.loadStandard">
-          <Text style={styles.btnText}>Load standard lists</Text>
-        </Pressable>
-      </View>
-      <View style={styles.tabs}>
+      <PageHeader
+        title="Vocabulary"
+        caption="The words the pickers offer, the BOM's spellings, the pin shapes and the placeholder endpoints."
+        actions={
+          <>
+            <Btn kind="tertiary" title="◀ Levels" onPress={() => router.dismissTo({ pathname: '/', params: projectId ? { project: projectId } : {} })} />
+            {!app ? (
+              <Btn
+                title="Copy from app library"
+                disabled={!editor || !projectId}
+                onPress={() =>
+                  run(async (e, s) => {
+                    const n = await copyAppVocab(e, s, projectId!);
+                    setNote(n ? `Copied ${n} value${n === 1 ? '' : 's'} from the app library.` : 'This project already has every accepted app value.');
+                  })
+                }
+              />
+            ) : null}
+            <Btn
+              kind="primary"
+              title="Load standard lists"
+              disabled={!editor}
+              onPress={() =>
+                run(async (e, s) => {
+                  const n = await loadStandard(e, s);
+                  const what = app ? `${n.values} draft${n.values === 1 ? '' : 's'} to the app library` : `${n.values} value${n.values === 1 ? '' : 's'} and ${n.placeholders} placeholder${n.placeholders === 1 ? '' : 's'}`;
+                  setNote(n.values || n.placeholders ? `Added ${what}.` : 'Everything standard is already here.');
+                })
+              }
+              testID="vocab.loadStandard"
+            />
+          </>
+        }
+      />
+      <FilterRow>
         {(['project', 'app'] as const).map((s) => (
-          <Pressable key={s} onPress={() => setScope(s)} style={[styles.chip, scope === s && styles.chipOn]} testID={`vocab.scope.${s}`}>
-            <Text style={scope === s ? styles.chipTextOn : styles.chipText}>{s === 'project' ? 'This project' : 'App library'}</Text>
-          </Pressable>
+          <Chip key={s} small selected={scope === s} onPress={() => setScope(s)} label={s === 'project' ? 'This project' : 'App library'} testID={`vocab.scope.${s}`} />
         ))}
         <Text style={[styles.sub, styles.grow]}>
           {app ? '  Drafts here are for Landry to accept; new projects copy the accepted values.' : '  This project only. Promote a value to offer it to every new project.'}
         </Text>
-      </View>
-      <View style={styles.tabs}>
+      </FilterRow>
+      <FilterRow style={styles.tabs}>
         {tabs.map((t) => (
-          <Pressable key={t} onPress={() => setTab(t)} style={[styles.tab, shown === t && styles.tabOn]} testID={`vocab.tab.${t}`}>
-            <Text style={shown === t ? styles.tabTextOn : styles.tabText}>{tabText(t)}</Text>
-          </Pressable>
+          <Chip key={t} selected={shown === t} onPress={() => setTab(t)} label={tabText(t)} testID={`vocab.tab.${t}`} />
         ))}
-      </View>
-      {note ? (
-        <Text style={styles.note} testID="vocab.note">
-          {note}
-        </Text>
-      ) : null}
+      </FilterRow>
+      {note ? <Banner text={note} testID="vocab.note" style={styles.note} /> : null}
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {shown === 'lists'
           ? VOCAB_LISTS.map((l) => <ListSection key={`${scope}-${l.list}`} list={l.list} title={l.title} hint={l.hint} entries={lists?.[l.list] ?? []} canEdit={!!editor} run={run} promote={promote} />)
@@ -208,12 +203,8 @@ function ValueRow(props: { e: VocabEntry; canEdit: boolean; run: RunFn; promote:
     return (
       <View style={styles.row}>
         <TextInput value={editing} onChangeText={setEditing} style={[styles.input, styles.grow]} autoFocus testID="vocab.rename.input" />
-        <Pressable onPress={async () => (await run((ed, s) => renameValue(ed, s, e.id, editing))) && setEditing(null)} style={styles.btn} testID="vocab.rename.save">
-          <Text style={styles.btnText}>Save</Text>
-        </Pressable>
-        <Pressable onPress={() => setEditing(null)}>
-          <Text style={styles.link}>Cancel</Text>
-        </Pressable>
+        <Btn kind="primary" title="Save" onPress={async () => (await run((ed, s) => renameValue(ed, s, e.id, editing))) && setEditing(null)} testID="vocab.rename.save" />
+        <Btn title="Cancel" onPress={() => setEditing(null)} />
       </View>
     );
   }
@@ -227,19 +218,19 @@ function ValueRow(props: { e: VocabEntry; canEdit: boolean; run: RunFn; promote:
       {props.canEdit ? (
         <>
           {e.draft ? (
-            <Pressable onPress={() => run((ed) => acceptValue(ed, e.id))} testID={`vocab.accept.${e.value}`}>
+            <Pressable onPress={() => run((ed) => acceptValue(ed, e.id))} hitSlop={space.md} testID={`vocab.accept.${e.value}`}>
               <Text style={styles.link}>Accept</Text>
             </Pressable>
           ) : null}
-          <Pressable onPress={() => setEditing(e.value)} testID={`vocab.edit.${e.value}`}>
+          <Pressable onPress={() => setEditing(e.value)} hitSlop={space.md} testID={`vocab.edit.${e.value}`}>
             <Text style={styles.link}>Edit</Text>
           </Pressable>
           {props.promote && !e.draft ? (
-            <Pressable onPress={() => props.promote!(e.id)}>
+            <Pressable onPress={() => props.promote!(e.id)} hitSlop={space.md}>
               <Text style={styles.link}>Promote</Text>
             </Pressable>
           ) : null}
-          <Pressable onPress={() => run((ed, s) => removeValue(ed, e.id, s))} testID={`vocab.remove.${e.value}`}>
+          <Pressable onPress={() => run((ed, s) => removeValue(ed, e.id, s))} hitSlop={space.md} testID={`vocab.remove.${e.value}`}>
             <Text style={styles.danger}>Remove</Text>
           </Pressable>
         </>
@@ -262,13 +253,8 @@ function ListSection(props: { list: VocabListKey; title: string; hint: string; e
       ))}
       {props.canEdit ? (
         <View style={styles.row}>
-          <TextInput value={text} onChangeText={setText} placeholder="Add a value" placeholderTextColor="#888" style={[styles.input, styles.grow]} testID={`vocab.add.${list}.input`} />
-          <Pressable
-            disabled={!text.trim()}
-            onPress={async () => (await run((ed, s) => addValue(ed, s, list, text))) && setText('')}
-            style={[styles.btn, !text.trim() && styles.off]} testID={`vocab.add.${list}`}>
-            <Text style={styles.btnText}>Add</Text>
-          </Pressable>
+          <TextInput value={text} onChangeText={setText} placeholder="Add a value" placeholderTextColor={color.text3} style={[styles.input, styles.grow]} testID={`vocab.add.${list}.input`} />
+          <Btn kind="primary" title="Add" disabled={!text.trim()} onPress={async () => (await run((ed, s) => addValue(ed, s, list, text))) && setText('')} testID={`vocab.add.${list}`} />
         </View>
       ) : null}
     </View>
@@ -299,15 +285,10 @@ function PairSection(props: { spec: (typeof VOCAB_PAIR_LISTS)[number]; pairs: Vo
       ))}
       {props.canEdit ? (
         <View style={styles.row}>
-          <TextInput value={raw} onChangeText={setRaw} placeholder={spec.variant} placeholderTextColor="#888" autoCapitalize="none" style={[styles.input, styles.grow]} />
+          <TextInput value={raw} onChangeText={setRaw} placeholder={spec.variant} placeholderTextColor={color.text3} autoCapitalize="none" style={[styles.input, styles.grow]} />
           <Text style={styles.value}>→</Text>
-          <TextInput value={canonical} onChangeText={setCanonical} placeholder={spec.canonical} placeholderTextColor="#888" autoCapitalize="none" style={[styles.input, styles.grow]} />
-          <Pressable
-            disabled={!ready}
-            onPress={async () => (await run((ed, s) => addPair(ed, s, spec.list, raw, canonical))) && (setRaw(''), setCanonical(''))}
-            style={[styles.btn, !ready && styles.off]}>
-            <Text style={styles.btnText}>Add</Text>
-          </Pressable>
+          <TextInput value={canonical} onChangeText={setCanonical} placeholder={spec.canonical} placeholderTextColor={color.text3} autoCapitalize="none" style={[styles.input, styles.grow]} />
+          <Btn kind="primary" title="Add" disabled={!ready} onPress={async () => (await run((ed, s) => addPair(ed, s, spec.list, raw, canonical))) && (setRaw(''), setCanonical(''))} />
         </View>
       ) : null}
     </View>
@@ -332,15 +313,15 @@ function PinShapes(props: { shapes: PinShapeMap | null; canEdit: boolean; run: R
           </Text>
           <View style={styles.wrap}>
             {PIN_SHAPE_NAMES.map((name) => (
-              <Pressable
+              <Chip
                 key={name}
+                small
                 disabled={!props.canEdit}
                 onPress={() => props.run((e, s) => setPinShape(e, s, role, name))}
-                style={[styles.chip, shapes[role] === name && styles.chipOn]} accessibilityState={{ selected: shapes[role] === name }} testID={`vocab.shape.${role}.${name}`}>
-                <Text style={shapes[role] === name ? styles.chipTextOn : styles.chipText}>
-                  {PIN_SHAPE_LABEL[name].glyph} {PIN_SHAPE_LABEL[name].label}
-                </Text>
-              </Pressable>
+                selected={shapes[role] === name}
+                label={`${PIN_SHAPE_LABEL[name].glyph} ${PIN_SHAPE_LABEL[name].label}`}
+                testID={`vocab.shape.${role}.${name}`}
+              />
             ))}
           </View>
         </View>
@@ -367,22 +348,18 @@ function Placeholders(props: { items: PlaceholderEntry[]; canEdit: boolean; run:
               editing?.id === p.id ? (
                 <View key={p.id} style={styles.row}>
                   <TextInput value={editing.text} onChangeText={(t) => setEditing({ id: p.id, text: t })} style={[styles.input, styles.grow]} autoFocus />
-                  <Pressable onPress={async () => (await run((ed, s) => editPlaceholder(ed, s, p.id, { label: editing.text }))) && setEditing(null)} style={styles.btn}>
-                    <Text style={styles.btnText}>Save</Text>
-                  </Pressable>
-                  <Pressable onPress={() => setEditing(null)}>
-                    <Text style={styles.link}>Cancel</Text>
-                  </Pressable>
+                  <Btn kind="primary" title="Save" onPress={async () => (await run((ed, s) => editPlaceholder(ed, s, p.id, { label: editing.text }))) && setEditing(null)} />
+                  <Btn title="Cancel" onPress={() => setEditing(null)} />
                 </View>
               ) : (
                 <View key={p.id} style={styles.row}>
                   <Text style={[styles.value, styles.grow]}>{p.label}</Text>
                   {props.canEdit ? (
                     <>
-                      <Pressable onPress={() => setEditing({ id: p.id, text: p.label })}>
+                      <Pressable onPress={() => setEditing({ id: p.id, text: p.label })} hitSlop={space.md}>
                         <Text style={styles.link}>Edit</Text>
                       </Pressable>
-                      <Pressable onPress={() => run((ed, s) => removePlaceholder(ed, s, p.id))} testID={`vocab.placeholder.remove.${p.label}`}>
+                      <Pressable onPress={() => run((ed, s) => removePlaceholder(ed, s, p.id))} hitSlop={space.md} testID={`vocab.placeholder.remove.${p.label}`}>
                         <Text style={styles.danger}>Remove</Text>
                       </Pressable>
                     </>
@@ -399,19 +376,12 @@ function Placeholders(props: { items: PlaceholderEntry[]; canEdit: boolean; run:
           <Text style={styles.sectionTitle}>Add a placeholder</Text>
           <View style={styles.wrap}>
             {KINDS.map((k) => (
-              <Pressable key={k} onPress={() => setKind(k)} style={[styles.chip, kind === k && styles.chipOn]}>
-                <Text style={kind === k ? styles.chipTextOn : styles.chipText}>{PLACEHOLDER_KIND_LABEL[k]}</Text>
-              </Pressable>
+              <Chip key={k} small onPress={() => setKind(k)} selected={kind === k} label={PLACEHOLDER_KIND_LABEL[k]} />
             ))}
           </View>
           <View style={styles.row}>
-            <TextInput value={text} onChangeText={setText} placeholder="Label" placeholderTextColor="#888" style={[styles.input, styles.grow]} />
-            <Pressable
-              disabled={!text.trim()}
-              onPress={async () => (await run((ed, s) => addPlaceholder(ed, s, text, kind))) && setText('')}
-              style={[styles.btn, !text.trim() && styles.off]}>
-              <Text style={styles.btnText}>Add</Text>
-            </Pressable>
+            <TextInput value={text} onChangeText={setText} placeholder="Label" placeholderTextColor={color.text3} style={[styles.input, styles.grow]} />
+            <Btn kind="primary" title="Add" disabled={!text.trim()} onPress={async () => (await run((ed, s) => addPlaceholder(ed, s, text, kind))) && setText('')} />
           </View>
         </View>
       ) : null}
@@ -420,35 +390,21 @@ function Placeholders(props: { items: PlaceholderEntry[]; canEdit: boolean; run:
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingVertical: 12 },
-  title: { fontSize: 24, fontWeight: '600', flex: 1 },
-  link: { color: '#1f6feb', fontSize: 16 },
-  danger: { color: '#b3261e', fontSize: 16 },
-  tabs: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingBottom: 8 },
-  tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: '#c9ccd1' },
-  tabOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  tabText: { color: '#111' },
-  tabTextOn: { color: '#fff' },
-  note: { paddingHorizontal: 20, paddingBottom: 8, color: '#b3261e', fontSize: 14 },
-  body: { padding: 20, gap: 20, borderTopWidth: 1, borderTopColor: '#e1e4e8' },
-  section: { gap: 8 },
-  group: { gap: 6, marginTop: 8 },
-  indent: { paddingLeft: 24 },
-  sectionTitle: { fontSize: 17, fontWeight: '600' },
-  sub: { fontSize: 13, color: '#666', fontWeight: '400' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eef0f3' },
+  root: { flex: 1, backgroundColor: color.bg },
+  link: { ...font.callout, color: color.primary },
+  danger: { ...font.callout, color: color.danger },
+  tabs: { paddingBottom: space.sm },
+  note: { marginHorizontal: PAGE_GUTTER, marginBottom: space.sm },
+  body: { paddingHorizontal: PAGE_GUTTER, paddingTop: space.sm, paddingBottom: space.xl, gap: space.lg },
+  section: { gap: space.sm, backgroundColor: color.surface, borderWidth: 1, borderColor: color.hairline, borderRadius: radius.card, paddingVertical: space.lg, paddingHorizontal: 20 },
+  group: { gap: 6, marginTop: space.sm },
+  indent: { paddingLeft: space.xl },
+  sectionTitle: { ...font.headline, color: color.text },
+  sub: { ...font.caption, color: color.text3, fontWeight: '400' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 6, minHeight: 44, borderBottomWidth: 1, borderBottomColor: color.hairline },
   grow: { flex: 1 },
-  value: { fontSize: 16 },
-  draft: { fontSize: 12, color: '#9a6700', fontWeight: '700' },
-  input: { borderWidth: 1, borderColor: '#c9ccd1', borderRadius: 8, padding: 10, fontSize: 16, minHeight: 44 },
-  btn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#1565c0' },
-  btnPlain: { paddingHorizontal: 6, paddingVertical: 10 },
-  btnText: { color: '#fff', fontWeight: '600' },
-  off: { opacity: 0.4 },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#c9ccd1' },
-  chipOn: { backgroundColor: '#1565c0', borderColor: '#1565c0' },
-  chipText: { color: '#111' },
-  chipTextOn: { color: '#fff' },
+  value: { ...font.body, color: color.text },
+  draft: { ...font.badge, color: color.warning },
+  input: fieldStyles.input,
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
 });

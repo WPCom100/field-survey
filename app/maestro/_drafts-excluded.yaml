@@ -27,5 +27,6 @@ appId: productions.luminarytechnology.fieldsurvey
 - scrollUntilVisible:
     element: '.*BOM↑.*'
     direction: UP
+    centerElement: true    # else it can stop with the row above the list's top edge, and the tap hits the status bar (T180)
 - tapOn: '.*BOM↑.*'
 - assertVisible: 'Category — pick one'
