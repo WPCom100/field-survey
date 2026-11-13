@@ -84,6 +84,9 @@ name: Sheets — the current DaVinci categories correct the ERn type
 - tapOn:                     # a tap lands mid-word and eraseText deletes only before the cursor
     id: library.search
 - eraseText: 30
+- tapOn:                     # a third pass: the narrower box since T180 leaves a long query's tail
+    id: library.search
+- eraseText: 30
 - inputText: ERn2-W-120
 - pressKey: Enter          # closes the keyboard: it covers the Save footer
 - assertVisible: '(▾ |▸ )?Equipment Panels.*'
@@ -97,6 +100,9 @@ name: Sheets — the current DaVinci categories correct the ERn type
     id: library.search
 - eraseText: 30
 - tapOn:                     # a tap lands mid-word and eraseText deletes only before the cursor
+    id: library.search
+- eraseText: 30
+- tapOn:                     # a third pass: the narrower box since T180 leaves a long query's tail
     id: library.search
 - eraseText: 30
 - inputText: P-NSPS-D

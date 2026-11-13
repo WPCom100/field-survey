@@ -31,11 +31,16 @@ name: Riser — a cached crop offline; a riser cable accepted offline
     id: drafts.level.06
 - tapOn:
     id: drafts.tab.devices
-- extendedWaitUntil:
-    visible: 'Excluded BOM lines: needs a connection to the server\.'
+- scrollUntilVisible:              # under 06's mismatch list, below the fold since T180's wrapping
+    element: 'Excluded BOM lines: needs a connection to the server\.'
+    direction: DOWN
     timeout: 30000
 - tapOn:
     id: drafts.tab.cables
+- scrollUntilVisible:              # the list may keep the devices tab's scroll
+    element: '.*X, .*, B7 Stair A fixture, .*'
+    direction: UP
+    centerElement: true
 - tapOn: '.*X, .*, B7 Stair A fixture, .*'
 - tapOn:
     id: draft.cable.confirm

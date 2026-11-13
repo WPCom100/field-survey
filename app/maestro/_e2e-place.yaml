@@ -2,7 +2,8 @@
 # proposals at their tags, and a faint guess by type for the EBDK beside CT06LCPB (D234); the rack
 # has none (the master: "Stair A Vestibule", left of CT06LCPB) and is placed from the list. The
 # proposal spots are whole percentages on the rig's "Field Survey iPad" at fit, portrait (read off a
-# screenshot, T49): a tap that lands elsewhere fails the place.selected assertion, not silently.
+# screenshot, T49; read again in T180: T177's 72-pt rail moved the sheet right): a tap that lands
+# elsewhere fails the place.selected assertion, not silently.
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - tapOn:
@@ -20,24 +21,24 @@ appId: productions.luminarytechnology.fieldsurvey
 - runFlow:
     file: _e2e-place-proposal.yaml
     env:
-      AT: 28%,51%
+      AT: 32%,50%
       ITEM: 'CT06LCPA \(UFMP8\).*'
 - runFlow:
     file: _e2e-place-proposal.yaml
     env:
-      AT: 23%,43%
+      AT: 28%,43%
       ITEM: 'CT06LCPB \(ERP24-FT-241P\).*'
 - runFlow:
     file: _e2e-place-proposal.yaml
     env:
-      AT: 25%,43%
+      AT: 30%,43%
       ITEM: 'EBDK .*'
 # the rack from the list, left of CT06LCPB
 - runFlow:
     file: _place-one.yaml
     env:
       ROW: '.*ERN4-RM-120.*'
-      AT: 20%,45%
+      AT: 25%,45%
       PLACED: 'Placed 06M-\? .*'
 - assertVisible: 'Placed 4 of 4.*'
 - assertNotVisible:
