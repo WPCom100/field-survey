@@ -31,15 +31,15 @@ The flow also asserts the Sync screen's timing line on a quiet cycle (`Last cycl
 2026-11-05, rig server with 19 other projects (pickup and wave 2 runs, the seed and the pipeline
 projects), so the download is 55–59 thousand ops of which Maestro scale is most.
 
-| Key | Run 1 (ceilings set from it) | Run 2 | Ceiling |
-|---|---|---|---|
-| download (ops) | 58,070 | 58,917 | — |
-| `download_cycle_ms` | 99,100 | 104,982 | 200,000 |
-| `download_apply_ms` | 96,004 | 99,945 | 200,000 |
-| `rules_first_ms` | 6,617 (1,612 ops: the project's first ever run writes its 526 proposals and 1,086 findings) | 714 (0 ops: run 1's were pulled down) | 15,000 |
-| `quiet_cycle_ms` | 769 | 842 | 2,000 |
-| `sheet_loaded_ms` (06M, 1,000 pins) | 1,243 | 1,247 | 3,000 |
-| `demo_sheet_loaded_ms` (500 pins) | 971 | 424 | 2,500 |
+| Key | Run 1 (ceilings set from it) | Run 2 | T181 (2026-11-13) | Ceiling |
+|---|---|---|---|---|
+| download (ops) | 58,070 | 58,917 | 32,707 | — |
+| `download_cycle_ms` | 99,100 | 104,982 | 48,583 | 200,000 |
+| `download_apply_ms` | 96,004 | 99,945 | 46,907 | 200,000 |
+| `rules_first_ms` | 6,617 (1,612 ops: the project's first ever run writes its 526 proposals and 1,086 findings) | 714 (0 ops: run 1's were pulled down) | 6,396 (the project's first run, as run 1; a store that then pulled it: 808 ms, 0 ops) | 15,000 |
+| `quiet_cycle_ms` | 769 | 842 | 660 | 2,000 |
+| `sheet_loaded_ms` (06M, 1,000 pins) | 1,243 | 1,247 | 389 | 3,000 |
+| `demo_sheet_loaded_ms` (500 pins) | 971 | 424 | 338 | 2,500 |
 
 A whole run takes about 4 minutes. What it tells you:
 
@@ -51,6 +51,14 @@ A whole run takes about 4 minutes. What it tells you:
   store reads them instead and its run is under a second.
 - **A quiet cycle with 20 projects** stays under a second; the 06M composite with 1,000 pins opens
   in about 1.2 s, the 500-pin demo in 0.4–1.0 s.
+
+**T181 (2026-11-13, after the UI makeover T174–T184).** A freshly reset rig server holding only
+Maestro scale, so the download is smaller (32,707 ops); per op it is 1.4 ms against 1.7, the
+first rules run on the new project 6.4 s against 6.6, a quiet cycle 0.66 s against 0.77–0.84,
+and B's run on the pulled project (`long-export-prep`) 808 ms against 714. All within noise: nothing in
+`packages/core` or `packages/rules` changed since T182 (the app's sync glue gained T185's `useReload`). The plans opened faster than on 2026-11-05
+(389 / 338 ms against 1,243 / 424–971); not investigated, and only a slowdown would matter. The same session's `rig.sh long-export` workbook: Reading 0.4 s, Photo Log 6.2 s,
+Writing 8.3 s, Comparing 0.5 s, **16 s** (the T171 read-only compare row below, within noise).
 
 ## The export of Maestro scale (T165)
 

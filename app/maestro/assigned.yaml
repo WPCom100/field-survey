@@ -63,11 +63,12 @@ name: Assigned — 06M to Bob, the network-kit flag, an owner change for B
     notVisible:
       id: 'proposal\.accept\.Network termination kit - .* run'
     timeout: 10000
+# the new part is listed after the rack's other eight, below the fold since the card's rows grew
+# (T175): scroll to its own row, not to the section header (T181)
 - runFlow:
     file: _side-down.yaml
     env:
-      ID: card.section.parts
-- assertVisible: '.*Network termination kit - .* run.*'
+      ID: 'card\.part\.Network termination kit - .* run'
 - tapOn:
     id: card.close
 - tapOn:

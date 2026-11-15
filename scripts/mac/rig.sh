@@ -268,6 +268,14 @@ cmd_setup() {
   say "ready"
 }
 
+clear_app_data() {  # <udid>: the app's local store, files and settings gone, as Maestro's clearState does
+  local d
+  xcrun simctl terminate "$1" "$BUNDLE" >/dev/null 2>&1 || true
+  d="$(xcrun simctl get_app_container "$1" "$BUNDLE" data 2>/dev/null)" || return 0
+  case "$d" in */Containers/Data/Application/*) ;; *) return 0 ;; esac
+  rm -rf "$d"/Documents/* "$d"/Library/* "$d"/tmp/*
+}
+
 cmd_server() {
   cd "$ROOT/server"
   case "${1:-up}" in
@@ -303,6 +311,9 @@ cmd_server() {
       for sim in "$SIM_A" "$SIM_B"; do
         u="$(sim_udid "$sim")"
         [ -n "$u" ] && xcrun simctl keychain "$u" reset && say "keychain reset on \"$sim\""
+        # ...and its store still lists the old server's projects: every pull of them is a 404 and the
+        # whole cycle fails, so a flow that resumes the store (the peer flows) never pushes (T181)
+        [ -n "$u" ] && clear_app_data "$u" && say "app data cleared on \"$sim\""
       done
       say "server data wiped; run 'rig.sh server' again" ;;
     *) die "server [stop|start|reset]" ;;
@@ -920,6 +931,25 @@ for e in sorted(json.load(sys.stdin), key=lambda e: e["created_at"] or "", rever
 '
 }
 
+# Pause the worker between two of its transactions. At 0.1 CPU a `docker pause` can land between a
+# progress write's UPDATE and its COMMIT; the frozen session then holds the export row's lock and
+# B's Cancel waits on it until unpause, so "Cancelling (Bob)…" never shows (T181, long-export run 2).
+# A session left "idle in transaction" after an UPDATE of `export` is that case (the job's own long
+# read transaction is idle in transaction too, but holds no row lock): unpause, let it commit, retry.
+pause_worker_clean() {
+  local worker="$1" open
+  for _ in $(seq 1 20); do
+    docker pause "$worker" >/dev/null
+    sleep 1
+    open="$(cd "$ROOT/server" && $COMPOSE exec -T postgres sh -c \
+      'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "select count(*) from pg_stat_activity where state like '"'"'idle in transaction%'"'"' and query ilike '"'"'update export%'"'"'"')"
+    [ "${open:-1}" = 0 ] && return 0
+    docker unpause "$worker" >/dev/null
+    sleep 0.5
+  done
+  die "the worker kept a transaction open at every pause"
+}
+
 cmd_long_export() {  # T165 (R6 rest, T93): a long workbook export of SCALE on two iPads
   local worker all cpus="${RIG_EXPORT_CPUS:-0.1}" id st by n rows a b
   server_up
@@ -949,7 +979,7 @@ cmd_long_export() {  # T165 (R6 rest, T93): a long workbook export of SCALE on t
   docker update --cpus "$cpus" "$worker" >/dev/null
   PROJECT="$SCALE_PROJECT" USER_NAME=Ann cmd_flows --device A long-export.yaml
   # paused, the job cannot reach its next step: "Cancelling (Bob)…" stays on both iPads until unpause
-  docker pause "$worker" >/dev/null
+  pause_worker_clean "$worker"
   say "worker paused: Ann's export stays running while B looks at it and cancels it"
   PROJECT="$SCALE_PROJECT" USER_NAME=Bob cmd_flows --device B long-export-peer.yaml
   PROJECT="$SCALE_PROJECT" USER_NAME=Ann cmd_flows --device A long-export-cancelling.yaml
