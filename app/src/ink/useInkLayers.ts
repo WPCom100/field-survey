@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { prepareText, readCachedText, register } from '../blobs/store-bytes';
 import { logTo } from '../log';
+import { useReload } from '../sync/useReload';
 import { UNDO_LIMIT } from './history';
 import { INK_MERGE_PREFIX, listToSave, loadInkLayers, ownLayer, reconcileInkLayer, saveInkLayer } from './model';
 
@@ -126,19 +127,32 @@ export function useInkLayers(opts: {
     [editor, sheetId, queue],
   );
 
-  // --- load every layer of the sheet; merge concurrent writes pulled since (D129)
-  useEffect(() => {
-    if (!sheetId || !queue) return;
-    let active = true;
-    (async () => {
-      const rows = await loadInkLayers(store, sheetId);
+  // --- load every layer of the sheet; merge concurrent writes pulled since (D129). T186: a pull
+  // during a load no longer throws it away (useReload); only another sheet, user or editor does.
+  const subject = sheetId && queue ? `${sheetId}|${userId ?? ''}|${editor?.projectId ?? ''}` : null;
+  const shown = useRef(subject);
+  shown.current = subject;
+  useEffect(
+    () => () => {
+      shown.current = null;
+    },
+    [],
+  );
+  useReload({
+    name: 'ink',
+    subject,
+    reloadKey,
+    load: async () => {
+      const started = subject;
+      const active = () => shown.current === started;
+      const rows = await loadInkLayers(store, sheetId!);
       const own = userId ? ownLayer(rows, userId) : null;
       let gone = 0;
       for (const row of rows) {
         // two iPads wrote this layer from the same copy: merge them before showing it
         if (editor && row.blob) {
           const r = await reconcileInkLayer(store, row.id, readList).catch((e: unknown) => (console.warn('[plan] ink merge', e), null));
-          if (r && active) {
+          if (r && active()) {
             const sha = (await prepareText(serializeStrokeList(r.merged), 'ink')).sha256;
             if (sha !== row.blob) {
               const w = await writeBlob(row.id, r.merged, `${INK_MERGE_PREFIX}${r.mergedOpIds.join(',')}`);
@@ -159,7 +173,9 @@ export function useInkLayers(opts: {
         if (own && row.id === own.id) layers.current.delete(OWN_NEW);
         layers.current.set(key, { layerId: row.id, userId: row.userId, list, base: list, baseBlob: row.blob, dirty: false });
       }
-      if (!active) return;
+      return { layers: rows.length, gone };
+    },
+    apply: ({ layers: count, gone }) => {
       setMissing(gone);
       publish();
       // what the sheet shows, to the log file (`rig.sh log B ink_loaded`: B has A's strokes, T158)
@@ -170,12 +186,10 @@ export function useInkLayers(opts: {
         if (l.userId === userId) mine += n;
         else others += n;
       }
-      logTo('plan', 'info', 'ink_loaded', { layers: rows.length, mine, others });
-    })().catch((e: unknown) => active && setError(String(e)));
-    return () => {
-      active = false;
-    };
-  }, [store, editor, sheetId, userId, queue, reloadKey, readList, writeBlob, publish]);
+      logTo('plan', 'info', 'ink_loaded', { layers: count, mine, others });
+    },
+    fail: (e) => setError(String(e)),
+  });
 
   /** Write every changed layer, each merged with its newest copy first. */
   const write = useCallback(async () => {

@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { handRuling } from '../rulings/handoff';
+import { useReload } from '../sync/useReload';
 import { Btn, ChipPicker, Notice, styles as w } from '../setup/widgets';
 import { Chip, color, font, hit, radius, space } from '../ui';
 import { engineFor } from './engine';
@@ -62,16 +63,15 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
     }, [findRetrofit]),
   );
 
-  useEffect(() => {
-    let live = true;
-    loadRuleParamRows(store, scope).then(
-      (rows) => live && setGroups(paramGroups(rows, { app })),
-      (e: unknown) => live && setError(`Could not read the rule settings: ${String(e)}`),
-    );
-    return () => {
-      live = false;
-    };
-  }, [store, scope, app, tick, dataKey]);
+  // T186: a pull during a load no longer throws it away (useReload)
+  useReload({
+    name: 'rule_params',
+    subject: scope ?? 'app',
+    reloadKey: `${tick}|${String(dataKey)}`,
+    load: () => loadRuleParamRows(store, scope),
+    apply: (rows) => setGroups(paramGroups(rows, { app })),
+    fail: (e) => setError(`Could not read the rule settings: ${String(e)}`),
+  });
 
   const run = useCallback(async (fn: () => Promise<number>, done: string, after?: () => Promise<void>) => {
     setError(null);

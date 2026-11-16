@@ -103,7 +103,7 @@ import { ruleDecider } from '../rules/engine';
 import { useRulesVersion } from '../rules/useRulesVersion';
 import { logTo } from '../log';
 import { LIST_ENTITY } from '../rulings/model';
-import { useReload } from '../sync/useReload';
+import { useIdentityKey, useReload } from '../sync/useReload';
 import type { PhotoTarget } from '../photo/model';
 import { PhotoFlow, pickFromLibrary, type PhotoRequest } from '../photo/PhotoFlow';
 import { Btn, Chip, Icon, RAIL_WIDTH, Rail, Sidebar, Swatch, color, font, hit, radius, shadow, space, tabular, type IconName } from '../ui';
@@ -372,16 +372,17 @@ export function PlanScreen(props: PlanScreenProps) {
   const [conflictNote, setConflictNote] = useState<string | null>(null);
   const names = props.names ?? NO_NAMES;
   useEffect(() => {
-    if (!reviewItemId || !plan) return setPinConflict(null);
-    let active = true;
-    loadPinConflict(store, reviewItemId, plan.sheet?.id ?? null, names).then(
-      (c) => active && setPinConflict(c),
-      (e: unknown) => active && setConflictNote(String(e)),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, reviewItemId, plan, names]);
+    if (!reviewItemId || !plan) setPinConflict(null);
+  }, [reviewItemId, plan]);
+  // T186: reloads with every plan load; one that lands during a load no longer throws it away
+  useReload({
+    name: 'pin_conflict',
+    subject: reviewItemId && plan ? `${reviewItemId}|${plan.sheet?.id ?? ''}` : null,
+    reloadKey: useIdentityKey(plan, names),
+    load: () => loadPinConflict(store, reviewItemId!, plan!.sheet?.id ?? null, names),
+    apply: setPinConflict,
+    fail: (e) => setConflictNote(String(e)),
+  });
 
   const projectId = plan?.level.projectId ?? null;
   const editor = useMemo(
@@ -392,20 +393,19 @@ export function PlanScreen(props: PlanScreenProps) {
 
   // --- Place devices (T46): the level's unplaced list while the panel is open
   useEffect(() => {
-    if (!placing || !projectId) return setUnplaced(null);
-    let active = true;
-    loadUnplaced(store, projectId, levelId).then(
-      (u) => {
-        if (!active) return;
-        setUnplaced(u);
-        console.log(`[plan] place: ${u?.items.length ?? 0} unplaced, ${u?.flagged.length ?? 0} flagged`);
-      },
-      (e: unknown) => console.warn('[plan] unplaced list not loaded', e),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, projectId, levelId, placing, edits, reloadKey]);
+    if (!placing || !projectId) setUnplaced(null);
+  }, [placing, projectId]);
+  useReload({
+    name: 'unplaced',
+    subject: placing && projectId ? `${projectId}|${levelId}` : null,
+    reloadKey: `${String(reloadKey)}|${edits}`,
+    load: () => loadUnplaced(store, projectId!, levelId),
+    apply: (u) => {
+      setUnplaced(u);
+      console.log(`[plan] place: ${u?.items.length ?? 0} unplaced, ${u?.flagged.length ?? 0} flagged`);
+    },
+    fail: (e) => console.warn('[plan] unplaced list not loaded', e),
+  });
   const startPlacing = useCallback(() => {
     setPlacing(true);
     setGridOpen(false);

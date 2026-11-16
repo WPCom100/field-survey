@@ -37,6 +37,7 @@ import {
   type LibraryView,
 } from './model';
 import { loadSuggestions, type Suggestion } from '../suggestions/model';
+import { useReload } from '../sync/useReload';
 import { SuggestionList, SuggestionsPane } from './SuggestionEditor';
 import { Banner, Btn, Chip, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 
@@ -67,7 +68,7 @@ export function LibraryScreen(props: {
   scope: string | null;
   /** Opens Needs review for this library's conflicts. */
   onOpenReview?: () => void;
-  /** Changes when a pull brought new ops (reload). */
+  /** Changes when a pull brought new ops for this library (reload; `projectDataKey`). */
   dataKey: string;
   names: ReadonlyMap<string, string>;
   header: React.ReactNode;
@@ -79,21 +80,18 @@ export function LibraryScreen(props: {
   const [tick, setTick] = useState(0);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
 
-  useEffect(() => {
-    if (!store) return;
-    let live = true;
-    Promise.all([loadLibrary(store, scope), loadSuggestions(store, scope)]).then(
-      ([v, c]) => {
-        if (!live) return;
-        setView(v);
-        setChips(c);
-      },
-      (e: unknown) => live && setNote({ text: String(e), error: true }),
-    );
-    return () => {
-      live = false;
-    };
-  }, [store, scope, tick, props.dataKey]);
+  // T186: a pull during a load no longer throws it away (useReload)
+  useReload({
+    name: 'library',
+    subject: store ? (scope ?? 'app') : null,
+    reloadKey: `${tick}|${props.dataKey}`,
+    load: () => Promise.all([loadLibrary(store!, scope), loadSuggestions(store!, scope)]),
+    apply: ([v, c]) => {
+      setView(v);
+      setChips(c);
+    },
+    fail: (e) => setNote({ text: String(e), error: true }),
+  });
 
   const run: RunFn = useCallback(
     async (fn, done) => {

@@ -5,7 +5,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { useIdentity } from '../identity/IdentityGate';
-import { syncDataKey } from '../sync/dataKey';
+import { projectDataKey } from '../sync/dataKey';
+import { useIdentityKey, useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { getImport, isFinished, type FilePart, type ImportBatch } from './imports';
 import { nativeUploadPart } from './upload-native';
@@ -24,7 +25,7 @@ const PDF = 'application/pdf';
  */
 export function FloorPlans({ projectId }: { projectId: string }) {
   const identity = useIdentity();
-  const reloadKey = syncDataKey(useSyncStatus()); // a pull brought the new sheet row (T67)
+  const dataKey = projectDataKey(useSyncStatus(), projectId); // a pull brought the new sheet row (T67)
   const [levels, setLevels] = useState<LevelSheets[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,15 +38,15 @@ export function FloorPlans({ projectId }: { projectId: string }) {
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    openAppStore()
-      .then((store) => loadLevelSheets(store, projectId))
-      .then((l) => active && setLevels(l), (e: unknown) => active && setError(String(e)));
-    return () => {
-      active = false;
-    };
-  }, [projectId, reloadKey, jobs]);
+  // T186: a pull during a load no longer throws it away (useReload)
+  useReload({
+    name: 'floor_plans',
+    subject: projectId,
+    reloadKey: useIdentityKey(dataKey, jobs),
+    load: async () => loadLevelSheets(await openAppStore(), projectId),
+    apply: setLevels,
+    fail: (e) => setError(String(e)),
+  });
 
   const pick = useCallback(
     async (levelId: string, code: string, kind: SheetKind) => {

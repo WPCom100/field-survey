@@ -24,7 +24,9 @@ import { openAppStore } from '../db';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
 import { handRuling } from '../rulings/handoff';
-import { syncDataKey } from '../sync/dataKey';
+import { useRulesVersion } from '../rules/useRulesVersion';
+import { projectDataKey } from '../sync/dataKey';
+import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { Btn as UiBtn, Chip as UiChip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
 
@@ -40,9 +42,11 @@ type Panel = { kind: 'drill'; drill: Drill } | { kind: 'search' } | null;
 export default function DashboardScreen() {
   const params = useLocalSearchParams<{ project?: string }>();
   const sync = useSyncStatus();
-  const dataKey = syncDataKey(sync);
   const [store, setStore] = useState<Store | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  // this project's pulls and rules runs only (T185, T186)
+  const dataKey = projectDataKey(sync, projectId);
+  const rulesKey = useRulesVersion(projectId);
   const [data, setData] = useState<DashboardData | null>(null);
   const [filter, setFilter] = useState<DashFilter>({});
   const [panel, setPanel] = useState<Panel>(null);
@@ -63,37 +67,36 @@ export default function DashboardScreen() {
   }, [params.project]);
   useFocusEffect(useCallback(() => setTick((n) => n + 1), []));
 
-  useEffect(() => {
-    if (!store || !projectId) return;
-    let live = true;
-    loadDashboard(store, projectId).then(
-      (d) => live && setData(d),
-      (e: unknown) => live && setNote(String(e)),
-    );
-    return () => {
-      live = false;
-    };
-  }, [store, projectId, tick, dataKey]);
+  // T186: a pull or a rules run during a load no longer throws it away (useReload)
+  const reloadKey = `${tick}|${dataKey}|${rulesKey}`;
+  useReload({
+    name: 'dashboard',
+    subject: store && projectId ? projectId : null,
+    reloadKey,
+    load: () => loadDashboard(store!, projectId!),
+    apply: setData,
+    fail: (e) => setNote(String(e)),
+  });
 
   // Search as you type, a quarter second after the last key.
+  const [searchFor, setSearchFor] = useState('');
   useEffect(() => {
-    if (!store || !projectId) return;
     if (!query.trim()) {
+      setSearchFor('');
       setResults(null);
       return;
     }
-    let live = true;
-    const t = setTimeout(() => {
-      searchProject(store, projectId, query).then(
-        (r) => live && setResults(r),
-        (e: unknown) => live && setNote(String(e)),
-      );
-    }, 250);
-    return () => {
-      live = false;
-      clearTimeout(t);
-    };
-  }, [store, projectId, query, tick, dataKey]);
+    const t = setTimeout(() => setSearchFor(query), 250);
+    return () => clearTimeout(t);
+  }, [query]);
+  useReload({
+    name: 'dashboard_search',
+    subject: store && projectId && searchFor.trim() ? `${projectId}|${searchFor}` : null,
+    reloadKey,
+    load: () => searchProject(store!, projectId!, searchFor),
+    apply: setResults,
+    fail: (e) => setNote(String(e)),
+  });
   // Typing opens the results; a sync while a drill-down is open leaves it open.
   useEffect(() => {
     if (!query.trim()) return;

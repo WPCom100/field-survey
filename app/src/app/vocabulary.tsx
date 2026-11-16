@@ -8,7 +8,9 @@ import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { PIN_SHAPE_LABEL, PIN_SHAPE_NAMES, type PinShapeMap } from '../plan/pins';
-import { syncDataKey } from '../sync/dataKey';
+import { useRulesVersion } from '../rules/useRulesVersion';
+import { projectDataKey } from '../sync/dataKey';
+import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { Banner, Btn, Chip, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 import {
@@ -51,9 +53,11 @@ export default function VocabularyScreen() {
   const params = useLocalSearchParams<{ project?: string; tab?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
-  const dataKey = syncDataKey(sync);
   const [store, setStore] = useState<Store | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  // this project's and the app library's pulls, this project's rules runs (T185, T186)
+  const dataKey = projectDataKey(sync, projectId);
+  const rulesKey = useRulesVersion(projectId);
   const [scope, setScope] = useState<Scope>('project');
   const [tab, setTab] = useState<Tab>(params.tab === 'placeholders' ? 'placeholders' : 'lists');
   const [lists, setLists] = useState<VocabView | null>(null);
@@ -76,23 +80,21 @@ export default function VocabularyScreen() {
 
   const app = scope === 'app';
   const scopeId = app ? null : projectId;
-  useEffect(() => {
-    if (!store || (!app && !projectId)) return;
-    let live = true;
-    Promise.all([loadVocab(store, scopeId), loadPairs(store, scopeId), loadPinShapes(store), projectId ? loadPlaceholders(store, projectId) : Promise.resolve([])]).then(
-      ([v, p, sh, ph]) => {
-        if (!live) return;
-        setLists(v);
-        setPairs(p);
-        setShapes(sh);
-        setPlaceholders(ph);
-      },
-      (e: unknown) => live && setNote(String(e)),
-    );
-    return () => {
-      live = false;
-    };
-  }, [store, projectId, scopeId, app, tick, dataKey]);
+  // T186: a pull or a rules run during a load no longer throws it away (useReload)
+  useReload({
+    name: 'vocabulary',
+    subject: store && (app || projectId) ? `${scope}|${projectId ?? ''}` : null,
+    reloadKey: `${tick}|${dataKey}|${rulesKey}`,
+    load: () =>
+      Promise.all([loadVocab(store!, scopeId), loadPairs(store!, scopeId), loadPinShapes(store!), projectId ? loadPlaceholders(store!, projectId) : Promise.resolve([])]),
+    apply: ([v, p, sh, ph]) => {
+      setLists(v);
+      setPairs(p);
+      setShapes(sh);
+      setPlaceholders(ph);
+    },
+    fail: (e) => setNote(String(e)),
+  });
 
   const projectEditor = useMemo(() => (store && projectId ? new Editor(store, { projectId, userId: user.id }) : null), [store, projectId, user.id]);
   const libraryEditor = useMemo(() => (store ? new Editor(store, { projectId: LIBRARY_STREAM, userId: user.id }) : null), [store, user.id]);

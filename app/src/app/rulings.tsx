@@ -45,7 +45,8 @@ import {
   type RulingProposalRow,
   type RulingsView,
 } from '../rulings/model';
-import { syncDataKey } from '../sync/dataKey';
+import { projectDataKey } from '../sync/dataKey';
+import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { Btn as UiBtn, Chip as UiChip, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
 
@@ -63,10 +64,11 @@ export default function RulingsScreen() {
   const params = useLocalSearchParams<{ project?: string; from?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
-  const dataKey = syncDataKey(sync);
-  const rulesKey = useRulesVersion();
   const [store, setStore] = useState<Store | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  // this project's pulls and rules runs only (T185, T186)
+  const dataKey = projectDataKey(sync, projectId);
+  const rulesKey = useRulesVersion(projectId);
   const [view, setView] = useState<RulingsView | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: 'idle' });
   const [tick, setTick] = useState(0);
@@ -91,17 +93,15 @@ export default function RulingsScreen() {
     if (h) setMode({ kind: 'edit', draft: h.draft, source: h.source });
   }, [projectId, params.from]);
 
-  useEffect(() => {
-    if (!store || !projectId) return;
-    let active = true;
-    loadRulings(store, projectId).then(
-      (v) => active && setView(v),
-      (e: unknown) => active && setNote(String(e)),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, projectId, tick, dataKey, rulesKey]);
+  // T186: a pull or a rules run during a load no longer throws it away (useReload)
+  useReload({
+    name: 'rulings',
+    subject: store && projectId ? projectId : null,
+    reloadKey: `${tick}|${dataKey}|${rulesKey}`,
+    load: () => loadRulings(store!, projectId!),
+    apply: setView,
+    fail: (e) => setNote(String(e)),
+  });
 
   const engine = useMemo(() => (store && projectId ? engineFor(store, projectId, user.id) : null), [store, projectId, user.id]);
   const codes = useMemo(() => (view?.levels ?? []).map((l) => l.code), [view]);
@@ -569,16 +569,14 @@ function DetailPanel({
     setDeleting(false);
     setReason('');
   }, [r.id]);
-  useEffect(() => {
-    let active = true;
-    loadRulingProposals(store, projectId, r.id).then(
-      (p) => active && setProposals(p),
-      () => active && setProposals([]),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, projectId, r.id, reload]);
+  useReload({
+    name: 'rulings_proposals',
+    subject: `${projectId}|${r.id}`,
+    reloadKey: reload,
+    load: () => loadRulingProposals(store, projectId, r.id),
+    apply: setProposals,
+    fail: () => setProposals([]),
+  });
   return (
     <>
       <Text style={styles.panelTitle}>{r.text}</Text>

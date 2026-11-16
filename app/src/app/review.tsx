@@ -24,7 +24,9 @@ import {
   type ReviewList,
   type ReviewRow,
 } from '../review/model';
-import { syncDataKey } from '../sync/dataKey';
+import { useRulesVersion } from '../rules/useRulesVersion';
+import { projectDataKey } from '../sync/dataKey';
+import { useIdentityKey, useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { Btn, Chip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, ring, space, tabular } from '../ui';
 
@@ -47,10 +49,12 @@ export default function NeedsReviewScreen() {
   const params = useLocalSearchParams<{ item?: string; project?: string; kind?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
-  const dataKey = syncDataKey(sync);
   const [store, setStore] = useState<Store | null>(null);
   const names = useTeamNames(store);
   const [projectId, setProjectId] = useState<string | null>(null);
+  // this project's pulls and rules runs only (T185, T186)
+  const dataKey = projectDataKey(sync, projectId);
+  const rulesKey = useRulesVersion(projectId);
   const [kind, setKind] = useState(params.kind ?? 'all');
   const [levelId, setLevelId] = useState<string | null>(null);
   const [sort, setSort] = useState<'oldest' | 'newest'>('oldest');
@@ -73,62 +77,59 @@ export default function NeedsReviewScreen() {
   // Back from the plan (a pin conflict resolved there): reload.
   useFocusEffect(useCallback(() => setTick((n) => n + 1), []));
 
-  useEffect(() => {
-    if (!store || !projectId) return;
-    let active = true;
-    loadReviewList(store, projectId, { kind, levelId, sort }).then(
-      (l) => {
-        if (!active) return;
-        setList(l);
-        // Keep the selection while it is listed; otherwise the first row (an empty list: none).
-        setSelected((cur) => (cur && l.rows.some((r) => r.id === cur) ? cur : (l.rows[0]?.id ?? null)));
-      },
-      (e: unknown) => active && setNote(String(e)),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, projectId, kind, levelId, sort, tick, dataKey]);
+  // T186: a pull or a rules run during a load no longer throws it away (useReload)
+  const reloadKey = `${tick}|${dataKey}|${rulesKey}`;
+  const library = projectId === LIBRARY_STREAM;
+  useReload({
+    name: 'review',
+    subject: store && projectId ? `${projectId}|${kind}|${levelId ?? ''}|${sort}` : null,
+    reloadKey,
+    load: () => loadReviewList(store!, projectId!, { kind, levelId, sort }),
+    apply: (l) => {
+      setList(l);
+      // Keep the selection while it is listed; otherwise the first row (an empty list: none).
+      setSelected((cur) => (cur && l.rows.some((r) => r.id === cur) ? cur : (l.rows[0]?.id ?? null)));
+    },
+    fail: (e) => setNote(String(e)),
+  });
 
   // Flagged extraction drafts (D11) wait in Setup → Review drafts; the Extraction tab links there (T44).
   const [drafts, setDrafts] = useState<{ devices: number; cables: number } | null>(null);
-  useEffect(() => {
-    if (!store || !projectId || projectId === LIBRARY_STREAM) return setDrafts(null);
-    let active = true;
-    flaggedDraftCounts(store, projectId).then(
-      (d) => active && setDrafts(d),
-      () => undefined,
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, projectId, tick, dataKey]);
-
   // Devices not on their plan yet (T46, M3 round A-4): one line per level, into its plan's Place devices panel.
   const [toPlace, setToPlace] = useState<LevelPlacement[]>([]);
   useEffect(() => {
-    if (!store || !projectId || projectId === LIBRARY_STREAM) return setToPlace([]);
-    let active = true;
-    loadPlacementProgress(store, projectId).then(
-      (p) => active && setToPlace(p.levels.filter((l) => l.inScope && l.unplacedDevices + l.draftUnits > 0)),
-      () => undefined,
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, projectId, tick, dataKey]);
+    if (!library) return;
+    setDrafts(null);
+    setToPlace([]);
+  }, [library]);
+  useReload({
+    name: 'review_drafts',
+    subject: store && projectId && !library ? projectId : null,
+    reloadKey,
+    load: () => flaggedDraftCounts(store!, projectId!),
+    apply: setDrafts,
+    fail: () => undefined,
+  });
+  useReload({
+    name: 'review_place',
+    subject: store && projectId && !library ? projectId : null,
+    reloadKey,
+    load: () => loadPlacementProgress(store!, projectId!),
+    apply: (p) => setToPlace(p.levels.filter((l) => l.inScope && l.unplacedDevices + l.draftUnits > 0)),
+    fail: () => undefined,
+  });
 
   useEffect(() => {
-    if (!store || !selected) return setDetail(null);
-    let active = true;
-    loadReviewDetail(store, selected, names).then(
-      (d) => active && setDetail(d),
-      (e: unknown) => active && setNote(String(e)),
-    );
-    return () => {
-      active = false;
-    };
-  }, [store, selected, names, tick, dataKey]);
+    if (!selected) setDetail(null);
+  }, [selected]);
+  useReload({
+    name: 'review_detail',
+    subject: store && selected ? selected : null,
+    reloadKey: useIdentityKey(reloadKey, names),
+    load: () => loadReviewDetail(store!, selected!, names),
+    apply: setDetail,
+    fail: (e) => setNote(String(e)),
+  });
 
   const editor = useMemo(() => (store && projectId ? new Editor(store, { projectId, userId: user.id }) : null), [store, projectId, user.id]);
 

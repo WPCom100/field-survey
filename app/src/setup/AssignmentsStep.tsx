@@ -1,10 +1,11 @@
 import type { Store } from '@field-survey/core';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamMembers } from '../identity/useTeamNames';
+import { useReload } from '../sync/useReload';
 import { AssignmentActions, assigneeColumns, loadAssignments, type AssignmentLevel } from './assignments';
 import { SetupError } from './model';
 import { Btn, Notice, Section, styles as w } from './widgets';
@@ -24,19 +25,21 @@ export function AssignmentsStep({ projectId, dataKey }: { projectId: string; dat
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    let live = true;
-    (async () => {
+  // T186: a pull during a load no longer throws it away (useReload)
+  useReload({
+    name: 'assignments',
+    subject: projectId,
+    reloadKey: `${reload}|${String(dataKey)}`,
+    load: async () => {
       const s = await openAppStore();
-      const l = await loadAssignments(s, projectId);
-      if (!live) return;
+      return { s, l: await loadAssignments(s, projectId) };
+    },
+    apply: ({ s, l }) => {
       setStore(s);
       setLevels(l);
-    })().catch((e: unknown) => console.warn('[setup] assignments', e));
-    return () => {
-      live = false;
-    };
-  }, [projectId, reload, dataKey]);
+    },
+    fail: (e) => console.warn('[setup] assignments', e),
+  });
 
   const run = useCallback(
     async (fn: (a: AssignmentActions) => Promise<number | void>, done?: (n: number) => string) => {

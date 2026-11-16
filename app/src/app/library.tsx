@@ -9,7 +9,7 @@ import { listProjects } from '../home/data';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamNames } from '../identity/useTeamNames';
 import { LibraryScreen } from '../library/LibraryScreen';
-import { syncDataKey } from '../sync/dataKey';
+import { projectDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { Btn, color, font, space } from '../ui';
 
@@ -53,7 +53,7 @@ export default function LibraryRoute() {
         editor={editor}
         libraryEditor={app ? null : libraryEditor}
         scope={app ? null : projectId}
-        dataKey={syncDataKey(sync)}
+        dataKey={projectDataKey(sync, app ? LIBRARY_STREAM : projectId)}
         names={names}
         onOpenReview={reviewOf ? () => router.push({ pathname: '/review', params: { project: reviewOf } }) : undefined}
         header={

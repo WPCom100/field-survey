@@ -6,7 +6,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { openAppStore } from '../db';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { RuleParamsEditor } from '../rules/RuleParamsEditor';
-import { syncDataKey } from '../sync/dataKey';
+import { projectDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { Notice } from '../setup/widgets';
 import { Btn, PageHeader, PAGE_GUTTER, color, font, space } from '../ui';
@@ -38,7 +38,7 @@ export default function RuleDefaultsRoute() {
         </View>
       ) : null}
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        {store && editor ? <RuleParamsEditor store={store} editor={editor} scope={null} dataKey={syncDataKey(sync)} /> : <Text style={styles.loading}>Loading…</Text>}
+        {store && editor ? <RuleParamsEditor store={store} editor={editor} scope={null} dataKey={projectDataKey(sync, LIBRARY_STREAM)} /> : <Text style={styles.loading}>Loading…</Text>}
       </ScrollView>
     </View>
   );

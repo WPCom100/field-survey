@@ -1,5 +1,5 @@
 import { useIsFocused } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { logTo } from '../log';
 import { Reloader } from './reload';
@@ -61,4 +61,13 @@ export function useReload<T>(opts: {
     loaded.current = { subject, key: reloadKey };
     reloader.request(() => latest.current.load());
   }, [reloader, subject, reloadKey, focused]);
+}
+
+/**
+ * A `reloadKey` for values compared by identity (a Map of names, a loaded plan, a jobs list): a
+ * new object whenever one of them changes, the same one otherwise (T186). The number of values
+ * must not change between renders.
+ */
+export function useIdentityKey(...values: unknown[]): object {
+  return useMemo(() => ({}), values);
 }

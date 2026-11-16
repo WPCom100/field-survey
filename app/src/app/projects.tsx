@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { openAppStore } from '../db';
@@ -10,6 +10,7 @@ import { Notice } from '../setup/widgets';
 import { getSyncEngine } from '../sync/engine';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { syncDataKey } from '../sync/dataKey';
+import { useReload } from '../sync/useReload';
 import { Btn, Card, PageHeader, PAGE_GUTTER, color, font, space, tabular } from '../ui';
 
 /**
@@ -28,9 +29,12 @@ export default function ProjectsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let live = true;
-    (async () => {
+  // every project's pulls (the list shows them all); T186: a pull during a load no longer throws it away
+  useReload({
+    name: 'projects',
+    subject: 'projects',
+    reloadKey: `${dataKey}|${sync.pendingOps}`,
+    load: async () => {
       const store = await openAppStore();
       const list = await listProjects(store);
       const counts = new Map<string, number>();
@@ -40,14 +44,14 @@ export default function ProjectsScreen() {
       )) {
         counts.set(r.project_id, r.n);
       }
-      if (!live) return;
+      return { list, counts };
+    },
+    apply: ({ list, counts }) => {
       setLocal(list);
       setLevels(counts);
-    })().catch((e: unknown) => console.warn('[projects] load', e));
-    return () => {
-      live = false;
-    };
-  }, [dataKey, sync.pendingOps]);
+    },
+    fail: (e) => console.warn('[projects] load', e),
+  });
 
   const refresh = useCallback(async () => {
     setBusy(true);

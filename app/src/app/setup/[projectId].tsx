@@ -14,7 +14,9 @@ import { DraftReview } from '../../drafts/DraftReview';
 import { loadLockTable, lockWarnings, type LockLevel } from '../../setup/lock';
 import { loadPlacementProgress, type PlacementProgress } from '../../placement/model';
 import { useSyncStatus } from '../../sync/useSyncStatus';
-import { syncDataKey } from '../../sync/dataKey';
+import { projectDataKey } from '../../sync/dataKey';
+import { useReload } from '../../sync/useReload';
+import { useRulesVersion } from '../../rules/useRulesVersion';
 import { Btn as UiBtn, color, font, radius, space, tabular } from '../../ui';
 
 type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock' | 'assignments' | 'rules';
@@ -35,7 +37,9 @@ export default function ProjectSetupScreen() {
   const { projectId, step: stepParam, draft } = useLocalSearchParams<{ projectId: string; step?: string; draft?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
-  const dataKey = syncDataKey(sync);
+  // this project's pulls and rules runs only (T185, T186)
+  const dataKey = projectDataKey(sync, projectId);
+  const rulesKey = useRulesVersion(projectId);
   const [step, setStep] = useState<Step>(stepParam && STEPS.includes(stepParam) ? (stepParam as Step) : 'levels');
   useEffect(() => {
     if (stepParam && STEPS.includes(stepParam)) setStep(stepParam as Step);
@@ -52,23 +56,26 @@ export default function ProjectSetupScreen() {
   /** Keep the Add level field in view above the keyboard (P-3); after the keyboard has animated in. */
   const toBottom = useCallback(() => setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 300), []);
 
-  useEffect(() => {
-    let live = true;
-    (async () => {
+  // T186: a pull or a rules run during a load no longer throws it away (useReload)
+  useReload({
+    name: 'setup',
+    subject: `${projectId}|${user.id}`,
+    reloadKey: `${reload}|${dataKey}|${rulesKey}`,
+    load: async () => {
       const store = await openAppStore();
       const s = await loadProjectSetup(store, projectId);
       const table = await loadLockTable(store, projectId);
       const progress = await loadPlacementProgress(store, projectId);
-      if (!live) return;
+      return { store, s, table, progress };
+    },
+    apply: ({ store, s, table, progress }) => {
       setSetup(s);
       setPlacement(progress);
       setLocks(new Map(table.map((l) => [l.id, l])));
       setActions((a) => a ?? new SetupActions(store, projectId, user.id));
-    })().catch((e: unknown) => console.warn('[setup] load', e));
-    return () => {
-      live = false;
-    };
-  }, [projectId, user.id, reload, dataKey]);
+    },
+    fail: (e) => console.warn('[setup] load', e),
+  });
 
   /** Run an action; errors show inline, success reloads the table. */
   const run = useCallback(

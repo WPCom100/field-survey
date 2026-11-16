@@ -17,7 +17,9 @@ import { useTeamNames } from '../identity/useTeamNames';
 import { logTo } from '../log';
 import { pinStyleFor } from '../plan/pins';
 import { handRuling } from '../rulings/handoff';
-import { syncDataKey } from '../sync/dataKey';
+import { useRulesVersion } from '../rules/useRulesVersion';
+import { projectDataKey } from '../sync/dataKey';
+import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { Btn as UiBtn, Chip as UiChip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, Swatch, color, font, hitSlopTo, radius, space, tabular } from '../ui';
 
@@ -37,10 +39,12 @@ export default function CablesScreen() {
   const params = useLocalSearchParams<{ project?: string }>();
   const user = useCurrentUser();
   const sync = useSyncStatus();
-  const dataKey = syncDataKey(sync);
   const [store, setStore] = useState<Store | null>(null);
   const [blobs, setBlobs] = useState<BlobQueue | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  // this project's pulls and rules runs only (T185, T186)
+  const dataKey = projectDataKey(sync, projectId);
+  const rulesKey = useRulesVersion(projectId);
   const [data, setData] = useState<CableData | null>(null);
   const [groupBy, setGroupBy] = useState<GroupBy>('vertical');
   const [filter, setFilter] = useState<CableFilter>({});
@@ -63,17 +67,15 @@ export default function CablesScreen() {
   }, [params.project]);
   useFocusEffect(useCallback(() => setTick((n) => n + 1), []));
 
-  useEffect(() => {
-    if (!store || !projectId) return;
-    let live = true;
-    loadCables(store, projectId).then(
-      (d) => live && setData(d),
-      (e: unknown) => live && setNote(String(e)),
-    );
-    return () => {
-      live = false;
-    };
-  }, [store, projectId, tick, dataKey]);
+  // T186: a pull or a rules run during a load no longer throws it away (useReload)
+  useReload({
+    name: 'cables',
+    subject: store && projectId ? projectId : null,
+    reloadKey: `${tick}|${dataKey}|${rulesKey}`,
+    load: () => loadCables(store!, projectId!),
+    apply: setData,
+    fail: (e) => setNote(String(e)),
+  });
 
   const groups = useMemo(() => (data ? groupCables(data, groupBy, filter) : []), [data, groupBy, filter]);
   const items = useMemo<Item[]>(() => {
@@ -228,7 +230,7 @@ export default function CablesScreen() {
               store={store}
               editor={editor}
               endId={endId}
-              reloadKey={`${tick}|${dataKey}`}
+              reloadKey={`${tick}|${dataKey}|${rulesKey}`}
               names={names}
               backLabel="Cables"
               onBack={() => setSelected(null)}
