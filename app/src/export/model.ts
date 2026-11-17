@@ -63,8 +63,16 @@ export type Gate = { ok: boolean; reason: string };
 /**
  * *Start* is enabled only when the last sync cycle reached the server ("Synced") and nothing is
  * waiting in the outbox (D94). Anything else names what to do instead.
+ *
+ * T193: a cycle in progress keeps the last settled answer. The 5-s cycle that follows every push
+ * used to flip the gate to "Syncing…" for a moment, and a Generate tap in that moment was dropped
+ * with the button reading enabled before and after. So while syncing, when the last completed
+ * cycle of this session succeeded (`lastCycle`, in memory only, `failed` false), the status is
+ * judged as idle: only an edit waiting in the outbox disables Start. With no completed cycle yet
+ * (a fresh launch) or a failed one (offline, error) it still reads "Syncing…" until the cycle ends.
  */
-export function startGate(s: SyncStatus): Gate {
+export function startGate(status: SyncStatus): Gate {
+  const s: SyncStatus = status.state === 'syncing' && status.lastCycle && !status.lastCycle.failed ? { ...status, state: 'idle' } : status;
   if (s.state === 'no_token') return { ok: false, reason: 'Not connected to the server. Connect on the Sync screen first.' };
   if (s.state === 'offline') return { ok: false, reason: 'Offline. Exports run on the server and need a connection.' };
   if (s.state === 'error') return { ok: false, reason: `Sync error: ${s.lastError ?? 'unknown'}. Sync first.` };

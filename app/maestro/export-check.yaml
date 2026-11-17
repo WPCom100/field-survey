@@ -93,22 +93,10 @@ name: R6 — export
       id: export.pdf.gate
       text: Synced — .*
     timeout: 60000
+# one tap: a sync cycle right after the Surveyed date's push no longer drops it (T193; T157 and
+# T189 saw the tap lost with no request reaching the server)
 - tapOn:
     id: export.generatePdf
-# a sync cycle right after the Surveyed date's push can hold the button disabled for the tap (T157
-# run 1, T189 twice: no request reached the server); the button is enabled again: tap once more
-- extendedWaitUntil:
-    visible:
-      id: export.card.state
-    timeout: 15000
-    optional: true
-- runFlow:
-    when:
-      notVisible:
-        id: export.card.state
-    commands:
-      - tapOn:
-          id: export.generatePdf
 - extendedWaitUntil:
     visible:
       id: export.card.state

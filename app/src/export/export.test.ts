@@ -63,6 +63,20 @@ describe('D94 gate', () => {
     expect(no({ state: 'syncing' }).ok).toBe(false);
     expect(no({ lastSyncAt: null }).reason).toMatch(/Not synced yet/);
   });
+
+  it('keeps the last settled answer while a cycle runs (T193)', () => {
+    const cycle = (failed: boolean) => ({ at: '2026-10-12T10:00:00Z', ms: 40, pushMs: 10, pullMs: 20, applyMs: 5, pushed: 1, pulled: 0, projects: 1, failed });
+    const during = (s: Partial<SyncStatus>) => startGate({ ...SYNCED, state: 'syncing', ...s });
+    // the cycle after a successful push: Start stays enabled, with the same line
+    expect(during({ lastCycle: cycle(false) })).toEqual(startGate(SYNCED));
+    // an edit made meanwhile still disables it, naming the edit
+    expect(during({ lastCycle: cycle(false), pendingOps: 1 })).toMatchObject({ ok: false, reason: expect.stringMatching(/^1 edit on this iPad/) });
+    // no cycle completed yet in this session, or the last one failed: wait for this one
+    expect(during({ lastCycle: null })).toMatchObject({ ok: false, reason: expect.stringMatching(/^Syncing/) });
+    expect(during({ lastCycle: cycle(true), failures: 1, lastError: 'Network request failed' })).toMatchObject({ ok: false, reason: expect.stringMatching(/^Syncing/) });
+    // never synced: the held answer is still "Not synced yet"
+    expect(during({ lastCycle: cycle(false), lastSyncAt: null }).reason).toMatch(/Not synced yet/);
+  });
 });
 
 describe('pre-flight', () => {
