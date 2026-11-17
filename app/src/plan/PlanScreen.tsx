@@ -106,7 +106,7 @@ import { LIST_ENTITY } from '../rulings/model';
 import { useIdentityKey, useReload } from '../sync/useReload';
 import type { PhotoTarget } from '../photo/model';
 import { PhotoFlow, pickFromLibrary, type PhotoRequest } from '../photo/PhotoFlow';
-import { Btn, Chip, Icon, RAIL_WIDTH, Rail, Sidebar, Swatch, color, font, hit, radius, shadow, space, tabular, type IconName } from '../ui';
+import { BackButton, Btn, Chip, Icon, RAIL_WIDTH, Shell, Swatch, color, font, hit, radius, shadow, space, tabular, type IconName, type ShellNav } from '../ui';
 
 import { loadLevelPlan, pinLabel, type LevelPlan, type PlanDevice, type PlanSheet } from './data';
 import { PIN_PX } from './drawPins';
@@ -189,13 +189,11 @@ const GRID_EDIT: EditContext = { change_type: 'Master edit', reason: 'Grid calib
 /** The popover open over the plan (T177, `docs/ui-plan.md` §6): one at a time, a tap outside closes it. */
 type Menu = 'filter' | 'layers' | 'legend' | null;
 
-/** What the rail and its sidebar overlay show (T177); the route loads it (`home/useShell.ts`). */
-export type PlanShell = {
-  projectName: string | null;
-  counts: { review?: number; lint?: number };
-  /** The signed-in person: name, the line under it (this iPad), and the row's spoken label. */
-  user: { name: string; sub: string; label: string };
-};
+/**
+ * What the rail and its sidebar overlay show (T177): the shell's (T188) but the project, which the
+ * plan knows. The route loads it (`home/useShell.ts`).
+ */
+export type PlanShell = Omit<ShellNav, 'projectId'>;
 
 export type PlanScreenProps = {
   store: Store;
@@ -326,7 +324,6 @@ export function PlanScreen(props: PlanScreenProps) {
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
   /** The rail's top button: the full sidebar over the screen (T177). */
-  const [navOpen, setNavOpen] = useState(false);
   /** Where the Filter button sits in the toolbar, for its popover. */
   const [filterX, setFilterX] = useState(0);
   const win = useWindowDimensions();
@@ -1050,29 +1047,12 @@ export function PlanScreen(props: PlanScreenProps) {
   const toggleMenu = (m: Exclude<Menu, null>) => setMenu(menu === m ? null : m);
 
   return (
-    <View style={styles.root}>
-      {props.shell ? (
-        <Rail
-          section="Levels"
-          projectId={projectId}
-          counts={props.shell.counts}
-          user={props.shell.user}
-          onMenu={() => {
-            setMenu(null);
-            setNavOpen(true);
-          }}
-        />
-      ) : null}
+    <Shell section="Levels" nav={props.shell ? { projectId, ...props.shell } : null} onMenu={() => setMenu(null)}>
 
       <View style={styles.main}>
       {/* toolbar (the board): ◀ back · code and name · Search · Filter · Ink · Place device */}
       <View style={styles.bar}>
-        <Pressable onPress={onBack} style={({ pressed }) => [styles.back, pressed && styles.pressedBg]} hitSlop={4} testID="plan.back" accessibilityRole="button">
-          <Icon name="chevronLeft" size={22} color={color.primary} strokeWidth={2.2} />
-          <Text style={styles.backText} numberOfLines={1}>
-            {props.backLabel ?? 'Levels'}
-          </Text>
-        </Pressable>
+        <BackButton label={props.backLabel ?? 'Levels'} onPress={onBack} testID="plan.back" />
         <View style={styles.barRule} />
         <View style={styles.titleBox}>
           <Text style={styles.titleCode} numberOfLines={1} testID="plan.title">
@@ -1720,15 +1700,6 @@ export function PlanScreen(props: PlanScreenProps) {
         </>
       ) : null}
 
-      {/* the rail's top button: the full sidebar over the plan (docs/ui-plan.md §6) */}
-      {navOpen && props.shell ? (
-        <View style={StyleSheet.absoluteFill}>
-          <Pressable style={styles.scrim} onPress={() => setNavOpen(false)} testID="rail.scrim" accessibilityLabel="Close the sidebar" />
-          <View style={styles.overlaySidebar}>
-            <Sidebar section="Levels" projectId={projectId} projectName={props.shell.projectName} counts={props.shell.counts} user={props.shell.user} onNavigate={() => setNavOpen(false)} />
-          </View>
-        </View>
-      ) : null}
       {props.blobs ? (
         <PhotoFlow
           request={photoReq}
@@ -1750,7 +1721,7 @@ export function PlanScreen(props: PlanScreenProps) {
           }}
         />
       ) : null}
-    </View>
+    </Shell>
   );
 }
 
@@ -2036,7 +2007,6 @@ function DeviceRow({ device, badges, selected, picking, onPress }: { device: Pla
 const INK_BAR_BG = `${color.text}E0`;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
   main: { flex: 1, minWidth: 0 },
   bar: {
     height: BAR_H,
@@ -2049,8 +2019,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: color.hairline,
   },
-  back: { flexDirection: 'row', alignItems: 'center', gap: 2, height: hit.target, paddingLeft: space.xs, paddingRight: space.sm, borderRadius: radius.control, flexShrink: 0, maxWidth: 160 },
-  backText: { ...font.body, color: color.primary, flexShrink: 1 },
   barRule: { width: StyleSheet.hairlineWidth, height: 24, backgroundColor: color.hairline },
   titleBox: { flexShrink: 1, minWidth: 48, paddingRight: space.xs },
   titleCode: { ...font.headline, ...tabular, color: color.text },
@@ -2163,8 +2131,6 @@ const styles = StyleSheet.create({
   filterGroup: { gap: space.sm },
   filterTitle: { ...font.captionBold, color: color.text2 },
   filterChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: `${color.text}40` },
-  overlaySidebar: { position: 'absolute', top: 0, bottom: 0, left: 0, flexDirection: 'row', ...shadow.card },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: hit.target, paddingHorizontal: space.xs, borderRadius: radius.control },
   menuCheck: { fontSize: 18, width: 22, color: color.text2 },
   menuCheckOn: { color: color.primary },

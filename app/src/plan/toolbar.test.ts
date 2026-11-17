@@ -1,21 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { EMPTY_FILTER, activeFilterGroups } from './filters';
-import { backLabelFor, levelCaption } from './toolbar';
+import { levelCaption } from './toolbar';
 
 describe('the plan toolbar (T177)', () => {
-  it('the back button names the screen under the plan', () => {
-    expect(backLabelFor('index')).toBe('Levels');
-    expect(backLabelFor(undefined)).toBe('Levels'); // nothing under it: ◀ replaces the stack with the home
-    expect(backLabelFor('review')).toBe('Needs review');
-    expect(backLabelFor('lint')).toBe('Lint');
-    expect(backLabelFor('dashboard')).toBe('Dashboard');
-    expect(backLabelFor('cables')).toBe('Cable / riser');
-    expect(backLabelFor('setup/[projectId]')).toBe('Setup');
-    expect(backLabelFor('setup/place')).toBe('Setup');
-    expect(backLabelFor('plan/[levelId]')).toBe('Back'); // a far end's jump: the other level's plan
-  });
-
   it('the line under the code names the level and counts its devices', () => {
     expect(levelCaption('06M', 23)).toBe('Level 6 mezzanine · 23 devices');
     expect(levelCaption('B2', 1)).toBe('Basement 2 · 1 device');

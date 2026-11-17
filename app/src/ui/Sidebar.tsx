@@ -2,58 +2,42 @@
  * The sidebar (T176, the "Levels · the shell" board): 240 pt, the project button (→ Projects, where
  * the project is switched, refreshed or created), the Survey and Project groups with icons and the
  * Needs review / Lint count pills, then Sync and the signed-in person at the bottom. The names are
- * PLAN §5's (D266 (1)); the test IDs are T149's `nav.<name>`.
+ * PLAN §5's (D266 (1)); the test IDs are T149's `nav.<name>`. A tap resets the Stack to Levels → that
+ * section (`useSectionTap`, D280, T188), never a push.
  */
 
-import { useRouter, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Icon, type IconName } from './icons';
+import { sectionEnabled, type NavName, type Section } from './navStack';
+import { useSectionTap } from './useNav';
 import { color, font, hit, radius, space, tabular } from './tokens';
 
-export type NavName =
-  | 'Levels'
-  | 'Needs review'
-  | 'Cable / riser'
-  | 'Dashboard'
-  | 'Rulings'
-  | 'Lint'
-  | 'Export'
-  | 'Setup'
-  | 'Vocabulary'
-  | 'Library'
-  | 'Sync';
+export type { NavName };
 
-type Entry = { name: NavName; icon: IconName; href: (projectId: string) => Href; count?: 'review' | 'lint' };
-
-const at = (pathname: string) => (project: string) => ({ pathname, params: { project } }) as Href;
-
-/** The Levels home (`/`), with or without params. */
-export function isHome(href: Href): boolean {
-  return typeof href === 'string' ? href === '/' : (href as { pathname?: string }).pathname === '/';
-}
+type Entry = { name: NavName; icon: IconName; count?: 'review' | 'lint' };
 
 /** The two groups, in the board's order. */
 export const NAV_GROUPS: { title: string; entries: Entry[] }[] = [
   {
     title: 'Survey',
     entries: [
-      { name: 'Levels', icon: 'levels', href: (project) => ({ pathname: '/', params: { project } }) as Href },
-      { name: 'Needs review', icon: 'review', href: at('/review'), count: 'review' },
-      { name: 'Cable / riser', icon: 'cable', href: at('/cables') },
-      { name: 'Dashboard', icon: 'dashboard', href: at('/dashboard') },
+      { name: 'Levels', icon: 'levels' },
+      { name: 'Needs review', icon: 'review', count: 'review' },
+      { name: 'Cable / riser', icon: 'cable' },
+      { name: 'Dashboard', icon: 'dashboard' },
     ],
   },
   {
     title: 'Project',
     entries: [
-      { name: 'Rulings', icon: 'rulings', href: at('/rulings') },
-      { name: 'Lint', icon: 'lint', href: at('/lint'), count: 'lint' },
-      { name: 'Export', icon: 'export', href: at('/export') },
-      { name: 'Setup', icon: 'setup', href: (projectId) => ({ pathname: '/setup/[projectId]', params: { projectId } }) as Href },
-      { name: 'Vocabulary', icon: 'vocabulary', href: at('/vocabulary') },
-      { name: 'Library', icon: 'library', href: at('/library') },
+      { name: 'Rulings', icon: 'rulings' },
+      { name: 'Lint', icon: 'lint', count: 'lint' },
+      { name: 'Export', icon: 'export' },
+      { name: 'Setup', icon: 'setup' },
+      { name: 'Vocabulary', icon: 'vocabulary' },
+      { name: 'Library', icon: 'library' },
     ],
   },
 ];
@@ -79,17 +63,14 @@ export type SidebarProps = {
 };
 
 export function Sidebar({ active, section, onNavigate, projectId, projectName, counts, user, extra }: SidebarProps) {
-  const router = useRouter();
-  const go = (href: Href) => {
+  const tap = useSectionTap(projectId);
+  const go = (section: Section) => {
     onNavigate?.();
-    // Levels goes back to the home under everything (T185): a pushed copy would stay mounted and
-    // reload on every pull, in the store's one queue, under whatever is open
-    if (isHome(href)) router.dismissTo(href);
-    else router.push(href);
+    tap(section);
   };
   return (
     <View style={styles.root}>
-      <Pressable onPress={() => go('/projects')} style={({ pressed }) => [styles.project, pressed && styles.pressed]} testID="nav.projects" accessibilityRole="button" accessibilityHint="Switch, refresh or create a project">
+      <Pressable onPress={() => go('Projects')} style={({ pressed }) => [styles.project, pressed && styles.pressed]} testID="nav.projects" accessibilityRole="button" accessibilityHint="Switch, refresh or create a project">
         <View style={styles.projectText}>
           <Text style={styles.projectName} numberOfLines={1}>
             {projectName ?? 'No project'}
@@ -110,7 +91,7 @@ export function Sidebar({ active, section, onNavigate, projectId, projectName, c
                 key={e.name}
                 name={e.name}
                 icon={e.icon}
-                href={projectId ? e.href(projectId) : null}
+                enabled={sectionEnabled(e.name, projectId)}
                 active={e.name === active}
                 current={e.name === section}
                 onGo={go}
@@ -123,8 +104,8 @@ export function Sidebar({ active, section, onNavigate, projectId, projectName, c
       </ScrollView>
 
       <View style={styles.bottom}>
-        <NavItem name="Sync" icon="sync" href="/sync" active={active === 'Sync'} onGo={go} />
-        <Pressable onPress={() => go('/sync')} style={({ pressed }) => [styles.item, styles.user, pressed && styles.pressed]} testID="nav.user" accessibilityRole="button" accessibilityLabel={user.label}>
+        <NavItem name="Sync" icon="sync" enabled active={active === 'Sync'} onGo={go} />
+        <Pressable onPress={() => go('Sync')} style={({ pressed }) => [styles.item, styles.user, pressed && styles.pressed]} testID="nav.user" accessibilityRole="button" accessibilityLabel={user.label}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user.name.slice(0, 1).toUpperCase()}</Text>
           </View>
@@ -142,9 +123,9 @@ export function Sidebar({ active, section, onNavigate, projectId, projectName, c
   );
 }
 
-function NavItem({ name, icon, href, active, current, onGo, count }: { name: NavName; icon: IconName; href: Href | null; active: boolean; current?: boolean; onGo: (href: Href) => void; count?: number }) {
+function NavItem({ name, icon, enabled, active, current, onGo, count }: { name: NavName; icon: IconName; enabled: boolean; active: boolean; current?: boolean; onGo: (section: Section) => void; count?: number }) {
   const lit = active || !!current;
-  const fg = lit ? color.primary : href ? color.text : color.text3;
+  const fg = lit ? color.primary : enabled ? color.text : color.text3;
   const body = (
     <>
       <Icon name={icon} size={20} color={fg} strokeWidth={1.8} />
@@ -158,15 +139,15 @@ function NavItem({ name, icon, href, active, current, onGo, count }: { name: Nav
       ) : null}
     </>
   );
-  if (active || !href) {
+  if (active || !enabled) {
     return (
-      <View style={[styles.item, active && styles.itemActive]} testID={navId(name)} accessibilityState={{ selected: active, disabled: !href }}>
+      <View style={[styles.item, active && styles.itemActive]} testID={navId(name)} accessibilityState={{ selected: active, disabled: !enabled }}>
         {body}
       </View>
     );
   }
   return (
-    <Pressable onPress={() => onGo(href)} style={({ pressed }) => [styles.item, current && styles.itemActive, pressed && styles.pressed]} testID={navId(name)} accessibilityRole="link">
+    <Pressable onPress={() => onGo(name)} style={({ pressed }) => [styles.item, current && styles.itemActive, pressed && styles.pressed]} testID={navId(name)} accessibilityRole="link">
       {body}
     </Pressable>
   );

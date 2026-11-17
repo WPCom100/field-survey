@@ -23,7 +23,7 @@ import { homeIdentityLine, installName, loadInstallLabels } from '../sync/instal
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { projectDataKey } from '../sync/dataKey';
 import { useReload } from '../sync/useReload';
-import { Banner, Btn, Empty, Icon, Sidebar, color, font, radius, space, tabular, type IconName } from '../ui';
+import { Banner, Btn, Empty, Icon, Shell, color, font, radius, space, tabular, type IconName } from '../ui';
 
 /** The Plan column (the board): the display sheet on this iPad, on its way, not yet, or none. */
 const PLAN_CELL: Record<HomeLevel['cache'], { label: string; icon: IconName | null; fg: string; bold?: boolean }> = {
@@ -103,26 +103,23 @@ export default function ProjectHomeScreen() {
   const projectName = home?.project.name ?? projects.find((p) => p.id === projectId)?.name ?? null;
 
   return (
-    <View style={styles.root}>
-      <Sidebar
-        active="Levels"
-        projectId={projectId}
-        projectName={projectName}
-        counts={{ review: home?.reviewOpen, lint: home?.lintOpen }}
-        user={{ name: user.name, sub: who.sub, label: who.label }}
-        extra={
-          __DEV__ ? (
-            <View style={styles.demo}>
-              <Link href="/demo-plan" style={styles.demoLink}>
-                Demo plan (06M composite) →
-              </Link>
-              <Link href={{ pathname: '/demo-plan', params: { pins: '500' } }} style={styles.demoLink}>
-                500 pins →
-              </Link>
-            </View>
-          ) : null
-        }
-      />
+    <Shell
+      sidebar
+      section="Levels"
+      nav={{ projectId, projectName, counts: { review: home?.reviewOpen, lint: home?.lintOpen }, user: { name: user.name, sub: who.sub, label: who.label } }}
+      extra={
+        __DEV__ ? (
+          <View style={styles.demo}>
+            <Link href="/demo-plan" style={styles.demoLink}>
+              Demo plan (06M composite) →
+            </Link>
+            <Link href={{ pathname: '/demo-plan', params: { pins: '500' } }} style={styles.demoLink}>
+              500 pins →
+            </Link>
+          </View>
+        ) : null
+      }
+    >
 
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
         {waiting ? (
@@ -193,7 +190,7 @@ export default function ProjectHomeScreen() {
           }}
         />
       ) : null}
-    </View>
+    </Shell>
   );
 }
 
@@ -243,7 +240,6 @@ function LevelRow({ level: l, first, lock, onLock }: { level: HomeLevel; first: 
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
   demo: { paddingHorizontal: space.md, paddingTop: space.lg, gap: space.sm },
   demoLink: { ...font.caption, color: color.primary },
   main: { flex: 1 },

@@ -2,17 +2,20 @@
  * The icon rail (T177, the "Plan · rail, card, status buttons" board): the plan screen's sidebar,
  * 72 pt wide so the sheet keeps its room. The top button opens the full 240-pt sidebar as an
  * overlay (`docs/ui-plan.md` §6); below it the sidebar's entries as 44-pt icons with their count
- * pills, Sync and the person at the bottom. Same entries, names and targets as `Sidebar` (each
- * icon's VoiceOver label is the entry's name); test IDs `rail.<name>` (`rail.menu`, `rail.levels`,
- * `rail.needs-review`, … `rail.sync`, `rail.user`), so they never collide with the overlay's `nav.*`.
+ * pills, Sync and the person at the bottom. Same entries, names and targets as `Sidebar`, and the
+ * same stack rule: a tap resets to Levels → that section (`useSectionTap`, D280, T188; before it the
+ * rail pushed, a second Levels included). Each icon's VoiceOver label is the entry's name; test
+ * IDs `rail.<name>` (`rail.menu`, `rail.levels`, `rail.needs-review`, … `rail.sync`, `rail.user`), so they
+ * never collide with the overlay's `nav.*`.
  */
 
-import { useRouter, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon, type IconName } from './icons';
+import { sectionEnabled } from './navStack';
 import { NAV_GROUPS, navId, type NavName } from './Sidebar';
 import { color, font, hit, radius, space, tabular } from './tokens';
+import { useSectionTap } from './useNav';
 
 export const RAIL_WIDTH = 72;
 
@@ -31,7 +34,7 @@ export type RailProps = {
 };
 
 export function Rail({ section, projectId, counts, user, onMenu }: RailProps) {
-  const router = useRouter();
+  const go = useSectionTap(projectId);
   return (
     <View style={styles.root}>
       <RailButton icon="sidePanel" label="Show section names" onPress={onMenu} testID="rail.menu" />
@@ -40,7 +43,6 @@ export function Rail({ section, projectId, counts, user, onMenu }: RailProps) {
         <View key={g.title} style={styles.group}>
           {gi > 0 ? <View style={styles.divider} /> : null}
           {g.entries.map((e) => {
-            const href = projectId ? e.href(projectId) : null;
             const n = e.count ? counts?.[e.count] : undefined;
             return (
               <RailButton
@@ -49,7 +51,7 @@ export function Rail({ section, projectId, counts, user, onMenu }: RailProps) {
                 label={n ? `${e.name}, ${n}` : e.name}
                 count={n}
                 active={e.name === section}
-                onPress={href ? () => router.push(href) : undefined}
+                onPress={sectionEnabled(e.name, projectId) ? () => go(e.name) : undefined}
                 testID={railId(e.name)}
               />
             );
@@ -57,8 +59,8 @@ export function Rail({ section, projectId, counts, user, onMenu }: RailProps) {
         </View>
       ))}
       <View style={styles.flex} />
-      <RailButton icon="sync" label="Sync" onPress={() => router.push('/sync' as Href)} testID={railId('Sync')} />
-      <Pressable onPress={() => router.push('/sync' as Href)} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} testID="rail.user" accessibilityRole="button" accessibilityLabel={user.label}>
+      <RailButton icon="sync" label="Sync" onPress={() => go('Sync')} testID={railId('Sync')} />
+      <Pressable onPress={() => go('Sync')} style={({ pressed }) => [styles.btn, pressed && styles.pressed]} testID="rail.user" accessibilityRole="button" accessibilityLabel={user.label}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{user.name.slice(0, 1).toUpperCase()}</Text>
         </View>

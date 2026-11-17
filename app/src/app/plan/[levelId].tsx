@@ -1,6 +1,6 @@
 import type { BlobQueue, Store } from '@field-survey/core';
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { getBlobFiles, getBlobQueue } from '../../blobs/queue';
@@ -10,17 +10,17 @@ import { useTeamNames } from '../../identity/useTeamNames';
 import { openAppStore } from '../../db';
 import type { PlanSheet } from '../../plan/data';
 import { PlanScreen } from '../../plan/PlanScreen';
-import { backLabelFor } from '../../plan/toolbar';
 import { handRuling } from '../../rulings/handoff';
 import { projectDataKey } from '../../sync/dataKey';
 import { useSyncStatus } from '../../sync/useSyncStatus';
+import { goBack, useBack } from '../../ui/useNav';
 
 /**
  * Plan view of one level from the app store; the sheet and photo thumbnails come from the blob
  * cache (T12). `?device=` selects and opens that device's card on arrival (a cross-level jump).
  * Photos taken here go to the app's blob queue (T21); the status strip over every screen shows
  * "n photos waiting". The rail (T177) gets the project's name and count pills from `useShell`;
- * the back button names the screen under the plan in the Stack.
+ * the back button names the screen under the plan in the Stack (`useBack`, D280, T188).
  * `?review=` draws that pin-position conflict on the plan with Choose A / Choose B (T26).
  * Select in the side lists → "Apply as ruling…" opens the ruling editor over the chosen records (T37).
  * `?place=1` opens with the Place devices panel (T46: Setup → 5 Place devices, Needs review).
@@ -43,13 +43,8 @@ export default function LevelPlanRoute() {
   }, [store, levelId]);
   const dataKey = projectDataKey(sync, projectId);
   const shell = useShell(store, levelId, projectId, user, dataKey);
-  // The back button returns to the screen under the plan in the Stack and says which (T177).
-  const navigation = useNavigation();
-  const backLabel = useMemo(() => {
-    const state = navigation.getState();
-    const here = state?.index ?? 0;
-    return backLabelFor(here > 0 ? state?.routes[here - 1]?.name : undefined);
-  }, [navigation]);
+  // The back button returns to the screen under the plan in the Stack and says which (T177, T188).
+  const back = useBack();
 
   useEffect(() => {
     openAppStore().then(setStore, (e: unknown) => console.error('[plan] store', e));
@@ -81,8 +76,8 @@ export default function LevelPlanRoute() {
       store={store}
       levelId={levelId}
       resolveSheetUri={resolveSheetUri}
-      onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-      backLabel={backLabel}
+      onBack={back?.onPress ?? goBack}
+      backLabel={back?.label}
       shell={shell}
       reloadKey={dataKey}
       userId={user.id}

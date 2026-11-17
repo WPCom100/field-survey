@@ -10,6 +10,7 @@ import { logTo } from '../log';
 import { RulesRunner } from '../rules/RulesRunner';
 import { SyncRunner } from '../sync/SyncRunner';
 import { useUpdateLog } from '../sync/useAppUpdates';
+import { transitionFor, type NavState } from '../ui/navStack';
 
 // The Mac test rig (T156): `rig.sh metro` starts Metro with EXPO_PUBLIC_RIG=1, and the dev client's
 // error toasts stay off the screen — T161's toast took Maestro's taps over and over. The errors
@@ -35,7 +36,8 @@ export default function RootLayout() {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <GlobalStatusBar />
         <View style={{ flex: 1 }}>
-          <Stack screenOptions={{ headerShown: false }} />
+          {/* a section opened from the sidebar or the rail neither slides nor takes the edge swipe (D280, T188) */}
+          <Stack screenOptions={({ route, navigation }) => ({ headerShown: false, ...transitionFor(navigation.getState() as NavState | undefined, route.key) })} />
         </View>
       </SafeAreaView>
     </IdentityGate>
