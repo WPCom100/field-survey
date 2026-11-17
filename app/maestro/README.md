@@ -112,6 +112,19 @@ team Ann / Bob), never to the Droplet.
 
 Selectors: `id:` is the control's `testID` (`<screen>.<element>`, CLAUDE.md §5); plain text is a
 regex on what is visible. A flow for a new screen gets its `testID`s in the same task.
+**Getting around (D280, T188–T191).** On the Levels home the sidebar's entries are `nav.*`; on
+every other screen the rail's are `rail.*`, and **`rail.levels` is how a flow goes home** (it
+replaced `setup.home`, `sync.back` and every `← Levels` / `◀ Levels` / `◀ Projects` text tap). A
+rail or sidebar tap resets the stack to Levels → that section, so a section reached that way shows
+no back; assert that with `assertNotVisible` on its back ID. A screen opened from another screen
+shows its back at the bar's top left, ID `<screen>.back` (`plan.back`, `review.back`, `lint.back`,
+`dash.back`, `cables.back`, `export.back`, `vocab.back`, `library.back`, `sync.back`, `setup.back`,
+`newProject.back`, `ruleDefaults.back`, `projects.back`; Rulings' is `rulings.bar.back`), its text
+the name of the screen it returns to. Panels: `end.back`, `item.back`, `rulings.back` (the
+preview) at the panel's top left; `card.close`, `crop.close`, `riser.close`, `place.done`,
+`grid.close`, `photo.close` are the `×` at the top right; a form's Cancel is left of its primary,
+so tap either by ID or text, never by position. `nav.yaml` walks the back rules on the sections,
+`projects.yaml` on Projects and Setup.
 The status bar is `id: status.bar`; its text (the board's copy since T176: "Synced 14:05", "Offline · 3 edits waiting · 1 photo waiting · Last synced 13:40", "· n need attention") is what a flow asserts (T154: it used to carry the label "Sync status", which hid the text).
 Variables come from `rig.sh` (`-e SERVER_URL=… TOKEN=… METRO_URL=… USER=… PROJECT=…`; its `RIG_*`
 defaults). Top-level flows carry no `env:` block: a flow's own `env:` beats `-e` (T151), so run them

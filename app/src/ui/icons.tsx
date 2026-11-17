@@ -2,7 +2,7 @@
  * Icons (D266 (7)): the boards draw them as 24-unit stroke SVGs; the app has no `react-native-svg`
  * (a native module, refused for now), so the same path data is drawn with Skia, already native
  * for the pins. One component, one path string per name (`iconPaths.ts`); a new icon is a new entry there. Text
- * glyphs that already serve (◀, ▸, ⋯, ☐) stay text.
+ * glyphs that already serve (▸, ⋯, ☐) stay text; back is the `chevronLeft` icon (D280).
  */
 
 import { Canvas, Group, Path, Skia } from '@shopify/react-native-skia';

@@ -195,6 +195,8 @@ Capture → JPEG + 320-px thumb → SHA-256 → `photo` record syncs at once, by
 
 Record badges: `NEW`, `↑n`, `IN REVIEW`, `DRAFT`, `DELETED`, `📷 n waiting`, `⚑ rule`.
 
+Navigation (D280, `docs/nav-plan.md`; built by T188–T191, D281–D284): the Levels home has the 240-pt sidebar, every other screen the 72-pt rail whose top button opens the sidebar as an overlay. **Sections** (the sidebar's entries, and Projects behind the project button) reached from the sidebar or rail have no back button; a sidebar or rail tap resets the stack to Levels → that section, never pushes. **Details** (the plan, a section opened by a link inside another screen, New project / Rule defaults / the app library / Setup opened from Projects) show one back at the top left of the bar: a chevron and the name of the screen under it, returning there (history back; the edge swipe does the same). No way out sits among a bar's actions. **Panels**: one that replaced another panel has `‹ <where it returns>` at its top left; one that closes to nothing has `×` at its top right; a form or dialog has Cancel left of its primary at the bottom right.
+
 Look (D266): the tokens, components and screen layouts of `docs/ui-plan.md`, drawn in the "Field Survey UI mock-ups" canvas (https://claude.ai/artifact/JErKMqFFj5Awmd5G5iQa2u); built by T174–T181. The boards are the look, not the spec: where a board disagrees with this section or §3's vocabulary, this file wins and the board is corrected. Screen names, badge words and testIDs do not change; the status bar's copy does (D266 (2)).
 
 ## 6. Rule engine (`packages/rules`, client only — D24)

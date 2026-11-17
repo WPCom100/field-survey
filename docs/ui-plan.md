@@ -153,8 +153,14 @@ one, it is filed as a task, not done in passing.
   radius and the card shadow, anchored to its button, dismissed by a tap outside. The Filter popover
   holds the four groups as chip rows and a Clear button; its count badge is the number of active
   groups.
-- The **rail** (72 pt) is the plan screen's sidebar; its top button opens the full sidebar as an
-  overlay over the plan. Every other screen keeps the 240-pt sidebar.
+- The **rail** (72 pt) is the sidebar on every screen but the Levels home, which keeps the 240-pt
+  sidebar; the rail's top button opens the full sidebar as an overlay (D280, amending this line's
+  "every other screen keeps the 240-pt sidebar", which was never built). **Back** follows
+  `docs/nav-plan.md`: a section reached from the sidebar or rail has none; a screen opened from
+  another screen has one chevron + that screen's name at the top left of its bar, and returns there
+  (the edge swipe too); a sidebar or rail tap resets the stack to Levels → that section. Panels:
+  `‹ <where it returns>` top left when they replaced another panel, `×` top right when they close to
+  nothing, Cancel left of the primary at the bottom right of a form (T188–T191, D281–D284).
 - The **project button** opens the Projects screen (switch, Refresh from server, + New project, the
   app library); the home's project chips go away with it (T176).
 - **Needs review** A/B, the **Setup** steps, **Export** history and the **Dashboard** charts keep

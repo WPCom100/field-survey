@@ -1,6 +1,6 @@
 /**
  * The project the Levels home last showed (T83). Screens reached from the home without a
- * `project` param (Needs review from Sync, a bare "← Levels" link) open this one instead of the
+ * `project` param (Needs review from Sync, a link with no project in it) open this one instead of the
  * first project on the iPad. Memory only: a cold start opens the first project, as before.
  */
 let current: string | null = null;

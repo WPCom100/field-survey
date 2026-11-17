@@ -16,7 +16,7 @@
  *   §4.5); "Jump to" a far end on another level opens that level (`onOpenLevel`), where a sheet that
  *   is not downloaded leaves the list and the card usable ("plan not downloaded").
  * - A punch item or missing part (card row, or Punch / Parts tab row) opens the item editor in the
- *   same panel (T162, D254): status, Owner, Notes; ◀ goes back to where it was opened.
+ *   same panel (T162, D254): status, Owner, Notes; its ‹ back (`PanelHeader`) returns to where it was opened.
  * - The photo flow (T21) is a full-screen modal over all of it.
  * - Long-press on the sheet (T23, Phase 3 §4.6) opens the add-here menu: + Device (field
  *   addition, form in the side panel, a grey "+" pin marks the spot), + Note here, + Photo here,
@@ -201,7 +201,7 @@ export type PlanScreenProps = {
   /** A `file://` or asset URI for the sheet, or null when its bytes are not on this iPad. */
   resolveSheetUri: (sheet: PlanSheet) => string | null;
   onBack: () => void;
-  /** The back button's word: the screen ◀ returns to (`backLabelFor`); "Levels" by default. */
+  /** The back button's word: the screen ‹ returns to (`backLabelFor`); "Levels" by default. */
   backLabel?: string;
   /** The 72-pt rail and its sidebar overlay (T177); none on the demo plan. */
   shell?: PlanShell;
@@ -1050,7 +1050,7 @@ export function PlanScreen(props: PlanScreenProps) {
     <Shell section="Levels" nav={props.shell ? { projectId, ...props.shell } : null} onMenu={() => setMenu(null)}>
 
       <View style={styles.main}>
-      {/* toolbar (the board): ◀ back · code and name · Search · Filter · Ink · Place device */}
+      {/* toolbar (the board): ‹ back (`BackButton`) · code and name · Search · Filter · Ink · Place device */}
       <View style={styles.bar}>
         <BackButton label={props.backLabel ?? 'Levels'} onPress={onBack} testID="plan.back" />
         <View style={styles.barRule} />
