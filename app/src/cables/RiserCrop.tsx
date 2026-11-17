@@ -37,7 +37,7 @@ import {
   type PdfViewport,
   type Rect,
 } from '../plan/viewport';
-import { Btn, color, font, radius, space } from '../ui';
+import { Btn, PanelHeader, color, font, radius, space } from '../ui';
 import { riserBlobOf, type RiserRef } from './model';
 
 const PAD = 0.15; // margin around a sheet-form bbox, as a share of its size
@@ -158,12 +158,11 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
       {big && uri && riser && source && typeof source !== 'string' && !('problem' in source) ? (
         <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setBig(false)}>
           <View style={styles.modal}>
+            {/* closes to nothing: × at the top right (D280 (5), T191; was a Close button) */}
             <View style={styles.bar}>
-              <Text style={styles.barTitle} numberOfLines={1}>
-                Riser crop{source.title ? ` · ${source.title}` : ''}
-              </Text>
-              <Text style={styles.muted}>Pinch to zoom · drag to pan</Text>
-              <Btn title="Close" small onPress={() => setBig(false)} style={styles.push} testID="riser.close" />
+              <PanelHeader title={`Riser crop${source.title ? ` · ${source.title}` : ''}`} close={{ onPress: () => setBig(false), testID: 'riser.close' }}>
+                <Text style={styles.muted}>Pinch to zoom · drag to pan</Text>
+              </PanelHeader>
             </View>
             <RiserPdf uri={uri} page={source.page} riser={riser} onError={onPdfError} />
           </View>
@@ -243,6 +242,4 @@ const styles = StyleSheet.create({
   mark: { position: 'absolute', borderWidth: 2, borderColor: color.danger, borderRadius: 2 },
   modal: { flex: 1, backgroundColor: color.surface },
   bar: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: color.hairline },
-  barTitle: { flexShrink: 1, ...font.calloutBold, color: color.text },
-  push: { marginLeft: 'auto' },
 });

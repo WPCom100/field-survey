@@ -13,7 +13,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 
 import { chipStyles } from '../plan/chips';
 import { DEVICE_CATEGORIES } from '../plan/pins';
-import { Btn, color, fieldStyles, font, hit, hitSlopTo, radius, space, tabular } from '../ui';
+import { Btn, FormActions, color, fieldStyles, font, hit, hitSlopTo, radius, space, tabular } from '../ui';
 import { addFieldDevice, libraryChoices, matchModel, searchChoices, type LibraryChoice } from './model';
 
 /** Chips shown at once: the app library holds about 500 placeable types after the DaVinci import. */
@@ -92,9 +92,6 @@ export function AddDevicePanel(props: AddDeviceProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onCancel} hitSlop={8} disabled={saving} testID="add.cancel" style={styles.backBtn}>
-          <Text style={styles.back}>◀ Cancel</Text>
-        </Pressable>
         <Text style={styles.title}>{props.title ?? 'Add device (field addition)'}</Text>
         <Text style={styles.muted}>{props.at ? 'Placed where you pressed (the grey + pin).' : 'Not on the plan yet: place its pin from the plan later.'}</Text>
       </View>
@@ -184,7 +181,13 @@ export function AddDevicePanel(props: AddDeviceProps) {
         <TextInput testID="add.room" style={styles.input} value={room} onChangeText={setRoom} placeholder="e.g. XX06M-1E05 Elec Rm" placeholderTextColor={color.text3} />
         {props.defaults?.room ? <Text style={styles.muted}>The room code printed nearest the pin.</Text> : null}
 
-        <Btn title="Add device" kind="primary" onPress={add} disabled={!ready} loading={saving} style={styles.addBtn} testID="add.submit" />
+        {/* a form: Cancel left of its primary at the bottom right (D280 (5), T191; Cancel was "◀ Cancel" at the top) */}
+        <View style={styles.addBtn}>
+          <FormActions>
+            <Btn title="Cancel" onPress={props.onCancel} disabled={saving} testID="add.cancel" />
+            <Btn title="Add device" kind="primary" onPress={add} disabled={!ready} loading={saving} testID="add.submit" />
+          </FormActions>
+        </View>
       </ScrollView>
     </View>
   );
@@ -212,8 +215,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.surface },
   flex: { flex: 1 },
   head: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: space.sm, gap: 3, borderBottomWidth: 1, borderBottomColor: color.hairline },
-  backBtn: { alignSelf: 'flex-start', minHeight: hit.small, justifyContent: 'center' },
-  back: { ...font.calloutBold, color: color.primary },
   title: { ...font.headline, color: color.text },
   body: { padding: space.md, gap: space.sm, paddingBottom: 40 },
   label: { ...font.captionBold, color: color.text2, marginTop: space.xs },
@@ -229,5 +230,5 @@ const styles = StyleSheet.create({
   // 36 pt as the side-panel editors (D279 (5)): at 44 the Room box slid under the keyboard
   input: { ...fieldStyles.input, minHeight: hit.small, paddingHorizontal: space.sm, paddingVertical: 7, ...font.callout },
   idPreview: { ...font.headline, ...tabular, color: color.text },
-  addBtn: { marginTop: space.md, alignSelf: 'stretch' },
+  addBtn: { marginTop: space.md },
 });

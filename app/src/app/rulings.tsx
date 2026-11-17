@@ -49,7 +49,7 @@ import {
 import { projectDataKey } from '../sync/dataKey';
 import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { Btn as UiBtn, Chip as UiChip, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
+import { Btn as UiBtn, Chip as UiChip, FormActions, PanelHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
 
 type Mode = { kind: 'idle' } | { kind: 'edit'; draft: RulingDraft; source: string | null } | { kind: 'preview'; draft: RulingDraft; preview: RulingPreview; skip: ReadonlySet<string>; back: 'edit' | 'detail' } | { kind: 'detail'; id: string };
 
@@ -196,6 +196,7 @@ export default function RulingsScreen() {
               }
               onAll={(on) => setMode((m) => (m.kind === 'preview' ? { ...m, skip: on ? new Set() : new Set(m.preview.rows.map((r) => r.key)) } : m))}
               onApply={() => apply(mode.draft, mode.skip)}
+              backLabel={mode.back === 'edit' ? 'New ruling' : 'Ruling'}
               onBack={() => setMode(mode.back === 'edit' ? { kind: 'edit', draft: mode.draft, source: null } : { kind: 'detail', id: mode.draft.id ?? '' })}
             />
           ) : (
@@ -381,10 +382,10 @@ function EditorPanel({
           ))}
         </View>
       ) : null}
-      <View style={styles.btnRow}>
-        <Btn label={busy ? 'Working…' : 'Preview ▸'} onPress={onPreview} disabled={busy || problems.length > 0} testID="rulings.preview" />
+      <FormActions>
         <Btn label="Cancel" onPress={onCancel} secondary />
-      </View>
+        <Btn label={busy ? 'Working…' : 'Preview ▸'} onPress={onPreview} disabled={busy || problems.length > 0} testID="rulings.preview" />
+      </FormActions>
     </>
   );
 }
@@ -469,9 +470,12 @@ function PreviewPanel({
   onToggle,
   onAll,
   onApply,
+  backLabel,
   onBack,
 }: {
   mode: Extract<Mode, { kind: 'preview' }>;
+  /** The panel the preview replaced: the New ruling form, or the ruling's detail. */
+  backLabel: string;
   busy: boolean;
   onToggle: (key: string) => void;
   onAll: (on: boolean) => void;
@@ -482,13 +486,16 @@ function PreviewPanel({
   const ticked = p.rows.filter((r) => !mode.skip.has(r.key)).length;
   return (
     <View style={styles.previewRoot}>
+      {/* the panel it replaced, at its top left (D280 (5), T191; Back was the button row's last) */}
+      <View style={styles.backRow}>
+        <PanelHeader back={{ label: backLabel, onPress: onBack, testID: 'rulings.back' }} />
+      </View>
       <Text style={styles.panelTitle}>{mode.draft.text.trim()}</Text>
       <View style={styles.btnRow}>
         <Text style={styles.value} testID="rulings.preview.title">{previewTitle(p, ticked)}</Text>
         <View style={styles.flex} />
         <Btn label={ticked === p.rows.length ? 'Untick all' : 'Tick all'} onPress={() => onAll(ticked !== p.rows.length)} secondary disabled={!p.rows.length} />
         <Btn label={busy ? 'Applying…' : `Apply ${ticked}`} onPress={onApply} disabled={busy || (!ticked && !!mode.draft.id) || (!ticked && !mode.draft.standing)} testID="rulings.apply" />
-        <Btn label="Back" onPress={onBack} secondary testID="rulings.back" />
       </View>
       <View style={[styles.tr, styles.th]}>
         <Text style={styles.cTick}> </Text>
@@ -596,10 +603,10 @@ function DetailPanel({
       {deleting ? (
         <View style={styles.block}>
           <TextInput style={styles.input} placeholderTextColor={color.text3} value={reason} onChangeText={setReason} placeholder="Why delete it? (what it changed stays)" testID="rulings.delete.reason" />
-          <View style={styles.btnRow}>
-            <Btn label="Delete" kind="destructive" onPress={() => onDelete(reason)} disabled={!reason.trim()} testID="rulings.delete.ok" />
+          <FormActions>
             <Btn label="Cancel" onPress={() => setDeleting(false)} secondary />
-          </View>
+            <Btn label="Delete" kind="destructive" onPress={() => onDelete(reason)} disabled={!reason.trim()} testID="rulings.delete.ok" />
+          </FormActions>
         </View>
       ) : null}
       <Label text={`Proposed by this ruling (${proposals.length})`} />
@@ -701,6 +708,7 @@ const styles = StyleSheet.create({
   note: { ...font.callout, color: color.success },
   prop: { gap: space.xs, borderBottomWidth: 1, borderBottomColor: color.hairline, paddingVertical: space.sm },
   previewRoot: { flex: 1, padding: space.lg, gap: 10 },
+  backRow: { marginLeft: -space.sm, marginTop: -space.sm },
   table: { flex: 1 },
   tr: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm, paddingHorizontal: space.sm, borderBottomWidth: 1, borderBottomColor: color.hairline },
   th: { backgroundColor: color.surface2, borderBottomColor: color.border, borderTopLeftRadius: radius.control, borderTopRightRadius: radius.control },

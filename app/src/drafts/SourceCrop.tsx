@@ -6,7 +6,7 @@ import { ZoomableImage } from '../crops/ZoomableImage';
 import type { Identity } from '../identity/api';
 import { authHeaders, batchFor, cropUrl, type Batch } from './api';
 import type { DraftSource } from './model';
-import { color, font, radius, space } from '../ui';
+import { PanelHeader, color, font, radius, space } from '../ui';
 
 /**
  * The source crops of a draft (Phase 3 §3.3): one PNG per source — the BOM line, the riser symbol
@@ -61,14 +61,11 @@ function BigCrop({ identity, batch, source, onClose }: { identity: Identity; bat
   return (
     <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={styles.modal}>
+        {/* closes to nothing: × at the top right (D280 (5), T191; was a Close button) */}
         <View style={styles.bar}>
-          <Text style={styles.barTitle} numberOfLines={1}>
-            {source.label}
-          </Text>
-          <Text style={styles.hint}>Pinch to zoom · drag to pan · double-tap to zoom / fit</Text>
-          <Pressable style={[styles.btn, styles.push]} onPress={onClose} hitSlop={4} accessibilityRole="button">
-            <Text style={styles.btnText}>Close</Text>
-          </Pressable>
+          <PanelHeader title={source.label} close={{ onPress: onClose, testID: 'crop.close' }}>
+            <Text style={styles.hint}>Pinch to zoom · drag to pan · double-tap to zoom / fit</Text>
+          </PanelHeader>
         </View>
         {crop.state === 'ok' ? (
           <ZoomableImage uri={crop.uri} accessibilityLabel={`Source crop: ${source.label}`} />
@@ -107,9 +104,7 @@ const styles = StyleSheet.create({
   failed: { gap: 6, padding: space.sm, borderRadius: radius.swatch, backgroundColor: color.dangerTint },
   modal: { flex: 1, backgroundColor: color.surface },
   bar: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: 10, borderBottomWidth: 1, borderColor: color.hairline },
-  barTitle: { flexShrink: 1, ...font.calloutBold, color: color.text },
   pad: { padding: space.lg },
-  push: { marginLeft: 'auto' },
   btn: { alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center', paddingHorizontal: space.md, borderRadius: radius.control, borderWidth: 1, borderColor: color.border, backgroundColor: color.surface },
   btnText: { ...font.captionBold, color: color.primary },
 });

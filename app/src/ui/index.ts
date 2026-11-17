@@ -16,5 +16,6 @@ export { PageHeader, FilterRow, FilterLabel, PAGE_GUTTER, type PageHeaderProps }
 export { Shell, type ShellNav, type ShellProps } from './Shell';
 export { NavBar, BackButton, NAV_BAR_H, type NavBarProps, type BackButtonProps } from './NavBar';
 export { PanelHeader, type PanelHeaderProps } from './PanelHeader';
+export { FormActions } from './FormActions';
 export { useBack, useSectionTap, goBack, type Back } from './useNav';
 export { backFor, sectionTap, transitionFor, type Section as NavSection } from './navStack';

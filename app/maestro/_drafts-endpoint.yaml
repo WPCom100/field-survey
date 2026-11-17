@@ -14,7 +14,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:
     visible: 'Pinch to zoom · drag to pan · double-tap to zoom / fit'
     timeout: 30000
-- tapOn: Close
+- tapOn:
+    id: crop.close           # × at the top right (T191; was a Close button)
 - extendedWaitUntil:
     notVisible: 'Pinch to zoom · drag to pan · double-tap to zoom / fit'
     timeout: 10000

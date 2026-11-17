@@ -19,7 +19,7 @@ import { PhotoStrip } from '../photo/PhotoStrip';
 import { chipStyles } from '../plan/chips';
 import { pinStyleFor } from '../plan/pins';
 import { useReload } from '../sync/useReload';
-import { Btn, Chip, color, fieldStyles, font, hit, hitSlopTo, radius, space, tabular, tinted } from '../ui';
+import { Btn, Chip, FormActions, PanelHeader, color, fieldStyles, font, hit, hitSlopTo, radius, space, tabular, tinted } from '../ui';
 import { PlaceholderPicker } from '../vocab/PlaceholderPicker';
 import { setCableTermKit, setEndNote, setEndPlaceholder, setEndStatus, setEndText } from './actions';
 import { CABLE_NAME, loadCableEnds, type CableView, type EndView } from './model';
@@ -32,7 +32,7 @@ export type EndEditorProps = {
   endId: string;
   reloadKey: unknown;
   names: ReadonlyMap<string, string>;
-  /** "◀ 06M-02" back to the card, or "◀ Connections" back to the list. */
+  /** "‹ 06M-02" back to the card, "‹ Connections" back to the list, "‹ Cables" on Cable / riser (`PanelHeader`, T191). */
   backLabel: string;
   onBack: () => void;
   onEdited: () => void;
@@ -100,9 +100,9 @@ export function EndEditor(props: EndEditorProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onBack} hitSlop={8} testID="end.back" style={styles.backBtn}>
-          <Text style={styles.back}>◀ {props.backLabel}</Text>
-        </Pressable>
+        <View style={styles.backRow}>
+          <PanelHeader back={{ label: props.backLabel, onPress: props.onBack, testID: 'end.back' }} />
+        </View>
         <View style={styles.headLine}>
           <Text style={styles.headId}>{mine.label}</Text>
           <Text style={styles.headCable}>
@@ -150,7 +150,8 @@ export function EndEditor(props: EndEditorProps) {
             onSubmitEditing={confirmPending}
             testID="end.reason"
           />
-          <View style={styles.rowWrap}>
+          <FormActions>
+            <Btn title="Cancel" small onPress={() => setPending(null)} />
             <Btn
               title={pending.kind === 'delete' ? 'Delete' : 'Restore'}
               kind={pending.kind === 'delete' ? 'destructive' : 'primary'}
@@ -159,8 +160,7 @@ export function EndEditor(props: EndEditorProps) {
               onPress={confirmPending}
               testID="end.reason.ok"
             />
-            <Btn title="Cancel" small onPress={() => setPending(null)} />
-          </View>
+          </FormActions>
         </View>
       ) : null}
       {view.deleted ? (
@@ -510,8 +510,8 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg },
   scroll: { paddingBottom: 40 },
   head: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: space.sm, gap: space.xs, borderBottomWidth: 1, borderBottomColor: color.hairline },
-  backBtn: { alignSelf: 'flex-start', minHeight: hit.small, justifyContent: 'center' },
-  back: { ...font.calloutBold, color: color.primary },
+  // the panel's back sits at its top left, the chevron aligned with the text under it (T191)
+  backRow: { marginLeft: -space.sm },
   headLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.sm },
   headId: { ...font.headline, ...tabular, color: color.text },
   headCable: { ...font.callout, color: color.text },

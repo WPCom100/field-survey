@@ -7,7 +7,7 @@ import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 import { openAppStore } from '../db';
 import { useIdentity } from '../identity/IdentityGate';
 import { Btn, Notice, styles as w } from '../setup/widgets';
-import { Chip as UiChip, color, font, radius, space, tabular } from '../ui';
+import { Chip as UiChip, FormActions, color, font, radius, space, tabular } from '../ui';
 import { revealOffset } from '../ui/reveal';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
@@ -397,10 +397,10 @@ function RejectForm({ onReject }: { onReject: (reason: string) => void }) {
         ))}
       </View>
       <TextInput style={w.input} value={reason} onChangeText={setReason} placeholder="Reason" placeholderTextColor={color.text3} testID="draft.reject.reason" />
-      <View style={styles.btnRow}>
-        <Btn title="Reject" small disabled={!reason.trim()} onPress={() => onReject(reason)} testID="draft.reject.submit" />
+      <FormActions>
         <Btn title="Cancel" small onPress={() => setOpen(false)} />
-      </View>
+        <Btn title="Reject" small disabled={!reason.trim()} onPress={() => onReject(reason)} testID="draft.reject.submit" />
+      </FormActions>
     </View>
   );
 }

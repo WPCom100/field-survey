@@ -29,6 +29,10 @@ appId: productions.luminarytechnology.fieldsurvey
     id: add.cat.Station
 - assertVisible:
     id: add.cat.Sensor
+- scrollUntilVisible:          # Cancel sits left of Add device at the form's bottom since T191
+    element:
+      id: add.cancel
+    direction: DOWN
 - tapOn:
     id: add.cancel
 - runFlow:

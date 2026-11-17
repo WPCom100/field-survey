@@ -18,7 +18,7 @@ import { handRuling } from '../rulings/handoff';
 import { projectDataKey } from '../sync/dataKey';
 import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { Btn, Chip, FilterLabel, FilterRow, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
+import { Btn, Chip, FilterLabel, FilterRow, FormActions, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 
 /** Reasons offered as chips; any text is accepted. */
 const REASON_CHIPS = ['Checked on site: correct as is', 'Known; handled outside the app', 'Master is right; rule does not apply'];
@@ -310,10 +310,10 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
           </View>
           <TextInput style={styles.input} placeholderTextColor={color.text3} value={reason} onChangeText={setReason} placeholder="Reason (required)" multiline testID="lint.reason" />
           <Text style={styles.sub}>Dismissed findings come back if their facts change (D178).</Text>
-          <View style={styles.btnRow}>
-            <Btn kind="primary" title="Dismiss" disabled={!reason.trim()} onPress={() => onAct('dismiss', r, reason)} testID="lint.dismiss.ok" />
+          <FormActions>
             <Btn title="Cancel" onPress={() => setDismissing(false)} />
-          </View>
+            <Btn kind="primary" title="Dismiss" disabled={!reason.trim()} onPress={() => onAct('dismiss', r, reason)} testID="lint.dismiss.ok" />
+          </FormActions>
         </View>
       ) : null}
     </>

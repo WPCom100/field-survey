@@ -55,7 +55,7 @@ import { discardPhoto, preparePhoto, type PreparedPhoto } from './capture';
 import { MarkupCanvas, type MarkupTool } from './MarkupCanvas';
 import { hasLink, linkOptions, toggleLink, type LinkOption } from './links';
 import { captionPhrases, createPhoto, loadPhoto, newPhotoFields, updatePhoto, type ExistingPhoto, type PhotoFields, type PhotoTarget } from './model';
-import { Btn, Chip, color, fieldStyles, font, hit, hitSlopTo, radius, space } from '../ui';
+import { Btn, Chip, FormActions, Icon, color, fieldStyles, font, hit, hitSlopTo, radius, space } from '../ui';
 
 export type PhotoRequest =
   | { kind: 'camera'; target: PhotoTarget; title: string }
@@ -229,15 +229,15 @@ function CameraStage({ title, onShot, onLibrary, onCancel }: { title: string; on
     return (
       <View style={styles.center}>
         <Text style={styles.centerText}>Field Survey needs the camera to take photos. Allow it in Settings, or pick from the library.</Text>
-        <View style={styles.rowWrap}>
+        <FormActions>
+          <Btn title="Cancel" onPress={onCancel} />
+          <Btn title="🖼 Library" onPress={onLibrary} />
           {permission.canAskAgain ? (
             <Btn title="Allow camera" kind="primary" onPress={() => void requestPermission()} />
           ) : (
             <Btn title="Open Settings" kind="primary" onPress={() => void Linking.openSettings()} />
           )}
-          <Btn title="🖼 Library" onPress={onLibrary} />
-          <Btn title="Cancel" onPress={onCancel} />
-        </View>
+        </FormActions>
       </View>
     );
   }
@@ -245,11 +245,12 @@ function CameraStage({ title, onShot, onLibrary, onCancel }: { title: string; on
     <View style={styles.camera}>
       <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" mode="picture" onCameraReady={() => setReady(true)} />
       <View style={[styles.camTop, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={onCancel} hitSlop={10}>
+        {/* the camera closes to nothing: ✕ at the top right (D280 (5), T191) */}
+        <View style={{ width: 80 }} />
+        <Text style={styles.camText}>{title}</Text>
+        <Pressable onPress={onCancel} hitSlop={10} style={styles.camClose} accessibilityRole="button" testID="photo.camera.cancel">
           <Text style={styles.camText}>✕ Cancel</Text>
         </Pressable>
-        <Text style={styles.camText}>{title}</Text>
-        <View style={{ width: 80 }} />
       </View>
       <View style={styles.camSide}>
         <Pressable onPress={shoot} disabled={!ready || shooting} style={[styles.shutter, (!ready || shooting) && styles.shutterBusy]} accessibilityLabel="Take photo">
@@ -448,17 +449,27 @@ function PhotoEditor(props: {
         )
       }>
       <View style={[styles.head, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => props.onDone(false)} hitSlop={8} disabled={saving} style={styles.headBack}>
-          <Text style={styles.headLink}>◀ {existing ? 'Close' : 'Cancel'}</Text>
-        </Pressable>
+        {/* D280 (5), T191: a new photo is a form (Cancel left of Save); an existing one is a viewer
+            that closes to nothing (Save, then × at the top right). The sheet's bar is its button row:
+            the bottom is the image and a scrolling panel. */}
         <Text style={styles.headTitle} numberOfLines={1}>
           {props.title} · Photo {existing ? (existing.isNew ? 'NEW' : existing.label) : 'NEW'}
         </Text>
-        {readOnly ? (
-          <View style={{ width: 60 }} />
-        ) : (
-          <Btn title="Save" kind="primary" onPress={save} disabled={!fields} loading={saving} style={styles.saveBtn} testID="photo.save" />
-        )}
+        {existing ? null : <Btn title="Cancel" onPress={() => props.onDone(false)} disabled={saving} testID="photo.cancel" />}
+        {readOnly ? null : <Btn title="Save" kind="primary" onPress={save} disabled={!fields} loading={saving} style={styles.saveBtn} testID="photo.save" />}
+        {existing ? (
+          <Pressable
+            onPress={() => props.onDone(false)}
+            disabled={saving}
+            hitSlop={4}
+            style={({ pressed }) => [styles.headClose, pressed && styles.headClosePressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            testID="photo.close"
+          >
+            <Icon name="close" size={22} color={color.text2} />
+          </Pressable>
+        ) : null}
       </View>
       <View style={styles.body}>
         <View style={styles.imageArea}>
@@ -588,15 +599,16 @@ const styles = StyleSheet.create({
   camera: { flex: 1, backgroundColor: DARK },
   camTop: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10, backgroundColor: `${DARK}59` },
   camText: { ...font.headline, color: color.onPrimary },
+  camClose: { width: 80, alignItems: 'flex-end' },
   camSide: { position: 'absolute', right: 28, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', gap: 28 },
   shutter: { width: 78, height: 78, borderRadius: 39, backgroundColor: color.surface, borderWidth: 6, borderColor: `${color.surface}73`, alignItems: 'center', justifyContent: 'center' },
   shutterBusy: { opacity: 0.6 },
   camLib: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.control, backgroundColor: `${DARK}73` },
   editor: { flex: 1, width: '100%', backgroundColor: color.bg },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md, paddingHorizontal: space.lg, paddingBottom: 10, backgroundColor: color.surface, borderBottomWidth: 1, borderBottomColor: color.hairline },
-  headBack: { minHeight: hit.target, justifyContent: 'center' },
-  headLink: { ...font.headline, color: color.primary },
-  headTitle: { flex: 1, textAlign: 'center', ...font.headline, color: color.text },
+  headTitle: { flex: 1, ...font.headline, color: color.text },
+  headClose: { width: hit.target, height: hit.target, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' },
+  headClosePressed: { backgroundColor: color.hairline },
   saveBtn: { minWidth: 70 },
   body: { flex: 1, flexDirection: 'row', overflow: 'hidden' },
   imageArea: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: DARK },

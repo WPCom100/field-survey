@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { chipStyles } from '../plan/chips';
-import { Btn as UiBtn, Chip as UiChip, color, fieldStyles, font, radius, space, tabular } from '../ui';
+import { Btn as UiBtn, Chip as UiChip, FormActions, PanelHeader, color, fieldStyles, font, radius, space, tabular } from '../ui';
 import { flagNotOnSheet, moveDraft, placeItem, unplaceDevice, type PlaceResult } from './actions';
 import { TAGGED_ROLES, itemLine, itemsIn, rolesIn, type LevelUnplaced, type PlaceScope, type UnplacedItem } from './model';
 
@@ -88,10 +88,8 @@ export function PlacePanel(props: PlacePanelProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onClose} hitSlop={space.md} style={styles.backHit} testID="place.done">
-          <Text style={styles.back}>◀ Done placing</Text>
-        </Pressable>
-        <Text style={styles.title}>Place devices — {props.levelCode}</Text>
+        {/* placing mode closes to the plan's panel: × at the top right (D280 (5), T191; was "◀ Done placing") */}
+        <PanelHeader title={`Place devices — ${props.levelCode}`} close={{ onPress: props.onClose, testID: 'place.done', label: 'Done placing' }} />
         {p ? (
           <Text style={styles.muted} testID="place.progress">
             Placed {p.placed} of {p.devices}
@@ -321,7 +319,8 @@ function Selected(props: {
           <TextInput style={styles.input} value={dp} onChangeText={(t) => { typed.current.dp = true; setDp(t); }} placeholder="e.g. Grid B-C / 9-8" placeholderTextColor={color.text3} autoCorrect={false} />
           <Text style={styles.label}>Room / Location</Text>
           <TextInput style={styles.input} value={room} onChangeText={(t) => { typed.current.room = true; setRoom(t); }} placeholder="e.g. Elec Rm XX06M-1E05" placeholderTextColor={color.text3} />
-          <View style={styles.rowWrap}>
+          <FormActions>
+            <Btn label="Cancel" onPress={props.onCancel} testID="place.cancel" />
             <Btn
               label={props.busy ? 'Placing…' : 'Place ✓'}
               testID="place.confirm"
@@ -329,8 +328,7 @@ function Selected(props: {
               disabled={props.busy || !props.canEdit}
               onPress={() => props.onPlace({ drawingPosition: dp, room, ...(tagged ? { panelName: panel } : {}) })}
             />
-            <Btn label="Cancel" onPress={props.onCancel} testID="place.cancel" />
-          </View>
+          </FormActions>
           <Text style={styles.muted}>Tap the plan again to move the spot.</Text>
         </>
       )}
@@ -351,9 +349,6 @@ function Btn({ label, onPress, primary, disabled, testID }: { label: string; onP
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.surface },
   head: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: space.sm, gap: 6, borderBottomWidth: 1, borderColor: color.hairline },
-  backHit: { alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' },
-  back: { ...font.calloutBold, color: color.primary },
-  title: { ...font.headline, color: color.text },
   muted: { ...font.caption, color: color.text3 },
   note: { ...font.caption, color: color.primary },
   warn: { ...font.caption, color: color.warning },

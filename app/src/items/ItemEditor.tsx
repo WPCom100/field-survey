@@ -1,6 +1,6 @@
 /**
  * Punch item / missing part editor (T162, D254) in the plan's side panel, opened from the device
- * card's Punch items / Missing parts rows or the plan's Punch / Parts tabs; ◀ goes back to where
+ * card's Punch items / Missing parts rows or the plan's Punch / Parts tabs; ‹ goes back to where
  * it was opened. Tracking status (Date closed set with it) or Part status, Owner, Notes with the
  * project's phrase chips; Item / Part text and Type stay as the rules or the import wrote them.
  * Every tap is one `Field survey` op (D45, D96). An R3c address item is kept by the rules: its
@@ -16,7 +16,7 @@ import { appendPhrase } from '../card/actions';
 import type { HistoryEntry, JumpTarget } from '../card/model';
 import { chipStyles } from '../plan/chips';
 import { useReload } from '../sync/useReload';
-import { Btn, Chip, color, fieldStyles, font, hit, radius, space, status as statusFills, tabular, tinted } from '../ui';
+import { Btn, Chip, PanelHeader, color, fieldStyles, font, hit, radius, space, status as statusFills, tabular, tinted } from '../ui';
 import { setItemNotes, setItemOwner, setPartStatus, setTrackingStatus, type ItemKind } from './actions';
 import { loadItem, type ItemView } from './model';
 
@@ -31,7 +31,7 @@ export type ItemEditorProps = {
   levelId: string | null;
   reloadKey: unknown;
   names: ReadonlyMap<string, string>;
-  /** "◀ 06M-02" back to the card, or "◀ Punch" / "◀ Parts" back to the list. */
+  /** "‹ 06M-02" back to the card, or "‹ Punch" / "‹ Parts" back to the list (`PanelHeader`, T191). */
   backLabel: string;
   onBack: () => void;
   onEdited: () => void;
@@ -100,9 +100,9 @@ export function ItemEditor(props: ItemEditorProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onBack} hitSlop={8} testID="item.back" style={styles.backBtn}>
-          <Text style={styles.back}>◀ {props.backLabel}</Text>
-        </Pressable>
+        <View style={styles.backRow}>
+          <PanelHeader back={{ label: props.backLabel, onPress: props.onBack, testID: 'item.back' }} />
+        </View>
         <View style={styles.headLine}>
           <Text style={styles.headId}>{view.label === 'NEW' ? 'NEW' : `${kind === 'punch' ? 'Punch' : 'Part'} #${view.label}`}</Text>
           {view.levelCode ? <Text style={styles.muted}>Level {view.levelCode}</Text> : null}
@@ -367,8 +367,8 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg },
   scroll: { paddingBottom: 40 },
   head: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: space.sm, gap: space.xs, borderBottomWidth: 1, borderBottomColor: color.hairline },
-  backBtn: { alignSelf: 'flex-start', minHeight: hit.small, justifyContent: 'center' },
-  back: { ...font.calloutBold, color: color.primary },
+  // the panel's back sits at its top left, the chevron aligned with the text under it (T191)
+  backRow: { marginLeft: -space.sm },
   headLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.sm },
   headId: { ...font.headline, ...tabular, color: color.text },
   title: { ...font.calloutBold, color: color.text },

@@ -12,6 +12,7 @@ import { labelKind, type GridSet, type GridTap } from '@field-survey/core';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { PanelHeader } from '../ui/PanelHeader';
 import { color, font, hit, radius, space } from '../ui/tokens';
 import { GRID_SET_COLORS } from './drawLayers';
 
@@ -58,10 +59,8 @@ export function GridPanel(props: GridPanelProps) {
   return (
     <View style={styles.root}>
       <View style={styles.head}>
-        <Pressable onPress={props.onClose} hitSlop={8}>
-          <Text style={styles.back}>◀ Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Grid calibration — {props.levelCode}</Text>
+        {/* closes to the plan's panel: × at the top right (D280 (5), T191; was "◀ Back") */}
+        <PanelHeader title={`Grid calibration — ${props.levelCode}`} close={{ onPress: props.onClose, testID: 'grid.close' }} />
         <Text style={styles.muted}>Drawing Position is read from these grids when a pin is placed or moved.</Text>
       </View>
       <ScrollView style={styles.flex} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
@@ -187,8 +186,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
   head: { paddingHorizontal: space.md, paddingTop: 10, paddingBottom: space.sm, gap: 3, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: color.hairline },
-  back: { ...font.calloutBold, color: color.primary },
-  title: { ...font.headline, color: color.text },
   body: { padding: space.md, gap: space.sm, paddingBottom: 40 },
   label: { ...font.captionBold, color: color.text2, marginTop: 6 },
   muted: { ...font.caption, color: color.text3 },

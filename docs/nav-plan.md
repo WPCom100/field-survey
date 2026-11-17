@@ -130,6 +130,12 @@ its button row to the panel's top left; the crops' and the photo viewer's `Close
 become the `×`. New project keeps `Cancel` at the bottom and its top-left back, and both go to
 Projects.
 
+**Built in T191 (D284).** The end editor (the plan's and Cable / riser's), the item editor and the
+Rulings preview open with `PanelHeader`'s back at their top left; the source and riser crops,
+placing mode, grid calibration and an existing photo close with `×` at the top right; forms and
+dialogs put Cancel left of the primary through `ui/FormActions` (Add device's Cancel moved from the
+top to the bottom). The photo sheet keeps its buttons in its bar.
+
 ## 3. Decisions (Landry, 2026-11-17, "take the defaults": the recommendation in each)
 
 1. **Rail or full sidebar on the screens that have neither today.** Recommended: the **72-pt rail**

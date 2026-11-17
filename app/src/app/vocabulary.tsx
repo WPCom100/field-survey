@@ -207,8 +207,8 @@ function ValueRow(props: { e: VocabEntry; canEdit: boolean; run: RunFn; promote:
     return (
       <View style={styles.row}>
         <TextInput value={editing} onChangeText={setEditing} style={[styles.input, styles.grow]} autoFocus testID="vocab.rename.input" />
-        <Btn kind="primary" title="Save" onPress={async () => (await run((ed, s) => renameValue(ed, s, e.id, editing))) && setEditing(null)} testID="vocab.rename.save" />
         <Btn title="Cancel" onPress={() => setEditing(null)} />
+        <Btn kind="primary" title="Save" onPress={async () => (await run((ed, s) => renameValue(ed, s, e.id, editing))) && setEditing(null)} testID="vocab.rename.save" />
       </View>
     );
   }
@@ -352,8 +352,8 @@ function Placeholders(props: { items: PlaceholderEntry[]; canEdit: boolean; run:
               editing?.id === p.id ? (
                 <View key={p.id} style={styles.row}>
                   <TextInput value={editing.text} onChangeText={(t) => setEditing({ id: p.id, text: t })} style={[styles.input, styles.grow]} autoFocus />
-                  <Btn kind="primary" title="Save" onPress={async () => (await run((ed, s) => editPlaceholder(ed, s, p.id, { label: editing.text }))) && setEditing(null)} />
                   <Btn title="Cancel" onPress={() => setEditing(null)} />
+                  <Btn kind="primary" title="Save" onPress={async () => (await run((ed, s) => editPlaceholder(ed, s, p.id, { label: editing.text }))) && setEditing(null)} />
                 </View>
               ) : (
                 <View key={p.id} style={styles.row}>

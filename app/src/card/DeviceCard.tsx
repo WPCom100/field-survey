@@ -45,6 +45,7 @@ import {
   Icon,
   Row,
   Section,
+  FormActions,
   Swatch,
   color,
   fieldStyles,
@@ -260,10 +261,10 @@ export function DeviceCard(props: DeviceCardProps) {
             onSubmitEditing={confirmPending}
             testID="card.reason"
           />
-          <View style={styles.actions}>
-            <Btn title={okLabel} kind={danger ? 'destructive' : 'primary'} disabled={!pending.reason.trim()} onPress={confirmPending} testID="card.reason.ok" />
+          <FormActions>
             <Btn title="Cancel" onPress={() => setPending(null)} testID="card.reason.cancel" />
-          </View>
+            <Btn title={okLabel} kind={danger ? 'destructive' : 'primary'} disabled={!pending.reason.trim()} onPress={confirmPending} testID="card.reason.ok" />
+          </FormActions>
         </View>
       ) : null}
 
@@ -673,10 +674,10 @@ function TypeRow({ card, readOnly, run }: { card: Card; readOnly: boolean; run: 
               ))}
             </View>
           ) : null}
-          <View style={styles.actions}>
-            <Btn title="Save" kind="primary" onPress={() => save(typing)} testID="card.type.save" />
+          <FormActions>
             <Btn title="Cancel" onPress={() => setTyping(null)} />
-          </View>
+            <Btn title="Save" kind="primary" onPress={() => save(typing)} testID="card.type.save" />
+          </FormActions>
         </View>
       ) : null}
     </>
@@ -753,8 +754,8 @@ function AddressRow({ kind, card, store, readOnly, run }: { kind: AddressKind; c
               onSubmitEditing={() => check && !check.error && void save()}
               testID={`card.${kind}.input`}
             />
-            <Btn title={dupes.length ? 'Save anyway' : 'Save'} kind="primary" small disabled={!check || !!check.error} onPress={() => void save()} testID={`card.${kind}.save`} />
             <Btn title="Cancel" small onPress={() => setTyping(null)} />
+            <Btn title={dupes.length ? 'Save anyway' : 'Save'} kind="primary" small disabled={!check || !!check.error} onPress={() => void save()} testID={`card.${kind}.save`} />
           </View>
           {check && typing ? <Text style={check.error ? styles.errorText : styles.hint}>{check.error ?? `${check.value} ✓`}</Text> : null}
           {dupes.length ? <Text style={styles.finding}>⚠ Already on {dupes.map((x) => x.label).join(', ')} in this project.</Text> : null}
@@ -966,10 +967,10 @@ export function DraftRow({ draft, decider, readOnly, onDecided }: { draft: CardD
             </View>
           ))}
           {/* small, like the draft's own buttons: both fit one line inside the dashed card on the portrait panel */}
-          <View style={styles.actions}>
-            <Btn title="Save & accept" kind="primary" small disabled={!canAct} onPress={saveEdit} testID={`proposal.save.${draft.title}`} />
+          <FormActions>
             <Btn title="Cancel" small disabled={busy} onPress={() => setEditing(null)} />
-          </View>
+            <Btn title="Save & accept" kind="primary" small disabled={!canAct} onPress={saveEdit} testID={`proposal.save.${draft.title}`} />
+          </FormActions>
         </View>
       ) : (
         <View style={styles.draftActions}>
@@ -1057,10 +1058,10 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
             returnKeyType="done"
             onSubmitEditing={() => void apply()}
           />
-          <View style={styles.actions}>
-            <Btn title="Apply" kind="primary" disabled={busy || (!q.optional && !answer.trim())} onPress={() => void apply()} testID="card.quick.apply" />
+          <FormActions>
             <Btn title="Cancel" disabled={busy} onPress={() => setAsking(null)} />
-          </View>
+            <Btn title="Apply" kind="primary" disabled={busy || (!q.optional && !answer.trim())} onPress={() => void apply()} testID="card.quick.apply" />
+          </FormActions>
         </View>
       ) : null}
       {!readOnly && !q ? (
