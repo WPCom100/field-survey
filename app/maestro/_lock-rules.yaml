@@ -87,7 +87,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: rules.R3.signal.newWord
 - inputText: test signal
-- tapOn: Signal word per cable code       # a plain label: closes the keyboard
+- pressKey: Enter          # closes the keyboard (the label it tapped before T190 sits above the top edge under the bar)
+- waitForAnimationToEnd
 - tapOn:
     id: rules.R3.signal.add
 - scrollUntilVisible:

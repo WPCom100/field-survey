@@ -20,7 +20,8 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 10000
 - assertNotVisible:
     id: sugg.row.Maestro ${output.n}
-- tapOn: ◀ Projects
+- tapOn:
+    id: library.back
 - scrollUntilVisible:
     element:
       id: projects.open.${PROJECT}

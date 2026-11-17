@@ -53,4 +53,4 @@ name: Assigned — B fetches the assigned level's sheet only; B's draft follows 
     id: setup.step.rules
 - assertVisible: '.*1 set away from the built-in defaults\.'
 - tapOn:
-    id: setup.home
+    id: rail.levels

@@ -40,7 +40,7 @@ name: Library two — Ann's type, chip, kits, pin shape and app-library type
 - tapOn:
     id: plan.back
 - tapOn:
-    id: setup.home            # the plan was opened from Setup, which has no sidebar
+    id: rail.levels           # the plan returns to Setup; the rail leads to Levels
 
 # the type the free-typed model made
 - tapOn:
@@ -258,8 +258,9 @@ name: Library two — Ann's type, chip, kits, pin shape and app-library type
       id: library.note
       text: Accepted.
     timeout: 10000
-- tapOn: ◀ Projects
-- scrollUntilVisible:          # the Projects screen has no sidebar: open PROJECT from its list
+- tapOn:
+    id: library.back
+- scrollUntilVisible:          # the rail switches no project: open PROJECT from the list
     element:
       id: projects.open.${PROJECT}
     direction: DOWN

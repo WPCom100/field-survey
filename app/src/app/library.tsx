@@ -11,7 +11,7 @@ import { useTeamNames } from '../identity/useTeamNames';
 import { LibraryScreen } from '../library/LibraryScreen';
 import { projectDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { Btn, color, font, space } from '../ui';
+import { color, font, space } from '../ui';
 
 /**
  * The device-type library (Phase 3 §10): a project's (T48, `?project=`) or the app library
@@ -56,9 +56,7 @@ export default function LibraryRoute() {
         dataKey={projectDataKey(sync, app ? LIBRARY_STREAM : projectId)}
         names={names}
         onOpenReview={reviewOf ? () => router.push({ pathname: '/review', params: { project: reviewOf } }) : undefined}
-        // the app library keeps its own way out until T190; a project's is on the shell (T189)
-        header={app ? <Btn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} /> : undefined}
-        shell={!app}
+        app={app}
       />
     </>
   );

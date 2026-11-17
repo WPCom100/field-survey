@@ -46,7 +46,8 @@ name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
 - tapOn: Hide keyboard          # the keyboard's own key closes it over Create (the "Levels"
                                 #   title scrolls off under the 44-pt rows since T174, T50)
 - assertNotVisible: own group    # no numbering picker open (its list's first chip)
-- tapOn: Levels                  # T183: takes the touch that drops the minimised keyboard's inset
+- tapOn:                         # T183: takes the touch that drops the minimised keyboard's inset
+    id: newProject.levels         # by ID: the rail's Levels button has the same label (T190)
 - waitForAnimationToEnd:         #   (the form jumps 76 pt), so Create's tap is not the lost one
     timeout: 5000
 - scrollUntilVisible:
@@ -112,5 +113,5 @@ name: Pipeline — BOM, riser and the 06M sheet into Maestro pipeline
     timeout: 180000
 - runFlow: _logbox.yaml
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml

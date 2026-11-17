@@ -140,9 +140,9 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: 'rules\.R3a\.run\.item\.reset'
 - assertNotVisible: 'Run item text  changed'
-- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- pressKey: Enter          # a scroll can focus a text box: close its keyboard first
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow:
     file: _open-card.yaml
     env:

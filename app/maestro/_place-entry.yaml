@@ -5,7 +5,7 @@
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - tapOn:
     id: nav.needs-review
 - tapOn:

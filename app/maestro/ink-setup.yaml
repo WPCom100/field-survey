@@ -30,5 +30,5 @@ name: Ink — Ann's stroke and the ink layer switch
 - tapOn:
     id: plan.back
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml

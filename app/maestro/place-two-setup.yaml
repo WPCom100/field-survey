@@ -57,5 +57,5 @@ name: Place two — a pooled draft of two units
 - tapOn:
     id: plan.back
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml

@@ -30,4 +30,5 @@ name: R7 — a refusal while the server is stopped
 - assertVisible:
     id: newProject.name
     text: ${PROJECT} offline
-- tapOn: ◀ Projects
+- tapOn:
+    id: newProject.back

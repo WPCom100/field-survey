@@ -30,7 +30,7 @@ name: Sign-in — sign-in needed; editing goes on
 - inputText: 2026-11-07
 - pressKey: Enter
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - extendedWaitUntil:
     visible:
       id: status.bar

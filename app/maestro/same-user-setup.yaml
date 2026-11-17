@@ -14,5 +14,5 @@ name: Same user — a project, a station and Ann's ink layer
 - tapOn:
     id: plan.back
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml

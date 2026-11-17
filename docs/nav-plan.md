@@ -109,6 +109,14 @@ column became three chips in the bar. Back buttons are `<screen>.back`, except R
 `rulings.bar.back` (`rulings.back` is the preview's). `app/maestro/nav.yaml` walks Dashboard →
 Apply as ruling → Rulings → `‹ Dashboard` and Sync → Needs review → `‹ Sync`.
 
+**Built in T190 (D283).** Projects, New project, Rule defaults, the app library and its Needs review
+and Setup render the same `SectionScreen`, which takes an optional section and project: the
+app-level screens light no entry and serve the rail the project the Levels home last showed (dim
+with none on the iPad). Back as §2.2 says (`‹ Projects`, `‹ Library`, none on Projects from the
+project button or on Setup from the sidebar); New project's Cancel is history back too. Setup and New
+project keep their step column under the bar; Setup's "Open the levels screen ▸" is gone and
+`setup.home` is `rail.levels` in the flows.
+
 ### 2.3 Panels
 
 | Kind | Control | Position |

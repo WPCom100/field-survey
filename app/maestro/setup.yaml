@@ -16,5 +16,5 @@ name: Setup — sources, drafts, place, card
 - tapOn:
     id: plan.back
 - tapOn:
-    id: setup.home            # the plan returns to Setup; the sidebar link leads to Levels
+    id: rail.levels           # the plan returns to Setup; the rail leads to Levels
 - runFlow: _sync.yaml

@@ -48,9 +48,9 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: 'rules\.R3c\.dmx\.owner\.ETC'
 - assertVisible: 'DMX address item owner  changed'
-- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- pressKey: Enter          # a scroll can focus a text box: close its keyboard first
 - tapOn:
-    id: setup.home
+    id: rail.levels
 
 # Lint's R3c drafts on 01: the IP one was ETC, the DMX one now ETC too
 - tapOn:
@@ -95,9 +95,9 @@ appId: productions.luminarytechnology.fieldsurvey
     id: 'rules\.E6\.owner\.EC'
 - assertVisible:
     id: 'rules\.E6\.owner\.reset'
-- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- pressKey: Enter          # a scroll can focus a text box: close its keyboard first
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow:
     file: _open-card.yaml
     env:
@@ -153,4 +153,4 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: rules.only
 - tapOn:
-    id: setup.home
+    id: rail.levels

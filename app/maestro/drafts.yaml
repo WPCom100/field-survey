@@ -26,7 +26,7 @@ name: Drafts — the riser's cable drafts, endpoints, mismatches, a waiting cabl
 - runFlow: _drafts-waiting.yaml
 # Cable / riser: side B of the made run is the 01 draft
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - tapOn:
     id: nav.cable-riser
 - extendedWaitUntil:

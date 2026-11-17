@@ -2,7 +2,9 @@
 # A new project PROJECT (06M only) beside "Maestro master" (the seed, B2 … 06): Refresh from server;
 # Projects switches the project, and Lint, Cable / riser, Dashboard, Rulings and Export follow the
 # chosen project; the new-project form names a two-way numbering share and a chain and Create
-# refuses both; ◀ Projects; Setup's "Open the levels screen ▸".
+# refuses both; the bar's back (T190, D280): none on Projects from the project button or on Setup from
+# the sidebar, ‹ Projects on New project (its Cancel returns there too), Rule defaults, the app library
+# and Setup, ‹ Library on the app library's review; the rail's Levels from Setup.
 appId: productions.luminarytechnology.fieldsurvey
 name: R7 — Projects
 ---
@@ -23,7 +25,10 @@ name: R7 — Projects
       id: projects.open.Maestro master
     direction: DOWN
     timeout: 120000
-- tapOn: ◀ Levels
+- assertNotVisible:
+    id: projects.back           # from the project button: a section, no back (T190)
+- tapOn:
+    id: rail.levels
 
 # Projects switches the project (the home's chips went with T176); every sidebar screen follows
 - runFlow:
@@ -75,9 +80,11 @@ name: R7 — Projects
 - tapOn:
     id: newProject.create
 - assertVisible: 'Levels 06 and 06M share numbering with each other\. .*'
-- assertVisible:
-    id: newProject.create
-    text: Create project
+- scrollUntilVisible:          # since T190 the bar puts Create under the bottom edge here
+    element:
+      id: newProject.create
+      text: Create project
+    direction: DOWN
 # a chain: 06M → 06 → 07
 - runFlow:
     file: _projects-level.yaml
@@ -91,16 +98,83 @@ name: R7 — Projects
 - tapOn:
     id: newProject.create
 - assertVisible: 'Level 06M shares with 06, which itself shares with 07\. .*'
-- tapOn: ◀ Projects
+- assertVisible:
+    id: newProject.back
+    text: Projects
+- tapOn:
+    id: newProject.back
 - assertVisible: '\+ New project'
 - assertNotVisible:
     id: projects.open.${PROJECT} refused
+# New project's Cancel returns to Projects too
+- tapOn:
+    id: projects.new
+- tapOn:
+    id: newProject.cancel
+- assertVisible:
+    id: projects.new
+- assertNotVisible:
+    id: projects.back
 
-# Setup's way back to the levels
+# Rule defaults and the app library (and its review, when it has one) name where they return
+- tapOn:
+    id: projects.ruleDefaults
+- assertVisible:
+    id: ruleDefaults.back
+    text: Projects
+- tapOn:
+    id: ruleDefaults.back
+- tapOn:
+    id: projects.library
+- assertVisible:
+    id: library.back
+    text: Projects
+- runFlow:
+    when:
+      visible:
+        id: library.review
+    commands:
+      - tapOn:
+          id: library.review
+      - assertVisible:
+          id: review.back
+          text: Library
+      - tapOn:
+          id: review.back
+- tapOn:
+    id: library.back
+- assertVisible:
+    id: projects.new
+
+# Setup from Projects: ‹ Projects; the rail's Levels leads home (Setup's own link before T190)
 - tapOn:
     text: Setup ▸
     index: 0
-- tapOn: Open the levels screen ▸
+- assertVisible:
+    id: setup.back
+    text: Projects
+- tapOn:
+    id: setup.back
+- assertVisible:
+    id: projects.new
+- tapOn:
+    text: Setup ▸
+    index: 0
+- tapOn:
+    id: rail.levels
+- extendedWaitUntil:
+    visible:
+      id: nav.needs-review
+    timeout: 10000
+# Setup from the sidebar: a section, no back
+- tapOn:
+    id: nav.setup
+- assertVisible:
+    id: setup.step.levels
+- assertNotVisible:
+    id: setup.back
+- tapOn:
+    id: rail.levels
 - extendedWaitUntil:
     visible:
       id: nav.needs-review

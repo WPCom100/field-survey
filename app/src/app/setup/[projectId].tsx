@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { openAppStore } from '../../db';
+import { SectionScreen } from '../../home/SectionScreen';
 import { useCurrentUser } from '../../identity/IdentityGate';
 import { SetupActions, SetupError, loadProjectSetup, mezzanineParent, type ProjectSetup, type SetupLevel } from '../../setup/model';
 import { Btn, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
@@ -17,7 +18,7 @@ import { useSyncStatus } from '../../sync/useSyncStatus';
 import { projectDataKey } from '../../sync/dataKey';
 import { useReload } from '../../sync/useReload';
 import { useRulesVersion } from '../../rules/useRulesVersion';
-import { Btn as UiBtn, color, font, radius, space, tabular } from '../../ui';
+import { color, font, radius, space, tabular } from '../../ui';
 
 type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock' | 'assignments' | 'rules';
 const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'place', 'lock', 'assignments', 'rules'];
@@ -94,75 +95,71 @@ export default function ProjectSetupScreen() {
     [actions],
   );
 
+  // Setup is a section (D280): no back from the sidebar or the rail, else `‹ Projects` (or the screen
+  // it was opened from); the rail's Levels replaced "Open the levels screen ▸" (T190)
   if (!setup) {
     return (
-      <View style={styles.root}>
+      <SectionScreen section="Setup" projectId={projectId} title="Setup" backTestID="setup.back">
         <Text style={styles.empty}>{setup === null ? 'Loading…' : 'Unknown project'}</Text>
-      </View>
+      </SectionScreen>
     );
   }
 
   return (
-    <View style={styles.root}>
-      <View style={styles.side}>
-        <UiBtn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} style={styles.backBtn} />
-        <Text style={styles.sideTitle} numberOfLines={2}>
-          {setup.project.name}
-        </Text>
-        <StepItem id="project" label="1 Project" step={step} onPick={setStep} />
-        <StepItem id="levels" label="2 Levels" step={step} onPick={setStep} />
-        <StepItem id="sources" label="3 Sources" step={step} onPick={setStep} />
-        <StepItem id="drafts" label="4 Review drafts" step={step} onPick={setStep} />
-        <StepItem id="place" label="5 Place devices" step={step} onPick={setStep} />
-        <StepItem id="lock" label="6 Lock baseline" step={step} onPick={setStep} />
-        <View style={styles.sideRule} />
-        <StepItem id="assignments" label="Assignments" step={step} onPick={setStep} />
-        <StepItem id="rules" label="Rules" step={step} onPick={setStep} />
-        <View style={{ flex: 1 }} />
-        <Pressable onPress={() => router.dismissTo({ pathname: '/', params: { project: projectId } })} hitSlop={space.sm} style={styles.homeLink} testID="setup.home">
-          <Text style={styles.back}>Open the levels screen ▸</Text>
-        </Pressable>
-      </View>
-
-      {step === 'drafts' ? (
-        <View style={{ flex: 1 }}>
-          <DraftReview projectId={projectId} focus={draft ?? null} />
+    <SectionScreen section="Setup" projectId={projectId} title="Setup" caption={setup.project.name} backTestID="setup.back">
+      <View style={styles.root}>
+        <View style={styles.side}>
+          <StepItem id="project" label="1 Project" step={step} onPick={setStep} />
+          <StepItem id="levels" label="2 Levels" step={step} onPick={setStep} />
+          <StepItem id="sources" label="3 Sources" step={step} onPick={setStep} />
+          <StepItem id="drafts" label="4 Review drafts" step={step} onPick={setStep} />
+          <StepItem id="place" label="5 Place devices" step={step} onPick={setStep} />
+          <StepItem id="lock" label="6 Lock baseline" step={step} onPick={setStep} />
+          <View style={styles.sideRule} />
+          <StepItem id="assignments" label="Assignments" step={step} onPick={setStep} />
+          <StepItem id="rules" label="Rules" step={step} onPick={setStep} />
         </View>
-      ) : (
-        <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
-          <Notice text={error} error />
-          <Notice text={notice} />
-          {step === 'project' ? (
-            <ProjectStep setup={setup} run={run} />
-          ) : step === 'sources' ? (
-            <SourcesStep projectId={projectId} />
-          ) : step === 'place' ? (
-            <PlaceStep progress={placement} />
-          ) : step === 'assignments' ? (
-            <AssignmentsStep projectId={projectId} dataKey={dataKey} />
-          ) : step === 'rules' ? (
-            <RulesStep projectId={projectId} dataKey={dataKey} />
-          ) : step === 'lock' ? (
-            <LockStep levels={setup.levels.map((l) => locks.get(l.id)).filter((l): l is LockLevel => !!l)} onLock={setDialog} />
-          ) : (
-            <LevelsStep setup={setup} locks={locks} run={run} toBottom={toBottom} onLock={setDialog} />
-          )}
-        </ScrollView>
-      )}
-      <BaselineDialog
-        projectId={projectId}
-        userId={user.id}
-        level={dialog}
-        onClose={(done) => {
-          setDialog(null);
-          if (done) {
-            setError(null);
-            setNotice(done);
-            setReload((n) => n + 1);
-          }
-        }}
-      />
-    </View>
+
+        {step === 'drafts' ? (
+          <View style={{ flex: 1 }}>
+            <DraftReview projectId={projectId} focus={draft ?? null} />
+          </View>
+        ) : (
+          <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+            <Notice text={error} error />
+            <Notice text={notice} />
+            {step === 'project' ? (
+              <ProjectStep setup={setup} run={run} />
+            ) : step === 'sources' ? (
+              <SourcesStep projectId={projectId} />
+            ) : step === 'place' ? (
+              <PlaceStep progress={placement} />
+            ) : step === 'assignments' ? (
+              <AssignmentsStep projectId={projectId} dataKey={dataKey} />
+            ) : step === 'rules' ? (
+              <RulesStep projectId={projectId} dataKey={dataKey} />
+            ) : step === 'lock' ? (
+              <LockStep levels={setup.levels.map((l) => locks.get(l.id)).filter((l): l is LockLevel => !!l)} onLock={setDialog} />
+            ) : (
+              <LevelsStep setup={setup} locks={locks} run={run} toBottom={toBottom} onLock={setDialog} />
+            )}
+          </ScrollView>
+        )}
+        <BaselineDialog
+          projectId={projectId}
+          userId={user.id}
+          level={dialog}
+          onClose={(done) => {
+            setDialog(null);
+            if (done) {
+              setError(null);
+              setNotice(done);
+              setReload((n) => n + 1);
+            }
+          }}
+        />
+      </View>
+    </SectionScreen>
   );
 }
 
@@ -541,11 +538,8 @@ function LevelRow({
 
 const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
-  side: { width: 220, backgroundColor: color.surface2, borderRightWidth: 1, borderRightColor: color.hairline, padding: space.md, gap: 2 },
-  backBtn: { marginLeft: -space.md, marginBottom: space.xs },
-  back: { ...font.callout, color: color.primary },
-  homeLink: { minHeight: 44, justifyContent: 'center' },
-  sideTitle: { ...font.headline, color: color.text, marginBottom: space.sm },
+  // 168 (was 220): beside the 72-pt rail the step's tables keep their room in portrait (T190)
+  side: { width: 168, backgroundColor: color.surface2, borderRightWidth: 1, borderRightColor: color.hairline, padding: space.sm, gap: 2 },
   step: { minHeight: 44, justifyContent: 'center', paddingVertical: space.sm, paddingHorizontal: space.md, borderRadius: radius.control },
   stepOn: { backgroundColor: color.primaryTint },
   stepPressed: { backgroundColor: color.border },

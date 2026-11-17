@@ -32,5 +32,5 @@ name: Lock — B sees the lock, the rule change and the assignment
 - tapOn:
     id: 'assign.06.Ann.*'
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml

@@ -38,9 +38,9 @@ appId: productions.luminarytechnology.fieldsurvey
       id: rules.R4b.kit.N
       text: 'N: off'
     timeout: 10000
-- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- pressKey: Enter          # a scroll can focus a text box: close its keyboard first
 - tapOn:
-    id: setup.home
+    id: rail.levels
 
 # the N end: no kit note while N is off; the cable's own Yes brings it back
 - runFlow:
@@ -167,6 +167,6 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:          # N was the only change: back on, nothing is set away
     visible: Nothing changed yet.
     timeout: 10000
-- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- pressKey: Enter          # a scroll can focus a text box: close its keyboard first
 - tapOn:
-    id: setup.home
+    id: rail.levels

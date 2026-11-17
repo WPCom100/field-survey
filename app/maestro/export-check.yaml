@@ -68,7 +68,7 @@ name: R6 — export
 - inputText: 2026-10-30
 - pressKey: Enter
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - tapOn:
     id: nav.export
 - tapOn:

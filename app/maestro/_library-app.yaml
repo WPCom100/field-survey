@@ -187,7 +187,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: library.note
       text: 'Rejected: .*'
     timeout: 10000
-- tapOn: ◀ Projects
+- tapOn:
+    id: library.back
 - scrollUntilVisible:
     element:
       id: projects.open.${PROJECT}

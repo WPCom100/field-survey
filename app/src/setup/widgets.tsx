@@ -154,10 +154,11 @@ export const LEVEL_HELP = {
  * A page section: a title over its content in a card (the shell's page pattern, `docs/ui-plan.md`
  * §4: "forms as Fields in a card"; T180).
  */
-export function Section({ title, children }: { title: string; children: ReactNode }) {
+/** A titled card; `testID` on the title (a plain label a flow can tap to end editing, T190). */
+export function Section({ title, children, testID }: { title: string; children: ReactNode; testID?: string }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle} accessibilityRole="header">
+      <Text style={styles.sectionTitle} accessibilityRole="header" testID={testID}>
         {title}
       </Text>
       <Card>{children}</Card>

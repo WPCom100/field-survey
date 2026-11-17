@@ -116,8 +116,10 @@ name: Conflicts — the same fields edited on both iPads, offline
       id: library.note
       text: Saved.
     timeout: 10000
-- tapOn: ◀ Projects
-- tapOn: ◀ Levels
+- tapOn:
+    id: library.back
+- tapOn:
+    id: rail.levels
 - assertVisible:
     id: status.bar
     text: 'Offline · [1-9]\d* edits? waiting.*'

@@ -12,7 +12,7 @@ name: Seed — the master workbook into Maestro master
 - runFlow: _seed-import.yaml
 - runFlow: _logbox.yaml
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml
 - runFlow: _seed-vocab.yaml
 - runFlow: _seed-review.yaml

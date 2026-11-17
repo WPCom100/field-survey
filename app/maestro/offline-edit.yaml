@@ -98,7 +98,7 @@ name: Offline — every kind of edit, server stopped
     visible: '🔒 Locked.*'
     timeout: 10000
 - tapOn:
-    id: setup.home
+    id: rail.levels
 
 # every screen still opens on the local data
 - tapOn:

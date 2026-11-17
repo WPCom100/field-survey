@@ -100,7 +100,8 @@ appId: productions.luminarytechnology.fieldsurvey
       - waitForAnimationToEnd
 - assertNotVisible:
     id: sugg.accept.Missing network termination
-- tapOn: ◀ Projects
+- tapOn:
+    id: library.back
 - scrollUntilVisible:
     element:
       id: projects.open.${PROJECT}

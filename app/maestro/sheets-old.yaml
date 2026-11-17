@@ -20,7 +20,7 @@ name: Sheets — the older DaVinci categories, an ERn device, a Neuron flag by h
       AT: ${PICK_3}           # 3rd file: the 06M composite PDF
 - runFlow: _logbox.yaml
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml        # the corrected type reaches the iPad's app library
 
 # an ERn device under Equipment, its type's category since the older upload
@@ -97,6 +97,8 @@ name: Sheets — the older DaVinci categories, an ERn device, a Neuron flag by h
       id: library.note
       text: Saved.
     timeout: 10000
-- tapOn: ◀ Projects
-- tapOn: ◀ Levels
+- tapOn:
+    id: library.back
+- tapOn:
+    id: rail.levels
 - runFlow: _sync.yaml

@@ -51,7 +51,7 @@ name: Riser — a cached crop offline; a riser cable accepted offline
       text: 'Accepted — the cable is made'
     timeout: 10000
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - tapOn:
     id: nav.cable-riser
 - extendedWaitUntil:

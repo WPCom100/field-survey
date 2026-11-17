@@ -23,7 +23,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - assertVisible: '06  ●, .*'          # the row is one element: "06  ●, Setup, Lock…, …"
 - assertNotVisible: 'B2  ●, .*'
 - tapOn:

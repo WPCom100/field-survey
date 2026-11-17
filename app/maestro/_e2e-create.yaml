@@ -43,7 +43,8 @@ appId: productions.luminarytechnology.fieldsurvey
 # inset; the form jumps 76 pt under the finger and the press is cancelled. Tapped on Create, that
 # touch was lost and the run waited out its 2 minutes on the form. The title, back on screen now,
 # takes that touch (a plain label: it only ends the editing).
-- tapOn: Levels
+- tapOn:
+    id: newProject.levels   # the rail's Levels button has the same label (T190)
 - waitForAnimationToEnd:
     timeout: 5000
 # 06M arrived sharing 06's numbering group and as a split of 06, as the Tower (D33): New project

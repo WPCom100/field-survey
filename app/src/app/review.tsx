@@ -29,7 +29,7 @@ import { useRulesVersion } from '../rules/useRulesVersion';
 import { projectDataKey } from '../sync/dataKey';
 import { useIdentityKey, useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { Btn, Chip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, ring, space, tabular } from '../ui';
+import { Btn, Chip, FilterLabel, FilterRow, PAGE_GUTTER, color, fieldStyles, font, radius, ring, space, tabular } from '../ui';
 
 const CHOICE_LABEL: Record<ResolveChoice['choice'], string> = { A: 'Choose A', B: 'Choose B', combine: 'Combine', value: 'Set value' };
 
@@ -299,17 +299,12 @@ export default function NeedsReviewScreen() {
     </>
   );
 
-  // the app library's review (from its Library screen) moves onto the shell in T190
+  // the app library's review (opened from the app library, `‹ Library`): on the shell, lighting no entry (T190)
   if (params.project === LIBRARY_STREAM) {
     return (
-      <View style={styles.root}>
-        <PageHeader
-          title={`App library — needs review (${total})`}
-          caption={intro}
-          actions={<Btn kind="tertiary" title="← Library" onPress={() => router.navigate({ pathname: '/library', params: { scope: 'app' } })} />}
-        />
+      <SectionScreen title={`App library — needs review (${total})`} intro={intro} backTestID="review.back">
         {body}
-      </View>
+      </SectionScreen>
     );
   }
   return (
@@ -602,7 +597,6 @@ function Side(props: { letter: string; title: string; side: ReviewDetail['a']; v
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
   link: { ...font.callout, color: color.primary },
   tabs: { flexGrow: 0, marginTop: space.md },
   chips: { gap: space.sm, alignItems: 'center', paddingHorizontal: PAGE_GUTTER },

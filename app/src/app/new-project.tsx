@@ -4,12 +4,13 @@ import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { listProjects, type HomeProject } from '../home/data';
+import { SectionScreen } from '../home/SectionScreen';
 import { useIdentity } from '../identity/IdentityGate';
 import { createProject, fetchProjects, type NewLevel, type NewProjectBody } from '../setup/api';
 import { DEFAULT_EXPORT_TITLE, SetupError, addDraftLevels, createFailureText, normLevelCode, parseLevelRange, shareProblem } from '../setup/model';
 import { Btn, Check, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../setup/widgets';
 import { getSyncEngine } from '../sync/engine';
-import { Btn as UiBtn, color, font, radius, space, tabular } from '../ui';
+import { Btn as UiBtn, color, font, goBack, radius, space, tabular } from '../ui';
 
 type DraftLevel = { code: string; inScope: boolean; shareWith: string | null; splitOf: string | null };
 
@@ -132,121 +133,121 @@ export default function NewProjectScreen() {
   };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.side}>
-        <UiBtn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} style={styles.back} />
-        <Text style={styles.sideTitle}>New project</Text>
-        {['1 Project', '2 Levels', '3 Sources', '4 Review drafts', '5 Place devices', '6 Lock baseline'].map((s, i) => (
-          <Text key={s} style={[styles.step, i < 2 && styles.stepOn, i > 1 && styles.stepDim]}>
-            {s}
-            {i < 2 ? '  ●' : ''}
-          </Text>
-        ))}
-        <Text style={styles.hint}>Sources (the seed import), review, placing and locking come after the project exists.</Text>
-      </View>
-
-      <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
-        <Section title="Project">
-          <Field label="Name" value={name} onChange={setName} placeholder="Houston Methodist Centennial Tower" testID="newProject.name" />
-          <Field label="Site" value={site} onChange={setSite} placeholder="Houston, TX" />
-          <View style={w.row}>
-            <Field label="EC" value={ec} onChange={setEc} placeholder="Electrical contractor" />
-            <Field label="ETC" value={etc} onChange={setEtc} placeholder="ETC field service" />
-            <Field label="GC" value={gc} onChange={setGc} placeholder="General contractor" />
-          </View>
-          <View style={w.row}>
-            <View style={{ gap: 4 }}>
-              <Text style={w.label}>Copy from</Text>
-              <ChipPicker value={copyFrom} options={sources.map((p) => ({ id: p.id, label: p.name }))} onPick={setCopyFrom} none="Nothing (app library only)" />
-            </View>
-          </View>
-          {copyFrom ? (
-            <View style={styles.flags}>
-              <Check label="Vocabulary" value={flags.vocabulary} onChange={(v) => setFlags({ ...flags, vocabulary: v })} />
-              <Check label="Device-type library" value={flags.library} onChange={(v) => setFlags({ ...flags, library: v })} />
-              <Check label="Standing rulings" value={flags.rulings} onChange={(v) => setFlags({ ...flags, rulings: v })} />
-              <Check label="Rule settings" value={flags.rule_params} onChange={(v) => setFlags({ ...flags, rule_params: v })} />
-              <Check label="Placeholders" value={flags.placeholders} onChange={(v) => setFlags({ ...flags, placeholders: v })} />
-            </View>
-          ) : (
-            <Text style={styles.hint}>The app library's accepted device types, suggestion chips and rule defaults are copied in either way (D65, D176, D174).</Text>
-          )}
-          <Field label="Export title" value={exportTitle} onChange={setExportTitle} />
-          <Field label="Disclaimer" value={disclaimer} onChange={setDisclaimer} placeholder="Based on submittal drawings rev F …" multiline />
-        </Section>
-
-        <Section title="Levels">
-          <View style={styles.levelsHead}>
-            <Text style={[styles.cN, w.label]}>#</Text>
-            <Text style={[styles.cCode, w.label]}>Code</Text>
-            <HeadCell style={styles.cScope} label="In scope" help={LEVEL_HELP.inScope} />
-            <HeadCell style={styles.cPick} label="Shares numbering with" help={LEVEL_HELP.numbering} />
-            <HeadCell style={styles.cPick} label="Split of" help={LEVEL_HELP.splitOf} />
-            <Text style={[styles.cActions, w.label]}> </Text>
-          </View>
-          {levels.map((l, i) => (
-            <View key={l.code} style={styles.levelRow}>
-              <Text style={styles.cN}>{i + 1}</Text>
-              <Text style={[styles.cCode, styles.code]}>{l.code}</Text>
-              <View style={styles.cScope}>
-                <ScopeSwitch value={l.inScope} onChange={(v) => update(i, { inScope: v })} />
-              </View>
-              <View style={styles.cPick}>
-                <ChipPicker value={l.shareWith} options={codes.filter((c) => c.id !== l.code)} onPick={(v) => update(i, { shareWith: v })} none="own group" testID={`newProject.share.${l.code}`} />
-              </View>
-              <View style={styles.cPick}>
-                <ChipPicker value={l.splitOf} options={codes.filter((c) => c.id !== l.code)} onPick={(v) => update(i, { splitOf: v })} testID={`newProject.split.${l.code}`} />
-              </View>
-              <View style={[styles.cActions, styles.actions]}>
-                <Btn title="↑" small onPress={() => move(i, -1)} disabled={i === 0} />
-                <Btn title="↓" small onPress={() => move(i, 1)} disabled={i === levels.length - 1} />
-                <Btn title="✕" small onPress={() => remove(i)} />
-              </View>
-            </View>
+    // opened from Projects only: the bar's `‹ Projects` and Cancel both return there (D280, T190)
+    <SectionScreen title="New project" backTestID="newProject.back">
+        <View style={styles.root}>
+        <View style={styles.side}>
+          {['1 Project', '2 Levels', '3 Sources', '4 Review drafts', '5 Place devices', '6 Lock baseline'].map((s, i) => (
+            <Text key={s} style={[styles.step, i < 2 && styles.stepOn, i > 1 && styles.stepDim]}>
+              {s}
+              {i < 2 ? '  ●' : ''}
+            </Text>
           ))}
-          <View style={w.row}>
-            <View style={{ width: 160 }}>
-              <Text style={w.label}>Add level</Text>
-              <TextInput
-                style={w.input}
-                placeholderTextColor={color.text3}
-                value={newCode}
-                onChangeText={setNewCode}
-                placeholder="06M"
-                autoCapitalize="characters"
-                autoCorrect={false}
-                onFocus={toBottom}
-                onSubmitEditing={addLevel}
-                submitBehavior="submit"
-                returnKeyType="next"
-                testID="newProject.levelCode"
-              />
-            </View>
-            <Btn title="+ Add level" onPress={addLevel} testID="newProject.addLevel" />
-            <View style={{ width: 200 }}>
-              <Text style={w.label}>Add range…</Text>
-              <TextInput style={w.input} placeholderTextColor={color.text3} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onFocus={toBottom} onSubmitEditing={addRange} />
-            </View>
-            <Btn title="Add range" onPress={addRange} />
-          </View>
-          <Notice text={shareIssue} error />
-        </Section>
-
-        <Notice text={error} error />
-        <View style={[w.row, { justifyContent: 'flex-end' }]}>
-          <UiBtn title="Cancel" onPress={() => router.back()} />
-          <Btn title={busy ? 'Creating…' : 'Create project'} primary onPress={() => void create()} disabled={busy} testID="newProject.create" />
+          <Text style={styles.hint}>Sources (the seed import), review, placing and locking come after the project exists.</Text>
         </View>
-      </ScrollView>
-    </View>
+
+        <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+          <Section title="Project">
+            <Field label="Name" value={name} onChange={setName} placeholder="Houston Methodist Centennial Tower" testID="newProject.name" />
+            <Field label="Site" value={site} onChange={setSite} placeholder="Houston, TX" />
+            <View style={w.row}>
+              <Field label="EC" value={ec} onChange={setEc} placeholder="Electrical contractor" />
+              <Field label="ETC" value={etc} onChange={setEtc} placeholder="ETC field service" />
+              <Field label="GC" value={gc} onChange={setGc} placeholder="General contractor" />
+            </View>
+            <View style={w.row}>
+              <View style={{ gap: 4 }}>
+                <Text style={w.label}>Copy from</Text>
+                <ChipPicker value={copyFrom} options={sources.map((p) => ({ id: p.id, label: p.name }))} onPick={setCopyFrom} none="Nothing (app library only)" />
+              </View>
+            </View>
+            {copyFrom ? (
+              <View style={styles.flags}>
+                <Check label="Vocabulary" value={flags.vocabulary} onChange={(v) => setFlags({ ...flags, vocabulary: v })} />
+                <Check label="Device-type library" value={flags.library} onChange={(v) => setFlags({ ...flags, library: v })} />
+                <Check label="Standing rulings" value={flags.rulings} onChange={(v) => setFlags({ ...flags, rulings: v })} />
+                <Check label="Rule settings" value={flags.rule_params} onChange={(v) => setFlags({ ...flags, rule_params: v })} />
+                <Check label="Placeholders" value={flags.placeholders} onChange={(v) => setFlags({ ...flags, placeholders: v })} />
+              </View>
+            ) : (
+              <Text style={styles.hint}>The app library's accepted device types, suggestion chips and rule defaults are copied in either way (D65, D176, D174).</Text>
+            )}
+            <Field label="Export title" value={exportTitle} onChange={setExportTitle} />
+            <Field label="Disclaimer" value={disclaimer} onChange={setDisclaimer} placeholder="Based on submittal drawings rev F …" multiline />
+          </Section>
+
+          <Section title="Levels" testID="newProject.levels">
+            <View style={styles.levelsHead}>
+              <Text style={[styles.cN, w.label]}>#</Text>
+              <Text style={[styles.cCode, w.label]}>Code</Text>
+              <HeadCell style={styles.cScope} label="In scope" help={LEVEL_HELP.inScope} />
+              <HeadCell style={styles.cPick} label="Shares numbering with" help={LEVEL_HELP.numbering} />
+              <HeadCell style={styles.cPick} label="Split of" help={LEVEL_HELP.splitOf} />
+              <Text style={[styles.cActions, w.label]}> </Text>
+            </View>
+            {levels.map((l, i) => (
+              <View key={l.code} style={styles.levelRow}>
+                <Text style={styles.cN}>{i + 1}</Text>
+                <Text style={[styles.cCode, styles.code]}>{l.code}</Text>
+                <View style={styles.cScope}>
+                  <ScopeSwitch value={l.inScope} onChange={(v) => update(i, { inScope: v })} />
+                </View>
+                <View style={styles.cPick}>
+                  <ChipPicker value={l.shareWith} options={codes.filter((c) => c.id !== l.code)} onPick={(v) => update(i, { shareWith: v })} none="own group" testID={`newProject.share.${l.code}`} />
+                </View>
+                <View style={styles.cPick}>
+                  <ChipPicker value={l.splitOf} options={codes.filter((c) => c.id !== l.code)} onPick={(v) => update(i, { splitOf: v })} testID={`newProject.split.${l.code}`} />
+                </View>
+                <View style={[styles.cActions, styles.actions]}>
+                  <Btn title="↑" small onPress={() => move(i, -1)} disabled={i === 0} />
+                  <Btn title="↓" small onPress={() => move(i, 1)} disabled={i === levels.length - 1} />
+                  <Btn title="✕" small onPress={() => remove(i)} />
+                </View>
+              </View>
+            ))}
+            <View style={w.row}>
+              <View style={{ width: 160 }}>
+                <Text style={w.label}>Add level</Text>
+                <TextInput
+                  style={w.input}
+                  placeholderTextColor={color.text3}
+                  value={newCode}
+                  onChangeText={setNewCode}
+                  placeholder="06M"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  onFocus={toBottom}
+                  onSubmitEditing={addLevel}
+                  submitBehavior="submit"
+                  returnKeyType="next"
+                  testID="newProject.levelCode"
+                />
+              </View>
+              <Btn title="+ Add level" onPress={addLevel} testID="newProject.addLevel" />
+              <View style={{ width: 200 }}>
+                <Text style={w.label}>Add range…</Text>
+                <TextInput style={w.input} placeholderTextColor={color.text3} value={range} onChangeText={setRange} placeholder="09-28" autoCorrect={false} onFocus={toBottom} onSubmitEditing={addRange} />
+              </View>
+              <Btn title="Add range" onPress={addRange} />
+            </View>
+            <Notice text={shareIssue} error />
+          </Section>
+
+          <Notice text={error} error />
+          <View style={[w.row, { justifyContent: 'flex-end' }]}>
+            <UiBtn title="Cancel" onPress={goBack} testID="newProject.cancel" />
+            <Btn title={busy ? 'Creating…' : 'Create project'} primary onPress={() => void create()} disabled={busy} testID="newProject.create" />
+          </View>
+        </ScrollView>
+        </View>
+    </SectionScreen>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
-  side: { width: 220, backgroundColor: color.surface2, borderRightWidth: 1, borderRightColor: color.hairline, padding: space.md, gap: space.xs },
-  back: { marginLeft: -space.md, marginBottom: space.sm },
-  sideTitle: { ...font.headline, color: color.text, marginBottom: space.sm },
+  // 168 (was 220), as Setup's: the step column beside the 72-pt rail (T190)
+  side: { width: 168, backgroundColor: color.surface2, borderRightWidth: 1, borderRightColor: color.hairline, padding: space.sm, gap: space.xs },
   step: { ...font.callout, color: color.text2, paddingVertical: 10, paddingHorizontal: space.md, borderRadius: radius.control },
   stepOn: { color: color.text },
   stepDim: { color: color.text3 },

@@ -153,5 +153,5 @@ appId: productions.luminarytechnology.fieldsurvey
     id: draft.level
     text: '.*pool \(no level\)  · basis: project_pool'
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml

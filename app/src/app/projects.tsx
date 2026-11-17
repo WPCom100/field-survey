@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { listProjects, type HomeProject } from '../home/data';
+import { SectionScreen } from '../home/SectionScreen';
 import { useIdentity } from '../identity/IdentityGate';
 import { fetchProjects, type ServerProject } from '../setup/api';
 import { Notice } from '../setup/widgets';
@@ -11,7 +12,7 @@ import { getSyncEngine } from '../sync/engine';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { syncDataKey } from '../sync/dataKey';
 import { useReload } from '../sync/useReload';
-import { Btn, Card, PageHeader, PAGE_GUTTER, color, font, space, tabular } from '../ui';
+import { Btn, Card, PAGE_GUTTER, color, font, space, tabular } from '../ui';
 
 /**
  * Projects (Phase 3 §2.1 "Projects"): what is on this iPad plus what the server lists. A
@@ -81,20 +82,20 @@ export default function ProjectsScreen() {
   const pending = (remote ?? []).filter((p) => !onDevice.has(p.id));
 
   return (
-    <View style={styles.root}>
-      <PageHeader
-        title="Projects"
-        caption="The projects on this iPad, and any the server lists that are still downloading."
-        actions={
-          <>
-            <Btn kind="tertiary" title="◀ Levels" onPress={() => router.dismissTo('/')} />
-            <Btn title="Device-type library" onPress={() => router.push({ pathname: '/library', params: { scope: 'app' } })} testID="projects.library" />
-            <Btn title="Rule defaults" onPress={() => router.push('/rule-defaults')} />
-            <Btn title={busy ? 'Refreshing…' : 'Refresh from server'} onPress={() => void refresh()} disabled={busy} testID="projects.refresh" />
-            <Btn title="+ New project" kind="primary" onPress={() => router.push('/new-project')} testID="projects.new" />
-          </>
-        }
-      />
+    // from the project button: no back (D280); the rail's Levels replaced "◀ Levels" (T190)
+    <SectionScreen
+      title="Projects"
+      intro="The projects on this iPad, and any the server lists that are still downloading."
+      backTestID="projects.back"
+      actions={
+        <>
+          <Btn title="Device-type library" onPress={() => router.push({ pathname: '/library', params: { scope: 'app' } })} testID="projects.library" />
+          <Btn title="Rule defaults" onPress={() => router.push('/rule-defaults')} testID="projects.ruleDefaults" />
+          <Btn title={busy ? 'Refreshing…' : 'Refresh from server'} onPress={() => void refresh()} disabled={busy} testID="projects.refresh" />
+          <Btn title="+ New project" kind="primary" onPress={() => router.push('/new-project')} testID="projects.new" />
+        </>
+      }
+    >
       <View style={styles.notices}>
         <Notice text={error} error />
         <Notice text={notice} />
@@ -126,12 +127,11 @@ export default function ProjectsScreen() {
           </Card>
         ))}
       </ScrollView>
-    </View>
+    </SectionScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
   notices: { paddingHorizontal: PAGE_GUTTER, paddingTop: space.sm, gap: space.xs },
   list: { paddingHorizontal: PAGE_GUTTER, paddingVertical: space.lg, gap: space.md },
   empty: { ...font.callout, color: color.text3 },

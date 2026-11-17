@@ -64,4 +64,4 @@ name: Riser — B sees the draft states and each accepted cable once
 - tapOn:
     id: drafts.filter.open
 - tapOn:
-    id: setup.home
+    id: rail.levels

@@ -22,7 +22,7 @@ name: Stranger — an edit under the lost id
 - inputText: 2026-11-06
 - pressKey: Enter
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - extendedWaitUntil:
     visible:
       id: status.bar

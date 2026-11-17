@@ -9,5 +9,5 @@ name: Resume — a project with a station
 - tapOn:
     id: plan.back
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml

@@ -60,7 +60,7 @@ name: Needs review — Save combined; the links
             id: drafts.tab.devices
           timeout: 20000
       - tapOn:
-          id: setup.home
+          id: rail.levels
       - runFlow: _open-project.yaml    # back to this run's project (the home follows the last opened)
 - runFlow:
     file: _open-card.yaml

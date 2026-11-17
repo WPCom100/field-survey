@@ -43,8 +43,9 @@ name: Library two — B sees Ann's library, card, kits and pin shape
       id: library.note
       text: 'Rejected: .*'
     timeout: 10000
-- tapOn: ◀ Projects
-- scrollUntilVisible:          # the Projects screen has no sidebar: open PROJECT from its list
+- tapOn:
+    id: library.back
+- scrollUntilVisible:          # the rail switches no project: open PROJECT from the list
     element:
       id: projects.open.${PROJECT}
     direction: DOWN

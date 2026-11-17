@@ -62,7 +62,7 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 300000
 - runFlow: _logbox.yaml
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml
 - tapOn:
     id: nav.vocabulary

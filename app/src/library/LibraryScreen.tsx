@@ -40,7 +40,7 @@ import { SectionScreen } from '../home/SectionScreen';
 import { loadSuggestions, type Suggestion } from '../suggestions/model';
 import { useReload } from '../sync/useReload';
 import { SuggestionList, SuggestionsPane } from './SuggestionEditor';
-import { Banner, Btn, Chip, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
+import { Banner, Btn, Chip, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 
 /** One row of the virtualised list: a group's header, or a type. */
 type Item = { kind: 'head'; group: LibraryGroup; total: LibraryGroup | null; collapsed: boolean } | { kind: 'type'; type: LibraryType };
@@ -72,10 +72,8 @@ export function LibraryScreen(props: {
   /** Changes when a pull brought new ops for this library (reload; `projectDataKey`). */
   dataKey: string;
   names: ReadonlyMap<string, string>;
-  /** The app library (T190 moves it onto the shell): its way out, left of the header's buttons. */
-  header?: React.ReactNode;
-  /** A project's library: on the shell with the rail and the bar (D280, T189). */
-  shell?: boolean;
+  /** The app library (`?scope=app`): on the shell with no section and no project of its own (T190). */
+  app?: boolean;
 }) {
   const { store, editor, scope } = props;
   const [view, setView] = useState<LibraryView | null>(null);
@@ -154,7 +152,6 @@ export function LibraryScreen(props: {
   const intro = scope ? "This project's device types: what the plan offers and what the rules key on." : 'What every new project copies: the accepted types and their suggestion chips.';
   const actions = (
           <>
-            {props.header}
             {view?.inReview && props.onOpenReview ? <Btn kind="tertiary" title={`${view.inReview} in review ▸`} onPress={props.onOpenReview} testID="library.review" /> : null}
             <Btn title="Suggestions…" onPress={() => setPane({ kind: 'suggestions' })} testID="library.suggestions" />
             <Btn title="Copy from…" disabled={!editor} onPress={() => setPane({ kind: 'copy' })} testID="library.copy" />
@@ -240,18 +237,11 @@ export function LibraryScreen(props: {
       </View>
     </>
   );
-  if (props.shell) {
-    return (
-      <SectionScreen section="Library" projectId={scope} title={title} intro={intro} backTestID="library.back" actions={actions}>
-        {body}
-      </SectionScreen>
-    );
-  }
+  // a project's Library is a section (T189); the app library, opened from Projects, lights no entry (T190)
   return (
-    <View style={styles.root}>
-      <PageHeader title={title} caption={intro} actions={actions} />
+    <SectionScreen {...(props.app ? {} : { section: 'Library' as const, projectId: scope })} title={title} intro={intro} backTestID="library.back" actions={actions}>
       {body}
-    </View>
+    </SectionScreen>
   );
 }
 
@@ -689,7 +679,6 @@ function Chips(props: { options: readonly string[]; value: string | null; onPick
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
   link: { ...font.callout, color: color.primary },
   source: { gap: 2, paddingBottom: 6 },
   desc: { ...font.callout, color: color.text2 },

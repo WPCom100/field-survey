@@ -9,4 +9,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - pressKey: Enter
 - assertVisible:
     id: newProject.share.${CODE}
-- tapOn: Levels            # the section title: the first tap only closes the keyboard (hideKeyboard opened the help bubbles)
+- tapOn:                   # the section title: the first tap only closes the keyboard (hideKeyboard opened the help bubbles)
+    id: newProject.levels   # by ID: the rail's Levels button has the same label (T190)

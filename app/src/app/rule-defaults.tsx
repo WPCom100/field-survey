@@ -1,15 +1,15 @@
 import { Editor, LIBRARY_STREAM, type Store } from '@field-survey/core';
-import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { openAppStore } from '../db';
+import { SectionScreen } from '../home/SectionScreen';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { RuleParamsEditor } from '../rules/RuleParamsEditor';
 import { projectDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import { Notice } from '../setup/widgets';
-import { Btn, PageHeader, PAGE_GUTTER, color, font, space } from '../ui';
+import { PAGE_GUTTER, color, font, space } from '../ui';
 
 /**
  * App-level rule defaults (T102, D176 (2), (4)), opened from the Projects list beside the
@@ -26,12 +26,7 @@ export default function RuleDefaultsRoute() {
   }, []);
   const editor = useMemo(() => (store ? new Editor(store, { projectId: LIBRARY_STREAM, userId: user.id }) : null), [store, user.id]);
   return (
-    <View style={styles.root}>
-      <PageHeader
-        title="Rule defaults"
-        caption="What a new project's Rules start from. A change is a draft until accepted."
-        actions={<Btn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} />}
-      />
+    <SectionScreen title="Rule defaults" intro="What a new project's Rules start from. A change is a draft until accepted." backTestID="ruleDefaults.back">
       {error ? (
         <View style={styles.notice}>
           <Notice text={error} error />
@@ -40,12 +35,11 @@ export default function RuleDefaultsRoute() {
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {store && editor ? <RuleParamsEditor store={store} editor={editor} scope={null} dataKey={projectDataKey(sync, LIBRARY_STREAM)} /> : <Text style={styles.loading}>Loading…</Text>}
       </ScrollView>
-    </View>
+    </SectionScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
   body: { paddingHorizontal: PAGE_GUTTER, paddingTop: space.lg, paddingBottom: 80 },
   loading: { ...font.callout, color: color.text3 },
   notice: { paddingHorizontal: PAGE_GUTTER },

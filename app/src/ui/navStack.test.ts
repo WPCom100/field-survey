@@ -83,6 +83,25 @@ describe('the stack rule (D280, T188)', () => {
     expect(backFor(tap!, 1)).toBeNull();
   });
 
+  it('the app-level screens (T190): Projects and Setup from the sidebar show none, what Projects opens says Projects', () => {
+    const projects = { name: 'projects' };
+    // the project button and the rail's Setup: sections on Levels, no back
+    expect(backFor(st(home, projects), 1)).toBeNull();
+    expect(backFor(st(home, { name: 'setup/[projectId]', params: { projectId: P } }), 1)).toBeNull();
+    // opened from Projects: ‹ Projects
+    for (const r of [{ name: 'new-project' }, { name: 'rule-defaults' }, { name: 'library', params: { scope: 'app' } }, { name: 'setup/[projectId]', params: { projectId: P } }]) {
+      expect(backFor(st(home, projects, r), 2)).toBe('Projects');
+    }
+    // the app library's Needs review: ‹ Library
+    expect(backFor(st(home, projects, { name: 'library', params: { scope: 'app' } }, { name: 'review', params: { project: 'library' } }), 3)).toBe('Library');
+    // Setup from Needs review (a drafts row): ‹ Needs review
+    expect(backFor(st(home, { name: 'review', params: { project: P } }, { name: 'setup/[projectId]', params: { projectId: P, step: 'drafts' } }), 2)).toBe('Needs review');
+    // the rail's Levels from any of them (setup.home's job before T190): the home alone
+    expect(sectionTap(st(home, projects, { name: 'setup/[projectId]', params: { projectId: P } }), 'Levels', P)).toEqual({ index: 0, routes: [home] });
+    // the project button again on Projects does nothing
+    expect(sectionTap(st(home, projects), 'Projects', P)).toBeNull();
+  });
+
   it('the back label names the screen under it (moved from plan/toolbar.ts, T177)', () => {
     expect(backLabelFor('index')).toBe('Levels');
     expect(backLabelFor(undefined)).toBe('Levels');

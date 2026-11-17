@@ -27,5 +27,5 @@ appId: productions.luminarytechnology.fieldsurvey
     visible: '🔒 Locked \d\d\d\d-\d\d-\d\d'
     timeout: 10000
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - assertVisible: '06M, .*Locked, .*'   # the Levels row (T176: a lock icon, no 🔒)

@@ -65,9 +65,9 @@ appId: productions.luminarytechnology.fieldsurvey
       id: rules.review
       text: 'Review accepted items ▸  1 punch item: Owner → .ETC.'
     timeout: 20000
-- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- pressKey: Enter          # a scroll can focus a text box: close its keyboard first
 - tapOn:
-    id: setup.home
+    id: rail.levels
 
 # the open draft follows the new owner
 - runFlow:
@@ -97,9 +97,9 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: 'rules\.R3a\.run\.owner\.reset'
 - assertNotVisible: 'Run item owner  changed'
-- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- pressKey: Enter          # a scroll can focus a text box: close its keyboard first
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow:
     file: _open-card.yaml
     env:

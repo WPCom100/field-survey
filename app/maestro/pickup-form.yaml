@@ -11,7 +11,8 @@ name: Pickup — A's open library form follows B
       text: PU-B1 ${output.n}
     timeout: 20000
 - assertNotVisible: 'Unsaved changes.*'
-- tapOn: ◀ Projects
+- tapOn:
+    id: library.back
 - scrollUntilVisible:
     element:
       id: projects.open.${SEED}

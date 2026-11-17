@@ -68,9 +68,12 @@ name: Conflicts — resolved in Needs review, both iPads agree
             id: review.row
             text: '.*Device type EBDK.*'
           timeout: 10000
-      - tapOn: ← Library
-      - tapOn: ◀ Projects
-      - tapOn: ◀ Levels
+      - tapOn:
+          id: review.back
+      - tapOn:
+          id: library.back
+      - tapOn:
+          id: rail.levels
       - runFlow: _sync.yaml
 
 # both iPads: B's values, nothing in review
@@ -126,5 +129,7 @@ name: Conflicts — resolved in Needs review, both iPads agree
     text: '.*EBDK.*O2 B ${PROJECT}.*'
 - assertNotVisible:
     id: library.review
-- tapOn: ◀ Projects
-- tapOn: ◀ Levels
+- tapOn:
+    id: library.back
+- tapOn:
+    id: rail.levels

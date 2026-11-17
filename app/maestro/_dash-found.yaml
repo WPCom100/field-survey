@@ -129,7 +129,7 @@ appId: productions.luminarytechnology.fieldsurvey
     visible: '🔒 Locked.*'
     timeout: 10000
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - tapOn:
     id: nav.dashboard
 - scrollUntilVisible:

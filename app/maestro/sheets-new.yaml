@@ -29,8 +29,9 @@ name: Sheets — the current DaVinci categories correct the ERn type
       id: library.note
       text: Added MAESTRO-CLASH-${output.n} as a draft.
     timeout: 10000
-- tapOn: ◀ Projects
-- scrollUntilVisible:          # the Projects screen has no sidebar: open PROJECT from its list
+- tapOn:
+    id: library.back
+- scrollUntilVisible:          # the rail switches no project: open PROJECT from the list
     element:
       id: projects.open.${PROJECT}
     direction: DOWN
@@ -51,7 +52,7 @@ name: Sheets — the current DaVinci categories correct the ERn type
     id: sources.davinci.status
     text: '.*Neuron flags? corrected.*'
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml
 
 # the app library: ERn2 under Equipment Panels; the hand-set flag stands
@@ -123,8 +124,10 @@ name: Sheets — the current DaVinci categories correct the ERn type
       id: library.note
       text: Saved.
     timeout: 10000
-- tapOn: ◀ Projects
-- tapOn: ◀ Levels
+- tapOn:
+    id: library.back
+- tapOn:
+    id: rail.levels
 
 # Lint: the ERn device's category differs from its type's → one ruling
 - tapOn:

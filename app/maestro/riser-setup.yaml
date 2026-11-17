@@ -91,7 +91,7 @@ name: Riser — two riser cables on the placed rack, the riser downloaded once
 
 # Cable / riser: the riser downloaded once, the second cable's crop cached
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - tapOn:
     id: nav.cable-riser
 - extendedWaitUntil:

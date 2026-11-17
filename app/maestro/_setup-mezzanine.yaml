@@ -32,11 +32,11 @@ appId: productions.luminarytechnology.fieldsurvey
     text: '— ▾'
 - pressKey: Enter
 - assertNotVisible: Added level.*
-# back to the Levels home, where the next stage starts (Setup has no sidebar); the first tap after
+# back to the Levels home (the rail), where the next stage starts; the first tap after
 # typing only closes the keyboard, so a plain label first
 - tapOn: Shares numbering with
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - extendedWaitUntil:
     visible:
       id: level.07

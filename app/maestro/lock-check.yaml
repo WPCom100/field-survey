@@ -25,5 +25,5 @@ name: Lock — A follows B's untick; unlock with a reason
     notVisible: '🔒 Locked.*'
     timeout: 10000
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml

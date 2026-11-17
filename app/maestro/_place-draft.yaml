@@ -8,6 +8,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: drafts.new.model
 - inputText: ${MODEL}
+- pressKey: Enter         # closes the keyboard: since T190 the bar puts Add draft under it
 - tapOn:
     id: drafts.new.qty
 - eraseText: 3

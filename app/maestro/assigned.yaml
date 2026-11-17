@@ -22,7 +22,7 @@ name: Assigned — 06M to Bob, the network-kit flag, an owner change for B
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn:
-    id: setup.home
+    id: rail.levels
 
 # T103: a network kit part on 06M-01
 - runFlow:
@@ -92,9 +92,9 @@ name: Assigned — 06M to Bob, the network-kit flag, an owner change for B
       id: rules.R4b.kit.N
       text: 'N: off'
     timeout: 10000
-- pressKey: Enter          # a scroll can focus a text box; its keyboard covers the levels link
+- pressKey: Enter          # a scroll can focus a text box: close its keyboard first
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _lint-open.yaml
 - tapOn:
     id: lint.level.06M
@@ -119,7 +119,7 @@ name: Assigned — 06M to Bob, the network-kit flag, an owner change for B
     timeout: 10000
 - pressKey: Enter
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _lint-open.yaml
 - tapOn:
     id: lint.level.06M
@@ -174,8 +174,8 @@ name: Assigned — 06M to Bob, the network-kit flag, an owner change for B
 - pressKey: Enter
 - scrollUntilVisible:
     element:
-      id: setup.home
+      id: rail.levels
     direction: UP
 - tapOn:
-    id: setup.home
+    id: rail.levels
 - runFlow: _sync.yaml
