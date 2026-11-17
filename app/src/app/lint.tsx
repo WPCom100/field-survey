@@ -8,6 +8,7 @@ import { DraftRow } from '../card/DeviceCard';
 import { openAppStore } from '../db';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
+import { SectionScreen } from '../home/SectionScreen';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { detailTitle, loadLintView, seedSummary, type LintDraft, type LintGroup, type LintRow, type LintView } from '../lint/model';
 import { logTo } from '../log';
@@ -17,7 +18,7 @@ import { handRuling } from '../rulings/handoff';
 import { projectDataKey } from '../sync/dataKey';
 import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { Btn, Chip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
+import { Btn, Chip, FilterLabel, FilterRow, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 
 /** Reasons offered as chips; any text is accepted. */
 const REASON_CHIPS = ['Checked on site: correct as is', 'Known; handled outside the app', 'Master is right; rule does not apply'];
@@ -132,12 +133,13 @@ export default function LintScreen() {
   const title = view ? `Lint (${view.open} open · ${view.dismissed} dismissed${view.drafts.length ? ` · ${view.drafts.length} draft${view.drafts.length === 1 ? '' : 's'}` : ''})` : 'Lint';
 
   return (
-    <View style={styles.root}>
-      <PageHeader
-        title={title}
-        caption="The rules' findings on this project. A finding you dismiss comes back when its facts change."
-        actions={<Btn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />}
-      />
+    <SectionScreen
+      section="Lint"
+      projectId={projectId}
+      title={title}
+      intro="The rules' findings on this project. A finding you dismiss comes back when its facts change."
+      backTestID="lint.back"
+    >
       <FilterRow style={styles.filters}>
         <FilterLabel text="Level" />
         <Chip small label="All" selected={!levelId} onPress={() => setLevelId(null)} testID="lint.level.all" />
@@ -227,7 +229,7 @@ export default function LintScreen() {
           ) : null}
         </ScrollView>
       </View>
-    </View>
+    </SectionScreen>
   );
 }
 
@@ -319,7 +321,6 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
   link: { ...font.callout, color: color.primary },
   filters: { paddingBottom: space.md },
   body: {

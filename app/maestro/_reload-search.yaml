@@ -15,6 +15,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:
     visible: No matches\.
     timeout: 10000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - assertVisible:            # the Levels home (T176: the sidebar has no "Field Survey" title)
     id: nav.projects

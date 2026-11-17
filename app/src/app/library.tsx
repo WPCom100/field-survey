@@ -56,13 +56,9 @@ export default function LibraryRoute() {
         dataKey={projectDataKey(sync, app ? LIBRARY_STREAM : projectId)}
         names={names}
         onOpenReview={reviewOf ? () => router.push({ pathname: '/review', params: { project: reviewOf } }) : undefined}
-        header={
-          app ? (
-            <Btn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} />
-          ) : (
-            <Btn kind="tertiary" title="◀ Levels" onPress={() => router.dismissTo({ pathname: '/', params: projectId ? { project: projectId } : {} })} />
-          )
-        }
+        // the app library keeps its own way out until T190; a project's is on the shell (T189)
+        header={app ? <Btn kind="tertiary" title="◀ Projects" onPress={() => router.dismissTo('/projects')} /> : undefined}
+        shell={!app}
       />
     </>
   );

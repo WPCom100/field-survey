@@ -73,4 +73,5 @@ appId: productions.luminarytechnology.fieldsurvey
       id: vocab.note
       text: 'Added .* values? and .* placeholders?\.'
     timeout: 20000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels

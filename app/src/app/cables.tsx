@@ -12,6 +12,7 @@ import { openAppStore } from '../db';
 import { EndEditor } from '../ends/EndEditor';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
+import { SectionScreen } from '../home/SectionScreen';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamNames } from '../identity/useTeamNames';
 import { logTo } from '../log';
@@ -21,7 +22,7 @@ import { useRulesVersion } from '../rules/useRulesVersion';
 import { projectDataKey } from '../sync/dataKey';
 import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { Btn as UiBtn, Chip as UiChip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, Swatch, color, font, hitSlopTo, radius, space, tabular } from '../ui';
+import { Btn as UiBtn, Chip as UiChip, FilterLabel, FilterRow, PAGE_GUTTER, Swatch, color, font, hitSlopTo, radius, space, tabular } from '../ui';
 
 type Item = { type: 'group'; key: string; title: string; count: number; collapsed: boolean } | { type: 'row'; key: string; row: CableRow };
 
@@ -131,13 +132,14 @@ export default function CablesScreen() {
   const title = data ? `Cable / riser (${shown.length}${shown.length !== data.rows.length ? ` of ${data.rows.length}` : ''})` : 'Cable / riser';
 
   return (
-    <View style={styles.root}>
-      <PageHeader
-        title={title}
-        caption="Every cable of the project with both ends; the project's consistency checks along the bottom."
-        actions={
+    <SectionScreen
+      section="Cable / riser"
+      projectId={projectId}
+      title={title}
+      intro="Every cable of the project with both ends; the project's consistency checks along the bottom."
+      backTestID="cables.back"
+      actions={
           <>
-            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
             {picked ? (
               <>
                 <Btn label={`All ${shown.length}`} onPress={() => setPicked(new Set(shown.map((r) => r.id)))} testID="cables.select.all" />
@@ -148,8 +150,8 @@ export default function CablesScreen() {
               <Btn label="Select" plain onPress={() => setPicked(new Set())} testID="cables.select" />
             )}
           </>
-        }
-      />
+      }
+    >
       <FilterRow style={styles.filters}>
         <FilterLabel text="Group by" />
         <Chip label="Vertical" on={groupBy === 'vertical'} onPress={() => setGroupBy('vertical')} testID="cables.groupBy.vertical" />
@@ -272,7 +274,7 @@ export default function CablesScreen() {
           </Pressable>
         ))}
       </View>
-    </View>
+    </SectionScreen>
   );
 }
 
@@ -351,7 +353,6 @@ function Btn({ label, onPress, disabled, plain, small, testID }: { label: string
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
   filters: { paddingBottom: space.md },
   body: {
     flex: 1,

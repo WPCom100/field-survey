@@ -19,4 +19,5 @@ name: Restart — nothing refused after the api restart
     timeout: 60000
 - assertNotVisible: '.*the server refused.*'
 - assertNotVisible: '.*failed to send.*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

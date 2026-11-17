@@ -68,7 +68,8 @@ appId: productions.luminarytechnology.fieldsurvey
     text: 'Information · ETC · Open'
     index: 1                     # both drafts
 - assertNotVisible: 'Information · EC · Open'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # Reset; then Spot-check fixed → Owner EC
 - tapOn:

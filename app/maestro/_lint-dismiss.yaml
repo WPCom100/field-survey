@@ -33,4 +33,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: lint.show.dismissed
     text: Dismissed ${output.dismissed + 1}
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

@@ -27,4 +27,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertNotVisible: 'NEW .* · (unnumbered|refused)'
 - assertNotVisible:
     id: lint.local
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

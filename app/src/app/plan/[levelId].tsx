@@ -42,7 +42,7 @@ export default function LevelPlanRoute() {
     );
   }, [store, levelId]);
   const dataKey = projectDataKey(sync, projectId);
-  const shell = useShell(store, levelId, projectId, user, dataKey);
+  const shell = useShell(store, projectId, user, dataKey);
   // The back button returns to the screen under the plan in the Stack and says which (T177, T188).
   const back = useBack();
 

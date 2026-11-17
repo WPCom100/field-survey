@@ -13,7 +13,7 @@ export type PageHeaderProps = {
   /** The screen's name, with its counts where the screen shows them (`Lint (3 open · 0 dismissed)`). */
   title: string;
   caption?: string | null;
-  /** Buttons at the right: `← Levels` (tertiary) first, the one primary action last. */
+  /** Buttons at the right, the one primary action last (the section screens use `NavBar` since T189, D282). */
   actions?: ReactNode;
   style?: StyleProp<ViewStyle>;
 };

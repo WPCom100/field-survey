@@ -20,7 +20,8 @@ name: Riser — a cached crop offline; a riser cable accepted offline
       ID: riser.enlarge
 - assertNotVisible:
     id: riser.download
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # accepted offline
 - tapOn:
@@ -72,4 +73,5 @@ name: Riser — a cached crop offline; a riser cable accepted offline
     visible:
       id: riser.problem
     timeout: 30000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

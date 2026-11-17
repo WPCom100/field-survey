@@ -32,7 +32,8 @@ name: Riser — B sees the draft states and each accepted cable once
     id: cables.row
     text: '.*B7 Stair A fixture.*'
     index: 1
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # Review drafts: the same states as on A
 - tapOn:

@@ -41,7 +41,8 @@ appId: productions.luminarytechnology.fieldsurvey
       - assertVisible: 'Lint \(0 open · 0 dismissed\)'   # a new, empty project
       - assertNotVisible:
           id: lint.level.${HASNOT}
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.cable-riser
 - extendedWaitUntil:
@@ -53,7 +54,8 @@ appId: productions.luminarytechnology.fieldsurvey
     commands:
       - assertNotVisible:
           id: cables.level.${HASNOT}
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.dashboard
 - extendedWaitUntil:
@@ -66,12 +68,14 @@ appId: productions.luminarytechnology.fieldsurvey
     commands:
       - assertNotVisible:
           id: dash.level.${HASNOT}
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.export
 - extendedWaitUntil:
     visible: ${CHIP}
     timeout: 15000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - assertVisible:
     id: level.${HAS}

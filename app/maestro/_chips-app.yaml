@@ -137,4 +137,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: sugg.row.Maestro ${output.n}
     text: Maestro ${output.n}
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels

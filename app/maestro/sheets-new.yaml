@@ -160,12 +160,14 @@ name: Sheets — the current DaVinci categories correct the ERn type
       id: rulings.note
       text: 'Applied .*: 1 change\.'
     timeout: 15000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.lint
 - extendedWaitUntil:
     visible: 'Lint \(\d+ open · \d+ dismissed.*\)'
     timeout: 30000
 - assertNotVisible: '. Category differs from its type.*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - runFlow: _sync.yaml

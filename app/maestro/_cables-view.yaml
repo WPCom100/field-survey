@@ -84,7 +84,8 @@ appId: productions.luminarytechnology.fieldsurvey
     visible: 'Needs review \(\d+\)'
     timeout: 10000
 - assertVisible: 'Import pair.*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.cable-riser
 - extendedWaitUntil:
@@ -168,4 +169,5 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 10000
 - assertVisible: 'Only the [34] chosen records'
 - tapOn: Cancel
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

@@ -54,7 +54,8 @@ name: Restart — a large push waits offline
       id: rulings.note
       text: 'Applied "O6 restart ${STAMP}": \d\d\d\d changes\.'   # no {n} beside ${…}: Maestro reads up to its }
     timeout: 300000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - extendedWaitUntil:
     visible:
       id: status.bar

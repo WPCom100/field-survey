@@ -117,11 +117,12 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: plan.back             # back to Needs review, where _place-entry opened the plan
 - tapOn:
-    text: ← Levels
-    optional: true            # opened from Levels instead
+    id: rail.levels
+    optional: true            # opened from Levels instead (its sidebar has no rail)
 - tapOn:
     id: nav.cable-riser
 - extendedWaitUntil:
     visible: 'Cable / riser \(81\)'
     timeout: 20000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

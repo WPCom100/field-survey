@@ -14,6 +14,13 @@ appId: productions.luminarytechnology.fieldsurvey
 - pressKey: Enter
 - tapOn:
     id: rulings.where.device
+# T189: beside the rail the field chips run past the panel's edge (Status half cut): scroll the row
+- swipe:
+    from:
+      id: rulings.cond.field.category
+    direction: LEFT
+- waitForAnimationToEnd:
+    timeout: 2000
 - tapOn:
     id: rulings.cond.field.status
 - tapOn: No access          # the Status chip (an enum: chips only)
@@ -45,7 +52,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: rulings.back
 - assertVisible: 'Proposed by this ruling \(0\)'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # a record that matches later: 06M-03 No access → one proposal → Accept
 - runFlow:
@@ -104,4 +112,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:
     visible: 'Proposed by this ruling \(0\)'
     timeout: 15000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

@@ -42,7 +42,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: vocab.value.Echo relay panel
       text: Echo relay panel
     timeout: 10000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 - runFlow:
     file: _open-card.yaml
     env:

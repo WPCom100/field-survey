@@ -37,4 +37,5 @@ name: Offline — the edits drained
 - assertVisible:
     id: lint.show.dismissed
     text: Dismissed 1
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

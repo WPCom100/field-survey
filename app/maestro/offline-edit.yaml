@@ -78,7 +78,8 @@ name: Offline — every kind of edit, server stopped
     id: cables.note
     text: 'Endpoint confirmed: .*'
 - assertVisible: '.*unconfirmed endpoint ${output.unconfirmed - 1}.*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # Lint: dismiss the first open finding with a reason
 - runFlow:
@@ -104,11 +105,13 @@ name: Offline — every kind of edit, server stopped
     id: nav.dashboard
 - assertVisible: Dashboard
 - assertVisible: '.*\(local data\)'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.rulings
 - assertVisible: 'Rulings \(\d+ standing · \d+ applied\)'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # the edits wait in the outbox
 - tapOn:
@@ -116,7 +119,8 @@ name: Offline — every kind of edit, server stopped
 - assertVisible:            # the Edits waiting tile (T178)
     id: sync.pending
     text: '[1-9]\d*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - assertVisible:
     id: status.bar
     text: 'Offline · [1-9]\d* edits? waiting.*'

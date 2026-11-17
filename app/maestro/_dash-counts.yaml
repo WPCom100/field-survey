@@ -155,4 +155,5 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 10000
 - assertVisible: 'Only the \d+ chosen records?'
 - tapOn: Cancel
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

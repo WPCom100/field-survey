@@ -42,4 +42,5 @@ name: R6 — export gate offline
 - assertVisible:
     id: export.generatePdf
     enabled: false
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

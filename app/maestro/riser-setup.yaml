@@ -138,5 +138,6 @@ name: Riser — two riser cables on the placed rack, the riser downloaded once
 - extendedWaitUntil:
     notVisible: 'Pinch to zoom · drag to pan'
     timeout: 10000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - runFlow: _sync.yaml

@@ -27,7 +27,8 @@ name: Assigned — B fetches the assigned level's sheet only; B's draft follows 
 - assertVisible:
     id: sync.level.03
     text: Not on iPad
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # B's draft follows the owner A set
 - runFlow:

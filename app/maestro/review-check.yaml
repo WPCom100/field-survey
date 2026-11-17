@@ -41,7 +41,8 @@ name: Needs review — Save combined; the links
       - assertVisible:
           id: review.tab.sync_conflict
           text: Sync conflict 0
-      - tapOn: ← Levels
+      - tapOn:
+          id: rail.levels
       - runFlow: _sync.yaml
       # the Extraction drafts line (a project with BOM drafts) → Setup → Review drafts
       - runFlow:
@@ -78,4 +79,5 @@ name: Needs review — Save combined; the links
 - assertVisible:
     id: review.tab.sync_conflict
     text: Sync conflict 0
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

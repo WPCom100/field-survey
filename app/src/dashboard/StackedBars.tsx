@@ -64,7 +64,8 @@ export function StackedBars({ table }: { table: SummaryTable }) {
 }
 
 const styles = StyleSheet.create({
-  box: { flex: 1, minWidth: 260 },
+  // 220: beside the device grid (664 pt) in portrait next to the 72-pt rail (T189); 260 wrapped it under
+  box: { flex: 1, minWidth: 220 },
   chart: { height: 190 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 4 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },

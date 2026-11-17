@@ -9,6 +9,7 @@ import { flaggedDraftCounts } from '../drafts/model';
 import { loadPlacementProgress, type LevelPlacement } from '../placement/model';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
+import { SectionScreen } from '../home/SectionScreen';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { useTeamNames } from '../identity/useTeamNames';
 import { logTo } from '../log';
@@ -235,19 +236,9 @@ export default function NeedsReviewScreen() {
       </View>
     ) : null;
 
-  return (
-    <View style={styles.root}>
-      <PageHeader
-        title={`${projectId === LIBRARY_STREAM ? 'App library — needs review' : 'Needs review'} (${total})`}
-        caption="Items waiting for a person's decision, by kind and level. Nothing is overwritten while one waits."
-        actions={
-          projectId === LIBRARY_STREAM ? (
-            <Btn kind="tertiary" title="← Library" onPress={() => router.navigate({ pathname: '/library', params: { scope: 'app' } })} />
-          ) : (
-            <Btn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
-          )
-        }
-      />
+  const intro = "Items waiting for a person's decision, by kind and level. Nothing is overwritten while one waits.";
+  const body = (
+    <>
       <ScrollView horizontal style={styles.tabs} contentContainerStyle={styles.chips} showsHorizontalScrollIndicator={false}>
         {list?.tabs.map((t) => (
           <Chip key={t.kind} label={`${t.label}${t.kind === 'all' ? '' : ` ${t.count}`}`} selected={kind === t.kind} onPress={() => setKind(t.kind)} testID={`review.tab.${t.kind}`} />
@@ -305,7 +296,26 @@ export default function NeedsReviewScreen() {
           )}
         </ScrollView>
       </View>
-    </View>
+    </>
+  );
+
+  // the app library's review (from its Library screen) moves onto the shell in T190
+  if (params.project === LIBRARY_STREAM) {
+    return (
+      <View style={styles.root}>
+        <PageHeader
+          title={`App library — needs review (${total})`}
+          caption={intro}
+          actions={<Btn kind="tertiary" title="← Library" onPress={() => router.navigate({ pathname: '/library', params: { scope: 'app' } })} />}
+        />
+        {body}
+      </View>
+    );
+  }
+  return (
+    <SectionScreen section="Needs review" projectId={projectId} title={`Needs review (${total})`} intro={intro} backTestID="review.back">
+      {body}
+    </SectionScreen>
   );
 }
 

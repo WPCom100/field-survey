@@ -36,6 +36,7 @@ import {
   type LibraryType,
   type LibraryView,
 } from './model';
+import { SectionScreen } from '../home/SectionScreen';
 import { loadSuggestions, type Suggestion } from '../suggestions/model';
 import { useReload } from '../sync/useReload';
 import { SuggestionList, SuggestionsPane } from './SuggestionEditor';
@@ -71,7 +72,10 @@ export function LibraryScreen(props: {
   /** Changes when a pull brought new ops for this library (reload; `projectDataKey`). */
   dataKey: string;
   names: ReadonlyMap<string, string>;
-  header: React.ReactNode;
+  /** The app library (T190 moves it onto the shell): its way out, left of the header's buttons. */
+  header?: React.ReactNode;
+  /** A project's library: on the shell with the rail and the bar (D280, T189). */
+  shell?: boolean;
 }) {
   const { store, editor, scope } = props;
   const [view, setView] = useState<LibraryView | null>(null);
@@ -146,12 +150,9 @@ export function LibraryScreen(props: {
     ]);
   };
 
-  return (
-    <View style={styles.root}>
-      <PageHeader
-        title={`${scope ? 'Device-type library' : 'App device-type library'} (${types.filter((t) => t.state !== 'rejected').length} types${view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})`}
-        caption={scope ? "This project's device types: what the plan offers and what the rules key on." : 'What every new project copies: the accepted types and their suggestion chips.'}
-        actions={
+  const title = `${scope ? 'Device-type library' : 'App device-type library'} (${types.filter((t) => t.state !== 'rejected').length} types${view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})`;
+  const intro = scope ? "This project's device types: what the plan offers and what the rules key on." : 'What every new project copies: the accepted types and their suggestion chips.';
+  const actions = (
           <>
             {props.header}
             {view?.inReview && props.onOpenReview ? <Btn kind="tertiary" title={`${view.inReview} in review ▸`} onPress={props.onOpenReview} testID="library.review" /> : null}
@@ -159,8 +160,9 @@ export function LibraryScreen(props: {
             <Btn title="Copy from…" disabled={!editor} onPress={() => setPane({ kind: 'copy' })} testID="library.copy" />
             <Btn kind="primary" title="+ New type" disabled={!editor} onPress={() => setPane({ kind: 'new' })} testID="library.new" />
           </>
-        }
-      />
+  );
+  const body = (
+    <>
       {note ? <Banner tone={note.error ? 'danger' : 'success'} text={note.text} testID="library.note" style={styles.note} /> : null}
       <View style={styles.split}>
         <View style={styles.list}>
@@ -236,6 +238,19 @@ export function LibraryScreen(props: {
           </ScrollView>
         )}
       </View>
+    </>
+  );
+  if (props.shell) {
+    return (
+      <SectionScreen section="Library" projectId={scope} title={title} intro={intro} backTestID="library.back" actions={actions}>
+        {body}
+      </SectionScreen>
+    );
+  }
+  return (
+    <View style={styles.root}>
+      <PageHeader title={title} caption={intro} actions={actions} />
+      {body}
     </View>
   );
 }

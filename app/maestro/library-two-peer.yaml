@@ -75,7 +75,8 @@ name: Library two — B sees Ann's library, card, kits and pin shape
       id: vocab.shape.station.circle
       selected: true
     timeout: 10000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 
 # the project's library
 - tapOn:
@@ -112,7 +113,8 @@ name: Library two — B sees Ann's library, card, kits and pin shape
 - assertVisible:
     id: sugg.row.Maestro L2 chip
     text: DRAFT Maestro L2 chip
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 
 # the card
 - runFlow:

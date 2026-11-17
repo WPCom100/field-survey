@@ -1,0 +1,105 @@
+# T189 (D280): the section screens on the shell, read-only on `Maestro master` (`rig.sh seed`, once
+# per server lifetime). Dashboard from the sidebar has no back; a drill-down → Select → All → Apply
+# as ruling opens Rulings with `‹ Dashboard` (rulings.bar.back), and that back lands on the same
+# Dashboard (its drill-down still open: the screen under Rulings, not a new one); a rail tap from
+# there opens Rulings directly on Levels (no back); Sync from the rail has none either, its Open
+# Needs review link gives `‹ Sync` back to Sync; rail.levels ends on the Levels home. Nothing is
+# written: the ruling editor is left with its draft unapplied.
+appId: productions.luminarytechnology.fieldsurvey
+name: Nav — back means where I came from (T189)
+---
+- runFlow: _launch.yaml
+- runFlow: _connect.yaml
+- runFlow:
+    file: _open-project.yaml
+    env:
+      PROJECT: Maestro master
+
+# Dashboard from the sidebar: a section on Levels, no back
+- tapOn:
+    id: nav.dashboard
+- extendedWaitUntil:              # a fresh store: the master's records arrive after its 06M level
+    visible:
+      id: dash.cell.punchByFloor.06M.Open
+      text: '[1-9]\d*'
+    timeout: 180000
+- assertNotVisible:
+    id: dash.back
+- assertVisible:
+    id: rail.levels
+
+# Apply as ruling from a drill-down: Rulings opened from the Dashboard says so
+- tapOn:
+    id: dash.cell.punchByFloor.06M.Open
+- tapOn:
+    id: dash.select
+- tapOn:
+    id: dash.select.all
+- tapOn:
+    id: dash.select.apply
+- extendedWaitUntil:
+    visible:
+      id: rulings.editor.title
+      text: 'New ruling · from Dashboard: .*'
+    timeout: 10000
+- assertVisible:
+    id: rulings.bar.back
+    text: Dashboard
+- tapOn:
+    id: rulings.bar.back
+
+# back on the same Dashboard: the drill-down still open (a new Dashboard would open with none)
+- extendedWaitUntil:
+    visible:
+      id: dash.panel.title
+      text: 'Outstanding items by floor · 06M · Open \(\d+\)'
+    timeout: 10000
+- assertVisible:                 # Apply as ruling left selection mode before it opened Rulings
+    id: dash.select
+- assertNotVisible:
+    id: rulings.bar.back
+- assertNotVisible:
+    id: dash.back
+
+# a rail tap from there: Rulings directly on Levels, no back
+- tapOn:
+    id: rail.rulings
+- extendedWaitUntil:
+    visible: 'Rulings \(\d+ standing · \d+ applied\)'
+    timeout: 10000
+- assertNotVisible:
+    id: rulings.bar.back
+
+# Sync from the rail: no back; its Needs review link: ‹ Sync, back to Sync
+- tapOn:
+    id: rail.sync
+- extendedWaitUntil:
+    visible:
+      id: sync.now
+    timeout: 10000
+- assertNotVisible:
+    id: sync.back
+- tapOn:
+    id: sync.review
+- extendedWaitUntil:
+    visible: 'Needs review \(\d+\)'
+    timeout: 10000
+- assertVisible:
+    id: review.back
+    text: Sync
+- tapOn:
+    id: review.back
+- extendedWaitUntil:
+    visible:
+      id: sync.now
+    timeout: 10000
+- assertNotVisible:
+    id: review.back
+
+# Levels from the rail: the home with its sidebar
+- tapOn:
+    id: rail.levels
+- extendedWaitUntil:
+    visible:
+      id: level.06M
+    timeout: 10000

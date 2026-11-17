@@ -41,7 +41,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: '▾ Level 06M \(\d+\)'
 - tapOn:
     id: lint.groupBy.check
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # 06M-03 Issue → its finding; Open card ▸ and back
 - runFlow:
@@ -127,7 +128,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: lint.show.dismissed
       text: Dismissed 0
     timeout: 20000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - runFlow:
     file: _open-card.yaml
     env:
@@ -188,7 +190,8 @@ appId: productions.luminarytechnology.fieldsurvey
     visible: New ruling · from Lint
     timeout: 10000
 - assertVisible: 'Rulings \(\d+ standing · \d+ applied\)'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # Needs review → Lint tab → the link into Lint
 - tapOn:
@@ -220,4 +223,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:
     visible: 'Lint \(\d+ open · \d+ dismissed.*\)'
     timeout: 10000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

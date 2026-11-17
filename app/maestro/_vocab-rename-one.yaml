@@ -9,7 +9,15 @@ appId: productions.luminarytechnology.fieldsurvey
     commands:
       - tapOn: '▸ Value outside vocabulary \(\d+\)'
 # the findings are a list on the left ~46 % of the screen (a centre swipe moves the detail pane);
-# the group sorts by count, so a rare spelling (Equipment rack, 2) sits well down it
+# the group sorts by count, so a rare spelling (Equipment rack, 2) sits well down it. T189: one
+# swipe first — a row cut by the screen's bottom edge counts as visible and its tap misses (Relay
+# panel at y 1360–1380 of 1376); the group starts low (under the drafts, IP and DMX groups)
+- swipe:
+    start: 25%,80%
+    end: 25%,62%
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 2000
 - repeat:
     times: 40
     while:
@@ -44,4 +52,5 @@ appId: productions.luminarytechnology.fieldsurvey
       id: rulings.note
       text: 'Applied .*: \d+ changes?\.'
     timeout: 15000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

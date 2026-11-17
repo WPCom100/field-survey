@@ -129,7 +129,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: review.place.04
     text: '.*Not on the plan, 04: \d+ devices? and 2 to place from drafts.*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 # Review drafts: the level and basis of each move
 - tapOn:
     id: nav.setup

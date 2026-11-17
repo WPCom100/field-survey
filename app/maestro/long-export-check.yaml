@@ -30,4 +30,5 @@ name: Long export — Cancelled on the first iPad, then one to Ready
       text: 'Ready · .* MB'
     timeout: 300000
 - assertVisible: 'Started by Ann'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

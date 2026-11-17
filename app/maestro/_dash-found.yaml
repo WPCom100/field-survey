@@ -46,7 +46,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: Nothing here.
 - tapOn:
     id: dash.close
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # an IP on 01-06 and a DMX address on 01-01 (card → Type…)
 - runFlow:
@@ -116,7 +117,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: dash.ready.B2
     text: 'B2 setup.*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.setup
 - tapOn:
@@ -137,7 +139,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: dash.ready.B2
     text: 'B2 ready.*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - runFlow:
     file: _open-card.yaml
     env:
@@ -227,7 +230,8 @@ appId: productions.luminarytechnology.fieldsurvey
     id: dash.close
 - assertNotVisible:
     id: dash.panel.title
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # the DMX address changes: the new one is found, the old one no longer
 - runFlow:
@@ -263,4 +267,5 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 10000
 - tapOn:
     id: dash.close
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

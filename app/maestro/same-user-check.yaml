@@ -25,5 +25,6 @@ name: Same user — no conflict, last write stands, inks merged
 - tapOn:
     id: nav.needs-review
 - assertNotVisible: 'Sync conflict [1-9].*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - runFlow: _sync.yaml

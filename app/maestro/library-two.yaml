@@ -135,7 +135,8 @@ name: Library two — Ann's type, chip, kits, pin shape and app-library type
       id: library.note
       text: Added "Maestro L2 chip" as a draft.
     timeout: 10000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 
 # the card: the chip, no Neuron ID, the optional run and the accessory added
 - runFlow:
@@ -229,7 +230,8 @@ name: Library two — Ann's type, chip, kits, pin shape and app-library type
       id: vocab.shape.station.square
       selected: true
     timeout: 10000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 
 # the app library: a type accepted (B sees it with no project open)
 - tapOn:

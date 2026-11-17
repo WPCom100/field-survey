@@ -204,7 +204,8 @@ appId: productions.luminarytechnology.fieldsurvey
     id: sugg.row.Faceplate cracked
     text: DRAFT Faceplate cracked
 # leave and come back: everything kept
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.library
 - tapOn:
@@ -253,4 +254,5 @@ appId: productions.luminarytechnology.fieldsurvey
     element:
       text: 'Rules that reference this type: .*R2g.*'
     direction: DOWN
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels

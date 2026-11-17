@@ -101,7 +101,8 @@ appId: productions.luminarytechnology.fieldsurvey
     id: lint.show.open
 - tapOn:
     id: lint.level.all
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # after a sync: 01's punch list ends Neuron, IP, DMX, numbered in that order; B2's rejected draft
 # has not come back
@@ -137,4 +138,5 @@ appId: productions.luminarytechnology.fieldsurvey
     id: proposal.accept.Missing all Device IP addresses
 - tapOn:
     id: lint.level.all
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

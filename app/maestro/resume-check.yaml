@@ -18,7 +18,8 @@ name: Resume — signed in again, everything synced
 - assertVisible:            # the Photos waiting tile (T178)
     id: sync.photos
     text: '0'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - runFlow:
     file: _open-card.yaml
     env:

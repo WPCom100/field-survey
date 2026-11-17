@@ -107,4 +107,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: 1 record unticked in an earlier preview stays as it is.
 - tapOn:
     id: rulings.back
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

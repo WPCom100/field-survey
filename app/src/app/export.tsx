@@ -1,4 +1,4 @@
-import { Link, router, useLocalSearchParams } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -44,13 +44,16 @@ import {
   type Preflight,
 } from '../export/model';
 import { listProjects } from '../home/data';
+import { SectionScreen } from '../home/SectionScreen';
 import { useIdentity } from '../identity/IdentityGate';
 import { getSyncEngine } from '../sync/engine';
 import { describeSync, useSyncStatus } from '../sync/useSyncStatus';
 import { Btn, Check, Notice, Section } from '../setup/widgets';
-import { Btn as UiBtn, Chip as UiChip, color, font, radius, space, tabular } from '../ui';
+import { Chip as UiChip, color, font, radius, space, tabular } from '../ui';
 
 type Pane = 'workbook' | 'pdf' | 'history';
+const PANES: readonly Pane[] = ['workbook', 'pdf', 'history'];
+const PANE_LABEL: Record<Pane, string> = { workbook: KIND_LABEL.xlsx, pdf: KIND_LABEL.floor_pdf, history: 'History' };
 
 /**
  * Export (T31, Phase 3 §11.1). The master workbook is a server job over the server's data (D18,
@@ -253,26 +256,16 @@ export default function ExportScreen() {
   const toggleTab = (t: DataTab) => setTabs((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : DATA_TABS.filter((x) => x === t || cur.includes(x))));
 
   return (
-    <View style={styles.root}>
-      <View style={styles.nav}>
-        <Text style={styles.brand}>Export</Text>
-        <Text style={styles.project}>{projectName}</Text>
-        {(['workbook', 'pdf', 'history'] as Pane[]).map((p) => (
-          <Pressable
-            key={p}
-            onPress={() => setPane(p)}
-            style={({ pressed }) => [styles.navItem, pane === p && styles.navActive, pressed && pane !== p && styles.navPressed]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: pane === p }}
-            testID={`export.pane.${p}`}
-          >
-            <Text style={[styles.navText, pane === p && styles.navTextActive]}>{p === 'workbook' ? KIND_LABEL.xlsx : p === 'pdf' ? KIND_LABEL.floor_pdf : 'History'}</Text>
-          </Pressable>
-        ))}
-        <View style={{ flex: 1 }} />
-        <UiBtn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
-      </View>
-
+    <SectionScreen
+      section="Export"
+      projectId={projectId}
+      title="Export"
+      caption={projectName}
+      backTestID="export.back"
+      actions={PANES.map((p) => (
+        <UiChip key={p} small label={PANE_LABEL[p]} selected={pane === p} onPress={() => setPane(p)} testID={`export.pane.${p}`} />
+      ))}
+    >
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
         <View style={styles.statusRow}>
           <Text style={styles.status} testID="export.sync">{describeSync(sync)}</Text>
@@ -374,7 +367,7 @@ export default function ExportScreen() {
           </Section>
         ) : null}
       </ScrollView>
-    </View>
+    </SectionScreen>
   );
 }
 
@@ -441,15 +434,6 @@ function JobCard({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: color.bg },
-  nav: { width: 220, backgroundColor: color.surface2, borderRightWidth: 1, borderRightColor: color.hairline, padding: space.md, paddingTop: space.xl, gap: 2 },
-  brand: { ...font.display, color: color.text },
-  project: { ...font.caption, color: color.text3, marginBottom: space.md },
-  navItem: { minHeight: 44, justifyContent: 'center', paddingVertical: 10, paddingHorizontal: space.md, borderRadius: radius.control },
-  navActive: { backgroundColor: color.primaryTint },
-  navPressed: { backgroundColor: color.border },
-  navText: { ...font.callout, color: color.text },
-  navTextActive: { color: color.primary, fontWeight: '600' },
   back: { ...font.callout, color: color.primary, paddingVertical: 10 },
   main: { flex: 1 },
   mainContent: { paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xl, gap: space.md },

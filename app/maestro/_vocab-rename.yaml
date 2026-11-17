@@ -41,7 +41,8 @@ appId: productions.luminarytechnology.fieldsurvey
     id: lint.fixAll.NSPS
 - assertNotVisible:
     id: lint.fixAll.Equipment rack
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 # roles survive
 - runFlow:
     file: _open-card.yaml

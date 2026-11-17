@@ -69,6 +69,20 @@ describe('the stack rule (D280, T188)', () => {
     expect(backFor(st(home), 5)).toBeNull();
   });
 
+  it("the section screens' cross-links (T189): back names the screen the link was on", () => {
+    const linked = (from: string, to: string) => backFor(st(home, { name: from, params: { project: P } }, { name: to, params: { project: P } }), 2);
+    expect(linked('review', 'lint')).toBe('Needs review'); // Needs review → Open the Lint view
+    expect(linked('export', 'lint')).toBe('Export'); // Export → the gate's Lint link
+    expect(linked('sync', 'review')).toBe('Sync'); // Sync → Open Needs review
+    expect(linked('cables', 'review')).toBe('Cable / riser'); // a cable's review item
+    expect(linked('lint', 'rulings')).toBe('Lint'); // Fix all via ruling
+    expect(linked('cables', 'rulings')).toBe('Cable / riser'); // Select → Apply as ruling
+    // a rail tap from any of them leaves Levels → section: no back again
+    const tap = sectionTap(st(home, { name: 'dashboard', params: { project: P } }, { name: 'rulings', params: { project: P } }), 'Lint', P);
+    expect(tap?.routes.map((r) => r.name)).toEqual(['index', 'lint']);
+    expect(backFor(tap!, 1)).toBeNull();
+  });
+
   it('the back label names the screen under it (moved from plan/toolbar.ts, T177)', () => {
     expect(backLabelFor('index')).toBe('Levels');
     expect(backLabelFor(undefined)).toBe('Levels');

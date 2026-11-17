@@ -29,7 +29,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: vocab.value.Stuck button
       text: Stuck button  draft
     timeout: 10000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 # a draft phrase is a chip at once
 - runFlow:
     file: _open-card.yaml
@@ -121,4 +122,5 @@ appId: productions.luminarytechnology.fieldsurvey
     notVisible:
       id: vocab.value.Stuck button cover
     timeout: 10000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels

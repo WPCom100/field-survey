@@ -17,4 +17,5 @@ name: Conflict — the status is in review
 - assertVisible:
     id: review.tab.sync_conflict
     text: 'Sync conflict [1-9]\d*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

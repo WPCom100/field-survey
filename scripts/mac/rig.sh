@@ -110,7 +110,7 @@ usage: bash scripts/mac/rig.sh <command>
                         (restart-check.yaml, the server's op states) and each numbering group continues
   long-export           T165 (R6 rest, T93): A and B hold "$SCALE_PROJECT" (long-export-prep.yaml); with
                         the worker at RIG_EXPORT_CPUS (0.1) CPU A's workbook runs for minutes: the stage
-                        line changes, ← Levels and back keep the card (long-export.yaml); the worker paused,
+                        line changes, Levels (rail) and back keep the card (long-export.yaml); the worker paused,
                         B sees Ann's card, Generate disabled, the PDF allowed, and cancels (-peer); A shows
                         Cancelling (-cancelling); unpaused, Cancelled by Bob on B (-cancelled) and A, then one
                         to Ready at full speed (-check); the server's two workbooks. Run 'scale' first

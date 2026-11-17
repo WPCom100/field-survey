@@ -1,7 +1,7 @@
 # Step 2 of `rig.sh long-export` (T165, T93), on A (Ann): Generate workbook on SCALE, whose export
 # runs for minutes while `rig.sh` holds the worker to a tenth of a CPU. The card's stage line
 # names the stage with its counts (`Photo Log 1,240 / 10,000 pictures · 25 s`), then changes and
-# its time ticks; ← Levels and Export again re-attach the same card, still running. Ends on the
+# its time ticks; Levels (the rail) and Export again re-attach the same card, still running. Ends on the
 # Export screen, so A keeps following the export while B looks at it (no launch in A's next flow).
 appId: productions.luminarytechnology.fieldsurvey
 name: Long export — stage line, leave and come back
@@ -65,7 +65,8 @@ name: Long export — stage line, leave and come back
 - assertTrue: ${output.s2 > output.s1}
 
 # leave and come back: the same card, still running, its time still counting
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - assertVisible:
     id: level.06M
 - tapOn:

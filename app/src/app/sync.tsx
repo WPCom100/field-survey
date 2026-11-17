@@ -8,6 +8,7 @@ import { useBlobStatus } from '../blobs/useBlobStatus';
 import { openAppStore } from '../db';
 import { pickProject } from '../home/currentProject';
 import { levelName, listProjects } from '../home/data';
+import { SectionScreen } from '../home/SectionScreen';
 import { useIdentity, useMicrosoftSignIn, useSignOut } from '../identity/IdentityGate';
 import { fetchAuthConfig, SignInCancelled } from '../identity/microsoft';
 import { SIGN_IN_NEEDED } from '../identity/session';
@@ -339,20 +340,16 @@ export default function SyncScreen() {
   const firstFailed = failedUploads[0];
 
   return (
+    <SectionScreen
+      section="Sync"
+      projectId={projectId}
+      title="Sync & uploads"
+      intro="Edits never need sign-in or a connection. Sync, uploads and exports do, on any network, cellular included."
+      backTestID="sync.back"
+      actions={<Btn kind="primary" title="Sync now" testID="sync.now" icon={<Icon name="sync" size={18} color={color.onPrimary} />} onPress={syncNow} />}
+    >
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
       <View style={styles.inner} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.title} accessibilityRole="header">
-              Sync & uploads
-            </Text>
-            <Text style={styles.caption}>Edits never need sign-in or a connection. Sync, uploads and exports do, on any network, cellular included.</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <Btn kind="tertiary" title="← Levels" testID="sync.back" onPress={() => router.dismissTo('/')} />
-            <Btn kind="primary" title="Sync now" testID="sync.now" icon={<Icon name="sync" size={18} color={color.onPrimary} />} onPress={syncNow} />
-          </View>
-        </View>
 
         {needsSignIn ? (
           <Banner
@@ -456,6 +453,7 @@ export default function SyncScreen() {
         )}
       </View>
     </ScrollView>
+    </SectionScreen>
   );
 }
 
@@ -529,10 +527,6 @@ const styles = StyleSheet.create({
   inner: { gap: 20 },
   flex: { flex: 1 },
   gap8: { gap: space.sm },
-  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.lg, flexWrap: 'wrap' },
-  headerText: { flex: 1, minWidth: 280 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  title: { ...font.display, color: color.text },
   caption: { ...font.caption, color: color.text3 },
   sec: { ...font.headline, color: color.text },
   link: { ...font.captionBold, color: color.primary },

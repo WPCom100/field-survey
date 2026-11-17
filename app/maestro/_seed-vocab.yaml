@@ -20,4 +20,5 @@ appId: productions.luminarytechnology.fieldsurvey
       id: vocab.note
       text: Everything standard is already here.
     timeout: 20000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels

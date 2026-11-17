@@ -102,7 +102,8 @@ name: Assigned — 06M to Bob, the network-kit flag, an owner change for B
     file: _lint-find.yaml
     env:
       TEXT: '.*Network termination kits are not parts: "Network termination kit - .* run".*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # N on again → the finding goes
 - tapOn:
@@ -125,7 +126,8 @@ name: Assigned — 06M to Bob, the network-kit flag, an owner change for B
 - extendedWaitUntil:
     notVisible: '.*Network termination kits are not parts.*'
     timeout: 15000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # T102: an open Run draft on 06M-04, then the owner change B will follow
 - runFlow:

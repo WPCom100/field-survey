@@ -87,7 +87,8 @@ appId: productions.luminarytechnology.fieldsurvey
       GROUP: Cable with missing far end
 - assertVisible: '▾ Linked to a deleted device or connection \(1\)'
 - assertVisible: '.*Punch #\d+ Run DMX to Level 11.*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # History → Restore… → C-23 is back with its end Not installed
 - runFlow:
@@ -152,4 +153,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: cables.code.all
 - assertVisible: Cable / riser \(79\)
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

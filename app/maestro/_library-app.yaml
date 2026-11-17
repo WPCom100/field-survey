@@ -92,7 +92,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: library.note
       text: Accepted.
     timeout: 10000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 
 # the app library
 - tapOn:

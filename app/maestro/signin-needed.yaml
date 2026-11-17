@@ -17,7 +17,8 @@ name: Sign-in — sign-in needed; editing goes on
     timeout: 30000
 - assertVisible:
     id: sync.signInNeeded.microsoft
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - runFlow: _open-project.yaml
 - tapOn:
     id: nav.setup

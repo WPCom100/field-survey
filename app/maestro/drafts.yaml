@@ -32,5 +32,6 @@ name: Drafts — the riser's cable drafts, endpoints, mismatches, a waiting cabl
 - extendedWaitUntil:
     visible: '.*\(draft on 01, not placed yet\).*'
     timeout: 20000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - runFlow: _sync.yaml

@@ -43,7 +43,8 @@ name: R6 — export
 - extendedWaitUntil:
     visible: 'Lint \(\d+ open · .*'
     timeout: 15000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.export
 
@@ -55,7 +56,8 @@ name: R6 — export
 - assertVisible:
     id: export.pdf.header
     text: 'Header: "ETC Lighting Controls Survey — Level 06M · Surveyed \d{4}-\d{2}-\d{2}".*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.setup
 - tapOn:
@@ -93,6 +95,20 @@ name: R6 — export
     timeout: 60000
 - tapOn:
     id: export.generatePdf
+# a sync cycle right after the Surveyed date's push can hold the button disabled for the tap (T157
+# run 1, T189 twice: no request reached the server); the button is enabled again: tap once more
+- extendedWaitUntil:
+    visible:
+      id: export.card.state
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: export.card.state
+    commands:
+      - tapOn:
+          id: export.generatePdf
 - extendedWaitUntil:
     visible:
       id: export.card.state
@@ -108,4 +124,5 @@ name: R6 — export
     visible: '.*\.pdf'
     timeout: 15000
 - assertVisible: '.*\.xlsx'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

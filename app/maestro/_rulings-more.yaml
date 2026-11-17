@@ -34,7 +34,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: rulings.note
       text: 'Applied .*: 11 changes\.'
     timeout: 15000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - runFlow: _lint-open.yaml
 - runFlow:
     when:
@@ -45,7 +46,8 @@ appId: productions.luminarytechnology.fieldsurvey
     id: lint.fixAll.Relay panel
 - assertNotVisible:
     id: lint.fixAll.EBDK
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # from a plan list: Select → All → Apply as ruling…
 - runFlow:
@@ -67,7 +69,8 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 10000
 - assertVisible: 'Only the \d+ chosen records'
 - tapOn: Cancel
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # Generate item, once
 - tapOn:
@@ -192,4 +195,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertNotVisible:
     id: rulings.row
     text: '○ Land the 0-10V wiring.*'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

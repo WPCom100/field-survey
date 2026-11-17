@@ -76,7 +76,8 @@ name: Photos — library photos, upload resume, a link, + Photo here
 - assertNotVisible: 'Upload failed.*'
 - assertNotVisible:
     id: sync.retryUploads
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # 2. the card: one photo, nothing waiting; link it to 06M-S2 in its caption sheet
 - runFlow:
@@ -164,4 +165,5 @@ name: Photos — library photos, upload resume, a link, + Photo here
       text: '0'
     timeout: 60000
 - assertVisible: Nothing to upload
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

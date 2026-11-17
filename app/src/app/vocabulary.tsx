@@ -1,18 +1,19 @@
 import { Editor, LIBRARY_STREAM, OpError, ROLE, ROLE_LABEL, type Role, type Store } from '@field-survey/core';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
+import { SectionScreen } from '../home/SectionScreen';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { PIN_SHAPE_LABEL, PIN_SHAPE_NAMES, type PinShapeMap } from '../plan/pins';
 import { useRulesVersion } from '../rules/useRulesVersion';
 import { projectDataKey } from '../sync/dataKey';
 import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { Banner, Btn, Chip, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
+import { Banner, Btn, Chip, FilterRow, PAGE_GUTTER, color, fieldStyles, font, radius, space } from '../ui';
 import {
   acceptValue,
   addPair,
@@ -132,13 +133,14 @@ export default function VocabularyScreen() {
   };
 
   return (
-    <View style={styles.root}>
-      <PageHeader
-        title="Vocabulary"
-        caption="The words the pickers offer, the BOM's spellings, the pin shapes and the placeholder endpoints."
-        actions={
+    <SectionScreen
+      section="Vocabulary"
+      projectId={projectId}
+      title="Vocabulary"
+      intro="The words the pickers offer, the BOM's spellings, the pin shapes and the placeholder endpoints."
+      backTestID="vocab.back"
+      actions={
           <>
-            <Btn kind="tertiary" title="◀ Levels" onPress={() => router.dismissTo({ pathname: '/', params: projectId ? { project: projectId } : {} })} />
             {!app ? (
               <Btn
                 title="Copy from app library"
@@ -165,8 +167,8 @@ export default function VocabularyScreen() {
               testID="vocab.loadStandard"
             />
           </>
-        }
-      />
+      }
+    >
       <FilterRow>
         {(['project', 'app'] as const).map((s) => (
           <Chip key={s} small selected={scope === s} onPress={() => setScope(s)} label={s === 'project' ? 'This project' : 'App library'} testID={`vocab.scope.${s}`} />
@@ -190,7 +192,7 @@ export default function VocabularyScreen() {
               ? <PinShapes shapes={shapes} canEdit={!!libraryEditor} run={(fn) => run(fn, libraryEditor)} />
               : <Placeholders items={placeholders} canEdit={!!projectEditor} run={run} />}
       </ScrollView>
-    </View>
+    </SectionScreen>
   );
 }
 
@@ -392,7 +394,6 @@ function Placeholders(props: { items: PlaceholderEntry[]; canEdit: boolean; run:
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
   link: { ...font.callout, color: color.primary },
   danger: { ...font.callout, color: color.danger },
   tabs: { paddingBottom: space.sm },

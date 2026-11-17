@@ -23,6 +23,7 @@ import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } fr
 import { openAppStore } from '../db';
 import { pickProject } from '../home/currentProject';
 import { listProjects } from '../home/data';
+import { SectionScreen } from '../home/SectionScreen';
 import { useCurrentUser } from '../identity/IdentityGate';
 import { logTo } from '../log';
 import { bumpRulesVersion, engineFor } from '../rules/engine';
@@ -48,7 +49,7 @@ import {
 import { projectDataKey } from '../sync/dataKey';
 import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { Btn as UiBtn, Chip as UiChip, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
+import { Btn as UiBtn, Chip as UiChip, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
 
 type Mode = { kind: 'idle' } | { kind: 'edit'; draft: RulingDraft; source: string | null } | { kind: 'preview'; draft: RulingDraft; preview: RulingPreview; skip: ReadonlySet<string>; back: 'edit' | 'detail' } | { kind: 'detail'; id: string };
 
@@ -151,18 +152,14 @@ export default function RulingsScreen() {
   const title = view ? `Rulings (${view.standing} standing · ${view.applied} applied)` : 'Rulings';
 
   return (
-    <View style={styles.root}>
-      <PageHeader
-        title={title}
-        caption="One decision applied to every matching record, previewed before anything changes."
-        actions={
-          <>
-            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
-            <Btn label="+ New ruling" onPress={() => setMode({ kind: 'edit', draft: emptyDraft(), source: null })} disabled={!engine} testID="rulings.new" />
-          </>
-        }
-        style={styles.header}
-      />
+    <SectionScreen
+      section="Rulings"
+      projectId={projectId}
+      title={title}
+      intro="One decision applied to every matching record, previewed before anything changes."
+      backTestID="rulings.bar.back"
+      actions={<Btn label="+ New ruling" onPress={() => setMode({ kind: 'edit', draft: emptyDraft(), source: null })} disabled={!engine} testID="rulings.new" />}
+    >
       <View style={styles.body}>
         <FlatList
           style={styles.list}
@@ -264,7 +261,7 @@ export default function RulingsScreen() {
           )}
         </View>
       </View>
-    </View>
+    </SectionScreen>
   );
 }
 
@@ -666,14 +663,13 @@ function Btn({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
-  header: { paddingBottom: space.md },
   flex: { flex: 1 },
   link: { ...font.callout, color: color.primary },
   body: {
     flex: 1,
     flexDirection: 'row',
     marginHorizontal: PAGE_GUTTER,
+    marginTop: space.md,
     marginBottom: space.lg,
     backgroundColor: color.surface,
     borderWidth: 1,

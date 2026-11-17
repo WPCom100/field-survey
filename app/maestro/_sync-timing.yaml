@@ -1,6 +1,6 @@
 # On the Sync screen, just opened: open Details (folded on every visit unless edits were refused,
 # T178; the callers fail on refused edits anyway) and bring its Last cycle line (`sync.timing`) on
-# screen. Callers wait on the line, then scroll back up to ← Levels.
+# screen. Callers wait on the line, then tap rail.levels (T189: the rail never scrolls).
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - tapOn:

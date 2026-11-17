@@ -41,11 +41,8 @@ name: Scale — the synthetic project's timings
       text: 'Last cycle .* · 0 pushed, 0 pulled.*'
     timeout: 600000
 - assertNotVisible: ".*need attention.*"
-- scrollUntilVisible:
-    element:
-      id: sync.back
-    direction: UP
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels             # T189: the rail beside the Sync screen, never scrolled away
 
 # the dense level's plan
 - tapOn:

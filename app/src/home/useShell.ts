@@ -1,30 +1,34 @@
 /**
- * The plan's shell (T177): the project name and count pills for its rail and sidebar overlay, and
- * the signed-in person's row, as the Levels home builds them (T176). Reloads when a sync brought
- * data (`reloadKey`) or the rules ran (the Lint pill), this project's only (T186).
+ * The shell's data (T177, T189): the project name and count pills for the rail and its sidebar
+ * overlay, and the signed-in person's row, as the Levels home builds them (T176). The plan and
+ * every section screen read it for their project. Reloads when a sync brought data (`reloadKey`)
+ * or the rules ran (the Lint pill), this project's only (T186). With no project (Sync on a fresh
+ * iPad) only the person's row loads.
  */
 
 import type { Store } from '@field-survey/core';
 import { useState } from 'react';
 
-import type { PlanShell } from '../plan/PlanScreen';
+import type { ShellNav } from '../ui';
 import { useRulesVersion } from '../rules/useRulesVersion';
 import { useReload } from '../sync/useReload';
 import { homeIdentityLine, installName, loadInstallLabels } from '../sync/install';
-import { loadShellNav } from './data';
+import { loadProjectShellNav } from './data';
 
-export function useShell(store: Store | null, levelId: string | undefined, projectId: string | null, user: { name: string }, reloadKey: string): PlanShell {
+export type ShellData = Omit<ShellNav, 'projectId'>;
+
+export function useShell(store: Store | null, projectId: string | null, user: { name: string }, reloadKey: string): ShellData {
   const rules = useRulesVersion(projectId);
-  const [shell, setShell] = useState<PlanShell>({
+  const [shell, setShell] = useState<ShellData>({
     projectName: null,
     counts: {},
     user: { name: user.name, sub: '', label: `Signed in as ${user.name}` },
   });
   useReload({
     name: 'shell',
-    subject: store && levelId ? `${levelId}|${user.name}` : null,
+    subject: store ? `${projectId ?? ''}|${user.name}` : null,
     reloadKey: `${reloadKey}|${rules}`,
-    load: async () => ({ nav: await loadShellNav(store!, levelId!), labels: await loadInstallLabels(store!) }),
+    load: async () => ({ nav: projectId ? await loadProjectShellNav(store!, projectId) : null, labels: await loadInstallLabels(store!) }),
     apply: ({ nav, labels }) =>
       setShell({
         projectName: nav?.projectName ?? null,
@@ -35,7 +39,7 @@ export function useShell(store: Store | null, levelId: string | undefined, proje
           label: homeIdentityLine(user.name, store!.installId, labels),
         },
       }),
-    fail: (e) => console.warn('[plan] shell', e),
+    fail: (e) => console.warn('[shell] load', e),
   });
   return shell;
 }

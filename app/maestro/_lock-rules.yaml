@@ -57,7 +57,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: rulings.note
       text: 'Applied .*: 1 change\.'
     timeout: 15000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - tapOn:
     id: nav.setup
 - tapOn:

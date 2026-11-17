@@ -2,7 +2,7 @@
 # 06M-02's "Run DMX to equipment rack") and an open Run draft on 06M-04 (C-13 set Not installed by
 # _rules-setup), R3a Run item owner (any other code) → ETC: the box offers both accepted items →
 # Preview, untick one, Apply → swipe back to Setup: the box lists the one left (the box is an offer
-# on the change, held by the Setup screen while it stays open: `← Levels` leaves it). The open
+# on the change, held by the Setup screen while it stays open: going to Levels leaves it). The open
 # draft reads ETC. Reset to default: the draft reads EC again and is rejected (after the reset, so
 # the wording step proves the reject alone). Starts and ends on Levels.
 appId: productions.luminarytechnology.fieldsurvey

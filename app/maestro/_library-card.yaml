@@ -72,7 +72,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: library.note
       text: Saved.
     timeout: 10000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 
 # the card: Neuron ID shown, the R2g draft, the optional N offered, the second 120V not yet
 - runFlow:
@@ -148,7 +149,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: library.note
       text: 'Rejected: it leaves the chips.'
     timeout: 10000
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels
 
 # the open draft follows; accept it; the optional rows
 - runFlow:

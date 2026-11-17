@@ -81,7 +81,8 @@ name: Conflicts — the same fields edited on both iPads, offline
       - extendedWaitUntil:
           visible: 'Rulings \(\d+ standing · [1-9]\d* applied\)'
           timeout: 10000
-      - tapOn: ← Levels
+      - tapOn:
+          id: rail.levels
       # T36 "Two iPads": a dismissal made on A
       - runFlow:
           file: _lint-dismiss.yaml

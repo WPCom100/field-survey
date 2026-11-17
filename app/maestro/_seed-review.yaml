@@ -132,4 +132,5 @@ appId: productions.luminarytechnology.fieldsurvey
 - extendedWaitUntil:
     visible: 'Needs review \(27\)'
     timeout: 10000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

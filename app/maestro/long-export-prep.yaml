@@ -39,10 +39,7 @@ name: Long export — SCALE on this iPad
       text: 'Last cycle .* · 0 pushed, 0 pulled.*'
     timeout: 900000
 - assertNotVisible: ".*need attention.*"
-- scrollUntilVisible:
-    element:
-      id: sync.back
-    direction: UP
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels             # T189: the rail beside the Sync screen, never scrolled away
 - assertVisible:
     id: level.06M

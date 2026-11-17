@@ -13,6 +13,7 @@ appId: productions.luminarytechnology.fieldsurvey
 # a refused edit still reads "Synced …" with " · n need attention" after it: fail on it (T154: a
 # server reset left the keychain's old user id, and every edit went unknown-user for a whole session)
 - assertNotVisible: ".*need attention.*"
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 - assertVisible:            # the Levels home (T176: the sidebar has no "Field Survey" title)
     id: nav.projects

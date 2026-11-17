@@ -28,7 +28,8 @@ import { useRulesVersion } from '../rules/useRulesVersion';
 import { projectDataKey } from '../sync/dataKey';
 import { useReload } from '../sync/useReload';
 import { useSyncStatus } from '../sync/useSyncStatus';
-import { Btn as UiBtn, Chip as UiChip, FilterLabel, FilterRow, PageHeader, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
+import { SectionScreen } from '../home/SectionScreen';
+import { Btn as UiBtn, Chip as UiChip, FilterLabel, FilterRow, PAGE_GUTTER, color, fieldStyles, font, radius, space, tabular } from '../ui';
 
 type Panel = { kind: 'drill'; drill: Drill } | { kind: 'search' } | null;
 
@@ -129,13 +130,13 @@ export default function DashboardScreen() {
   const asOf = sync.lastSyncAt ? `as of sync ${new Date(sync.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (local data)` : 'not synced yet (local data)';
 
   return (
-    <View style={styles.root}>
-      <PageHeader
-        title="Dashboard"
-        caption={asOf}
-        actions={
-          <>
-            <UiBtn kind="tertiary" title="← Levels" onPress={() => router.dismissTo(projectId ? { pathname: '/', params: { project: projectId } } : '/')} />
+    <SectionScreen
+      section="Dashboard"
+      projectId={projectId}
+      title="Dashboard"
+      caption={asOf}
+      backTestID="dash.back"
+      actions={
             <TextInput
               style={styles.search}
               value={query}
@@ -147,9 +148,8 @@ export default function DashboardScreen() {
               clearButtonMode="while-editing"
               testID="dash.search"
             />
-          </>
-        }
-      />
+      }
+    >
       <FilterRow>
         <FilterLabel text="Levels" />
         <Chip label="All" on={!filter.levelId} onPress={() => setFilter((f) => ({ ...f, levelId: null }))} testID="dash.level.all" />
@@ -280,7 +280,7 @@ export default function DashboardScreen() {
           </View>
         ) : null}
       </View>
-    </View>
+    </SectionScreen>
   );
 }
 
@@ -386,7 +386,6 @@ function Btn({ label, onPress, disabled, plain, testID }: { label: string; onPre
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
   search: { ...fieldStyles.input, ...font.callout, width: 380 },
   body: { flex: 1, flexDirection: 'row', marginTop: space.md, borderTopWidth: 1, borderTopColor: color.hairline },
   main: { flex: 1 },

@@ -35,4 +35,5 @@ appId: productions.luminarytechnology.fieldsurvey
       selected: true
     timeout: 10000
 - assertNotVisible: '.*shares its shape with another role'
-- tapOn: ◀ Levels
+- tapOn:
+    id: rail.levels

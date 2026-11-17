@@ -62,7 +62,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: rulings.note
       text: 'Applied .*: 2 changes\.'
     timeout: 15000
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # the plan follows; the rejected draft is offered again in the new wording
 - runFlow:
@@ -126,7 +127,8 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: '1 record its rule no longer words, left as it is: 06M #\d+\.'
 - tapOn:
     id: rulings.back
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels
 
 # Reset to default: the draft reads "Run DMX to …" again
 - tapOn:

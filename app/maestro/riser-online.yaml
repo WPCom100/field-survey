@@ -20,4 +20,5 @@ name: Riser — the cable accepted offline finds its riser after the sync
 - assertNotVisible:
     id: riser.problem
 - assertVisible: 'Riser crop · riser\.pdf p\.\d+'
-- tapOn: ← Levels
+- tapOn:
+    id: rail.levels

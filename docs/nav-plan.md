@@ -102,6 +102,13 @@ in the root layout's `screenOptions`); details still slide. The rule lives in `u
 `ui/NavBar.tsx` (with `BackButton`) and `ui/PanelHeader.tsx` are ready for T189 and T191; in
 T188 only the plan's toolbar takes `BackButton`.
 
+**Built in T189 (D282).** The nine section screens render `home/SectionScreen.tsx`: the rail, then
+the `NavBar` (title, a short caption, the screen's controls at the right) and, under it, the
+screen's one-line description, which the old page header carried as its caption. Export's pane
+column became three chips in the bar. Back buttons are `<screen>.back`, except Rulings'
+`rulings.bar.back` (`rulings.back` is the preview's). `app/maestro/nav.yaml` walks Dashboard →
+Apply as ruling → Rulings → `‹ Dashboard` and Sync → Needs review → `‹ Sync`.
+
 ### 2.3 Panels
 
 | Kind | Control | Position |
