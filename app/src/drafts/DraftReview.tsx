@@ -1,13 +1,14 @@
 import { Editor, type Store } from '@field-survey/core';
 import { DEVICE_CATEGORIES } from '@field-survey/rules';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { openAppStore } from '../db';
 import { useIdentity } from '../identity/IdentityGate';
 import { Btn, Notice, styles as w } from '../setup/widgets';
 import { Chip as UiChip, color, font, radius, space, tabular } from '../ui';
+import { revealOffset } from '../ui/reveal';
 import { syncDataKey } from '../sync/dataKey';
 import { useSyncStatus } from '../sync/useSyncStatus';
 import {
@@ -102,6 +103,27 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const panelRef = useRef<ScrollView>(null);
+  const panelContent = useRef(0);
+
+  /** Scroll the side panel so `field` sits near its top, its results above the keyboard (T187). */
+  const revealInPanel = useCallback((field: TextInput | null) => {
+    const scroll = panelRef.current;
+    // getInnerViewRef is on ScrollView at runtime (RN 0.86) but missing from its legacy .d.ts
+    const inner = (scroll as unknown as { getInnerViewRef?: () => View | null } | null)?.getInnerViewRef?.();
+    const outer = scroll?.getNativeScrollRef();
+    if (!scroll || !inner || !outer || !field) return;
+    field.measureLayout(
+      inner,
+      (_x, y) =>
+        outer.measureInWindow((_wx, top, _w, height) => {
+          const kb = Keyboard.metrics();
+          const covered = kb ? top + height - kb.screenY : 0;
+          scroll.scrollTo({ y: revealOffset({ y, margin: space.md, content: panelContent.current, view: height, covered }), animated: true });
+        }),
+      () => undefined,
+    );
+  }, []);
 
   const editor = useMemo(() => (store ? new Editor(store, { projectId, userId: identity.user.id }) : null), [store, projectId, identity.user.id]);
 
@@ -237,7 +259,14 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
           )}
           {tab === 'devices' ? <Excluded batches={batches} data={data} level={level.levelId} levelCode={level.code} run={run} editor={editor} projectId={projectId} /> : null}
         </ScrollView>
-        <ScrollView style={styles.panel} contentContainerStyle={{ padding: space.lg, gap: 10, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+        <ScrollView
+          ref={panelRef}
+          style={styles.panel}
+          contentContainerStyle={{ padding: space.lg, gap: 10, paddingBottom: 60 }}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          onContentSizeChange={(_w, h) => (panelContent.current = h)}
+        >
           {adding ? (
             tab === 'devices' ? (
               <AddDevice levels={data.levels} levelId={level.levelId} onAdd={(f) => run(() => addDeviceDraft(editor, projectId, f).then((id) => (setSelected(id), setAdding(false), 'Draft added')))} />
@@ -247,7 +276,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
           ) : selDevice ? (
             <DevicePanel key={selDevice.id} d={selDevice} data={data} batches={batches} identity={identity} editor={editor} store={store} run={run} />
           ) : selCable ? (
-            <CablePanel key={selCable.id} projectId={projectId} c={selCable} data={data} batches={batches} identity={identity} editor={editor} store={store} riserBlob={riserBlob} run={run} />
+            <CablePanel key={selCable.id} projectId={projectId} c={selCable} data={data} batches={batches} identity={identity} editor={editor} store={store} riserBlob={riserBlob} run={run} reveal={revealInPanel} />
           ) : (
             <Text style={styles.dim}>Pick a draft on the left. Drafts under 0.7 or with a conflict wait in Needs review (D11); nothing is accepted for you.</Text>
           )}
@@ -535,6 +564,7 @@ function CablePanel({
   store,
   riserBlob,
   run,
+  reveal,
 }: {
   projectId: string;
   c: CableDraftRow;
@@ -545,6 +575,7 @@ function CablePanel({
   store: Store;
   riserBlob: string | null;
   run: Run;
+  reveal: (field: TextInput | null) => void;
 }) {
   const [picking, setPicking] = useState<Side | null>(null);
   const blockers = cableBlockers(c);
@@ -596,7 +627,7 @@ function CablePanel({
           <Text style={w.label}>{side === 'from' ? 'From' : 'To'}</Text>
           <Text style={[styles.endText, !c.ends[side] && styles.warn]}>{endLine(side)}</Text>
           {open ? <Btn title={picking === side ? 'Close' : 'Change…'} small onPress={() => setPicking((p) => (p === side ? null : side))} testID={`draft.cable.change.${side}`} /> : null}
-          {picking === side ? <EndpointPicker c={c} side={side} data={data} onPick={(e) => void run(() => setEndpoint(editor, store, c.id, side, e).then(() => setPicking(null)), 'Endpoint set')} /> : null}
+          {picking === side ? <EndpointPicker c={c} side={side} data={data} reveal={reveal} onPick={(e) => void run(() => setEndpoint(editor, store, c.id, side, e).then(() => setPicking(null)), 'Endpoint set')} /> : null}
         </View>
       ))}
       {c.conflicts.map((k) => (
@@ -638,12 +669,30 @@ function cableNote(r: { linked: boolean; waiting: boolean; pending: boolean }): 
   return r.linked ? 'Accepted — the baseline already had this cable; the riser crop is now on it' : 'Accepted — the cable is made';
 }
 
-function EndpointPicker({ c, side, data, onPick }: { c: CableDraftRow; side: Side; data: DraftReviewData; onPick: (e: Endpoint | null) => void }) {
+/**
+ * Change… on a cable end. The box sits low in the side panel, so while it has focus the panel
+ * scrolls it near its top and the results list above the keyboard (T187): on focus when the
+ * keyboard is already up, else once the keyboard has shown (its inset is in place by then).
+ */
+function EndpointPicker({ c, side, data, reveal, onPick }: { c: CableDraftRow; side: Side; data: DraftReviewData; reveal: (field: TextInput | null) => void; onPick: (e: Endpoint | null) => void }) {
   const [q, setQ] = useState('');
+  const input = useRef<TextInput>(null);
   const options = endpointOptions(data, c, side, q).slice(0, 40);
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      if (input.current?.isFocused()) reveal(input.current);
+    });
+    return () => sub.remove();
+  }, [reveal]);
   return (
     <View style={styles.form}>
-      <TextInput style={w.input} value={q} onChangeText={setQ} placeholder="Search devices, drafts, placeholders (any level)" placeholderTextColor={color.text3} autoCorrect={false} testID="draft.cable.search" />
+      <TextInput
+        ref={input}
+        onFocus={() => {
+          if (Keyboard.isVisible()) reveal(input.current);
+        }}
+        style={w.input}
+        value={q} onChangeText={setQ} placeholder="Search devices, drafts, placeholders (any level)" placeholderTextColor={color.text3} autoCorrect={false} testID="draft.cable.search" />
       {options.map((e) => (
         <Pressable key={`${e.kind}:${e.id}`} onPress={() => onPick(e)} style={styles.option} testID="draft.cable.option">
           <Text style={styles.optionText}>

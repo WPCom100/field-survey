@@ -51,7 +51,6 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: draft.cable.search
 - inputText: 06M-04
-- pressKey: Enter          # closes the keyboard: since T180's panel the results can sit under it
 - waitForAnimationToEnd
 - tapOn:
     id: draft.cable.option
@@ -65,7 +64,6 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: draft.cable.search
 - inputText: MAESTRO-EQ
-- pressKey: Enter          # closes the keyboard: since T180's panel the results can sit under it
 - waitForAnimationToEnd
 - tapOn:
     id: draft.cable.option
