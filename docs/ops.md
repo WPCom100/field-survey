@@ -262,6 +262,61 @@ Then, in `server/.env.production` (and `scp` as in §1.6):
 A 503 "Sign-in keys unavailable" means the server cannot reach
 `login.microsoftonline.com` and has no cached keys: `docker compose logs api | grep jwks`.
 
+### 4.4 The one-library wipe (T198, D287 (7), D292 (5)): once
+
+D287 gave the app one device library and stopped copying it into projects. The projects made before
+it, and the library itself (D292 (5): every type and chip, to be imported again with the first-use
+answers of T200), go in one run of `server/deploy/wipe-projects.sh` (`server/app/wipe.py`). It
+deletes every project and everything under it (levels, sheets, devices, cables, punch, parts,
+photos, ink, rulings, proposals, findings, imports, drafts, exports, the project vocabulary and rule
+parameters, project ops and review items), every `library_type` and `suggestion` row with the
+library log's ops and review items about them, and every blob no kept op names (rows and R2 objects).
+It keeps users, installs, the app-level vocabulary (categories, cable codes, pin shapes, …), the
+rule defaults and their ops. It is the one hard delete in the system; the backups are the undo.
+
+**Before** (all of it, then Landry's go):
+
+1. Every iPad runs the T198 update: Sync → Install shows the update "T198: …" (launch twice, §5.5).
+2. Every iPad's Sync screen reads **Synced** with nothing waiting. An edit still queued on an iPad
+   is lost: its project is gone.
+3. Anything wanted from the old projects is exported (workbook, floor PDF) and kept off the server.
+
+**On the Droplet** (as root):
+
+```
+bash /opt/field-survey/server/deploy/wipe-projects.sh        # dry run: per table, gone / kept
+bash /opt/field-survey/server/deploy/wipe-projects.sh --run  # R2 dump + /root/pre-wipe-<time>.dump,
+                                                             # the counts again, type WIPE, delete
+docker compose exec -T api python -m app.wipe                # after: every "gone" reads 0
+```
+
+Add `--all` to both commands (`wipe-projects.sh --run --all`) to empty every table instead,
+users, installs, the app vocabulary and rule defaults too, and delete every blob object (backups stay).
+That is what ran on 2026-11-18 (Landry: "all users, projects, libraries"): afterwards people come back
+at their Microsoft sign-in, and Vocabulary → **Load standard values** brings back the categories and
+cable codes.
+
+`--run` stops the API and the worker for the delete and starts them again even if it fails. The delete
+is one transaction (the foreign keys are deferred, so a row left pointing at a gone one fails the
+commit and nothing changes). To undo: restore `/root/pre-wipe-<time>.dump` (§3.3). Blob objects
+deleted from R2 are not in the dump: a restored photo or sheet then has no bytes until an iPad that
+still holds them uploads them again, so treat the wipe as final.
+
+**Each iPad afterwards** (all of them; an iPad that keeps its old store pulls projects the server no
+longer has, and every sync cycle fails on the 404):
+
+1. Long-press Field Survey → **Remove App** → **Delete App** (the local database and photos go).
+2. Install it again: TestFlight → Field Survey → **Install** (a development iPad: the dev build's
+   install link from EAS, §5.2).
+3. Open it, connect (server, token or Microsoft sign-in, name), swipe it away and open it again so
+   the update applies; Sync → Install shows "T198: …" again. Projects is empty, the Library is
+   empty.
+
+**Then the library again** (one iPad): New project → Setup → Sources → **DaVinci**
+(`library.json` with `DaVinci_categories.xlsx`, `server/docs/library.md`). Every imported type
+is a draft with its cable rows undecided; the first device of each asks Required / Optional (T200,
+D298). Rule defaults, the app vocabulary and pin shapes are as they were.
+
 ## 5. iOS builds and TestFlight (T06b, D59, D70)
 
 All on the PC in `app/`, in **your own terminal** (EAS asks for the Apple ID password and 2FA code interactively). Needs the Apple Developer Program membership **active** (developer.apple.com → Account → Membership shows a Team ID). Nothing here needs a Mac. **Always run `eas` from `app/`**: from the repo root it writes a stray `eas.json`/`app.json` there and fails with "The `expo` package was not found". Apple team `H2CLZXHCH8`; commands that need it non-interactively take `--apple-team-id H2CLZXHCH8` (e.g. `eas device:list`).

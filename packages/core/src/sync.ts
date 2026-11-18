@@ -417,6 +417,12 @@ export class SyncEngine {
     }
     for (const project of projects) {
       try {
+        // A library edit made while this cycle ran (after the library's turn) may be the draft
+        // type a project's new device names (D292 (2)): it goes before that project's push, or
+        // the server refuses the device on the missing type (T198).
+        if (projects.includes(LIBRARY_STREAM) && project !== LIBRARY_STREAM && (await this.store.outbox(LIBRARY_STREAM, 1)).length > 0) {
+          pushed += await this.push(transport, LIBRARY_STREAM);
+        }
         pushed += await this.push(transport, project);
       } catch (e) {
         failure = e as Error;

@@ -609,6 +609,35 @@ describe('the app library stream (T61, D184)', () => {
     const plain = await client(server, ANN, 'ipad-c');
     expect((await plain.engine.sync()).projects).not.toContain(LIBRARY_STREAM);
   });
+
+  it('a draft type made after the library had its turn in a cycle is pushed before the project device naming it (T198)', async () => {
+    const pushed: string[] = [];
+    let typeId: string | null = null;
+    const a = await client(null, ANN, 'ipad-a', { library: true });
+    const lib = () => new Editor(a.store, { projectId: LIBRARY_STREAM, userId: ANN, now: tsNext });
+    // Add device of an unknown model lands while the cycle pulls the library (after its push).
+    const transport = {
+      push: (body: Parameters<FakeServer['push']>[0]) => {
+        pushed.push(body.project_id === LIBRARY_STREAM ? 'library' : 'project');
+        return server.push(body);
+      },
+      pull: async (projectId: string, since: number, limit: number) => {
+        const res = await server.pull(projectId, since, limit);
+        if (projectId === LIBRARY_STREAM && !typeId) {
+          typeId = (await lib().create('library_type', { project_id: null, model: 'XX04-1E01', state: 'draft' }, { change_type: 'Field survey', reason: 'test' })).id;
+          await newDevice(a, { library_type_id: typeId });
+        }
+        return res;
+      },
+    };
+    a.engine.setTransport(transport);
+    const report = await a.engine.sync();
+    expect(report.outcome).toBe('ran');
+    expect(pushed).toEqual(['library', 'project']);
+    expect(server.ops(LIBRARY_STREAM).map((o) => o.entity_id)).toEqual([typeId]);
+    expect(server.ops(PROJECT).map((o) => o.entity_kind)).toEqual(['device']);
+    expect(await a.store.outboxCount()).toBe(0);
+  });
 });
 
 describe('status and scheduling', () => {

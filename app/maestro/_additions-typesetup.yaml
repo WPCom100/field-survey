@@ -15,7 +15,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: plan.back
 - tapOn:
-    id: nav.library
+    id: '(nav|rail).library'   # Setup (the plan's opener here) shows the rail only
 # the run's draft type: a default U row, an optional X row (the blank row's code)
 - tapOn:
     id: library.new
@@ -159,7 +159,7 @@ appId: productions.luminarytechnology.fieldsurvey
 
 # the Library: accepted with both rows required; then the run's type leaves the library
 - tapOn:
-    id: nav.library
+    id: '(nav|rail).library'   # Setup (the plan's opener here) shows the rail only
 - tapOn:
     id: library.search
 - inputText: MAESTRO-TS-${output.n}
