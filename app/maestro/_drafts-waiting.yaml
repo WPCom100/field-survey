@@ -11,8 +11,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - tapOn:
     id: drafts.tab.devices
 - tapOn: '.*ERN4-RM-120, Equipment Rack 18U, Equipment Panels, 1, .*'
-- tapOn:
-    id: draft.accept
+- runFlow: _draft-accept.yaml   # Accept below the panel's fold on a long draft (T194)
 - extendedWaitUntil:
     visible:
       id: drafts.notice

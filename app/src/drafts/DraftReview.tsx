@@ -2,7 +2,7 @@ import { Editor, type Store } from '@field-survey/core';
 import { DEVICE_CATEGORIES } from '@field-survey/rules';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { openAppStore } from '../db';
 import { useIdentity } from '../identity/IdentityGate';
@@ -303,9 +303,7 @@ function DeviceTable({ rows, selected, onSelect }: { rows: DeviceDraftRow[]; sel
     <View>
       <View style={styles.thead}>
         {['Model', 'Name', 'Category', 'Qty', 'Conf', 'Src', ''].map((h, i) => (
-          <Text key={i} style={[w.label, [styles.cModel, styles.cName, styles.cCat, styles.cQty, styles.cConf, styles.cSrc, styles.cState][i]]}>
-            {h}
-          </Text>
+          <Th key={i} col={[styles.cModel, styles.cName, styles.cCat, styles.cQty, styles.cConf, styles.cSrc, styles.cState][i]} title={h} />
         ))}
       </View>
       {rows.map((d) => (
@@ -333,14 +331,21 @@ function DeviceTable({ rows, selected, onSelect }: { rows: DeviceDraftRow[]; sel
   );
 }
 
+/** A header cell: the column's width, the label's font, one line (a narrow column shrinks the word rather than breaking it, T194). */
+function Th({ col, title }: { col: StyleProp<TextStyle>; title: string }) {
+  return (
+    <Text style={[col, w.label]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+      {title}
+    </Text>
+  );
+}
+
 function CableTable({ rows, selected, onSelect }: { rows: CableDraftRow[]; selected: string | null; onSelect: (id: string) => void }) {
   return (
     <View>
       <View style={styles.thead}>
         {['Code', 'From', 'To', 'To-lvl', 'Conf', 'Src', ''].map((h, i) => (
-          <Text key={i} style={[w.label, [styles.cCode, styles.cFrom, styles.cTo, styles.cQty, styles.cConf, styles.cSrc, styles.cState][i]]}>
-            {h}
-          </Text>
+          <Th key={i} col={[styles.cCode, styles.cFrom, styles.cTo, styles.cQty, styles.cConf, styles.cSrc, styles.cState][i]} title={h} />
         ))}
       </View>
       {rows.map((c) => (
@@ -844,9 +849,10 @@ const styles = StyleSheet.create({
   chipDim: { opacity: 0.6 },
   sep: { ...font.callout, color: color.muted },
   body: { flex: 1, flexDirection: 'row', gap: space.sm, marginTop: 6 },
-  left: { flex: 3, backgroundColor: color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: color.hairline },
+  // ScrollViews carry their own flexGrow: 1, which beats `flex`: the 3 : 2 split needs flexGrow + flexBasis 0 (T194)
+  left: { flexGrow: 3, flexShrink: 1, flexBasis: 0, backgroundColor: color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: color.hairline },
   leftBody: { paddingBottom: 40, paddingHorizontal: space.sm },
-  panel: { flex: 2, backgroundColor: color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: color.hairline },
+  panel: { flexGrow: 2, flexShrink: 1, flexBasis: 0, backgroundColor: color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: color.hairline },
   thead: { flexDirection: 'row', gap: 6, paddingVertical: 6, paddingHorizontal: space.sm, marginTop: space.sm, marginBottom: 2, borderRadius: radius.control, backgroundColor: color.surface2, borderBottomWidth: 1, borderColor: color.hairline },
   tr: { flexDirection: 'row', gap: 6, minHeight: 44, paddingVertical: 9, borderBottomWidth: 1, borderColor: color.hairline, alignItems: 'center' },
   trOn: { backgroundColor: color.primaryTint },

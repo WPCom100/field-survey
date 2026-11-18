@@ -63,6 +63,7 @@ team Ann / Bob), never to the Droplet.
 | `_setup-mezzanine.yaml` | Setup → 2 Levels → Add level: a typed 07M fills Shares numbering with and Split of with 07 until the user picks, erased both go back; adds nothing (T172, D263; in `e2e-setup.yaml`) |
 | `_pick-wait.yaml` | waits for the Files picker before a position tap (the spots: `PICK_*` from `rig.sh`, T168) |
 | `_drafts.yaml` | Setup → 4 Review drafts: three hand drafts, accepted / edited / rejected |
+| `_drafts-panel.yaml`, `_draft-accept.yaml` | Review drafts: swipes the right-hand panel (x 85 %) until `ID` (env) is on screen, a little more after; `_draft-accept` does that for the selected draft's Accept and taps it. A long draft puts its buttons below the panel's fold since the 3 : 2 split (T194) |
 | `_place.yaml` | Setup → 5 Place devices → Place ▸ → first unit → tap the sheet → Place ✓ |
 | `_plan-tools.yaml` | on an open 06M plan (T177): ‹ Levels and the `06M` title, the Filter popover (count of groups in use, Clear), the Legend popover, the rail's sidebar overlay; leaves the filter cleared |
 | `_card.yaml` | Devices list → card: status Issue, a note, Quick actions → Spot-check fixed (punch item) |

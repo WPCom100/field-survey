@@ -13,6 +13,7 @@ appId: productions.luminarytechnology.fieldsurvey
     id: drafts.new.qty
 - eraseText: 3
 - inputText: ${QTY}
+- pressKey: Enter         # T194: at the panel's 2/5 the category chips take more rows and Add draft sits under the keyboard
 - tapOn:
     id: drafts.new.cat.${CAT}
 - tapOn:

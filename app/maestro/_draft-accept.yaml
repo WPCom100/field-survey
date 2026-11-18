@@ -1,0 +1,9 @@
+# Review drafts: the selected draft's Accept, below the panel's fold on a long draft (T194).
+appId: productions.luminarytechnology.fieldsurvey
+---
+- runFlow:
+    file: _drafts-panel.yaml
+    env:
+      ID: draft.accept
+- tapOn:
+    id: draft.accept

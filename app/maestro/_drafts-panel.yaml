@@ -1,0 +1,20 @@
+# Review drafts: swipe the right-hand panel until `ID` (env) is on screen, then a little more, so
+# it sits clear of the bottom edge (T194). Since the list and the panel split 3 : 2, a long draft
+# (the rack's accessories, source or riser crops) puts its buttons and forms below the panel's
+# fold. The swipes stay at x 85 %, clear of the list.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- repeat:
+    while:
+      notVisible:
+        id: ${ID}
+    times: 8
+    commands:
+      - swipe:
+          start: 85%, 75%
+          end: 85%, 35%
+          duration: 400
+- swipe:
+    start: 85%, 70%
+    end: 85%, 55%
+    duration: 300

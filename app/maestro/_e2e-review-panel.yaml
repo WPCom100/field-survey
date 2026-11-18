@@ -6,8 +6,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: '.*06 or 06M\?.*'
 - tapOn: '○ 06M'
 - assertVisible: '◉ 06M'
-- tapOn:
-    id: draft.accept
+- runFlow: _draft-accept.yaml   # Accept below the panel's fold on a long draft (T194)
 - extendedWaitUntil:
     visible:
       id: drafts.notice
