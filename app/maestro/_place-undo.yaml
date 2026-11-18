@@ -46,6 +46,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: Below CT06LCPB
 - tapOn:
     id: place.confirm
+- runFlow: _type-later.yaml    # T200: a draft type's first-use sheet → Later
 - extendedWaitUntil:
     visible:
       id: place.last

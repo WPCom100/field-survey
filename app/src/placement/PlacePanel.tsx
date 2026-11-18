@@ -8,13 +8,15 @@
  * plan are proposals from what the sheet prints (types and panel tags, T140), a guess fainter and
  * named so in the form; tapping one selects it with its spot. The row
  * just placed stays at the top with ↶ Undo until the panel closes (T139).
- * The logic is in `model.ts` / `actions.ts`; this is the view.
+ * The logic is in `model.ts` / `actions.ts`; this is the view. A draft placed as a device of a
+ * draft type (or carrying a draft accessory) asks that type's cables once (T200).
  */
 
 import { OpError, ROLE_LABEL, type Editor, type Role, type Store } from '@field-survey/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { askTypeSetup, questionsForDevices } from '../library/typeSetup';
 import { chipStyles } from '../plan/chips';
 import { Btn as UiBtn, Chip as UiChip, FormActions, PanelHeader, color, fieldStyles, font, radius, space, tabular } from '../ui';
 import { flagNotOnSheet, moveDraft, placeItem, unplaceDevice, type PlaceResult } from './actions';
@@ -179,6 +181,7 @@ export function PlacePanel(props: PlacePanelProps) {
               const r = await placeItem(editor, props.store, selected, { levelId: props.levelId, sheetId: props.sheetId, at: spot, ...form });
               console.log(`[plan] placed ${selected.key} → ${r.deviceId}${r.cablesMade ? `, ${r.cablesMade} waiting cable(s) made` : ''}`);
               props.onPlaced(r, selected);
+              if (r.created) questionsForDevices(props.store, [r.deviceId]).then(askTypeSetup, (e: unknown) => console.warn(`[plan] type setup: ${String(e)}`));
               const what = selected.kind === 'device' ? selected.label : `${props.levelCode}-? ${selected.title}`;
               setLast({ deviceId: r.deviceId, what, text: `Placed ${what}.${r.cablesMade ? ` ${r.cablesMade} waiting cable${r.cablesMade === 1 ? '' : 's'} made.` : ''}` });
               return null;

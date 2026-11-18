@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlobalStatusBar } from '../components/StatusBar';
 import { openAppStore } from '../db';
 import { IdentityGate } from '../identity/IdentityGate';
+import { TypeSetupHost } from '../library/TypeSetupSheet';
 import { logTo } from '../log';
 import { RulesRunner } from '../rules/RulesRunner';
 import { SyncRunner } from '../sync/SyncRunner';
@@ -33,6 +34,8 @@ export default function RootLayout() {
     <IdentityGate>
       <SyncRunner />
       <RulesRunner />
+      {/* first use of a draft type (T200): the one sheet every screen hands its questions to */}
+      <TypeSetupHost />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <GlobalStatusBar />
         <View style={{ flex: 1 }}>

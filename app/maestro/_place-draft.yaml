@@ -27,6 +27,7 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 10000
 - tapOn:
     id: draft.accept
+- runFlow: _type-later.yaml    # T200: a draft type's first-use sheet → Later
 - extendedWaitUntil:
     visible:
       id: drafts.notice

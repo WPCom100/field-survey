@@ -28,6 +28,7 @@ import { runQuickAction, type QuickAction } from '@field-survey/rules';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { askTypeSetup, questionsForAccessory } from '../library/typeSetup';
 import { PhotoStrip } from '../photo/PhotoStrip';
 import { BadgeStrip } from '../plan/chips';
 import { UNSURVEYED } from '../plan/filters';
@@ -335,7 +336,13 @@ export function DeviceCard(props: DeviceCardProps) {
                   label={`+ add ${o.model}`}
                   sub={o.expected !== null ? `expected ${o.expected}` : null}
                   disabled={readOnly}
-                  onPress={() => void run((e) => addOptionalAccessory(e, d.id, o.model, o.expected))}
+                  onPress={() =>
+                    void run(async (e) => {
+                      await addOptionalAccessory(e, d.id, o.model, o.expected);
+                      // first use of the accessory's type (T200): its cables, Required or Optional, asked once
+                      askTypeSetup(await questionsForAccessory(store, o.model, d.device));
+                    })
+                  }
                 />
               ));
               if (!block.group) return rows;

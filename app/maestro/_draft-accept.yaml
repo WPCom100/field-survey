@@ -7,3 +7,4 @@ appId: productions.luminarytechnology.fieldsurvey
       ID: draft.accept
 - tapOn:
     id: draft.accept
+- runFlow: _type-later.yaml    # T200: a draft type's first-use sheet → Later

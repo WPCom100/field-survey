@@ -206,6 +206,7 @@ appId: productions.luminarytechnology.fieldsurvey
     text: '.*expected 1.*'
 - tapOn:
     id: card.offer.Back box
+- runFlow: _type-later.yaml    # T200: a draft accessory type's first-use sheet → Later
 - extendedWaitUntil:
     visible: Back box expected 1.*
     timeout: 10000

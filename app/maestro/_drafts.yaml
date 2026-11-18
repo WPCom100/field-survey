@@ -20,6 +20,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: Draft added
 - tapOn:
     id: draft.accept
+- runFlow: _type-later.yaml    # T200: a draft type's first-use sheet → Later
 - assertVisible: Accepted
 # 2: edit → Save & accept
 - tapOn:

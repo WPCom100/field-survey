@@ -10,6 +10,8 @@ import { Btn, ChipPicker, Field, HeadCell, Notice, ScopeSwitch, Section, styles 
 import { SourcesStep } from '../../setup/SourcesStep';
 import { AssignmentsStep } from '../../setup/AssignmentsStep';
 import { RulesStep } from '../../setup/RulesStep';
+import { TypeSetupList } from '../../library/TypeSetupSheet';
+import { questionsForProject, type TypeSetupQuestion } from '../../library/typeSetup';
 import { BaselineDialog } from '../../setup/BaselineDialog';
 import { DraftReview } from '../../drafts/DraftReview';
 import { loadLockTable, lockWarnings, type LockLevel } from '../../setup/lock';
@@ -20,8 +22,8 @@ import { useReload } from '../../sync/useReload';
 import { useRulesVersion } from '../../rules/useRulesVersion';
 import { color, font, radius, space, tabular } from '../../ui';
 
-type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock' | 'assignments' | 'rules';
-const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'place', 'lock', 'assignments', 'rules'];
+type Step = 'project' | 'levels' | 'sources' | 'drafts' | 'place' | 'lock' | 'types' | 'assignments' | 'rules';
+const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'place', 'lock', 'types', 'assignments', 'rules'];
 
 /**
  * Setup of an existing project (Phase 3 §3.1 steps 1–2): the project's fields and the levels
@@ -32,7 +34,9 @@ const STEPS: readonly string[] = ['project', 'levels', 'sources', 'drafts', 'pla
  * baseline is the Phase 3 §3.5 table (T47, T46's columns), whose Lock / Unlock is also on each
  * Levels row. Assignments (T97, D168) assigns levels to team names, and Rules (T102, D176) sets the
  * rules' owners, wordings and statuses; both sit below the numbered steps because they change all
- * through the survey, not once.
+ * through the survey, not once. Types to set up (T200, D292 (1)) sits with them: the draft types the
+ * project's devices and accepted drafts use, each asked its Required / Optional cables once — where
+ * a seed import's devices are answered, all types listed once.
  */
 export default function ProjectSetupScreen() {
   const { projectId, step: stepParam, draft } = useLocalSearchParams<{ projectId: string; step?: string; draft?: string }>();
@@ -49,6 +53,7 @@ export default function ProjectSetupScreen() {
   const [actions, setActions] = useState<SetupActions | null>(null);
   const [locks, setLocks] = useState<Map<string, LockLevel>>(new Map());
   const [placement, setPlacement] = useState<PlacementProgress | null>(null);
+  const [types, setTypes] = useState<TypeSetupQuestion[]>([]);
   const [dialog, setDialog] = useState<LockLevel | null>(null);
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -67,11 +72,13 @@ export default function ProjectSetupScreen() {
       const s = await loadProjectSetup(store, projectId);
       const table = await loadLockTable(store, projectId);
       const progress = await loadPlacementProgress(store, projectId);
-      return { store, s, table, progress };
+      const toSetUp = await questionsForProject(store, projectId);
+      return { store, s, table, progress, toSetUp };
     },
-    apply: ({ store, s, table, progress }) => {
+    apply: ({ store, s, table, progress, toSetUp }) => {
       setSetup(s);
       setPlacement(progress);
+      setTypes(toSetUp);
       setLocks(new Map(table.map((l) => [l.id, l])));
       setActions((a) => a ?? new SetupActions(store, projectId, user.id));
     },
@@ -116,6 +123,7 @@ export default function ProjectSetupScreen() {
           <StepItem id="place" label="5 Place devices" step={step} onPick={setStep} />
           <StepItem id="lock" label="6 Lock baseline" step={step} onPick={setStep} />
           <View style={styles.sideRule} />
+          <StepItem id="types" label={`Types to set up${types.length ? ` (${types.length})` : ''}`} step={step} onPick={setStep} />
           <StepItem id="assignments" label="Assignments" step={step} onPick={setStep} />
           <StepItem id="rules" label="Rules" step={step} onPick={setStep} />
         </View>
@@ -134,6 +142,16 @@ export default function ProjectSetupScreen() {
               <SourcesStep projectId={projectId} />
             ) : step === 'place' ? (
               <PlaceStep progress={placement} />
+            ) : step === 'types' ? (
+              <TypeSetupList
+                key={types.map((q) => q.typeId).join('|')}
+                questions={types}
+                onDone={(done) => {
+                  setError(null);
+                  setNotice(done);
+                  setReload((n) => n + 1);
+                }}
+              />
             ) : step === 'assignments' ? (
               <AssignmentsStep projectId={projectId} dataKey={dataKey} />
             ) : step === 'rules' ? (

@@ -1,0 +1,11 @@
+# T200: after a device enters a project (placed from a draft, a draft accepted, Add device, an
+# accessory added), the first-use sheet of a draft type asks its cables Required / Optional
+# (`typeSetup.sheet`). Since T199 every DaVinci-imported type is a draft with undecided rows, so
+# the flows that place or accept the sample's models meet it: this answers Later when it shows,
+# and waits out the optional tap when it does not (a type already set up, or one with no rows).
+# The question itself is `_additions-typesetup.yaml`'s.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: typeSetup.later
+    optional: true

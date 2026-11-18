@@ -5,7 +5,8 @@
  * Every ID comes from the server (D93, D118): the device shows `<level>-?` + NEW until then. The new device's
  * card opens after Add. The pin goes where the surveyor long-pressed (shown as a grey "+" pin).
  * The model box searches the choices as you type (T114: model, alias, catalogue name; the
- * Library screen's search), and shows at most `SHOWN` chips.
+ * Library screen's search), and shows at most `SHOWN` chips. A type that is still a draft is asked
+ * its Required / Optional cables once the device is added (T200, `library/TypeSetupSheet`).
  */
 
 import { OpError, type Editor, type Store } from '@field-survey/core';
@@ -15,6 +16,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { chipStyles } from '../plan/chips';
 import { DEVICE_CATEGORIES } from '../plan/pins';
 import { Btn, FormActions, color, fieldStyles, font, hit, hitSlopTo, radius, space, tabular } from '../ui';
+import { askTypeSetup, questionsForDevices } from '../library/typeSetup';
 import { addFieldDevice, libraryChoices, matchModel, searchChoices, type LibraryChoice } from './model';
 
 /** Chips shown at once: the app library holds about 500 placeable types after the DaVinci import. */
@@ -84,6 +86,8 @@ export function AddDevicePanel(props: AddDeviceProps) {
         drawingPosition,
       });
       props.onAdded(r.deviceId);
+      // first use of a draft type, or of a draft accessory it carries (T200): asked once, never blocking
+      questionsForDevices(store, [r.deviceId]).then(askTypeSetup, (e: unknown) => console.warn(`[plan] type setup: ${String(e)}`));
     } catch (e) {
       setError(e instanceof OpError ? e.message : `Not added: ${String((e as Error)?.message ?? e)}`);
       setSaving(false);

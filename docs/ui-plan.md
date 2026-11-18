@@ -165,6 +165,36 @@ one, it is filed as a task, not done in passing.
   app library); the home's project chips go away with it (T176).
 - **Needs review** A/B, the **Setup** steps, **Export** history and the **Dashboard** charts keep
   their layouts; only tokens, primitives and the page pattern change (T179, T180).
+- **First use of a type** (T200, D292 (1)): a centred dialog over whatever screen brought the device
+  in (the baseline dialog's scrim, box 640 pt, scrolling when long), never a panel, so the plan
+  and the card stay where they were.
+
+  ```
+  ┌ Types to set up (2) ─────────────────────────────────────────────┐   (one type: "Set up <model>")
+  │ First use of this type. Which of its cables must every device of │
+  │ it have? Required runs become drafts on each device; Optional    │
+  │ ones are only offered. Saved to the library for every project,   │
+  │ and edited there later.                                          │
+  │ ┌ P-NSPS-D-KIT ────────────────────────────────────────────────┐ │
+  │ │ Equipment · 0 required · 2 optional                          │ │
+  │ │ U · 2 ends · qty 1                     [Required] [Optional] │ │
+  │ │ N · 2 ends · qty 1                     [Required] [Optional] │ │
+  │ └──────────────────────────────────────────────────────────────┘ │
+  │ ┌ P-NSPS-D Power Supply ───────────────────────────────────────┐ │
+  │ │ accessory of P-NSPS-D-KIT · 1 required · 0 optional          │ │   (a forced slot, carried with the device)
+  │ │ 120V · single row · qty 1              [Required] [Optional] │ │
+  │ │   Suggested: a power supply needs a 120 V feed; …            │ │   (why the preset is Required)
+  │ └──────────────────────────────────────────────────────────────┘ │
+  │                                             [Later] [Confirm]    │
+  └──────────────────────────────────────────────────────────────────┘
+  ```
+
+  Each row is two small chips, the answer selected; Later sits left of Confirm (D280 (5)) and is
+  always enabled. Setup's **Types to set up** (below the numbered steps, with its count) lists the
+  same cards inline, each with its own Confirm at its bottom right. IDs: `typeSetup.sheet`,
+  `typeSetup.type.<model>`, `typeSetup.<model>.<row>.required|optional` (`d0`… default rows,
+  `o0`… optional), `typeSetup.later`, `typeSetup.confirm`, `typeSetup.confirm.<model>` (the step),
+  `setup.step.types`.
 - **iPhone** (T62) is out of scope; the tokens are what it will build on.
 
 ## 7. Order

@@ -1,0 +1,186 @@
+# F3 (T200, D292 (1)): first use of a draft type, asked once. A type named for this run,
+# MAESTRO-TS-<n> (Station), left a **draft** with a default U row and an optional X row. On 06M's
+# plan, Add device of that model → the sheet `Set up MAESTRO-TS-<n>` lists both rows (U preset
+# Required, "Suggested: required on the type"; X Optional) → Later: nothing written, the device
+# is added. A second device → asked again → X made Required (`2 required · 0 optional`) →
+# Confirm. A third device → no sheet. The Library shows the type accepted; it is deleted at the
+# end (the server-wide library keeps nothing of the run's; the question names its devices).
+# Starts on 06M's plan (a card may be open); ends on the Library.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- tapOn:
+    id: card.close
+    optional: true
+- tapOn:
+    id: plan.back
+- tapOn:
+    id: nav.library
+# the run's draft type: a default U row, an optional X row (the blank row's code)
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: MAESTRO-TS-${output.n}
+- tapOn:
+    id: library.new.category.Station
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added MAESTRO-TS-${output.n} as a draft.
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: library.defaults.add
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.defaults.add
+- scrollUntilVisible:
+    element:
+      id: library.defaults.0.code.U
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.defaults.0.code.U
+- scrollUntilVisible:
+    element:
+      id: library.optional.add
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.optional.add
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- assertVisible:
+    id: library.type.state
+    text: '0 devices · draft'
+
+# 1: Add device of the draft type → asked → Later
+- runFlow:
+    file: _open-level.yaml
+    env:
+      LEVEL: 06M
+- extendedWaitUntil:
+    visible:
+      id: plan.place
+    timeout: 60000
+- longPressOn:
+    point: 65%,50%
+- tapOn:
+    id: press.device
+- tapOn:
+    id: add.cat.Station
+- tapOn:
+    id: add.model
+- inputText: MAESTRO-TS-${output.n}
+- tapOn: 'ID'                      # a plain label: closes the keyboard over Add device
+- assertVisible: 'Matches the library type MAESTRO-TS-${output.n}.'
+- tapOn:
+    id: add.submit
+- extendedWaitUntil:
+    visible:
+      id: typeSetup.sheet
+    timeout: 10000
+- assertVisible: Set up MAESTRO-TS-${output.n}
+- assertVisible: 'First use of this type\..*'
+- assertVisible: 'Station · 1 required · 1 optional'
+- assertVisible: 'Suggested: required on the type'
+- assertVisible:
+    id: typeSetup.MAESTRO-TS-${output.n}.d0.required
+- assertVisible:
+    id: typeSetup.MAESTRO-TS-${output.n}.o0.optional
+- tapOn:
+    id: typeSetup.later
+- assertNotVisible:
+    id: typeSetup.sheet
+- extendedWaitUntil:
+    visible: 'NEW · ID assigned at sync|06M-S\d+'
+    timeout: 10000
+- tapOn:
+    id: card.close
+
+# 2: the next device asks again → X Required → Confirm
+- longPressOn:
+    point: 35%,60%
+- tapOn:
+    id: press.device
+- tapOn:
+    id: add.cat.Station
+- tapOn:
+    id: add.model
+- inputText: MAESTRO-TS-${output.n}
+- tapOn: 'ID'
+- tapOn:
+    id: add.submit
+- extendedWaitUntil:
+    visible:
+      id: typeSetup.sheet
+    timeout: 10000
+- tapOn:
+    id: typeSetup.MAESTRO-TS-${output.n}.o0.required
+- assertVisible: 'Station · 2 required · 0 optional'
+- tapOn:
+    id: typeSetup.confirm
+- assertNotVisible:
+    id: typeSetup.sheet
+- tapOn:
+    id: card.close
+
+# 3: set up once: the third device asks nothing
+- longPressOn:
+    point: 55%,35%
+- tapOn:
+    id: press.device
+- tapOn:
+    id: add.cat.Station
+- tapOn:
+    id: add.model
+- inputText: MAESTRO-TS-${output.n}
+- tapOn: 'ID'
+- tapOn:
+    id: add.submit
+- extendedWaitUntil:
+    visible: 'NEW · ID assigned at sync|06M-S\d+'
+    timeout: 10000
+- assertNotVisible:
+    id: typeSetup.sheet
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# the Library: accepted with both rows required; then the run's type leaves the library
+- tapOn:
+    id: nav.library
+- tapOn:
+    id: library.search
+- inputText: MAESTRO-TS-${output.n}
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: 'MAESTRO-TS-${output.n}.*'
+- assertVisible:
+    id: library.type.state
+    text: '3 devices · accepted'
+- tapOn:
+    id: library.delete
+- extendedWaitUntil:
+    visible: 'Delete MAESTRO-TS-${output.n}\?'
+    timeout: 10000
+- assertVisible: '3 devices on this iPad use it\..*'
+- tapOn:
+    text: Delete
+    rightOf: Cancel
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Deleted: MAESTRO-TS-${output.n}.'
+    timeout: 10000

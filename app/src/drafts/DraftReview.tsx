@@ -6,6 +6,7 @@ import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 
 import { openAppStore } from '../db';
 import { useIdentity } from '../identity/IdentityGate';
+import { askTypeSetup, questionsForDrafts } from '../library/typeSetup';
 import { Btn, Notice, styles as w } from '../setup/widgets';
 import { Chip as UiChip, FormActions, color, font, radius, space, tabular } from '../ui';
 import { revealOffset } from '../ui/reveal';
@@ -207,7 +208,17 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
       `Every open ${tab === 'devices' ? 'device' : 'cable'} draft at 0.9 or over with no conflict is accepted.${tab === 'cables' ? ' Their endpoints stay unconfirmed.' : ''}`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Accept all', onPress: () => void run(async () => `${await acceptAll(editor, store, data, level.key, tab, { riserBlob: batches ? riserBlobFor(batches, null) : null })} accepted`) },
+        {
+          text: 'Accept all',
+          onPress: () =>
+            void run(async () => {
+              const accepted = tab === 'devices' ? bulkDevices(data, level.key) : [];
+              const n = await acceptAll(editor, store, data, level.key, tab, { riserBlob: batches ? riserBlobFor(batches, null) : null });
+              // the types they bring that wait for a first-use answer, listed once (T200), never one per draft
+              askTypeSetup(await questionsForDrafts(store, accepted));
+              return `${n} accepted`;
+            }),
+        },
       ],
     );
   };
@@ -492,7 +503,20 @@ function DevicePanel({ d, data, batches, identity, editor, store, run }: { d: De
         <>
           {blockers.length ? <Text style={styles.dim}>{blockers.join(' ')}</Text> : null}
           <View style={styles.btnRow}>
-            <Btn title="Accept" primary small disabled={blockers.length > 0} onPress={() => void run(() => acceptDevice(editor, d, choice), 'Accepted')} testID="draft.accept" />
+            <Btn
+              title="Accept"
+              primary
+              small
+              disabled={blockers.length > 0}
+              onPress={() =>
+                void run(async () => {
+                  await acceptDevice(editor, d, choice);
+                  // first use of its type (T200): the model as accepted, and its accessory lines
+                  askTypeSetup(await questionsForDrafts(store, [{ model: choice.model ?? d.model, category: choice.category ?? d.category, accessories: d.accessories }]));
+                }, 'Accepted')
+              }
+              testID="draft.accept"
+            />
             <Btn title="Edit…" small onPress={() => setEditing((e) => !e)} testID="draft.edit" />
             <RejectForm onReject={(r) => void run(() => rejectDraft(editor, 'device', d, r), 'Rejected')} />
           </View>

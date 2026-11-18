@@ -82,7 +82,8 @@ team Ann / Bob), never to the Droplet.
 | `_lists-conns.yaml`, `_lists-punch.yaml` | the steps of `lists.yaml` |
 | `_add-here.yaml` | long-press `AT` → + Device → `CAT`, new model `MODEL` → Add device → NEW, then the server's ID `IDRE` (env) |
 | `_quick-apply.yaml` | Return applies the open quick action; waits for its question to close |
-| `_additions-add.yaml`, `_additions-menu.yaml`, `_additions-quick.yaml` | the steps of `additions.yaml` |
+| `_additions-add.yaml`, `_additions-menu.yaml`, `_additions-quick.yaml`, `_additions-typesetup.yaml` | the steps of `additions.yaml` (the last: a draft type's first-use question, T200) |
+| `_type-later.yaml` | after a place / accept / `+ add`: Later on the first-use sheet of a draft type when it shows (an optional tap, T200) |
 | `_place-draft.yaml` | Review drafts: + Draft device `MODEL`, `CAT`, `QTY` on 06M → Add draft → Accept |
 | `_place-one.yaml` | in the open place panel: row `ROW` → tap `AT` → Place ✓ → the "Placed …" row reads `PLACED` |
 | `_place-drafts.yaml`, `_place-entry.yaml`, `_place-undo.yaml`, `_place-waiting.yaml`, `_place-flag.yaml` | the steps of `place.yaml` |
