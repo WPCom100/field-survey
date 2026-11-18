@@ -155,15 +155,14 @@ export function ItemEditor(props: ItemEditorProps) {
               );
             })}
           </View>
-          {kind === 'punch' ? (
+          {kind === 'punch' && view.dateClosed ? (
             <Text style={styles.muted} testID="item.dateClosed">
-              {view.dateClosed ? `Date closed ${view.dateClosed}${marks('date_closed') ? ` ${marks('date_closed')}` : ''}` : 'Closing sets Date closed to today.'}
+              {`Date closed ${view.dateClosed}${marks('date_closed') ? ` ${marks('date_closed')}` : ''}`}
             </Text>
           ) : null}
           {view.rule ? (
             <Text style={styles.ruleNote} testID="item.rule">
-              Kept by the rules (R3c): reads “all” while no device on the floor has its {view.rule.label} and “some” once some do, closes by itself when every
-              device has one, and reopens when one is missing again.
+              Kept by the rules
             </Text>
           ) : null}
         </View>

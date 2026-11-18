@@ -113,13 +113,10 @@ describe('editor steps', () => {
     const p = { rows: [{}, {}, {}] as never[], matched: 5, excepted: 1, levels: 2, vocab: null, note: 'The project has no punch_item vocabulary yet: the rename changes the records only.', problems: [] };
     expect(previewTitle(p, 3)).toBe('3 changes on 2 levels');
     expect(previewTitle(p, 2)).toBe('3 changes on 2 levels · 1 unticked');
-    expect(previewFooter(p, corridor())).toEqual([
-      'Each ticked row becomes one Change Log line: Change = Ruling, Reason = the ruling text.',
+    expect(previewFooter(p)).toEqual([
       '1 record unticked in an earlier preview stays as it is.',
       '1 matching record is already right.',
       'The project has no punch_item vocabulary yet: the rename changes the records only.',
-      'Standing: records that match later get this change as a proposal (Accept / Reject on the card or here).',
-      'Unticked rows are remembered: this ruling never changes or proposes them.',
     ]);
   });
 
@@ -132,13 +129,10 @@ describe('editor steps', () => {
       rows: [{}] as never[], matched: 5, excepted: 0, levels: 1, vocab: null, note: null, problems: [], byHand: 1,
       unworded: [{ id: 'a', ref: '#4', levelCode: '06' }, { id: 'b', ref: 'NEW', levelCode: '06M' }],
     };
-    expect(previewFooter(p, { ...d, text: 'Reword' })).toEqual([
-      'Each ticked row becomes one Change Log line: Change = Ruling, Reason = the ruling text.',
+    expect(previewFooter(p)).toEqual([
       '1 matching record is already right.',
       '1 record changed by hand since the rule wrote it: left as it is.',
       '2 records their rule no longer words, left as they are: 06 #4, 06M NEW.',
-      'Each row reads what its rule now words, the rule parameters as they stand.',
-      'Unticked rows are remembered: this ruling never changes or proposes them.',
     ]);
   });
 });

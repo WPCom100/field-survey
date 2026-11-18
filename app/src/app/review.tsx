@@ -172,7 +172,7 @@ export default function NeedsReviewScreen() {
           (e: unknown) => setNote(`Not linked: ${String((e as Error)?.message ?? e)}`),
         );
       if (!confirm) return void run();
-      Alert.alert('Link to device', `Link this punch item to ${deviceLabel}? Its Device text then follows the device.`, [
+      Alert.alert('Link to device', `Link this punch item to ${deviceLabel}?`, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Link', onPress: () => void run() },
       ]);
@@ -194,7 +194,7 @@ export default function NeedsReviewScreen() {
         );
       Alert.alert(
         endId ? 'Put on this connection' : 'Keep on the device',
-        endId ? `Put this punch item on ${endLabel ?? 'that connection'}? It then stands for that run's item (no second draft there).` : 'Keep this punch item on its device, on no connection?',
+        endId ? `Put this punch item on ${endLabel ?? 'that connection'}?` : 'Keep this punch item on its device, on no connection?',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: endId ? 'Put on' : 'Keep', onPress: () => void run() },
@@ -236,7 +236,6 @@ export default function NeedsReviewScreen() {
       </View>
     ) : null;
 
-  const intro = "Items waiting for a person's decision, by kind and level. Nothing is overwritten while one waits.";
   const body = (
     <>
       <ScrollView horizontal style={styles.tabs} contentContainerStyle={styles.chips} showsHorizontalScrollIndicator={false}>
@@ -302,13 +301,13 @@ export default function NeedsReviewScreen() {
   // the app library's review (opened from the app library, `‹ Library`): on the shell, lighting no entry (T190)
   if (params.project === LIBRARY_STREAM) {
     return (
-      <SectionScreen title={`App library — needs review (${total})`} intro={intro} backTestID="review.back">
+      <SectionScreen title={`App library — needs review (${total})`} backTestID="review.back">
         {body}
       </SectionScreen>
     );
   }
   return (
-    <SectionScreen section="Needs review" projectId={projectId} title={`Needs review (${total})`} intro={intro} backTestID="review.back">
+    <SectionScreen section="Needs review" projectId={projectId} title={`Needs review (${total})`} backTestID="review.back">
       {body}
     </SectionScreen>
   );
@@ -370,16 +369,13 @@ function Panel({ detail: d, canEdit, onResolve }: { detail: ReviewDetail; canEdi
     return (
       <>
         {head}
-        <Text style={styles.sub}>
-          {draft
-            ? 'Settled in Setup → Review drafts (T44): Accept with the count you choose, or Reject to keep the baseline.'
-            : `${kindLabel(d.item.kind)} items are reviewed in Setup (their screens come with the setup tasks). Listed here so nothing is missed.`}
-        </Text>
         {draft ? (
           <Pressable onPress={() => router.push({ pathname: '/setup/[projectId]', params: { projectId: d.item.project_id, step: 'drafts', draft } })}>
             <Text style={styles.link}>Open in Review drafts ▸</Text>
           </Pressable>
-        ) : null}
+        ) : (
+          <Text style={styles.sub}>Reviewed in Setup.</Text>
+        )}
       </>
     );
   }
@@ -402,15 +398,14 @@ function Panel({ detail: d, canEdit, onResolve }: { detail: ReviewDetail; canEdi
       </View>
       {was ? (
         <Text style={styles.sub}>
-          was: {d.fields.map((f) => `${d.fields.length > 1 ? `${f.label} ` : ''}${f.was ?? '?'}`).join(' · ')} — the value before both edits
-        </Text>
+          was: {d.fields.map((f) => `${d.fields.length > 1 ? `${f.label} ` : ''}${f.was ?? '?'}`).join(' · ')}        </Text>
       ) : null}
       {d.item.ruling ? <Text style={styles.flag}>⚑ A ruling lost to a field edit here</Text> : null}
 
       {d.resolvable ? (
         <>
           {d.pins ? (
-            <Btn title="Resolve on the plan ▸ (A solid, B dashed)" onPress={() => openOnPlan(true)} disabled={!d.row.levelId} />
+            <Btn title="Resolve on the plan ▸" onPress={() => openOnPlan(true)} disabled={!d.row.levelId} />
           ) : null}
           <View style={styles.btnRow}>
             <Btn kind="primary" title="Choose A" onPress={() => onResolve({ choice: 'A' })} disabled={!canEdit} testID="review.choose.A" />
@@ -421,7 +416,7 @@ function Panel({ detail: d, canEdit, onResolve }: { detail: ReviewDetail; canEdi
           </View>
           {combine !== null ? (
             <View style={styles.block}>
-              <Text style={styles.sub}>Combined text (pre-filled "A; B", A first — edit as needed)</Text>
+              <Text style={styles.sub}>Combined text</Text>
               <TextInput style={styles.input} value={combine} onChangeText={setCombine} multiline />
               <Btn kind="primary" title="Save combined" disabled={!combine.trim()} onPress={() => onResolve({ choice: 'combine', text: combine })} />
             </View>
@@ -437,7 +432,6 @@ function Panel({ detail: d, canEdit, onResolve }: { detail: ReviewDetail; canEdi
               />
             </View>
           ) : null}
-          <Text style={styles.sub}>No dismiss: a sync conflict is closed by a choice (D98). The reason is filled in for you.</Text>
         </>
       ) : null}
       {d.row.levelId ? (
@@ -510,10 +504,6 @@ function PunchDevicePanel(props: {
         </View>
       ) : (
         <>
-          <Text style={styles.sub}>
-            Link it to the device it is about, or create that device. Once linked, its Device text follows the device (renames included). A row
-            that is really about a room or several devices can stay unlinked: the export then keeps the master&apos;s text.
-          </Text>
           <View style={styles.btnRow}>
             <Btn title="Create device ▸" onPress={() => setCreating(true)} testID="review.createDevice" />
           </View>
@@ -554,12 +544,8 @@ function PunchEndPanel(props: { detail: ReviewDetail; review: PunchEndReview; ca
         </Text>
       ) : (
         <>
-          <Text style={styles.sub}>
-            The import could not tell which {what} connection of this device the item is about. Put it on one: the rules then treat it as that run&apos;s item and draft no
-            second one there. An item about two runs goes on one of them; the other run gets its own Run draft on the card. Or keep it on the device.
-          </Text>
           <Text style={styles.sideTitle}>Put on a {what} connection</Text>
-          {r.ends.length === 0 ? <Text style={styles.sub}>This device has no {what} connection. Keep it on the device, or add the connection on the card and come back.</Text> : null}
+          {r.ends.length === 0 ? <Text style={styles.sub}>This device has no {what} connection.</Text> : null}
           {r.ends.map((x) => (
             <Pressable key={x.id} onPress={() => props.onPut(x.id, x.label)} style={styles.pick} accessibilityRole="button" disabled={!props.canEdit} testID={`review.put.${x.label}`}>
               <Text style={styles.pickId}>{x.label}</Text>

@@ -10,14 +10,16 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: 'ERN4-RM-120 Equipment Rack 18U \(draft, 01\)  \(not placed yet\)'
 - assertVisible: 'P-NSPS-D \(draft, 02\)  \(not placed yet\)  · riser: PARADIGM P-NSPS-DIN'
 # the crop, enlarged and closed
-- tapOn: 'Source crop: Riser 001 · level 01 · bubble .*Tap to enlarge.*'
+- tapOn: 'Source crop: Riser 001 · level 01 · bubble .*'
 - extendedWaitUntil:
-    visible: 'Pinch to zoom · drag to pan · double-tap to zoom / fit'
+    visible:
+      id: crop.close
     timeout: 30000
 - tapOn:
     id: crop.close           # × at the top right (T191; was a Close button)
 - extendedWaitUntil:
-    notVisible: 'Pinch to zoom · drag to pan · double-tap to zoom / fit'
+    notVisible:
+      id: crop.close
     timeout: 10000
 # the endpoint picker: by model, then by the riser's text
 - tapOn:

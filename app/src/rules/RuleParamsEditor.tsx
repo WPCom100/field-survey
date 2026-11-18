@@ -97,8 +97,8 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
           return setRuleParam(editor, item.spec.rule, item.spec.key, value);
         },
         app
-          ? `${item.spec.rule} · ${item.spec.label}: saved as a draft default. Accept it to have new projects copy it.`
-          : `${item.spec.rule} · ${item.spec.label}: saved. Open drafts follow on the next rules run; accepted items keep their text.`,
+          ? `${item.spec.rule} · ${item.spec.label}: saved as a draft default.`
+          : `${item.spec.rule} · ${item.spec.label}: saved.`,
         app
           ? undefined
           : async () => {
@@ -133,13 +133,7 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
   if (!groups) return <Text style={styles.hint}>Loading…</Text>;
   return (
     <View style={styles.root}>
-      <Text style={styles.hint}>
-        {app
-          ? 'The defaults every new project starts with (copied at creation; an existing project keeps its own). A change is a draft until accepted.'
-          : 'What the rules write on this project: owners, item wording, starting statuses. A change applies at once: open drafts follow on the next rules run and rejected ones are offered again; accepted items keep their text.'}
-        {' '}
-        {changed ? `${changed} set away from the built-in defaults.` : 'All on the built-in defaults.'}
-      </Text>
+      <Text style={styles.hint}>{changed ? `${changed} set away from the built-in defaults.` : 'All on the built-in defaults.'}</Text>
       {!app ? (
         <Link href={{ pathname: '/rulings', params: { project: scope } }} style={styles.link}>
           Change accepted items with a ruling ▸
@@ -157,15 +151,13 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
       <Notice text={notice} />
       {retrofit ? (
         <View style={styles.retrofit}>
-          <Text style={styles.changes}>
-            Accepted items still read the old wording. Review accepted items ▸ opens a ruling over them, pre-filled; untick any in its preview.
-          </Text>
+          <Text style={styles.changes}>Accepted items still read the old wording.</Text>
           {retrofit.groups.slice(0, RETROFIT_SHOWN).map((g) => (
             <Btn key={`${g.entity}|${g.field}`} title={`Review accepted items ▸  ${describeRetrofit(g)}`} small testID="rules.review" onPress={() => review(g, retrofit.reason, retrofit.before)} />
           ))}
           {retrofit.groups.length > RETROFIT_SHOWN ? (
             <Text style={styles.small}>
-              +{retrofit.groups.length - RETROFIT_SHOWN} more fields, one ruling each: they show here as these are done.
+              +{retrofit.groups.length - RETROFIT_SHOWN} more fields.
             </Text>
           ) : null}
         </View>
@@ -176,7 +168,6 @@ export function RuleParamsEditor({ store, editor, scope, dataKey }: { store: Sto
           <Text style={styles.groupTitle}>
             {g.rule.startsWith('E') || g.rule === 'not_found' || g.rule === 'R3' || g.rule === 'R5' ? g.title : `${g.rule} · ${g.title}`}
           </Text>
-          {g.text ? <Text style={styles.ruleText}>{g.text}</Text> : null}
           {g.items.map((item) => (
             <ParamRow key={item.spec.key} item={item} app={app} onSet={set} onDecide={decide} />
           ))}
@@ -207,7 +198,6 @@ function ParamRow({
             {item.set ? <Text style={styles.badge}>  changed</Text> : null}
             {app && item.state ? <Text style={item.state === 'draft' ? styles.badgeDraft : styles.badge}>  {item.state}</Text> : null}
           </Text>
-          <Text style={styles.changes}>{spec.changes}</Text>
           {spec.placeholders?.length ? <Text style={styles.small}>Fills in: {spec.placeholders.join(' · ')}</Text> : null}
         </View>
         {app && item.state === 'draft' ? (
@@ -385,7 +375,6 @@ const styles = StyleSheet.create({
   small: { ...font.caption, color: color.text3 },
   group: { gap: space.sm, paddingVertical: 10, borderTopWidth: 1, borderTopColor: color.hairline },
   groupTitle: { ...font.headline, color: color.text },
-  ruleText: { ...font.caption, color: color.text2, maxWidth: 820 },
   param: { gap: 6, padding: 10, borderRadius: radius.control, backgroundColor: color.bg },
   paramSet: { backgroundColor: color.primaryTint, borderLeftWidth: 3, borderLeftColor: color.primary },
   paramHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },

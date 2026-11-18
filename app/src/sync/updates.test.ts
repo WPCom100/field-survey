@@ -26,7 +26,7 @@ describe('describeRunning', () => {
   it('says embedded for the JS the build shipped with', () => {
     expect(describeRunning(embedded)).toEqual({
       runtime: 'runtime 9099e69e · channel production',
-      running: 'embedded (the JS this build shipped with)',
+      running: 'embedded',
     });
   });
 

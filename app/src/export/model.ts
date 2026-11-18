@@ -79,7 +79,7 @@ export function startGate(status: SyncStatus): Gate {
   if (s.state === 'syncing') return { ok: false, reason: 'Syncing… wait for "Synced".' };
   if (!s.lastSyncAt) return { ok: false, reason: 'Not synced yet. Sync first.' };
   if (s.pendingOps > 0) {
-    return { ok: false, reason: `${s.pendingOps} edit${s.pendingOps === 1 ? '' : 's'} on this iPad not synced yet. Sync first: the export reads the server's data.` };
+    return { ok: false, reason: `${s.pendingOps} edit${s.pendingOps === 1 ? '' : 's'} on this iPad not synced yet. Sync first.` };
   }
   return { ok: true, reason: 'Synced — the export will include every edit on this iPad.' };
 }

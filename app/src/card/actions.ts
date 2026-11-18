@@ -13,7 +13,7 @@ export const FIELD_SURVEY: EditContext = { change_type: 'Field survey', reason: 
 
 /** A `Correction` with the typed reason; refuses a blank one before any op is built. */
 export function correction(reason: string): EditContext {
-  if (!reason.trim()) throw new OpError('Say why (the reason is kept in the history).');
+  if (!reason.trim()) throw new OpError('Say why.');
   return { change_type: 'Correction', reason: reason.trim() };
 }
 

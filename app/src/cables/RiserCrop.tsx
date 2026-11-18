@@ -110,7 +110,7 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
   const onPdfError = useCallback((e: unknown) => setError(`The riser could not be opened: ${String((e as Error)?.message ?? e)}`), []);
 
   let body: ReactNode;
-  if (!riser) body = <Text style={styles.muted}>No riser crop for this cable: it was not made from a riser draft (Setup → Review drafts).</Text>;
+  if (!riser) body = <Text style={styles.muted}>No riser crop for this cable.</Text>;
   else if (error) body = <Text style={styles.error}>{error}</Text>;
   else if (source === 'missing') body = <Text style={styles.muted}>The riser sheet this cable points to is not on this iPad.</Text>;
   else if (source && 'problem' in source)
@@ -160,9 +160,7 @@ export function RiserCrop({ store, projectId, riser, blobs }: { store: Store; pr
           <View style={styles.modal}>
             {/* closes to nothing: × at the top right (D280 (5), T191; was a Close button) */}
             <View style={styles.bar}>
-              <PanelHeader title={`Riser crop${source.title ? ` · ${source.title}` : ''}`} close={{ onPress: () => setBig(false), testID: 'riser.close' }}>
-                <Text style={styles.muted}>Pinch to zoom · drag to pan</Text>
-              </PanelHeader>
+              <PanelHeader title={`Riser crop${source.title ? ` · ${source.title}` : ''}`} close={{ onPress: () => setBig(false), testID: 'riser.close' }} />
             </View>
             <RiserPdf uri={uri} page={source.page} riser={riser} onError={onPdfError} />
           </View>

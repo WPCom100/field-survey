@@ -8,7 +8,7 @@ import { SectionScreen } from '../home/SectionScreen';
 import { useIdentity } from '../identity/IdentityGate';
 import { createProject, fetchProjects, type NewLevel, type NewProjectBody } from '../setup/api';
 import { DEFAULT_EXPORT_TITLE, SetupError, addDraftLevels, createFailureText, normLevelCode, parseLevelRange, shareProblem } from '../setup/model';
-import { Btn, Check, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../setup/widgets';
+import { Btn, Check, ChipPicker, Field, HeadCell, Notice, ScopeSwitch, Section, styles as w } from '../setup/widgets';
 import { getSyncEngine } from '../sync/engine';
 import { Btn as UiBtn, color, font, goBack, radius, space, tabular } from '../ui';
 
@@ -143,7 +143,6 @@ export default function NewProjectScreen() {
               {i < 2 ? '  ●' : ''}
             </Text>
           ))}
-          <Text style={styles.hint}>Sources (the seed import), review, placing and locking come after the project exists.</Text>
         </View>
 
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={styles.main} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
@@ -169,9 +168,7 @@ export default function NewProjectScreen() {
                 <Check label="Rule settings" value={flags.rule_params} onChange={(v) => setFlags({ ...flags, rule_params: v })} />
                 <Check label="Placeholders" value={flags.placeholders} onChange={(v) => setFlags({ ...flags, placeholders: v })} />
               </View>
-            ) : (
-              <Text style={styles.hint}>The app library's accepted device types, suggestion chips and rule defaults are copied in either way (D65, D176, D174).</Text>
-            )}
+            ) : null}
             <Field label="Export title" value={exportTitle} onChange={setExportTitle} />
             <Field label="Disclaimer" value={disclaimer} onChange={setDisclaimer} placeholder="Based on submittal drawings rev F …" multiline />
           </Section>
@@ -180,9 +177,9 @@ export default function NewProjectScreen() {
             <View style={styles.levelsHead}>
               <Text style={[styles.cN, w.label]}>#</Text>
               <Text style={[styles.cCode, w.label]}>Code</Text>
-              <HeadCell style={styles.cScope} label="In scope" help={LEVEL_HELP.inScope} />
-              <HeadCell style={styles.cPick} label="Shares numbering with" help={LEVEL_HELP.numbering} />
-              <HeadCell style={styles.cPick} label="Split of" help={LEVEL_HELP.splitOf} />
+              <HeadCell style={styles.cScope} label="In scope" />
+              <HeadCell style={styles.cPick} label="Shares numbering with" />
+              <HeadCell style={styles.cPick} label="Split of" />
               <Text style={[styles.cActions, w.label]}> </Text>
             </View>
             {levels.map((l, i) => (
@@ -251,7 +248,6 @@ const styles = StyleSheet.create({
   step: { ...font.callout, color: color.text2, paddingVertical: 10, paddingHorizontal: space.md, borderRadius: radius.control },
   stepOn: { color: color.text },
   stepDim: { color: color.text3 },
-  hint: { ...font.caption, color: color.text3 },
   main: { paddingHorizontal: space.xl, paddingVertical: space.lg, gap: space.sm },
   flags: { flexDirection: 'row', flexWrap: 'wrap', gap: space.lg },
   levelsHead: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: color.hairline },

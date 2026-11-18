@@ -60,8 +60,8 @@ import { SourceCrops } from './SourceCrop';
 type Tab = 'devices' | 'cables';
 
 const CONFLICT_TEXT: Readonly<Record<string, string>> = {
-  'model:SR/LR': 'SR or LR — the BOM does not say which (D28)',
-  'qty:bom≠riser': 'BOM and riser quantities differ (D28)',
+  'model:SR/LR': 'SR or LR — the BOM does not say which',
+  'qty:bom≠riser': 'BOM and riser quantities differ',
   'cards:bom≠riser': 'Option cards differ between BOM and riser',
   'source:riser_only': 'On the riser, not in the BOM',
   'pairing:ebdk≠erp': 'EBDKs and relay panels do not pair one to one',
@@ -187,7 +187,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
     return (
       <View style={styles.pad}>
         <Text style={styles.h1}>Review drafts</Text>
-        <Text style={styles.dim}>No levels and no drafts yet. Upload the BOM and the riser in 3 Sources, or add drafts by hand once levels exist.</Text>
+        <Text style={styles.dim}>No levels and no drafts yet.</Text>
       </View>
     );
   }
@@ -204,7 +204,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
   const bulk = () => {
     Alert.alert(
       `Accept all ≥ 0.9 on ${level.code}?`,
-      `Every open ${tab === 'devices' ? 'device' : 'cable'} draft at 0.9 or over with no conflict is accepted, each recorded as reviewed by ${identity.user.name}.${tab === 'cables' ? ' Their endpoints stay unconfirmed (⚑ in the cable view) until confirmed one by one.' : ''}`,
+      `Every open ${tab === 'devices' ? 'device' : 'cable'} draft at 0.9 or over with no conflict is accepted.${tab === 'cables' ? ' Their endpoints stay unconfirmed.' : ''}`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Accept all', onPress: () => void run(async () => `${await acceptAll(editor, store, data, level.key, tab, { riserBlob: batches ? riserBlobFor(batches, null) : null })} accepted`) },
@@ -277,9 +277,7 @@ export function DraftReview({ projectId, focus }: { projectId: string; focus?: s
             <DevicePanel key={selDevice.id} d={selDevice} data={data} batches={batches} identity={identity} editor={editor} store={store} run={run} />
           ) : selCable ? (
             <CablePanel key={selCable.id} projectId={projectId} c={selCable} data={data} batches={batches} identity={identity} editor={editor} store={store} riserBlob={riserBlob} run={run} reveal={revealInPanel} />
-          ) : (
-            <Text style={styles.dim}>Pick a draft on the left. Drafts under 0.7 or with a conflict wait in Needs review (D11); nothing is accepted for you.</Text>
-          )}
+          ) : null}
         </ScrollView>
       </View>
     </View>
@@ -436,7 +434,7 @@ function DevicePanel({ d, data, batches, identity, editor, store, run }: { d: De
       ) : null}
       {d.needs.model ? (
         <View>
-          <Text style={w.label}>Model — pick one; nothing is chosen for you (D28)</Text>
+          <Text style={w.label}>Model — pick one</Text>
           {d.needs.model.options.map((m) => (
             <Radio key={m} label={m} on={choice.model === m} onPress={() => setChoice((c) => ({ ...c, model: m }))} />
           ))}
@@ -483,7 +481,7 @@ function DevicePanel({ d, data, batches, identity, editor, store, run }: { d: De
           ⚠ {conflictText(c)}
         </Text>
       ))}
-      {d.reviewItemId ? <Text style={styles.warn}>⚑ Source conflict with the master's count (D30) — Accept or Reject settles it.</Text> : null}
+      {d.reviewItemId ? <Text style={styles.warn}>⚑ Source conflict with the master's count.</Text> : null}
       {d.onLevel ? <Text style={styles.dim}>{d.onLevel} device{d.onLevel === 1 ? '' : 's'} of this model already on {lvl(d.levelId)} (the baseline).</Text> : null}
       {d.placed ? <Text style={styles.dim}>{d.placed} placed from this draft.</Text> : null}
 
@@ -603,7 +601,7 @@ function CablePanel({
           {c.codeGuess ? (
             <Text style={styles.dim}>
               Guess: {c.codeGuess.value}
-              {c.codeGuess.reason === 'load' ? ' (load circuits) to Fixtures' : ''} ({pct(c.codeGuess.confidence)}, {c.codeGuess.source === 'label' ? 'from the text at the line’s end' : 'the model’s reading'}) — not applied until you pick it.
+              {c.codeGuess.reason === 'load' ? ' (load circuits) to Fixtures' : ''} ({pct(c.codeGuess.confidence)}, {c.codeGuess.source === 'label' ? 'from the text at the line’s end' : 'the model’s reading'})
             </Text>
           ) : null}
           <View style={styles.chips}>
@@ -611,7 +609,6 @@ function CablePanel({
               <Chip key={k} label={k === c.codeGuess?.value && c.code !== k ? `${k} ?` : k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, store, data, c.id, k))} />
             ))}
           </View>
-          <Text style={styles.dim}>A load-circuit line is the panel’s 120V to Fixtures. Not a cable to survey (a sense feed, something by others)? Reject it with a reason. A 0-10V or 120V line becomes the device’s library row, never a second one.</Text>
         </View>
       ) : open ? (
         <View>
@@ -621,7 +618,6 @@ function CablePanel({
               <Chip key={k} label={k} on={c.code === k} onPress={() => void run(() => setCableCode(editor, store, data, c.id, k))} />
             ))}
           </View>
-          <Text style={styles.dim}>Read wrong? Pick the right code. A To of Fixtures, 120v Power or EBDK panic wire follows the code unless you picked it.</Text>
         </View>
       ) : null}
       <Text style={styles.dim}>
@@ -640,7 +636,7 @@ function CablePanel({
           ⚠ {conflictText(k)}
         </Text>
       ))}
-      <Text style={w.label}>Riser crop (the bubble outlined)</Text>
+      <Text style={w.label}>Riser crop</Text>
       <SourceCrops identity={identity} batches={batches} sources={c.sources} />
       {open ? (
         <>
@@ -650,7 +646,6 @@ function CablePanel({
             <Btn title="Accept unconfirmed" small disabled={blockers.length > 0} onPress={() => void run(() => acceptCable(editor, store, data, c, { confirm: false, riserBlob }).then(cableNote))} />
             <RejectForm onReject={(r) => void run(() => rejectDraft(editor, 'cable', c, r), 'Rejected')} />
           </View>
-          <Text style={styles.dim}>Confirm endpoint = you checked both ends against the riser crop (D6). Unconfirmed cables show ⚑ in the cable view.</Text>
         </>
       ) : c.committed ? (
         <Pressable onPress={() => router.push({ pathname: '/cables', params: { project: projectId } })} hitSlop={space.sm}>
@@ -660,7 +655,7 @@ function CablePanel({
         <Btn title="Reopen" small onPress={() => void run(() => reopenDraft(editor, 'cable', c), 'Reopened')} />
       ) : (
         <>
-          <Text style={styles.warn}>Accepted — the cable is made once its draft-device end is placed (5 Place devices).</Text>
+          <Text style={styles.warn}>Accepted — the cable is made once its draft-device end is placed.</Text>
           <Btn title="Reopen" small onPress={() => void run(() => reopenDraft(editor, 'cable', c), 'Reopened')} />
         </>
       )}
@@ -707,7 +702,7 @@ function EndpointPicker({ c, side, data, reveal, onPick }: { c: CableDraftRow; s
           </Text>
         </Pressable>
       ))}
-      {options.length === 0 ? <Text style={styles.dim}>Nothing matches. Add a placeholder in Vocabulary, or type to search other levels.</Text> : null}
+      {options.length === 0 ? <Text style={styles.dim}>Nothing matches.</Text> : null}
       {c.chosen[side] ? <Btn title="Clear my choice" small onPress={() => onPick(null)} /> : null}
     </View>
   );
@@ -722,7 +717,6 @@ function AddDevice({ levels, levelId, onAdd }: { levels: DraftReviewData['levels
   return (
     <View style={styles.form}>
       <Text style={styles.h2}>Add a device draft by hand</Text>
-      <Text style={styles.dim}>For a floor surveyed before its BOM and riser are extracted (K12). It is reviewed like any other draft.</Text>
       <Text style={w.label}>Model</Text>
       <TextInput style={w.input} value={model} onChangeText={setModel} autoCapitalize="characters" autoCorrect={false} placeholder="PI1002" placeholderTextColor={color.text3} testID="drafts.new.model" />
       <Text style={w.label}>Category</Text>
@@ -772,7 +766,6 @@ function AddCable({
   return (
     <View style={styles.form}>
       <Text style={styles.h2}>Add a cable draft by hand</Text>
-      <Text style={styles.dim}>Then pick its two ends and Confirm endpoint, as for a riser cable.</Text>
       <Text style={w.label}>Code</Text>
       <View style={styles.chips}>
         {codes.map((k) => (
@@ -812,7 +805,6 @@ function Excluded({ batches, data, level, levelCode, run, editor, projectId }: {
           Excluded BOM lines ({here.length} here, {all.length} in all) {open ? '▾' : '▸'}
         </Text>
       </Pressable>
-      <Text style={styles.dim}>Lines the BOM extraction set aside (services, hardware, parts outside lighting control). Promote one to review it as a device draft (D12).</Text>
       {open
         ? (here.length ? here : all).map((l) => (
             <View key={l.key} style={styles.excluded}>

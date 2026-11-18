@@ -64,13 +64,13 @@ export function BaselineDialog({
           {unlocking ? (
             <>
               <Text style={styles.body}>
-                {level.code} goes back to Setup. Edits stay in the history; the baseline is locked again from Setup or the Levels screen.
+                {level.code} goes back to Setup.
               </Text>
               <TextInput
                 style={w.input}
                 value={reason}
                 onChangeText={setReason}
-                placeholder="Why unlock? (kept in the history)"
+                placeholder="Why unlock?"
                 placeholderTextColor={color.text3}
                 autoFocus
                 testID="lock.reason"
@@ -78,7 +78,7 @@ export function BaselineDialog({
             </>
           ) : (
             <Text style={styles.body}>
-              Change logging starts now: every later edit on {level.code} shows who, when, was → now and why in History.
+              Every later edit on {level.code} is logged.
               {warnings.length ? ' What is listed above stays open after the lock.' : ''}
             </Text>
           )}

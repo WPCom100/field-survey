@@ -137,7 +137,6 @@ export default function VocabularyScreen() {
       section="Vocabulary"
       projectId={projectId}
       title="Vocabulary"
-      intro="The words the pickers offer, the BOM's spellings, the pin shapes and the placeholder endpoints."
       backTestID="vocab.back"
       actions={
           <>
@@ -173,9 +172,6 @@ export default function VocabularyScreen() {
         {(['project', 'app'] as const).map((s) => (
           <Chip key={s} small selected={scope === s} onPress={() => setScope(s)} label={s === 'project' ? 'This project' : 'App library'} testID={`vocab.scope.${s}`} />
         ))}
-        <Text style={[styles.sub, styles.grow]}>
-          {app ? '  Drafts here are for Landry to accept; new projects copy the accepted values.' : '  This project only. Promote a value to offer it to every new project.'}
-        </Text>
       </FilterRow>
       <FilterRow style={styles.tabs}>
         {tabs.map((t) => (
@@ -306,9 +302,7 @@ function PinShapes(props: { shapes: PinShapeMap | null; canEdit: boolean; run: R
   const shared = new Set(sharedShapes(shapes));
   return (
     <View style={styles.section}>
-      <Text style={styles.sub}>
-        The shape of a device's pin follows its role (its library type's, else its category's). A change here applies at once to every project, on the plan and in the floor PDF. The fill colour stays the status.
-      </Text>
+      <Text style={styles.sub}>A change here applies to every project.</Text>
       {ROLE.map((role: Role) => (
         <View key={role} style={styles.group}>
           <Text style={styles.sectionTitle} testID={`vocab.shape.${role}`}>
@@ -341,7 +335,6 @@ function Placeholders(props: { items: PlaceholderEntry[]; canEdit: boolean; run:
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   return (
     <View style={styles.section}>
-      <Text style={styles.sub}>Endpoints a connection can name when the far end is not a device (D26). The text is what the export prints.</Text>
       {KINDS.map((k) => {
         const items = props.items.filter((p) => p.kind === k);
         if (!items.length) return null;
@@ -374,7 +367,7 @@ function Placeholders(props: { items: PlaceholderEntry[]; canEdit: boolean; run:
           </View>
         );
       })}
-      {!props.items.length ? <Text style={styles.sub}>No placeholders yet. Load the standard lists, or add one.</Text> : null}
+      {!props.items.length ? <Text style={styles.sub}>No placeholders yet.</Text> : null}
       {props.canEdit ? (
         <View style={styles.group}>
           <Text style={styles.sectionTitle}>Add a placeholder</Text>

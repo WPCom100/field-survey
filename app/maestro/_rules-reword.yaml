@@ -54,7 +54,6 @@ appId: productions.luminarytechnology.fieldsurvey
     timeout: 15000
 - assertVisible: '.*Run DMX to Level 11.*Pull DMX to Level 11.*'
 - assertVisible: '.*Run DMX to equipment rack.*Pull DMX to equipment rack.*'
-- assertVisible: Each row reads what its rule now words, the rule parameters as they stand.
 - tapOn:
     id: rulings.apply
 - extendedWaitUntil:

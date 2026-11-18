@@ -71,7 +71,7 @@ export default function ProjectHomeScreen() {
       const labels = await loadInstallLabels(store);
       const who = {
         label: homeIdentityLine(user.name, store.installId, labels),
-        sub: `This iPad: ${installName(store.installId, labels)}${labels.has(store.installId) ? '' : ' (name it on the Sync screen)'}`,
+        sub: `This iPad: ${installName(store.installId, labels)}`,
       };
       const known = list.map((p) => p.id);
       // just created: it arrives with the next sync, which reloads (dataKey)
@@ -128,7 +128,7 @@ export default function ProjectHomeScreen() {
           <Empty
             text="No project on this iPad yet."
             icon="levels"
-            action={{ label: 'Open Projects to download one from the server or create a new one', onPress: () => router.push('/projects'), testID: 'home.openProjects' }}
+            action={{ label: 'Open Projects', onPress: () => router.push('/projects'), testID: 'home.openProjects' }}
           />
         ) : (
           <>

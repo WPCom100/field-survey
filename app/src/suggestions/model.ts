@@ -184,7 +184,7 @@ function check(input: SuggestionInput, params: RuleParams): SuggestionInput {
   if (!text) throw new OpError('Type the phrase first.');
   if (!ref) throw new OpError('Pick what the chip is for.');
   if (input.scope === 'code' && input.target === 'part' && !offersPartChips(params, ref))
-    throw new OpError(`A ${ref} cable offers no Part chips: its termination kits are off in the Rules (R4b), so network terminations are never missing parts (R4). Offer it as an End Note or a Punch item.`);
+    throw new OpError(`A ${ref} cable offers no Part chips: its termination kits are off in the Rules. Offer it as an End Note or a Punch item.`);
   return { scope: input.scope, ref, target: input.target, text };
 }
 

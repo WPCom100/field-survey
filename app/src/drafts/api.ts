@@ -113,12 +113,12 @@ export function extractionLine(kind: ExtractionKind, b: Batch): string {
   const s = b.stats ?? {};
   switch (b.job_state) {
     case 'queued':
-      return 'Queued — the server picks it up within a few seconds';
+      return 'Queued';
     case 'running':
-      if (kind === 'davinci') return 'Reading the DaVinci library into app-library drafts…';
-      return kind === 'riser' ? 'Reading the riser (bands, devices, bubbles; endpoints by the Claude API — about 12 minutes)…' : 'Reading the BOM (text, OCR where a page has none)…';
+      if (kind === 'davinci') return 'Reading the DaVinci library…';
+      return kind === 'riser' ? 'Reading the riser (about 12 minutes)…' : 'Reading the BOM…';
     case 'skipped':
-      return kind === 'davinci' ? 'Already imported — this library and mapping were imported before' : 'Already uploaded — this exact file was extracted for this project before';
+      return kind === 'davinci' ? 'Already imported — this library and mapping were imported before' : 'Already uploaded';
     case 'failed':
       return `Failed: ${typeof s.error === 'string' ? s.error : 'see the server log'}`;
     default: {

@@ -103,7 +103,7 @@ export default function LintScreen() {
       run.then(
         () => {
           logTo('rules', 'info', `lint_${what}`, { finding: r.id, lint: r.lintId });
-          setNote(what === 'dismiss' ? `Dismissed: ${r.subject}. It comes back if its facts change.` : `Reopened: ${r.subject}.`);
+          setNote(what === 'dismiss' ? `Dismissed: ${r.subject}.` : `Reopened: ${r.subject}.`);
           bumpRulesVersion();
           setTick((n) => n + 1);
         },
@@ -137,7 +137,6 @@ export default function LintScreen() {
       section="Lint"
       projectId={projectId}
       title={title}
-      intro="The rules' findings on this project. A finding you dismiss comes back when its facts change."
       backTestID="lint.back"
     >
       <FilterRow style={styles.filters}>
@@ -221,7 +220,7 @@ export default function LintScreen() {
           }
         />
         <ScrollView style={styles.panel} contentContainerStyle={styles.panelBody}>
-          {row ? <Detail row={row} canEdit={!!engine} onAct={act} /> : <Text style={styles.empty}>Select a finding.</Text>}
+          {row ? <Detail row={row} canEdit={!!engine} onAct={act} /> : null}
           {note ? (
             <Text style={styles.note} testID="lint.note">
               {note}
@@ -309,7 +308,6 @@ function Detail({ row: r, canEdit, onAct }: { row: LintRow; canEdit: boolean; on
             ))}
           </View>
           <TextInput style={styles.input} placeholderTextColor={color.text3} value={reason} onChangeText={setReason} placeholder="Reason (required)" multiline testID="lint.reason" />
-          <Text style={styles.sub}>Dismissed findings come back if their facts change (D178).</Text>
           <FormActions>
             <Btn title="Cancel" onPress={() => setDismissing(false)} />
             <Btn kind="primary" title="Dismiss" disabled={!reason.trim()} onPress={() => onAct('dismiss', r, reason)} testID="lint.dismiss.ok" />

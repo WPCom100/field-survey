@@ -93,7 +93,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
     <View style={styles.root}>
       <View style={styles.head}>
         <Text style={styles.title}>{props.title ?? 'Add device (field addition)'}</Text>
-        <Text style={styles.muted}>{props.at ? 'Placed where you pressed (the grey + pin).' : 'Not on the plan yet: place its pin from the plan later.'}</Text>
+        {props.at ? null : <Text style={styles.muted}>Not on the plan yet.</Text>}
       </View>
       <ScrollView style={styles.flex} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -138,12 +138,12 @@ export function AddDevicePanel(props: AddDeviceProps) {
               />
             ))}
           </View>
-          {hidden > 0 ? <Text style={styles.muted}>{hidden} more: type in the box below to narrow.</Text> : null}
+          {hidden > 0 ? <Text style={styles.muted}>{hidden} more.</Text> : null}
           </>
         ) : typed.trim() && all.length ? (
           <Text style={styles.muted}>No library type matches “{typed.trim()}”{category ? ` in ${category}` : ''}.</Text>
         ) : (
-          <Text style={styles.muted}>{category ? `No ${category} types in the library yet.` : 'No types in the library yet.'} Type the model below.</Text>
+          <Text style={styles.muted}>{category ? `No ${category} types in the library yet.` : 'No types in the library yet.'}</Text>
         )}
         <TextInput
           style={styles.input}
@@ -162,7 +162,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
           typedMatch ? (
             <Text style={styles.muted}>Matches the library type {typedMatch.model}.</Text>
           ) : (
-            <Text style={styles.note}>New model: added to this project's library as a draft for review (D55).</Text>
+            <Text style={styles.note}>New model: added to this project's library as a draft.</Text>
           )
         ) : null}
 
@@ -170,16 +170,13 @@ export function AddDevicePanel(props: AddDeviceProps) {
         <View style={styles.rowWrap}>
           <Text style={styles.idPreview}>{levelCode}-?</Text>
           <Text style={[chipStyles.badge]}>NEW</Text>
-          <Text style={styles.muted}>numbered by the server at the next sync</Text>
         </View>
 
         <Text style={styles.label}>Drawing Position (optional)</Text>
         <TextInput style={styles.input} value={drawingPosition} onChangeText={setDrawingPosition} placeholder="e.g. Grid B-C / 9-8" placeholderTextColor={color.text3} autoCorrect={false} />
-        {props.defaults?.drawingPosition ? <Text style={styles.muted}>From the grid at the pin; edit if the drawing says otherwise.</Text> : null}
 
         <Text style={styles.label}>Room / Location (optional)</Text>
         <TextInput testID="add.room" style={styles.input} value={room} onChangeText={setRoom} placeholder="e.g. XX06M-1E05 Elec Rm" placeholderTextColor={color.text3} />
-        {props.defaults?.room ? <Text style={styles.muted}>The room code printed nearest the pin.</Text> : null}
 
         {/* a form: Cancel left of its primary at the bottom right (D280 (5), T191; Cancel was "◀ Cancel" at the top) */}
         <View style={styles.addBtn}>

@@ -54,7 +54,7 @@ export function ZoomableImage({ uri, accessibilityLabel }: { uri: string; access
           scrollEventThrottle={16}
           onScroll={onScroll}
         >
-          <Pressable onPress={onPress} accessibilityHint="Double-tap to zoom in or back to fit">
+          <Pressable onPress={onPress}>
             <Image source={{ uri }} style={{ width: size.width, height: size.height }} resizeMode="contain" accessibilityLabel={accessibilityLabel} />
           </Pressable>
         </ScrollView>

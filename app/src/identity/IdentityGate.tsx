@@ -166,7 +166,7 @@ function ConnectForm({ onDone }: { onDone: (i: Identity) => void }) {
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Btn title="Connect" kind="primary" onPress={submit} style={styles.button} testID="connect.submit" />
-      <Text style={styles.or}>or, on a server with Microsoft sign-in (no token needed)</Text>
+      <Text style={styles.or}>or</Text>
       <Btn title={busy ? 'Signing in…' : 'Sign in with Microsoft'} onPress={microsoft} disabled={busy} style={styles.button} testID="connect.microsoft" />
     </View>
   );

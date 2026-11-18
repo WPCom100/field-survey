@@ -208,8 +208,8 @@ export function previewTitle(p: RulingPreview, ticked: number): string {
 const UNWORDED_SHOWN = 12;
 
 /** What the preview's footer says beside Apply. */
-export function previewFooter(p: RulingPreview, d: RulingDraft): string[] {
-  const out = ['Each ticked row becomes one Change Log line: Change = Ruling, Reason = the ruling text.'];
+export function previewFooter(p: RulingPreview): string[] {
+  const out: string[] = [];
   if (p.excepted) out.push(p.excepted === 1 ? '1 record unticked in an earlier preview stays as it is.' : `${p.excepted} records unticked in an earlier preview stay as they are.`);
   const right = p.matched - p.rows.length - p.excepted - (p.byHand ?? 0) - (p.unworded?.length ?? 0);
   if (right > 0) out.push(`${right} matching record${right === 1 ? ' is' : 's are'} already right.`);
@@ -220,8 +220,5 @@ export function previewFooter(p: RulingPreview, d: RulingDraft): string[] {
     const refs = p.unworded.slice(0, UNWORDED_SHOWN).map((u) => `${u.levelCode ?? '—'} ${u.ref}`).join(', ');
     out.push(`${n} record${n === 1 ? '' : 's'} ${n === 1 ? 'its' : 'their'} rule no longer words, left as ${n === 1 ? 'it is' : 'they are'}: ${refs}${n > UNWORDED_SHOWN ? `, +${n - UNWORDED_SHOWN} more` : ''}.`);
   }
-  if (d.action.kind === 'reword') out.push('Each row reads what its rule now words, the rule parameters as they stand.');
-  if (d.standing) out.push('Standing: records that match later get this change as a proposal (Accept / Reject on the card or here).');
-  out.push('Unticked rows are remembered: this ruling never changes or proposes them.');
   return out;
 }

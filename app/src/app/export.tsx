@@ -134,7 +134,7 @@ export default function ExportScreen() {
       const rows = await cachedHistory(store, projectId);
       if (!live.current) return;
       setHistory(rows);
-      setHistoryNote('Not connected: showing the list from the last time this iPad reached the server. Files marked "on this iPad" still open.');
+      setHistoryNote('Not connected: showing the last list from the server.');
     }
   }, [identity, projectId]);
 
@@ -192,7 +192,7 @@ export default function ExportScreen() {
         if (isFinished(row.job_state)) refreshHistory().catch(fail);
       }, fail);
     };
-    Alert.alert(`Cancel this ${KIND_LABEL[e.kind as ExportKind] ?? 'export'}?`, `Started by ${e.created_by ?? 'someone'}. Anyone can start it again afterwards.`, [
+    Alert.alert(`Cancel this ${KIND_LABEL[e.kind as ExportKind] ?? 'export'}?`, `Started by ${e.created_by ?? 'someone'}.`, [
       { text: 'Keep it running', style: 'cancel' },
       { text: 'Cancel export', style: 'destructive', onPress: go },
     ]);
@@ -269,7 +269,6 @@ export default function ExportScreen() {
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
         <View style={styles.statusRow}>
           <Text style={styles.status} testID="export.sync">{describeSync(sync)}</Text>
-          <Text style={styles.statusHint}>Exports run on the server and need a connection; edits never do.</Text>
         </View>
         {!projectId ? <Text style={styles.hint}>No project on this iPad yet.</Text> : null}
 
@@ -295,7 +294,6 @@ export default function ExportScreen() {
                 <Check key={t} label={t} value={tabs.includes(t)} onChange={() => toggleTab(t)} />
               ))}
             </View>
-            <Text style={styles.hint}>Summary and Lists are always included; a Summary table is left out with its tab. There is no Change Log tab (history stays in the app).</Text>
 
             <Text style={styles.label}>Pre-flight</Text>
             <Text style={styles.value}>{pre ? preflightLine(pre, sync.pendingOps, blobs.photosWaiting) : '…'}</Text>
@@ -331,8 +329,7 @@ export default function ExportScreen() {
                 <Check key={s.key} label={s.label} value={sections.includes(s.key)} onChange={() => toggleSection(s.key)} />
               ))}
             </View>
-            <Text style={styles.hint} testID="export.pdf.header">Header: "{floorHeader(floor)}" — the survey date only, no company name.</Text>
-            <Text style={styles.hint}>Findings are the devices whose status is not Installed, untested, several per page with a plan crop and photos. Everyone's ink is drawn on the plan.</Text>
+            <Text style={styles.hint} testID="export.pdf.header">Header: "{floorHeader(floor)}"</Text>
 
             <Text style={styles.label}>Pre-flight</Text>
             <Text style={styles.value}>{pre ? preflightLine(pre, sync.pendingOps, blobs.photosWaiting) : '…'}</Text>
@@ -439,7 +436,6 @@ const styles = StyleSheet.create({
   mainContent: { paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xl, gap: space.md },
   statusRow: { gap: 2 },
   status: { ...font.calloutBold, color: color.text },
-  statusHint: { ...font.caption, color: color.text3 },
   label: { ...font.captionBold, color: color.text2, marginTop: 10 },
   value: { ...font.callout, ...tabular, color: color.text },
   hint: { ...font.caption, color: color.text3 },

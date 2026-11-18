@@ -138,12 +138,14 @@ name: Riser — two riser cables on the placed rack, the riser downloaded once
 - tapOn:
     id: riser.enlarge
 - extendedWaitUntil:
-    visible: 'Pinch to zoom · drag to pan'
+    visible:
+      id: riser.close
     timeout: 15000
 - tapOn:
     id: riser.close
 - extendedWaitUntil:
-    notVisible: 'Pinch to zoom · drag to pan'
+    notVisible:
+      id: riser.close
     timeout: 10000
 - tapOn:
     id: rail.levels

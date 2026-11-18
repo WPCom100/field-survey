@@ -49,7 +49,7 @@ export function PlaceholderPicker(props: { store: Store; editor: Editor; current
         {(items ?? []).map((p) => (
           <Chip key={p.id} label={p.label} small selected={p.label === props.currentLabel} onPress={() => pick(p.id)} testID={`placeholder.pick.${p.label}`} />
         ))}
-        {items && !items.length ? <Text style={styles.muted}>None yet. Add one below, or load the standard list under Manage.</Text> : null}
+        {items && !items.length ? <Text style={styles.muted}>None yet.</Text> : null}
       </View>
       <View style={styles.wrap}>
         <TextInput value={text} onChangeText={setText} placeholder="New placeholder" placeholderTextColor={color.text3} style={styles.input} onSubmitEditing={add} testID="placeholder.new" />

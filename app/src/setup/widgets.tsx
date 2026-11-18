@@ -143,13 +143,6 @@ export function HeadCell({ label, help, style }: { label: string; help?: string;
   );
 }
 
-/** What the levels-table columns mean, shown under their headers. */
-export const LEVEL_HELP = {
-  inScope: 'Off: not surveyed; the floor only holds far ends of cables from surveyed floors.',
-  numbering: 'Levels in one group share punch, part, photo and C- numbers (06 and 06M).',
-  splitOf: 'A part of another floor drawn on its own sheet (06M of 06); it is listed right after it.',
-} as const;
-
 /**
  * A page section: a title over its content in a card (the shell's page pattern, `docs/ui-plan.md`
  * §4: "forms as Fields in a card"; T180).

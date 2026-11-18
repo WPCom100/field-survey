@@ -117,9 +117,6 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
   const davinci = latest('davinci');
   return (
     <Section title="BOM and riser">
-      <Text style={styles.hint}>
-        Upload the BOM first, then the riser. The server reads them into device and cable drafts (the riser's far ends by the Claude API, about 12 minutes); the drafts reach this iPad with the next sync and are reviewed in step 4. Needs a connection.
-      </Text>
       {(['bom', 'riser'] as const).map((kind) => {
         const b = latest(kind);
         return (
@@ -143,10 +140,6 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
           </View>
         );
       })}
-      <Text style={[styles.hint, styles.gap]}>
-        <Text style={styles.kind}>DaVinci library. </Text>
-        Seeds the app library (every project) with ETC's product types as drafts: pick DaVinci's library.json from Files (DaVinci writes it to its AppData folder at launch; copy it to iCloud Drive first) and, the first time or after you regroup the categories, DaVinci_categories.xlsx with it. Re-running on a newer file updates the drafts; accepted types are left alone.
-      </Text>
       <View style={styles.row}>
         <Text style={styles.kind}>{TITLE.davinci}</Text>
         <View style={{ flex: 1, gap: 2 }}>
@@ -165,7 +158,7 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
           testID="sources.davinci"
         />
       </View>
-      <Check label="Retire the hand-made app-library types first (they are kept in History; project copies stay) — D199" value={retire} onChange={setRetire} />
+      <Check label="Retire the hand-made app-library types first" value={retire} onChange={setRetire} />
       {busy ? <Text style={styles.hint}>{busy}</Text> : null}
       <Notice text={error} error />
       {(batches ?? []).some((b) => b.job_state === 'done' && b.kind !== 'davinci') ? (
@@ -179,7 +172,6 @@ export function ExtractionSources({ projectId }: { projectId: string }) {
 
 const styles = StyleSheet.create({
   hint: { ...font.caption, color: color.text3 },
-  gap: { marginTop: 10 },
   row: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: space.sm, borderBottomWidth: 1, borderColor: color.hairline },
   kind: { width: 60, ...font.calloutBold, color: color.text },
   file: { ...font.callout, color: color.text },

@@ -6,7 +6,7 @@ import { openAppStore } from '../../db';
 import { SectionScreen } from '../../home/SectionScreen';
 import { useCurrentUser } from '../../identity/IdentityGate';
 import { SetupActions, SetupError, loadProjectSetup, mezzanineParent, type ProjectSetup, type SetupLevel } from '../../setup/model';
-import { Btn, ChipPicker, Field, HeadCell, LEVEL_HELP, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
+import { Btn, ChipPicker, Field, HeadCell, Notice, ScopeSwitch, Section, styles as w } from '../../setup/widgets';
 import { SourcesStep } from '../../setup/SourcesStep';
 import { AssignmentsStep } from '../../setup/AssignmentsStep';
 import { RulesStep } from '../../setup/RulesStep';
@@ -207,7 +207,6 @@ function ProjectStep({ setup, run }: { setup: ProjectSetup; run: Run }) {
         onCommit={run((a) => a.setProject({ settings: { export_title: title, disclaimer } }), 'Saved')}
         multiline
       />
-      {p.copiedFromId ? <Text style={styles.hint}>Vocabulary, library and rulings were copied from another project at creation.</Text> : null}
     </Section>
   );
 }
@@ -222,11 +221,6 @@ function PlaceStep({ progress }: { progress: PlacementProgress | null }) {
   const levels = progress.levels.filter((l) => l.inScope);
   return (
     <Section title="Place devices">
-      <Text style={styles.hint}>
-        Put every device on its level's plan: the master's devices without a pin and the units of accepted drafts (Review drafts). Place ▸ opens
-        the plan with the unplaced list; panels found in the sheet's text are proposed as dashed pins. A draft that is not on the sheet can be
-        flagged.
-      </Text>
       <View style={styles.head}>
         <Text style={[styles.cCode, w.label]}>Level</Text>
         <Text style={[styles.cLockNum, w.label]}>Placed</Text>
@@ -262,7 +256,7 @@ function PlaceStep({ progress }: { progress: PlacementProgress | null }) {
       {levels.length === 0 ? <Text style={styles.empty}>No levels in scope yet.</Text> : null}
       {progress.pool.draftUnits + progress.pool.flagged > 0 ? (
         <Text style={styles.hint}>
-          Pool (drafts with no level): {progress.pool.draftUnits} unit{progress.pool.draftUnits === 1 ? '' : 's'} to place from any level's plan
+          Pool (drafts with no level): {progress.pool.draftUnits} unit{progress.pool.draftUnits === 1 ? '' : 's'} to place
           {progress.pool.flagged ? `, ${progress.pool.flagged} flagged` : ''}.
         </Text>
       ) : null}
@@ -274,10 +268,6 @@ function PlaceStep({ progress }: { progress: PlacementProgress | null }) {
 function LockStep({ levels, onLock }: { levels: LockLevel[]; onLock: (l: LockLevel) => void }) {
   return (
     <Section title="Lock baseline">
-      <Text style={styles.hint}>
-        Locking a level starts change logging: every later edit shows who, when, was → now and why in History. Lock is allowed with
-        warnings; Unlock asks why.
-      </Text>
       <View style={styles.head}>
         <Text style={[styles.cCode, w.label]}>Level</Text>
         <Text style={[styles.cLockNum, w.label]}>Placed</Text>
@@ -379,9 +369,9 @@ function LevelsStep({
       <View style={styles.head}>
         <Text style={[styles.cN, w.label]}>#</Text>
         <Text style={[styles.cCode, w.label]}>Code</Text>
-        <HeadCell style={styles.cScope} label="In scope" help={LEVEL_HELP.inScope} />
-        <HeadCell style={styles.cGroup} label="Numbering group" help={`${LEVEL_HELP.numbering} Fixed once a level has records.`} />
-        <HeadCell style={styles.cPick} label="Split of" help={LEVEL_HELP.splitOf} />
+        <HeadCell style={styles.cScope} label="In scope" />
+        <HeadCell style={styles.cGroup} label="Numbering group" />
+        <HeadCell style={styles.cPick} label="Split of" />
         <Text style={[styles.cDate, w.label]}>Surveyed</Text>
         <Text style={[styles.cDate, w.label]}>Updated</Text>
         <Text style={[styles.cSheet, w.label]}>Display sheet</Text>

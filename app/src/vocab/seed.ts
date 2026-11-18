@@ -16,11 +16,11 @@ export const VOCAB_LISTS = [
   { list: 'punch_note', title: 'Punch notes', hint: 'Phrases for the Notes of a punch item.' },
   { list: 'part_note', title: 'Part notes', hint: 'Phrases for the Notes of a missing part.' },
   { list: 'photo_caption', title: 'Photo captions', hint: 'Chips on the photo caption.' },
-  { list: 'type', title: 'Device types', hint: "Chips under a device's Type on the card (the master's Type column, e.g. \"Echo relay panel\"). Free typing stays." },
-  { list: 'category', title: 'Device categories', hint: "Device Category picker (the D196 eleven). A pin shape follows the device's role, which its library type carries (D64, T112)." },
-  { list: 'cable_code', title: 'Cable codes', hint: 'The codes a cable can carry (CLAUDE.md §3). A DaVinci port protocol with no code arrives here as a draft (T111); accepting it records a decision, it does not make a code yet.' },
-  { list: 'room_code_pattern', title: 'Room-code patterns', hint: 'What the plan upload reads as a room code (T79): one regular expression per row (Python syntax, matched against a whole word). An empty list uses the Tower\'s pattern. A pattern that does not compile is skipped and named on the upload\'s job line.' },
-  { list: 'tag_pattern', title: 'Tag patterns', hint: 'What the plan upload reads as a device tag for dashed proposals (T79): one regular expression per row, matched against a whole word. An empty list uses the Tower\'s patterns. Takes effect on the next sheet upload.' },
+  { list: 'type', title: 'Device types', hint: "Chips under a device's Type on the card." },
+  { list: 'category', title: 'Device categories', hint: 'The Device Category picker.' },
+  { list: 'cable_code', title: 'Cable codes', hint: 'The codes a cable can carry.' },
+  { list: 'room_code_pattern', title: 'Room-code patterns', hint: 'Room codes on a plan upload: one regular expression per row (Python syntax), matched against a whole word.' },
+  { list: 'tag_pattern', title: 'Tag patterns', hint: 'Device tags on a plan upload: one regular expression per row, matched against a whole word.' },
 ] as const satisfies readonly { list: (typeof vocab.VOCAB_LIST)[number]; title: string; hint: string }[];
 
 export type VocabListKey = (typeof VOCAB_LISTS)[number]['list'];
@@ -55,8 +55,8 @@ export const SEED_VOCAB_VARIANTS: Readonly<Partial<Record<VocabListKey, Readonly
  * stand for it. The BOM job reads them as raw → canonical on top of its built-in pairs.
  */
 export const VOCAB_PAIR_LISTS = [
-  { list: 'model_map', title: 'Model map', canonical: 'Model', variant: 'BOM spelling', hint: 'A BOM model spelling → the model the master uses (P-DOC-W-WD → P-DOC-W). Colour suffixes (-4Z, -4, -5) are stripped before matching; spaces and case are ignored.' },
-  { list: 'level_alias', title: 'Level aliases', canonical: 'Level', variant: 'Venue text', hint: "A BOM venue's text → the project's level code (Level 5 → 06M). Applied only when the project has that level." },
+  { list: 'model_map', title: 'Model map', canonical: 'Model', variant: 'BOM spelling', hint: 'A BOM model spelling → the model the master uses (P-DOC-W-WD → P-DOC-W).' },
+  { list: 'level_alias', title: 'Level aliases', canonical: 'Level', variant: 'Venue text', hint: "A BOM venue's text → the project's level code (Level 5 → 06M)." },
 ] as const satisfies readonly { list: (typeof vocab.VOCAB_LIST)[number]; title: string; canonical: string; variant: string; hint: string }[];
 
 export type VocabPairListKey = (typeof VOCAB_PAIR_LISTS)[number]['list'];

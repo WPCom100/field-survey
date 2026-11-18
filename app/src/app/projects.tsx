@@ -85,7 +85,6 @@ export default function ProjectsScreen() {
     // from the project button: no back (D280); the rail's Levels replaced "◀ Levels" (T190)
     <SectionScreen
       title="Projects"
-      intro="The projects on this iPad, and any the server lists that are still downloading."
       backTestID="projects.back"
       actions={
         <>
@@ -101,7 +100,7 @@ export default function ProjectsScreen() {
         <Notice text={notice} />
       </View>
       <ScrollView contentContainerStyle={styles.list}>
-        {local.length === 0 ? <Text style={styles.empty}>No project on this iPad yet. Refresh from the server, or create one.</Text> : null}
+        {local.length === 0 ? <Text style={styles.empty}>No project on this iPad yet.</Text> : null}
         {local.map((p) => (
           <Card key={p.id} style={styles.card}>
             <View style={styles.grow}>

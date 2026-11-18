@@ -87,9 +87,6 @@ export function FloorPlans({ projectId }: { projectId: string }) {
 
   return (
     <Section title="Floor plans">
-      <Text style={styles.hint}>
-        One display sheet (the level's composite) and any number of source sheets per level, as PDF. The server reads the grid bubbles, room codes, panel tags and the source-sheet boundaries; the sheet reaches every iPad with the next sync. Needs a connection.
-      </Text>
       <View style={styles.head}>
         <Text style={[styles.cLvl, styles.label]}>Lvl</Text>
         <Text style={[styles.cDisplay, styles.label]}>Display sheet (composite)</Text>
@@ -130,7 +127,7 @@ export function FloorPlans({ projectId }: { projectId: string }) {
           </View>
         </View>
       ))}
-      {levels && levels.length === 0 ? <Text style={styles.hint}>No levels yet — add them in step 2.</Text> : null}
+      {levels && levels.length === 0 ? <Text style={styles.hint}>No levels yet.</Text> : null}
       {busy ? <Text style={styles.hint}>{busy}</Text> : null}
       <Notice text={error} error />
       {jobs.map((j) => (

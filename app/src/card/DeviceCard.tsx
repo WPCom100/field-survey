@@ -181,7 +181,7 @@ export function DeviceCard(props: DeviceCardProps) {
     if (!pending) return;
     const reason = pending.reason;
     if (pending.kind === 'move') {
-      if (!reason.trim()) return setError('Say why the pin moves (kept in the history).');
+      if (!reason.trim()) return setError('Say why the pin moves.');
       setPending(null);
       props.onStartMove(reason.trim());
       return;
@@ -254,7 +254,7 @@ export function DeviceCard(props: DeviceCardProps) {
             style={fieldStyles.input}
             value={pending.reason}
             onChangeText={(t) => setPending({ ...pending, reason: t })}
-            placeholder="Reason (kept in the history)"
+            placeholder="Reason"
             placeholderTextColor={color.text3}
             autoFocus
             returnKeyType="done"
@@ -282,7 +282,7 @@ export function DeviceCard(props: DeviceCardProps) {
 
         {/* Status: the five device statuses as swatch buttons, two to a row; each tap saves (D45) */}
         <View style={styles.block}>
-          <FieldHead title="Status" hint="each tap saves">
+          <FieldHead title="Status">
             <Marks card={card} field="status" />
           </FieldHead>
           <View style={styles.statusGrid}>
@@ -1063,12 +1063,6 @@ function QuickActions({ deviceId, readOnly, run }: { deviceId: string; readOnly:
             <Btn title="Apply" kind="primary" disabled={busy || (!q.optional && !answer.trim())} onPress={() => void apply()} testID="card.quick.apply" />
           </FormActions>
         </View>
-      ) : null}
-      {!readOnly && !q ? (
-        <Text style={styles.hint}>
-          Spot-check fixed closes an ETC item "Reterminated - all good"; Non-ETC device marks it Not installed and asks the EC to confirm; Relocated notes the move; Not found on site marks it Not installed
-          and not found, no item.
-        </Text>
       ) : null}
     </View>
   );

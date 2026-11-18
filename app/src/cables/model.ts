@@ -20,8 +20,8 @@ export const CABLE_CHECKS: readonly { id: CheckId; title: string; hint: string }
   { id: 'far_end', title: 'missing far end', hint: 'Open the end and pick the far end (a device or a placeholder).' },
   { id: 'code', title: 'code mismatch', hint: 'The cable code is missing, not a cable code, or not what the riser label names.' },
   { id: 'status', title: 'status mismatch', hint: 'A wire is run or not: survey both ends again and correct one.' },
-  { id: 'riser', title: 'To ≠ riser', hint: 'The riser governs To (R2): correct the To text, or keep the guess in the note.' },
-  { id: 'unconfirmed', title: 'unconfirmed endpoint', hint: 'Check the far end against the riser, then Confirm endpoint (D6).' },
+  { id: 'riser', title: 'To ≠ riser', hint: 'The riser governs To: correct the To text, or keep the guess in the note.' },
+  { id: 'unconfirmed', title: 'unconfirmed endpoint', hint: 'Check the far end against the riser, then Confirm endpoint.' },
   { id: 'not_started', title: 'Not started on in-scope level', hint: 'Not started is for runs to levels out of scope: survey this end.' },
 ];
 
@@ -201,7 +201,7 @@ export function cableChecks(
     if (r.state === 'differs') out.push({ id: 'riser', message: `To "${toEnd.toText}" does not match the riser "${r.riser}"` });
   }
   // unconfirmed endpoint
-  if (!c.endpointConfirmed) out.push({ id: 'unconfirmed', message: 'Endpoint not confirmed against the riser (D6)' });
+  if (!c.endpointConfirmed) out.push({ id: 'unconfirmed', message: 'Endpoint not confirmed against the riser' });
   // Not started on an in-scope level, unless the run goes to a level out of scope (the master's
   // reading: the run to 09 has not started, on the 06M end too)
   for (const e of sorted) {

@@ -173,7 +173,7 @@ export default function DashboardScreen() {
                 <SummaryGrid table={t} drill={drill} onPress={open} />
                 <StackedBars table={t} />
               </View>
-              {t.outside ? <Text style={styles.muted}>{t.id === 'devices' ? `${t.outside} Unsurveyed (in no column, as the export)` : `${t.outside} without a status (in no column, as the export)`}</Text> : null}
+              {t.outside ? <Text style={styles.muted}>{t.id === 'devices' ? `${t.outside} Unsurveyed` : `${t.outside} without a status`}</Text> : null}
             </View>
           ))}
           {found ? (
@@ -211,7 +211,6 @@ export default function DashboardScreen() {
                 ))}
             </View>
           ) : null}
-          {data ? <Text style={styles.muted}>Same counts as the export&apos;s Summary tab: in-scope levels, live records; tap any count for its list.</Text> : null}
         </ScrollView>
 
         {panel ? (

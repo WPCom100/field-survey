@@ -161,7 +161,7 @@ describe('device card read model', () => {
     expect(card.parts.find((p) => p.part === 'ERP-FT-LVD')!.sources).toEqual([`#${card0.punch[0]!.label}`]);
     expect(card.phrases).toEqual(['Missing ERP-FT-LVD card']);
     expect(NOT_WIRED.wired).toBe(false);
-    await expect(NOT_WIRED.decide('x', { kind: 'accept' })).rejects.toThrow(/T33/);
+    await expect(NOT_WIRED.decide('x', { kind: 'accept' })).rejects.toThrow(/Read-only/);
   });
 
   it('demo card samples fill every section on 06M-01, once', async () => {
