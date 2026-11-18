@@ -38,9 +38,10 @@ docker compose exec worker python -m app.jobs.davinci_library /tmp/library.json 
 ```
 
 **The project.** The batch is filed under the project whose Sources screen started it (an
-`import_batch` always has one), and that project's vocabulary takes the `cable_code` drafts
-(below). The types themselves go to the **app** library, project-less, whichever project started
-the job. Without `categories` the job reuses the workbook of the latest davinci batch that had one
+`import_batch` always has one). Everything it writes goes to the **app** library, project-less,
+whichever project started the job: the types and the `cable_code` drafts (below), on the library
+stream. There is one library for every project (T196, D287 (1)): projects hold no types and no
+cable-code list of their own (D292 (9)). Without `categories` the job reuses the workbook of the latest davinci batch that had one
 (`stats.categories_reused_from`); with none ever uploaded the request is refused (422).
 
 **Skipped.** The same library and the same mapping (both SHA-256) already imported → `skipped`.
@@ -62,7 +63,7 @@ product classifications, document types), `propertyTypes` (names), `scripts` (na
 | `Power` ports by direction; **power supplies** (D198) | one `120V` feed row (single row) when the type has a Power **Input** or **Bus** port (`qty` = that count: an ECPB AC plate, a ColorSource relay, an ELTS), or **is a power supply**, or **carries one as an accessory** — every power supply needs a 120 V line in. DaVinci marks a supply by its `Power Supplies` category, a `PowerSupplyCurrentDraw` / `ParadigmPowerSupplyCurrentDraw` script, a `… Power Supply - Aux` capacity property (the NSPS, P-SPS-D, the DIN14 SPS kits) or "power supply" / "power module" in its name or description (not "no power supply"); the `Power Supply - Units` / `Enabled` properties sit on relay-panel hosts and are ignored. `source_ref.power_supply = {self, accessories[]}` says why (the ERn2 enclosure: its P-SPM-E module and upgrade kit; the NSPS: itself). A Power **Output** port is a load circuit, not a surveyed cable (`stats.load_outputs`; a relay panel's own feed is by others, as the master has it). |
 | Paradigm Portable (the handheld touchscreen's cable) | `N` (D200). |
 | **not surveyed** (D200): Contact, EBDK Switch, USB, Serial, MIDI, SMPTE, LSH Control, SPS Connection, Control, Emergency, CANbus, Multiverse, MeshConnect, Echoflex, Audio, the F-Drive links | no row, no draft; the ports stay on the type in `source_ref.ports` and are counted in `stats.not_surveyed_protocols`. |
-| any protocol nobody has ruled on (a newer library) | **never a code**: one `vocab(cable_code)` **draft** per protocol in the uploading project, for Landry to accept or reject as a decision (D197); `stats.unmapped_protocols`. |
+| any protocol nobody has ruled on (a newer library) | **never a code**: one `vocab(cable_code)` **draft** per protocol in the app library (the one cable-code list, T196), for Landry to accept or reject as a decision (D197); `stats.unmapped_protocols`. |
 | `accessories[]` (`typeId`, `maxQuantity`, `userDefinable`) | `optional_accessories` rows `{model, expected_qty, max_quantity, group?}`: `expected_qty` = the slot max for a forced slot (`userDefinable = false`, e.g. the UH10002's faceplate, the ERn2's P-ACP-E Mk2) and the `SetMinAccessories` minimum where a type has one; else null. |
 | `scripts[]` `MaxAccessoryMonitor` (`rules[]: accessoryIds, minCount, maxCount, minValueMessage`) | each slot in a rule carries `group: {label, min, max}` — "one of these back boxes" (P-TS7-E: four boxes, min 1 max 1), "two ERn modules incl. the forced processor" (ERn2-W-120 Mk2: min 2 max 2). A group is an expectation across alternatives, which `expected_qty` cannot say; the D52 lint reads `expected_qty` only (the group lint is T113). |
 | `propertyTypes[]` names | `needs_neuron_id` = true when the type carries `IP Address` / `Subnet Mask` / `Gateway Address` (any port), else null (the category default, D185); always null on an `nsps` or `equipment_rack` type (the role decides, D222). |
@@ -80,8 +81,8 @@ accessory's own slots are not followed.
 types first" box, the CLI's `--retire-hand-made`) soft-deletes every app-library type with no
 `source_ref` before planning — Landry's ruling once the catalogue covers them (D199). History keeps
 them (`delete` ops, reason "Replaced by the DaVinci library import"; a restore op brings one back),
-their models stop counting as clashes, and the **project** copies made at project creation stay,
-since devices may point at them. `stats.retired` lists the models.
+their models stop counting as clashes, and a device that points at one keeps the link and is read
+by its category until its type is restored or changed. `stats.retired` lists the models.
 
 **Unique names.** Models and aliases are unique across the app library (spaces and case ignored,
 as the library's own clash rule). Within one file, two types that strip to the same model (the
@@ -119,17 +120,15 @@ op each in the library log. A later run (a newer `library.json`, or a regrouped 
   touched, on a draft either;
 - a **category** the import set (the field head's `reason` is "DaVinci library import") that the
   mapping now files elsewhere is corrected in any state (D232, T144): an accepted or rejected type
-  in one `Correction` op, a draft by the ordinary `set`. So are the **project copies** of that type
-  (matched by model) whose category nobody edited — the head is still the create op that copied
-  it into a new project (reason "Project created by …") or an earlier import correction — in one
-  `Correction` op each in that project's own op stream. A category a person set (any later op, in
-  the app library or the project) stands, and so does every copy of a type whose app category a
-  person set. The role is not touched (an ERn stays `equipment_rack`). `stats.categories_corrected`
-  counts the app types and copies, "n categories corrected" on the Sources card. A device placed
+  in one `Correction` op, a draft by the ordinary `set`. A category a person set (any later op)
+  stands. The role is not touched (an ERn stays `equipment_rack`). Projects hold no copies of
+  types since T196 (D287 (1)), so nothing is written in a project's stream (the D232 correction of
+  project copies is gone). `stats.categories_corrected` counts the types, "n categories corrected"
+  on the Sources card. A device placed
   under the old category gets the `lint.type_category` finding (type says one, device the other)
   with Fix all via ruling;
 - a new `typeId` → created; a type ETC removed → its row stays (nothing is deleted);
-- the `cable_code` drafts already in the uploading project are not written again;
+- the `cable_code` values already in the app library (any state) are not written again;
 - the same pair of files is `skipped` only against a batch run since D222 (its stats carry
   `neuron_flags_corrected`), so re-uploading the same library still corrects the flags once.
 

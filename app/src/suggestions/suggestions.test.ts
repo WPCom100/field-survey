@@ -129,11 +129,11 @@ describe('suggestion chips: the union (T99, D174 (2))', () => {
     expect(chipsFor(rows, { codes: ['U'], termKit: true }, 'part')).toEqual(['Unison terminal block', 'Unison termination kit']);
   });
 
-  it('the device card and the end editor offer the type, category and code chips before the project lists', async () => {
-    const { store, project } = await setup();
+  it('the device card and the end editor offer the app library\'s accepted type, category and code chips before the project lists (T196)', async () => {
+    const { store, lib, project } = await setup();
     const p = await project('Tower');
-    const type = await createType(p.editor, store, p.id, { model: 'PI1002', category: 'Station' });
-    await acceptType(p.editor, type);
+    const type = await createType(lib, store, null, { model: 'PI1002', category: 'Station' });
+    await acceptType(lib, type);
     const station = await p.editor.create('device', { level_id: p.levelId, category: 'Station', device: 'PI1002' }, CTX);
     const panel = await p.editor.create('device', { level_id: p.levelId, category: 'Relay panel', device: 'ERP' }, CTX);
     const cable = await p.editor.create('cable', { project_id: p.id, cable: 'X' }, CTX);
@@ -144,13 +144,21 @@ describe('suggestion chips: the union (T99, D174 (2))', () => {
     expect((await loadDeviceCard(store, station.id))!.phrases).toEqual(STANDARD_PHRASES);
     expect((await loadCableEnds(store, endA.id))!.phrases).toEqual(CONNECTION_PHRASES);
 
-    await addSuggestion(p.editor, store, p.id, { scope: 'category', ref: 'Station', target: 'device_note', text: 'Empty box on wall.' });
-    await addSuggestion(p.editor, store, p.id, { scope: 'type', ref: type, target: 'device_note', text: 'Stuck buttons' });
-    await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'X', target: 'connection_note', text: 'Missing DMX termination kit' });
-    await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'X', target: 'punch_item', text: 'Missing DMX termination kit' });
-    await addSuggestion(p.editor, store, p.id, { scope: 'category', ref: 'Power Distribution', target: 'part', text: 'ERP-FT-LVD card' });
-    const nope = await addSuggestion(p.editor, store, p.id, { scope: 'category', ref: 'Station', target: 'device_note', text: 'Never shown' });
-    await rejectSuggestion(p.editor, nope);
+    // every chip is the app library's (D292 (9)): added there as drafts, offered once accepted
+    const add = (s: Parameters<typeof addSuggestion>[3]) => addSuggestion(lib, store, null, s);
+    const chips = [
+      await add({ scope: 'category', ref: 'Station', target: 'device_note', text: 'Empty box on wall.' }),
+      await add({ scope: 'type', ref: type, target: 'device_note', text: 'Stuck buttons' }),
+      await add({ scope: 'code', ref: 'X', target: 'connection_note', text: 'Missing DMX termination kit' }),
+      await add({ scope: 'code', ref: 'X', target: 'punch_item', text: 'Missing DMX termination kit' }),
+      await add({ scope: 'category', ref: 'Power Distribution', target: 'part', text: 'ERP-FT-LVD card' }),
+    ];
+    const pending = await add({ scope: 'category', ref: 'Station', target: 'device_note', text: 'Still a draft' });
+    expect((await loadDeviceCard(store, station.id))!.phrases).toEqual(STANDARD_PHRASES); // drafts wait for review
+    for (const id of chips) await acceptSuggestion(lib, id);
+    const nope = await add({ scope: 'category', ref: 'Station', target: 'device_note', text: 'Never shown' });
+    await rejectSuggestion(lib, nope);
+    expect(pending).toBeTruthy();
     await p.editor.create('vocab', { project_id: p.id, list: 'device_note', value: 'Not surveyed' }, CTX);
     await p.editor.create('vocab', { project_id: p.id, list: 'punch_item', value: 'Missing all Device Neuron IDs' }, CTX);
 

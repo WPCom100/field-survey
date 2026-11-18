@@ -24,7 +24,7 @@ so one row parser serves both. Every line keeps its `source_ref` (`job`, `page`,
 Classification (`build`):
 
 - ETC lighting-control **devices** become drafts with a **role** (`relay_panel` … `other`,
-  D201) and a D196 category (T115): the project's device-type library (`library_type.model` /
+  D201) and a D196 category (T115): the app's device-type library (`library_type.model` /
   `aliases`, D183 (4)) first — the type's role, else its category's, else `MODEL_ROLE`'s; its
   category canonicalised — then `MODEL_ROLE`, the category being the role's (`ROLE_CATEGORY`).
 - **Accessories** (faceplates, ERP option cards, through-beam parts, touchscreen backboxes, DIN
@@ -127,7 +127,7 @@ MODEL_ROLE: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^P-LS\b"), ROLE_SENSOR),
     (re.compile(r"^UHCI"), ROLE_SENSOR),  # partition sensor interface
 ]
-"""Built-in model → role (D201, T115); the project's library types come first."""
+"""Built-in model → role (D201, T115); the library's types come first."""
 
 RACK_ROOT_RE = re.compile(r"^(?:\d+U RACK|ERN4)")
 """A line that opens an Equipment rack: the rack itself or an ERn4 enclosure (wall mount)."""

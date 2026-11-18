@@ -1,8 +1,9 @@
 /**
  * A device's type, role and address needs, for the screens that read the store directly (card,
  * dashboard, plan). The rules themselves are `addressNeeds` and `roleOf` (packages/rules and
- * core); this loads the types they read — the project's own and the app library's (D183 (4)) —
- * and the wires each device gets (T146, D245: the codes of its live cable ends).
+ * core); this loads the types they read — the app library's, the one library every project
+ * reads (D183 (4), T196 / D287 (1)) — and the wires each device gets (T146, D245: the codes of its
+ * live cable ends).
  */
 
 import { isRole, roleOf, type Role, type Store } from '@field-survey/core';
@@ -29,9 +30,9 @@ export type DeviceType = TypeLike & {
 
 export type DeviceTypes = ReadonlyMap<string, DeviceType>;
 
-/** The live types a project's devices may be of: its own and the app library's. */
-export async function loadDeviceTypes(store: Store, projectId: string): Promise<DeviceTypes> {
-  const rows = await store.list<DeviceType>('library_type', { where: 'project_id = ? OR project_id IS NULL', params: [projectId] });
+/** The live types a device may be of: the app library's (one library for every project, T196). */
+export async function loadDeviceTypes(store: Store): Promise<DeviceTypes> {
+  const rows = await store.list<DeviceType>('library_type', { where: 'project_id IS NULL' });
   return new Map(rows.map((t) => [t.id, t] as const));
 }
 
@@ -117,8 +118,8 @@ function shortVariants(types: DeviceTypes): Map<string, DeviceType> {
   const cached = SHORT_VARIANTS.get(types);
   if (cached) return cached;
   const out = new Map<string, DeviceType>();
-  // the project's types before the app library's, as `findDeviceType`
-  const rows = [...types.values()].filter((t) => t.state !== 'rejected').sort((a, b) => Number(a.project_id == null) - Number(b.project_id == null) || a.id.localeCompare(b.id));
+  // the first by id, as `findDeviceType`
+  const rows = [...types.values()].filter((t) => t.state !== 'rejected').sort((a, b) => a.id.localeCompare(b.id));
   for (const t of rows) {
     const m = key(t.model);
     for (const k of keysOf(t)) {

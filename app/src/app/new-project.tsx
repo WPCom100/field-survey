@@ -31,7 +31,7 @@ export default function NewProjectScreen() {
   const [disclaimer, setDisclaimer] = useState('');
   const [sources, setSources] = useState<HomeProject[]>([]);
   const [copyFrom, setCopyFrom] = useState<string | null>(null);
-  const [flags, setFlags] = useState({ vocabulary: true, library: true, rulings: true, rule_params: true, placeholders: false });
+  const [flags, setFlags] = useState({ vocabulary: true, rulings: true, rule_params: true, placeholders: false });
   const [levels, setLevels] = useState<DraftLevel[]>([]);
   const [newCode, setNewCode] = useState('');
   const [range, setRange] = useState('');
@@ -163,7 +163,6 @@ export default function NewProjectScreen() {
             {copyFrom ? (
               <View style={styles.flags}>
                 <Check label="Vocabulary" value={flags.vocabulary} onChange={(v) => setFlags({ ...flags, vocabulary: v })} />
-                <Check label="Device-type library" value={flags.library} onChange={(v) => setFlags({ ...flags, library: v })} />
                 <Check label="Standing rulings" value={flags.rulings} onChange={(v) => setFlags({ ...flags, rulings: v })} />
                 <Check label="Rule settings" value={flags.rule_params} onChange={(v) => setFlags({ ...flags, rule_params: v })} />
                 <Check label="Placeholders" value={flags.placeholders} onChange={(v) => setFlags({ ...flags, placeholders: v })} />

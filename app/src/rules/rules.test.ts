@@ -133,6 +133,41 @@ describe('startRules over the app library stream (T131)', () => {
   });
 });
 
+describe('a library edit reaches the open project (T196, D287 (3))', () => {
+  it("a pulled type for a project's device raises its R2g draft there; a pulled edit of the type withdraws it", async () => {
+    const { store, pid, panel } = await demo();
+    const device = (await store.get<{ device: string | null }>('device', panel.id))!.device!;
+    expect(device).toBeTruthy();
+    type P = { subject: { entity_id: string }; discriminator: string | null };
+    const r2g = async () =>
+      (await store.list<P>('proposal', { where: `project_id = ? AND rule_id = 'R2g' AND state = 'proposed'`, params: [pid] })).map((p) => [p.subject.entity_id, p.discriminator]);
+    const until = async (ok: (rows: (string | null)[][]) => boolean) => {
+      for (let i = 0; i < 100 && !ok(await r2g()); i++) await new Promise((r) => setTimeout(r, 20));
+      return r2g();
+    };
+    const stop = startRules(store, ME, async () => [pid], 1);
+    expect(await until((rows) => rows.length === 0)).toEqual([]);
+    // another iPad adds the panel's model to the one library: it arrives by pull on the stream
+    const tid = uuidv7();
+    const create = uuidv7();
+    let seq = 0;
+    const pulled = (op: Partial<Op>) =>
+      store.applyRemote({
+        op_id: uuidv7(), project_id: LIBRARY_STREAM, user_id: ME, install_id: 'other-ipad', client_ts: new Date().toISOString(), change_type: 'Master edit',
+        server_seq: ++seq, server_ts: new Date().toISOString(), entity_kind: 'library_type', entity_id: tid, ...op,
+      } as Op);
+    await pulled({ op_id: create, kind: 'create', payload: { id: tid, project_id: null, model: device, category: 'Relay panel', state: 'accepted', default_cables: [{ code: 'F', to: 'Fiber patch panel' }] } });
+    // every device of that model gets the run as a draft (the demo level has several), the panel too
+    const raised = await until((rows) => rows.length > 0);
+    expect(raised).toContainEqual([panel.id, 'F']);
+    expect(new Set(raised.map(([, code]) => code))).toEqual(new Set(['F']));
+    // the library takes the row away again: the project's drafts go with it
+    await pulled({ kind: 'set', field: 'default_cables', now: [], base_op_id: create });
+    expect(await until((rows) => rows.length === 0)).toEqual([]);
+    stop();
+  });
+});
+
 describe('rulesVersion per project (T185)', () => {
   it("a pass that wrote to another project leaves this one's version alone; a decision moves every one", () => {
     let told = 0;

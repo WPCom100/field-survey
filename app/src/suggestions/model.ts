@@ -2,10 +2,9 @@
  * Library suggestion chips (T99, D172, D174, D212): one `suggestion` row per phrase, hung off a
  * device type (`ref` = its id), a device category (the canonical name) or a cable code, and
  * offered in one place (`target`): a device's Notes, a connection end's Note, a punch item's
- * Item, a missing part's Part. Rows live at the library's two scopes (D65): the app library
- * (`project_id` null, written to the library stream, D184) and a project's own. A project reads
- * its own category and code chips and its types' chips; the app library's reach it by copying
- * (project creation, "Copy from app library", or with a copied type). Chips are suggestions a
+ * Item, a missing part's Part. Every chip is the app library's (`project_id` null, written to the
+ * library stream, D184; T196, D292 (9)): a project reads them directly (`loadChipRows`) and holds
+ * none of its own, and the server refuses a chip in a project's stream. Chips are suggestions a
  * person picks: free typing stays, and the rules keep raising their own drafts (D174 (4)).
  * No React or Expo imports: tested in Node.
  */
@@ -106,13 +105,18 @@ export async function loadSuggestions(store: Store, library: string | null): Pro
   return rows.map(toSuggestion);
 }
 
-/** The chips a project's screens draw from: its own category and code chips, and the chips of `typeIds` (whatever library the type is in). Rejected ones left out. */
-export async function loadChipRows(store: Store, projectId: string, typeIds: readonly (string | null | undefined)[] = []): Promise<Suggestion[]> {
+/**
+ * The chips a project's screens draw from (T196, D292 (9)): the app library's — every chip is
+ * app-level — its category and code chips and the chips of `typeIds`, accepted ones only (a draft
+ * waits for its review in the Library, as the app library's drafts always did). The project's
+ * `vocab` phrases follow them as `chipsFor`'s `fallback`.
+ */
+export async function loadChipRows(store: Store, typeIds: readonly (string | null | undefined)[] = []): Promise<Suggestion[]> {
   const ids = typeIds.filter((t): t is string => !!t);
   const byType = ids.length ? ` OR (scope = 'type' AND ref IN (${ids.map(() => '?').join(', ')}))` : '';
   const rows = await store.list<Row>('suggestion', {
-    where: `state <> 'rejected' AND ((project_id = ? AND scope IN ('category', 'code'))${byType})`,
-    params: [projectId, ...ids],
+    where: `project_id IS NULL AND state = 'accepted' AND (scope IN ('category', 'code')${byType})`,
+    params: ids,
     orderBy: 'id',
   });
   return rows.map(toSuggestion);

@@ -11,9 +11,9 @@ the master's category strings (`NSPS`, `Relay panel`, …, D1), which the D196 e
   `Emergency Equipment` (ebdk), `Equipment Panels` / `Equipment Rack` (equipment_rack),
   `Touchscreen`, `Station` and `Sensor`. `Power Distribution` and `Equipment` name several
   roles, so a device of those categories with no type is `other`: the type carries the role.
-- `DeviceRoles` resolves a project's devices against its live types (its own and the app
-  library's) once: by `library_type_id`, else by Device text = model or alias, spaces and case
-  ignored (D183 (4)).
+- `DeviceRoles` resolves a project's devices against the app library's live types once (the one
+  library, T196 / D287 (1)): by `library_type_id`, else by Device text = model or alias, spaces
+  and case ignored (D183 (4)).
 """
 
 from __future__ import annotations
@@ -168,26 +168,27 @@ def model_key(s: str) -> str:
 
 
 class DeviceRoles:
-    """The roles of a project's devices, resolved against its live types once (D183 (4))."""
+    """The roles of a project's devices, resolved against the app library's live types once
+    (D183 (4), D287 (1))."""
 
     def __init__(self, types: Iterable[LibraryType]):
         self.by_id: dict[uuid.UUID, LibraryType] = {}
         self.by_name: dict[str, LibraryType] = {}
-        rows = sorted(types, key=lambda t: (t.project_id is None, str(t.id)))
+        rows = sorted(types, key=lambda t: str(t.id))
         for t in rows:
             self.by_id[t.id] = t
             if t.state == "rejected":
                 continue
             for name in (t.model, *(t.aliases or [])):
                 if isinstance(name, str) and name:
-                    # the project's type before the app library's (sorted above)
+                    # the first by id when two types share a name (sorted above)
                     self.by_name.setdefault(model_key(name), t)
 
     @classmethod
-    def load(cls, session: Session, project_id: uuid.UUID) -> "DeviceRoles":
+    def load(cls, session: Session) -> "DeviceRoles":
         rows = session.scalars(
             select(LibraryType).where(
-                (LibraryType.project_id == project_id) | (LibraryType.project_id.is_(None)),
+                LibraryType.project_id.is_(None),
                 LibraryType.deleted_at.is_(None),
             )
         ).all()

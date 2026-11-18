@@ -866,6 +866,12 @@ Decision D281–D284 (Claude's calls, T188–T191): (D281) the shell is a wrappe
 - [ ] **No screen leaves you stuck.** Do the work each screen is for without its old coaching: place a device (⊕ Place → pick a device → tap the plan; the banner "Pick a device in the list…" is gone), place an ink text note and use Erase / Recolor (their one-line hints are gone), calibrate a grid, confirm a riser cable's endpoint in Review drafts, and set a rule default in Rule defaults (only the labels show now: the group descriptions and the "what this changes" lines are gone). Note any place where you did not know what to do next; that hint comes back. → saw:
 - [ ] **Errors, warnings and empty states still say what is wrong.** Airplane mode on: Export, Sync, Review drafts' source crop and excluded BOM lines each say they need a connection; an empty Vocabulary placeholder list reads "No placeholders yet."; a draft in conflict shows "⚑ Source conflict with the master's count." → saw:
 
+## T196 — One device library 1: server, core and rules  ·  Needs: nothing to test yet (it ships with T198's JS update; T198 adds the iPad checks)
+
+**Why it matters:** every project now reads the one app library; a project holds no types or chips and copies none. Only the decisions below are yours now.
+
+Decision D295 (Claude's readings, T196): (1) a type's cable rows are all read, whatever the code; your project's own code list only drives the cable-code finding and the pickers; (2) a project offers the Library's **accepted** chips only, so a chip added in the Library shows on a card once someone accepts it there; (3) device categories and cable codes are app-level lists: a new project copies none, a DaVinci protocol nobody has ruled on becomes an app-level cable-code draft, and a ruling that renames a category changes the devices only; (4) when two types share a model or alias, the older one wins; (5) Add device and placing a draft put an unknown model's draft type in the Library (moved here from T197). → Approve / change:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

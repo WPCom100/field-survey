@@ -19,7 +19,8 @@ Panic → P, LinkConnect and EchoConnect → U, aux power → UV, Sense → 120V
 Ethernet → NG on Touchscreen and Station types else N, Paradigm Portable → N (D199, D200); a
 Power **input** → 120V, a Power output is a load circuit and no cable; the protocols Landry ruled
 **not surveyed** (contact closures, USB, serial, MIDI…) make no row; any protocol nobody has ruled
-on becomes a `vocab(cable_code)` draft in the uploading project — never a new code). A type that
+on becomes a `vocab(cable_code)` draft in the app library, whose cable-code list every project
+reads (T196, D292 (9)) — never a new code). A type that
 **is a power supply** (DaVinci's Power Supplies category, a PowerSupplyCurrentDraw script, a
 "Power Supply - Aux" property, or the name) or **carries one as an accessory** gets a `120V` feed
 row too (D198: every power supply needs a 120 V line in). `optional_accessories` = the
@@ -35,11 +36,11 @@ the NSPS -KIT power-supply expectation (D52) are not written: the reviewer adds 
 Re-running on a newer file updates **draft** rows by DaVinci `typeId` (field by field, as `set`
 ops with history) and never touches an accepted or rejected type — except a Neuron flag `true`
 the import itself wrote on an NSPS or rack type, which it clears in a `Correction` op (D222),
-and a category it set that the mapping now files elsewhere (D232), which it corrects on the app
-type and on the project copies of it nobody edited, in `Correction` ops; a flag or category a
-person set (any later op) stays, on a draft too. With `retire_hand_made` the
+and a category it set that the mapping now files elsewhere (D232), which it corrects in a
+`Correction` op; a flag or category a person set (any later op) stays, on a draft too. Projects
+hold no copies of types (T196, D287 (1)), so nothing else is corrected. With `retire_hand_made` the
 run first soft-deletes every app-library type that has no `source_ref` (hand-made, any state) —
-Landry's ruling once the catalogue covers them (D199); the project copies of those types stay.
+Landry's ruling once the catalogue covers them (D199).
 The same pair of files is not imported twice (`skipped`). Everything is one transaction through
 the ordinary apply loop.
 """
@@ -67,7 +68,6 @@ from app.auth import system_user, upsert_user
 from app.ids import uuid7
 from app.jobs import runner
 from app.models import FieldHead, ImportBatch, LibraryType, Op, Project, User, Vocab
-from app.projects import CREATED_REASON
 from app.roles import NO_NEURON_ROLES, role_of, role_of_category
 from app.storage import ObjectStore
 from app.sync import LIBRARY_STREAM, SERVER_INSTALL_ID, OpIn, Push, jsonable
@@ -906,8 +906,8 @@ def create_davinci_batch(
     retire_hand_made: bool = False,
 ) -> ImportBatch:
     """Store the library (and the mapping workbook, else reuse the last uploaded one) and queue
-    the job under `project_id` — the project whose Sources screen started it, which also takes
-    the `vocab(cable_code)` drafts. `retire_hand_made` soft-deletes the app library's hand-made
+    the job under `project_id` — the project whose Sources screen started it (the types and the
+    `vocab(cable_code)` drafts go to the app library). `retire_hand_made` soft-deletes the hand-made
     types first (D199). Commits. Raises `runner.ImportError_` on a bad request."""
     if session.get(Project, project_id) is None:
         raise runner.ImportError_(f"unknown project {project_id}")
@@ -1030,16 +1030,6 @@ def _set_by_import(session: Session, head: uuid.UUID | None) -> bool:
     return head is None or session.scalar(select(Op.reason).where(Op.op_id == head)) == REASON
 
 
-def _copied_or_imported(session: Session, head: uuid.UUID | None) -> bool:
-    """A project type's field still holds what the import set (D232): its head op is the create
-    that copied the type into a new project (`projects._copy`) or an earlier import correction."""
-    op = session.get(Op, head) if head else None
-    if op is None:
-        return False
-    reason = op.reason or ""
-    return reason == REASON or (op.kind == "create" and reason.startswith(CREATED_REASON))
-
-
 def _same(a: Any, b: Any) -> bool:
     return json.dumps(jsonable(a), sort_keys=True) == json.dumps(jsonable(b), sort_keys=True)
 
@@ -1129,17 +1119,6 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
 
     plan = build_plan(lib, mapping, reserved=reserved, filename=lib_name)
 
-    # Project copies of app types (made at project creation, D65) by model: the category fix
-    # reaches the ones nobody edited (D232).
-    copies: dict[str, list[LibraryType]] = {}
-    for c in session.scalars(
-        select(LibraryType).where(
-            LibraryType.project_id.is_not(None), LibraryType.deleted_at.is_(None)
-        )
-    ):
-        copies.setdefault(model_key(c.model), []).append(c)
-    copy_ops: dict[uuid.UUID, _Ops] = {}
-
     counts: Counter[str] = Counter()
     for tp in plan.types:
         row = by_type_id.get(tp.type_id)
@@ -1166,22 +1145,12 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
         if row.needs_neuron_id is True and role in NO_NEURON_ROLES and by_import:
             counts["neuron_flags_corrected"] += 1
         # The category the mapping files the type under replaces the one the import set, in any
-        # state and on the project copies nobody edited; a person's category stands (D232).
+        # state; a person's category stands (D232). Projects hold no copies to correct (T196).
         category = tp.payload.get("category")
         category_head = _head(session, row.id, "category")
         category_by_import = _set_by_import(session, category_head)
-        if category_by_import:
-            if not _same(row.category, category):
-                counts["categories_corrected"] += 1
-            for c in copies.get(model_key(row.model), []):
-                c_head = _head(session, c.id, "category")
-                if _same(c.category, category) or not _copied_or_imported(session, c_head):
-                    continue
-                c_ops = copy_ops.setdefault(c.project_id, _Ops(c.project_id, actor.id))
-                c_ops.set(
-                    "library_type", c.id, "category", c.category, category, c_head, CORRECTION
-                )
-                counts["categories_corrected"] += 1
+        if category_by_import and not _same(row.category, category):
+            counts["categories_corrected"] += 1
         if row.state != "draft":
             counts["kept_" + row.state] += 1
             if row.needs_neuron_id is True and role in NO_NEURON_ROLES and by_import:
@@ -1215,30 +1184,28 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
             changed += 1
         counts["updated" if changed else "unchanged"] += 1
         counts["fields_set"] += changed
-    push = _push(session, LIBRARY_STREAM, ops.ops, library=True) if ops.ops else None
-    for pid, c_ops in copy_ops.items():
-        _push(session, pid, c_ops.ops, library=False)
-
-    # Unmapped port protocols: `vocab(cable_code)` drafts in the uploading project (D197).
+    # Unmapped port protocols: `vocab(cable_code)` drafts in the app library (D197), whose
+    # cable-code list every project reads (T196, D292 (9)); they ride the same library push.
     have = {
         v.value.lower()
         for v in session.scalars(
             select(Vocab).where(
-                Vocab.project_id == project.id,
+                Vocab.project_id.is_(None),
                 Vocab.list == CABLE_CODE_LIST,
                 Vocab.deleted_at.is_(None),
             )
         )
     }
-    vocab_ops = _Ops(project.id, actor.id)
+    vocab_ops = _Ops(LIBRARY_STREAM, actor.id)
     for name in plan.unmapped_protocols:
         if name.lower() in have:
             continue
         vocab_ops.create(
             "vocab",
-            {"project_id": project.id, "list": CABLE_CODE_LIST, "value": name, "state": "draft"},
+            {"project_id": None, "list": CABLE_CODE_LIST, "value": name, "state": "draft"},
         )
-    vpush = _push(session, project.id, vocab_ops.ops, library=False) if vocab_ops.ops else None
+    all_ops = ops.ops + vocab_ops.ops
+    push = _push(session, LIBRARY_STREAM, all_ops, library=True) if all_ops else None
 
     stats = {
         "file": lib_name,
@@ -1256,9 +1223,8 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
         "categories_corrected": counts["categories_corrected"],
         "retired": retired,
         "vocab_drafts": len(vocab_ops.ops),
-        "ops": len(ops.ops) + len(vocab_ops.ops) + sum(len(o.ops) for o in copy_ops.values()),
+        "ops": len(all_ops),
         "last_library_seq": push.seq if push else None,
-        "last_server_seq": vpush.seq if vpush else None,
     }
     _event(
         "davinci_applied",
@@ -1294,7 +1260,7 @@ def main(argv: list[str] | None = None) -> int:
         "--project",
         type=uuid.UUID,
         required=True,
-        help="the project the batch is filed under (its vocabulary takes the unmapped protocols)",
+        help="the project the batch is filed under (its Sources list it)",
     )
     parser.add_argument(
         "--categories",

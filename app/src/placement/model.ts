@@ -207,7 +207,7 @@ type Computed = {
 
 async function compute(store: Store, projectId: string): Promise<Computed> {
   const levels = await store.list<LevelRow>('level', { where: 'project_id = ?', params: [projectId], orderBy: 'floor_order, level' });
-  const types = await loadDeviceTypes(store, projectId);
+  const types = await loadDeviceTypes(store);
   const rawDevices = await store.db.query<Row>(
     `SELECT d.id, d.level_id, d.display_id, d.category, d.device, d.panel_name, d.room_location, d.drawing_position, d.pin, d.baseline_ref_id, d.library_type_id
        FROM device d JOIN level l ON l.id = d.level_id

@@ -14,7 +14,7 @@ references: PLAN §3.1 (the op), §3.2 (apply steps, pull), §3.3 (conflict rule
 | `app/api/ops.py` | The routes: one transaction per push (commit on success, rollback and 409/422/500 otherwise); paged pull. |
 | `tests/test_ops.py` | Every row of PLAN §3.3, D37 ordering, numbering, idempotency, validation, one-transaction. |
 | `tests/test_pull_materialise.py` | Pull paging and states; materialised rows per op kind; replay == state; no `server_seq` gaps under 8 concurrent pushers (TP-7 partial). |
-| `app/projects.py`, `app/api/projects.py` | `POST /projects` / `GET /projects` (T41, D127): the `project` row a push locks on, then the project, its `numbering_group`s, levels and copies written as trusted ops (`Push(trusted=True)`) so an iPad's first pull delivers them. Replaces the `app.seed` CLI (D89); the twin-client harness (`packages/core/docs/e2e.md`) uses it. |
+| `app/projects.py`, `app/api/projects.py` | `POST /projects` / `GET /projects` (T41, D127): the `project` row a push locks on, then the project, its `numbering_group`s, levels and copies (vocabulary, rulings, rule parameters, placeholders; never device types or suggestion chips, T196) written as trusted ops (`Push(trusted=True)`) so an iPad's first pull delivers them. Replaces the `app.seed` CLI (D89); the twin-client harness (`packages/core/docs/e2e.md`) uses it. |
 
 ## Request and response
 
@@ -111,7 +111,8 @@ run it inside one transaction.
   op). A null `level_id` (cable ends off any level) → no number yet, logged as `assign_skipped`;
   an unknown `level_id` fails the push (409). A replayed create never renumbers.
   **Devices (D93, T63):** a `device` create without `display_id` whose scheme is `level_number`
-  (library type's `id_scheme`, else Station/Sensor → `level_tag`, any other category →
+  (its app-library type's `id_scheme` — the one library, T196: a type row naming a project is
+  not read — else Station/Sensor → `level_tag`, any other category →
   `level_number`) gets an `assign` op on `device.display_id` = `<level code>-<nn>`, highest number
   ever used on that level code in the project + 1, two digits (every device `display_id` in the
   op log in any state, plus the device table: deleted, renamed and imported IDs stay used). Per
@@ -210,11 +211,22 @@ as a project's `/ops`, in a log of its own (`app/api/library.py`, `Push(..., lib
   the wire and on the iPad; Postgres stores them with `project_id` **null** and numbers them on
   their own (`uq_op_library_server_seq`, a partial unique index); pushes are serialised by an
   advisory lock instead of the project row lock. `op_to_json` writes the stream id back.
-- Only `library_type` (with `project_id` null) and `review_item` sets (resolutions) are taken;
-  anything else is 422. A project push may not create a `library_type` without its project.
+- Only `library_type`, `suggestion`, `rule_param` and `vocab` rows with `project_id` null and
+  `review_item` sets (resolutions) are taken; anything else is 422.
+- **One library (T196, D287 (1), D292 (9)).** Device types and suggestion chips exist at app
+  level only: any op on a `library_type` or a `suggestion` in a project push (`/ops`) is refused
+  with 422 ("… belongs to the app library, never to a project: push it to /library/ops …"),
+  whatever its kind or payload, and the iPad quarantines it (D145). A project's device names an
+  app type by `library_type_id`; a type made in the same sync cycle (a draft for a model the
+  library lacks, D292 (2)) is already a row when the project push arrives, because the iPad
+  pushes the library stream first (`SyncEngine.defaultProjects`), and the deferred foreign key
+  holds. Rule parameters and vocabulary stay at both scopes; the vocabulary's `category` and
+  `cable_code` lists are read at app level only (`APP_VOCAB_LISTS`).
 - A conflict's `review_item` row has `project_id` null; its `create` op's payload carries the
   stream id on the wire, because the iPad's `review_item.project_id` is NOT NULL. Needs review
   lists it under the stream (`/review?project=<LIBRARY_STREAM>`).
 - `library_type.promoted_from_id` is a plain id (no foreign key, migration 0009): a promotion
   names a project's type across logs, and the two commit separately.
-- New projects copy the app library's accepted types at creation (`projects._copy`, D65).
+- New projects copy no types and no chips (T196; before it they copied the app library's
+  accepted types, D65): every project reads the app library, so a library edit reaches every
+  project on its next rules run (D287 (3)).

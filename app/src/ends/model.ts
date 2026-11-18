@@ -199,6 +199,6 @@ export async function loadCableEnds(store: Store, endId: string): Promise<CableV
     riser: riserCheck(str(cable.riser_to_label), [mine, other].find((e) => e?.side === 'A' && e.toText)?.toText ?? mine.toText ?? other?.toText ?? null),
     // the cable code's suggestion chips first (T99, D174 (2)), then the project's list; the
     // "; no term kit" Note only on a cable that takes kits (T118, D213)
-    phrases: chipsFor(await loadChipRows(store, project), { codes: [str(cable.cable)], params: ruleParams, termKit: ownKits }, 'connection_note', vocabRows.length ? vocabRows.map((v) => String(v.value)) : CONNECTION_PHRASES),
+    phrases: chipsFor(await loadChipRows(store), { codes: [str(cable.cable)], params: ruleParams, termKit: ownKits }, 'connection_note', vocabRows.length ? vocabRows.map((v) => String(v.value)) : CONNECTION_PHRASES),
   };
 }

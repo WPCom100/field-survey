@@ -2401,7 +2401,7 @@ class _Build:
                         self.merge(d, same_level, riser_ref, conflicts)
                         continue
                     pooled = self.pooled_for(code, key) if code else []
-                    # the project's library type for the model, when there is one, gives the
+                    # the library's type for the model, when there is one, gives the
                     # role and category (D183 (4), T115); else what the riser read
                     kind = (
                         bx.classify(m.model, self.norm)

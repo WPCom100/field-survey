@@ -152,7 +152,7 @@ function scopeWhere(scope: string | null): { where: string; params: string[] } {
   return scope ? { where: 'project_id = ?', params: [scope] } : { where: 'project_id IS NULL', params: [] };
 }
 
-function toType(r: Row, codes: readonly string[], params: RuleParams): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | 'promotedAs'> {
+function toType(r: Row, params: RuleParams): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | 'promotedAs'> {
   const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
   // what the type alone implies for a device of it with no cable record (T146): its flags, else its default cables and role
   const needs = addressNeeds(
@@ -170,8 +170,8 @@ function toType(r: Row, codes: readonly string[], params: RuleParams): Omit<Libr
     role: isRole(r.role) ? r.role : null,
     effectiveRole: roleOf({ role: r.role, category: str(r.category) }, null),
     idScheme: r.id_scheme === 'level_tag' || r.id_scheme === 'level_number' ? r.id_scheme : null,
-    defaultCables: parseLibraryCables(r.default_cables, codes),
-    optionalCables: parseLibraryCables(r.optional_cables, codes),
+    defaultCables: parseLibraryCables(r.default_cables),
+    optionalCables: parseLibraryCables(r.optional_cables),
     optionalAccessories: parseLibraryAccessories(r.optional_accessories),
     needsNeuronId: flag(r.needs_neuron_id),
     needsIpAddress: flag(r.needs_ip_address),
@@ -231,7 +231,7 @@ export async function loadLibrary(store: Store, scope: string | null): Promise<L
   }
   const types: LibraryType[] = [];
   for (const r of rows) {
-    const t = toType(r, codes, ruleParams);
+    const t = toType(r, ruleParams);
     const keys = new Set([t.model, ...t.aliases].map(modelKey));
     const count = devices.filter((d) => (d.library_type_id ? d.library_type_id === t.id : !!d.device && keys.has(modelKey(d.device)))).length;
     const first = (await store.opsFor(t.id))[0];

@@ -957,7 +957,7 @@ describe('draft roles (T115, D201)', () => {
   });
 
   it("placement's type match (T46): the catalogue type by model, its role before the draft's", () => {
-    const t = (id: string, model: string, category: string, role: string | null): DeviceType => ({ id, project_id: null, model, aliases: [], state: 'accepted', category, needs_neuron_id: null, role });
+    const t = (id: string, model: string, category: string, role: string | null): DeviceType => ({ id, model, aliases: [], state: 'accepted', category, needs_neuron_id: null, role });
     const types = new Map<string, DeviceType>([
       ['a', t('a', 'ERP24-FT-241P', 'Power Distribution', null)],
       ['b', t('b', 'UFMP8', 'Power Distribution', 'foundry_panel')],

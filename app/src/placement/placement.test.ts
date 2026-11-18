@@ -5,7 +5,7 @@
  * the waiting cable), the not-on-this-sheet flag, and the progress per level.
  */
 
-import { Editor, OpError, Store, uuidv7, type Op } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, OpError, Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
@@ -161,9 +161,10 @@ describe('unplaced list (T46)', () => {
     const dev = await store.get<Record<string, unknown>>('device', r.deviceId);
     expect(dev).toMatchObject({ level_id: ids.l02, baseline_ref_id: ids.dUfmp, device: 'UFMP4', category: 'Power Distribution', origin: 'baseline', drawing_position: 'Grid A / 1', pin: { sheet: ids.s02, x: 40, y: 50 } });
     expect(dev!.display_id ?? null).toBeNull();
-    // no library type for UFMP4: a draft project type carrying the draft's role
+    // no library type for UFMP4: a draft type in the one library carrying the draft's role (T196, D292 (2))
     const type = await store.get<Record<string, unknown>>('library_type', String(dev!.library_type_id));
-    expect(type).toMatchObject({ project_id: PROJECT, model: 'UFMP4', role: 'foundry_panel', state: 'draft' });
+    expect(type).toMatchObject({ project_id: null, model: 'UFMP4', role: 'foundry_panel', state: 'draft' });
+    expect((await store.opsFor(String(dev!.library_type_id))).map((o) => o.project_id)).toEqual([LIBRARY_STREAM]);
     const acc = await store.list<Record<string, unknown>>('accessory', { where: 'device_id = ?', params: [r.deviceId] });
     expect(acc.map((a) => [a.model, a.expected_qty])).toEqual([['ERM VDK', 1]]);
     // the cable waiting on it is made (its other end is the master's panel, by its tag)
@@ -418,7 +419,7 @@ describe('proposals from the sheet text tags (T46)', () => {
   });
 
   // the app library's rows for what the 03 composite prints (T111 import, trimmed)
-  const type = (id: string, model: string, role: string, aliases: string[] = []): DeviceType => ({ id, project_id: null, model, aliases, state: 'accepted', category: null, needs_neuron_id: null, role });
+  const type = (id: string, model: string, role: string, aliases: string[] = []): DeviceType => ({ id, model, aliases, state: 'accepted', category: null, needs_neuron_id: null, role });
   const TYPES: DeviceTypes = new Map(
     [
       type('t-pi', 'PI1104', 'station', ['Inspire Station - 4 Btn Fader', 'PI1104-X']),

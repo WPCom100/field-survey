@@ -8,6 +8,7 @@ import {
 } from './device-id';
 import { Editor, type EditContext } from './editor';
 import { uuidv7 } from './ids';
+import { LIBRARY_STREAM } from './library-stream';
 import { BetterSqliteDriver } from './node';
 import { Store } from './store';
 
@@ -115,7 +116,8 @@ describe('deviceIdFor', () => {
 
   it('the library type’s scheme wins over the category default', async () => {
     const type = async (category: string, id_scheme: string) =>
-      (await editor.create('library_type', { project_id: PROJECT, model: `m-${id_scheme}`, category, id_scheme }, CTX)).id;
+      // an app-library type (T196: the one library), on the library stream
+      (await new Editor(store, { projectId: LIBRARY_STREAM, userId: uuidv7() }).create('library_type', { project_id: null, model: `m-${id_scheme}`, category, id_scheme }, CTX)).id;
     const sensorAsNumber = await type('Sensor', 'level_number');
     expect(
       await deviceIdFor(store, { projectId: PROJECT, levelId: L06M, category: 'Sensor', libraryTypeId: sensorAsNumber }),

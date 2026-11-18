@@ -178,7 +178,8 @@ export interface LibraryTypeRow extends Deletable {
 
 export interface VocabRow extends Deletable {
   id: string;
-  project_id: string;
+  /** Null = the app library's (`appVocab`, T196: the category and cable-code lists). */
+  project_id: string | null;
   list: string;
   value: string;
   canonical_of_id: string | null;
@@ -276,8 +277,15 @@ export interface Snapshot {
   punchItems: PunchItemRow[];
   missingParts: MissingPartRow[];
   partSources: PartSourceRow[];
+  /** The app library's types: one library for every project (T196, D287 (1)). */
   libraryTypes: LibraryTypeRow[];
+  /** The project's vocabulary, the app-level lists (`APP_VOCAB_LISTS`) left out. */
   vocab: VocabRow[];
+  /**
+   * The app library's accepted rows of the app-level lists (T196, D292 (9)): the device
+   * categories and cable codes every project reads; absent = none.
+   */
+  appVocab?: VocabRow[];
   proposals: ProposalRow[];
   findings: FindingRow[];
   sheets: SheetRow[];

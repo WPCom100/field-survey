@@ -428,7 +428,7 @@ export async function loadDraftReview(store: Store, projectId: string): Promise<
      WHERE l.project_id = ? AND d.deleted_at IS NULL`,
     [projectId],
   );
-  const types = await loadDeviceTypes(store, projectId);
+  const types = await loadDeviceTypes(store);
   const placeholders = await store.list<{ id: string; label: string; kind: string; level_id: string | null }>('placeholder', {
     where: 'project_id = ? AND deleted_at IS NULL',
     params: [projectId],

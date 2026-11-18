@@ -146,30 +146,34 @@ class Numbering:
 
     # ----------------------------------------------------------- device IDs (D93)
 
-    def device_role(self, payload: dict) -> str:
-        """The created device's role (T112, D201): its library type's `role` (from its row, else
-        from the op log), else the type's category's, else its own category's. Mirrors `roleOf`
-        in core."""
+    def type_value(self, payload: dict, field: str):
+        """`field` of the created device's library type (from its row, else from the op log),
+        or None when it names none. Only an app-library type counts (T196, D287 (1)): the one
+        library, which the iPad pushes before the project, so a type made in the same sync
+        cycle is already a row here."""
         type_id = payload.get("library_type_id")
-        type_category = None
-        if type_id:
-            type_id = uuid.UUID(str(type_id))
-            role = self.value(LibraryType, type_id, "role")
-            if is_role(role):
-                return role
-            type_category = self.value(LibraryType, type_id, "category")
-        return role_of_category(type_category or payload.get("category"))
+        if not type_id:
+            return None
+        type_id = uuid.UUID(str(type_id))
+        if self.value(LibraryType, type_id, "project_id") is not None:
+            return None
+        return self.value(LibraryType, type_id, field)
+
+    def device_role(self, payload: dict) -> str:
+        """The created device's role (T112, D201): its library type's `role`, else the type's
+        category's, else its own category's. Mirrors `roleOf` in core."""
+        role = self.type_value(payload, "role")
+        if is_role(role):
+            return role
+        return role_of_category(self.type_value(payload, "category") or payload.get("category"))
 
     def device_scheme(self, payload: dict) -> str:
         """`level_number` or `level_tag` for a device create: the library type's `id_scheme`
-        wins (from its row, else from the op log), else the device's role: station / sensor →
-        `level_tag`, everything else (category unknown included) → `level_number`. Mirrors
-        `deviceIdFor` in core."""
-        type_id = payload.get("library_type_id")
-        if type_id:
-            scheme = self.value(LibraryType, uuid.UUID(str(type_id)), "id_scheme")
-            if scheme:
-                return scheme
+        wins, else the device's role: station / sensor → `level_tag`, everything else (category
+        unknown included) → `level_number`. Mirrors `deviceIdFor` in core."""
+        scheme = self.type_value(payload, "id_scheme")
+        if scheme:
+            return scheme
         return "level_tag" if self.device_role(payload) in TAG_PREFIX else "level_number"
 
     def next_device_id(self, level_id: uuid.UUID, prefix: str = "") -> str | None:

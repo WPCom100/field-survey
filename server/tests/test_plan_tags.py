@@ -168,15 +168,14 @@ def test_06m_keeps_its_panels_and_drops_its_notes():
 
 
 def test_the_job_reads_the_library(session, store, factory, monkeypatch):
-    """The plans job passes the names of the project's library and the app library, rejected and
-    deleted types left out (T140)."""
+    """The plans job passes the names of the app library's types, rejected and deleted types
+    left out (T140); a type row naming a project (none since T196, D287 (1)) is not read."""
     project_id, level, _ = _project_with_level(session)
-    other_id, _, _ = _project_with_level(session, "03")
     session.add_all(
         [
             LibraryType(id=uuid7(), project_id=None, model="PI1104", aliases=["PI1104-X"]),
-            LibraryType(id=uuid7(), project_id=project_id, model="P-LS", state="accepted"),
-            LibraryType(id=uuid7(), project_id=other_id, model="P-DOC-C", state="accepted"),
+            LibraryType(id=uuid7(), project_id=None, model="P-LS", state="accepted"),
+            LibraryType(id=uuid7(), project_id=project_id, model="P-DOC-C", state="accepted"),
             LibraryType(id=uuid7(), project_id=None, model="UFMP4", state="rejected"),
         ]
     )
@@ -234,7 +233,7 @@ def test_retag_rereads_the_tags_of_stored_sheets(session, store, factory):
     stored = {k: v for k, v in sheet.features.items() if k != "tags"}
 
     session.add(LibraryType(id=uuid7(), project_id=None, model="PI1104", state="accepted"))
-    session.add(LibraryType(id=uuid7(), project_id=project_id, model="PI1002", state="accepted"))
+    session.add(LibraryType(id=uuid7(), project_id=None, model="PI1002", state="accepted"))
     session.commit()
     out = plans.retag_sheets(session, store, project_id, user.id)
     session.commit()

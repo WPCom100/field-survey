@@ -22,7 +22,7 @@ the same level and kind is not imported twice (`skipped`). Room codes and tags a
 project's `vocab(room_code_pattern)` / `vocab(tag_pattern)` rows (T79, D240; none = the Tower's
 built-in patterns); a pattern that does not compile is skipped and listed in the batch's
 `bad_patterns`. The tags also keep every device type the sheet prints beside a device — a model
-or alias of the project's library or the app library (T140, D234). `retag` re-reads the tags of
+or alias of the app library's types (T140, D234; one library, T196). `retag` re-reads the tags of
 a project's live sheets from their stored PDFs after the tag pass or the library changes (the
 same file is never uploaded twice, and a replaced display sheet leaves its pins behind until
 T77): one `set` of `features` per sheet whose tags changed, only `tags` replaced in it.
@@ -288,12 +288,12 @@ def project_patterns(
     return patterns, source, bad
 
 
-def library_names(session: Session, project_id: uuid.UUID) -> frozenset[str]:
+def library_names(session: Session) -> frozenset[str]:
     """The device names the text pass reads as printed types (T140, D234): the models and aliases
-    of the project's live library and the app library's, rejected types left out."""
+    of the app library's live types (the one library, T196, D287 (1)), rejected types left out."""
     rows = session.execute(
         select(LibraryType.model, LibraryType.aliases).where(
-            (LibraryType.project_id == project_id) | (LibraryType.project_id.is_(None)),
+            LibraryType.project_id.is_(None),
             LibraryType.deleted_at.is_(None),
             LibraryType.state != "rejected",
         )
@@ -346,7 +346,7 @@ def import_sheets(session: Session, store: ObjectStore, batch: ImportBatch) -> d
     user_id = (requester or system_user(session, "import")).id
     ops = _Ops(project.id, user_id)
     patterns, pattern_source, bad_patterns = project_patterns(session, project.id)
-    names = library_names(session, project.id)
+    names = library_names(session)
     title = Path(str(entry.get("name") or "sheet.pdf")).stem
     pages = range(1) if sheet_kind == "display" else range(plan_analysis.page_count(data))
     sheets: list[dict[str, Any]] = []
@@ -465,7 +465,7 @@ def retag_sheets(
     gets one `set` of `features` with only `tags` replaced (rooms, bubbles and boundaries as
     stored), through the ordinary apply loop; the caller commits. Returns what changed per sheet."""
     patterns, _, bad_patterns = project_patterns(session, project_id)
-    names = library_names(session, project_id)
+    names = library_names(session)
     sheets = session.scalars(
         select(Sheet)
         .join(Level, Level.id == Sheet.level_id)

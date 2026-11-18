@@ -102,10 +102,14 @@ def test_project_creation_copies_accepted_app_vocabulary_with_its_pairs(client, 
     v(None, "type", "Echo relay panel")
     v(None, "type", "Gone", deleted=True)
     v(None, "type", "Rejected", state="rejected")
+    # the device categories and cable codes are app-level lists, read there, never copied (T196)
+    v(None, "category", "Dimmer rack")
+    v(None, "cable_code", "DX")
     # the source's own: one duplicate of an app value, one variant of the app's canonical
     sdoc = v(sid, "model_map", "p-doc-w")
     v(sid, "model_map", "P-DOC-W-4Z", sdoc)
     v(sid, "level_alias", "06M")
+    v(sid, "category", "Old category")
     session.commit()
 
     def rows(pid):

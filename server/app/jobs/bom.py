@@ -125,8 +125,9 @@ class _Body:
 
 
 def target_of(session: Session, project_id: uuid.UUID) -> bom_extract.Target:
-    """The project's levels, `model_map` / `level_alias` vocabulary and device-type library
-    (project rows, then the app library's, D65) as the extractor reads them."""
+    """The project's levels and `model_map` / `level_alias` vocabulary, and the device-type
+    library (the app library: one library for every project, T196, D287 (1)) as the extractor
+    reads them."""
     levels = {
         lv.level: lv.id
         for lv in session.scalars(
@@ -141,10 +142,9 @@ def target_of(session: Session, project_id: uuid.UUID) -> bom_extract.Target:
         .where(
             LibraryType.deleted_at.is_(None),
             LibraryType.state != "rejected",
-            (LibraryType.project_id == project_id) | (LibraryType.project_id.is_(None)),
+            LibraryType.project_id.is_(None),
         )
-        # the project's own types first, so they win over the app library's
-        .order_by(LibraryType.project_id.is_(None), LibraryType.id)
+        .order_by(LibraryType.id)
     )
     for t in rows:
         library.append(

@@ -199,7 +199,7 @@ def load(
             select(model).where(model.level_id == level.id, model.deleted_at.is_(None))
         ).all()
 
-    roles = DeviceRoles.load(session, project_id)  # T112: the devices' roles, by their types
+    roles = DeviceRoles.load(session)  # T112: the devices' roles, by their (app library) types
     data.shapes = pin_shapes(session)  # T104: the app library's shape per role
     devices = live(Device)
     punches = live(PunchItem)

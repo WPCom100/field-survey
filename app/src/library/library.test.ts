@@ -62,24 +62,22 @@ describe('device-type library editor (T48)', () => {
     const ts = await createType(p.editor, store, p.id, { model: ' P-TS18-E ', category: 'Touchscreen' });
     await expect(createType(p.editor, store, p.id, { model: 'p-ts18-e', category: null })).rejects.toThrow(/already in the library/);
     await expect(createType(p.editor, store, p.id, { model: '  ', category: null })).rejects.toThrow(/model first/);
-    // a model typed on the plan (T23) arrives as a draft of the project
+    // a model typed on the plan (T23) arrives as a draft of the one library (T196, D292 (2))
     const added = await addFieldDevice(p.editor, store, { projectId: p.id, levelId: p.levelId, category: 'Relay panel', typedModel: 'ERP-XYZ' });
+    expect((await loadLibrary(store, null)).types).toMatchObject([{ id: added.draftTypeId, model: 'ERP-XYZ', state: 'draft', createdById: userId, projectId: null, idScheme: null, defaultCables: [] }]);
     // an imported device without a link, named like an accepted type's alias
     const rack = await createType(p.editor, store, p.id, { model: 'Equipment Rack 18U', category: 'Equipment rack' });
     await updateType(p.editor, store, rack, { aliases: parseAliases('18U rack, ERn4-RM ,18u RACK') });
     await acceptType(p.editor, rack);
     await p.editor.create('device', { level_id: p.levelId, display_id: '06M-01', category: 'Equipment rack', device: 'ERn4-RM' }, CTX);
     const lib = await loadLibrary(store, p.id);
-    expect(lib.drafts).toBe(2);
+    expect(lib.drafts).toBe(1);
     expect(lib.types.map((t) => [t.category, t.model, t.state, t.devices])).toEqual([
-      ['Relay panel', 'ERP-XYZ', 'draft', 1],
       ['Equipment rack', 'Equipment Rack 18U', 'accepted', 1],
       ['Touchscreen', 'P-TS18-E', 'draft', 0],
     ]);
-    const draft = lib.types[0]!;
-    expect(draft).toMatchObject({ id: added.draftTypeId, createdById: userId, projectId: p.id, idScheme: null, defaultCables: [] });
-    expect(draft.createdAt).toMatch(/^2025-|^2026-/);
-    expect(lib.types[1]!.aliases).toEqual(['18U rack', 'ERn4-RM']);
+    expect(lib.types[1]!.createdAt).toMatch(/^2025-|^2026-/);
+    expect(lib.types[0]!.aliases).toEqual(['18U rack', 'ERn4-RM']);
     // an alias of another type is a duplicate too
     await expect(createType(p.editor, store, p.id, { model: 'ern4-rm', category: null })).rejects.toThrow(/Equipment Rack 18U/);
     // rejected types sink to the bottom and free their model; reopen brings one back as a draft
@@ -137,38 +135,35 @@ describe('device-type library editor (T48)', () => {
     await expect(updateType(p.editor, store, id, { model: '' })).rejects.toThrow(/needs a model/);
   });
 
-  it("a code the scope's Rules give a signal word is a cable code of its types, the picker and the card (T117)", async () => {
+  it("a code the app library's Rules give a signal word is a cable code of its types; the card offers the run in any project (T117, T196)", async () => {
     const { store, userId, project } = await setup();
     const p = await project('Tower');
-    const id = await createType(p.editor, store, p.id, { model: 'DALI-GW', category: 'Equipment' });
+    const lib = new Editor(store, { projectId: LIBRARY_STREAM, userId });
+    const id = await createType(lib, store, null, { model: 'DALI-GW', category: 'Equipment' });
     const dx = { ...blankCable('DX'), to: 'DALI-2 bus', far: 'Fixtures' };
-    expect((await loadLibrary(store, p.id)).codes).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D']);
-    await expect(updateType(p.editor, store, id, { optionalCables: [dx] })).rejects.toThrow(/"DX" is not a cable code/);
-    await setRuleParam(p.editor, 'R3', 'signal', { DX: 'DALI-2' });
-    await updateType(p.editor, store, id, { optionalCables: [dx] });
-    const view = await loadLibrary(store, p.id);
+    expect((await loadLibrary(store, null)).codes).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D']);
+    await expect(updateType(lib, store, id, { optionalCables: [dx] })).rejects.toThrow(/"DX" is not a cable code/);
+    // the app library reads its own accepted Rules: a draft word is not enough
+    await setRuleParam(lib, 'R3', 'signal', { DX: 'DALI-2' });
+    await expect(updateType(lib, store, id, { optionalCables: [dx] })).rejects.toThrow(/not a cable code/);
+    await decideRuleParam(lib, 'R3', 'signal', 'accepted');
+    await updateType(lib, store, id, { optionalCables: [dx] });
+    const view = await loadLibrary(store, null);
     expect(view.codes.slice(-2)).toEqual(['D', 'DX']);
     expect(view.types[0]!.optionalCables.map((c) => c.code)).toEqual(['DX']);
-    // the card offers the run on a device of the type
+    // the card offers the run on a device of the type, though the project's own Rules give DX no
+    // signal word: a type's rows are never hidden by a project's code list (D287 (5))
     const device = await p.editor.create('device', { level_id: p.levelId, category: 'Equipment', device: 'DALI-GW', library_type_id: id }, CTX);
     expect((await loadDeviceCard(store, device.id))!.cableOffers.map((o) => o.cable.code)).toEqual(['DX']);
-    // the app library reads its own accepted Rules: a draft word is not enough; another project knows nothing of DX
-    const lib = new Editor(store, { projectId: LIBRARY_STREAM, userId });
-    const appType = await createType(lib, store, null, { model: 'DALI-GW', category: 'Equipment' });
-    await setRuleParam(lib, 'R3', 'signal', { DX: 'DALI-2' });
-    await expect(updateType(lib, store, appType, { optionalCables: [dx] })).rejects.toThrow(/not a cable code/);
-    await decideRuleParam(lib, 'R3', 'signal', 'accepted');
-    await updateType(lib, store, appType, { optionalCables: [dx] });
-    expect((await loadLibrary(store, null)).types[0]!.optionalCables.map((c) => c.code)).toEqual(['DX']);
-    expect((await loadLibrary(store, (await project('Other')).id)).codes).not.toContain('DX');
   });
 
-  it('Neuron ID per type (T68, D185; by the wires since T146, D245): the flag in the editor, the card, the dashboard and Copy from', async () => {
+  it('Neuron ID per type (T68, D185; by the wires since T146, D245): the flag in the editor, the card and the dashboard', async () => {
     const { store, project } = await setup();
     const p = await project('Tower');
-    const nspsType = await createType(p.editor, store, p.id, { model: 'P-NSPS-D-KIT', category: 'NSPS' });
-    const stationType = await createType(p.editor, store, p.id, { model: 'PI1002', category: 'Station' });
-    let lib = await loadLibrary(store, p.id);
+    const le = p.editor.forStream(LIBRARY_STREAM); // the one library (T196), on the same clock
+    const nspsType = await createType(le, store, null, { model: 'P-NSPS-D-KIT', category: 'NSPS' });
+    const stationType = await createType(le, store, null, { model: 'PI1002', category: 'Station' });
+    let lib = await loadLibrary(store, null);
     expect(lib.types.map((t) => [t.model, t.needsNeuronId, t.neuronId])).toEqual([
       ['P-NSPS-D-KIT', null, false],
       ['PI1002', null, true],
@@ -183,10 +178,10 @@ describe('device-type library editor (T48)', () => {
     expect(asFound(dash)).toMatchObject({ neuronCaptured: 0, neuronDevices: 1, devices: 3 });
     expect(drillRows(dash, { table: 'asFound', key: 'neuronMissing', status: null }).map((r) => r.label)).toEqual(['06M-S1']);
     // the editor's flag: one op; the station type stops needing one, the NSPS type starts
-    await updateType(p.editor, store, nspsType, { needsNeuronId: true });
-    await updateType(p.editor, store, stationType, { needsNeuronId: false });
+    await updateType(le, store, nspsType, { needsNeuronId: true });
+    await updateType(le, store, stationType, { needsNeuronId: false });
     expect((await store.opsFor(nspsType)).at(-1)).toMatchObject({ field: 'needs_neuron_id', now: true });
-    lib = await loadLibrary(store, p.id);
+    lib = await loadLibrary(store, null);
     expect(lib.types.map((t) => [t.model, t.needsNeuronId, t.neuronId])).toEqual([
       ['P-NSPS-D-KIT', true, true],
       ['PI1002', false, false],
@@ -196,12 +191,12 @@ describe('device-type library editor (T48)', () => {
     dash = await loadDashboard(store, p.id);
     expect(drillRows(dash, { table: 'asFound', key: 'neuronMissing', status: null }).map((r) => r.label)).toEqual(['06M-05']);
     // back to "by the wires"
-    await updateType(p.editor, store, nspsType, { needsNeuronId: null });
+    await updateType(le, store, nspsType, { needsNeuronId: null });
     expect((await loadDeviceCard(store, nsps.id))!.device.needsNeuronId).toBe(false);
     // T146: the IP / DMX flags the same way — the station type says its devices carry an IP address
-    await updateType(p.editor, store, stationType, { needsIpAddress: true, needsDmxAddress: false });
+    await updateType(le, store, stationType, { needsIpAddress: true, needsDmxAddress: false });
     expect((await store.opsFor(stationType)).slice(-2).map((o) => [o.field, o.now])).toEqual([['needs_ip_address', true], ['needs_dmx_address', false]]);
-    expect((await loadLibrary(store, p.id)).types.find((t) => t.id === stationType)).toMatchObject({ needsIpAddress: true, needsDmxAddress: false, ipAddress: true, dmxAddress: false });
+    expect((await loadLibrary(store, null)).types.find((t) => t.id === stationType)).toMatchObject({ needsIpAddress: true, needsDmxAddress: false, ipAddress: true, dmxAddress: false });
     let card = (await loadDeviceCard(store, station.id))!;
     expect([card.device.needsNeuronId, card.device.needsIpAddress, card.device.needsDmxAddress]).toEqual([false, true, false]);
     // by the wires: a DMX run landing on the rack gives it a DMX address need; the NSPS with no wires needs nothing
@@ -211,11 +206,6 @@ describe('device-type library editor (T48)', () => {
     expect([card.device.needsNeuronId, card.device.needsIpAddress, card.device.needsDmxAddress]).toEqual([false, false, true]);
     card = (await loadDeviceCard(store, nsps.id))!;
     expect([card.device.needsNeuronId, card.device.needsIpAddress, card.device.needsDmxAddress]).toEqual([false, false, false]);
-    // Copy from carries the flags
-    await acceptType(p.editor, stationType);
-    const q = await project('Other');
-    await copyTypes(q.editor, store, q.id, [stationType]);
-    expect((await loadLibrary(store, q.id)).types[0]).toMatchObject({ model: 'PI1002', needsNeuronId: false, neuronId: false, needsIpAddress: true, ipAddress: true, needsDmxAddress: false });
   });
 
   it('accepting a type with default cables raises R2g drafts for the devices already there (and R2d stands aside)', async () => {
@@ -223,8 +213,9 @@ describe('device-type library editor (T48)', () => {
     const p = await project('Tower');
     await p.editor.create('placeholder', { project_id: p.id, label: '120v Power', kind: 'power' }, CTX);
     const nsps = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-05', category: 'NSPS', device: 'P-NSPS-D-KIT' }, CTX);
-    const id = await createType(p.editor, store, p.id, { model: 'P-NSPS-D-KIT', category: 'NSPS' });
-    await updateType(p.editor, store, id, {
+    const le = p.editor.forStream(LIBRARY_STREAM); // the one library (T196), on the same clock
+    const id = await createType(le, store, null, { model: 'P-NSPS-D-KIT', category: 'NSPS' });
+    await updateType(le, store, id, {
       defaultCables: [{ ...blankCable('120V'), from: '120v Power', to: 'NSPS PS', far: '120v Power', single_row: true }, { ...blankCable('N'), to: 'Network switch', far: 'Switch' }],
     });
     const engine = engineFor(store, p.id, userId);
@@ -232,7 +223,7 @@ describe('device-type library editor (T48)', () => {
     const draftsOf = async () => (await loadDeviceCard(store, nsps.id))!.drafts.map((d) => `${d.ruleId} ${d.title}`).sort();
     // a draft type governs nothing: the category table's R2d draft is offered
     expect(await draftsOf()).toEqual(['R2d 120V → P-NSPS-D Power Supply']);
-    await acceptType(p.editor, id);
+    await acceptType(le, id);
     await engine.run();
     expect(await draftsOf()).toEqual(['R2g 120V → NSPS PS', 'R2g N → Network switch']);
     // accepting the 120V draft creates the run with the type's texts

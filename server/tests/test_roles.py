@@ -56,21 +56,21 @@ def test_role_of_reads_the_type_role_then_its_category_then_the_device_category(
     assert roles.role_of(None, "EBDK") == "ebdk"
 
 
-def test_device_roles_resolve_by_link_then_by_device_text_project_types_first():
-    app_type = LibraryType(
-        id=uuid7(), project_id=None, model="UFMP4", role="foundry_panel", state="draft"
-    )
-    project_id = uuid7()
-    project_type = LibraryType(
+def test_device_roles_resolve_by_link_then_by_device_text_first_by_id():
+    # one library (T196, D287 (1)): no project types; two types sharing a name → the first by id
+    first = LibraryType(
         id=uuid7(),
-        project_id=project_id,
+        project_id=None,
         model="ufmp 4",
         aliases=["Foundry 4"],
         role="relay_panel",
         state="accepted",
     )
+    second = LibraryType(
+        id=uuid7(), project_id=None, model="UFMP4", role="foundry_panel", state="draft"
+    )
     rejected = LibraryType(
-        id=uuid7(), project_id=project_id, model="P-NSPS-D-KIT", role="nsps", state="rejected"
+        id=uuid7(), project_id=None, model="P-NSPS-D-KIT", role="nsps", state="rejected"
     )
     nsps = LibraryType(
         id=uuid7(),
@@ -80,8 +80,8 @@ def test_device_roles_resolve_by_link_then_by_device_text_project_types_first():
         category="Equipment",
         role="nsps",
     )
-    r = roles.DeviceRoles([app_type, project_type, rejected, nsps])
-    # by Device text, spaces and case ignored: the project's type shadows the app library's
+    r = roles.DeviceRoles([second, first, rejected, nsps])
+    # by Device text, spaces and case ignored
     assert r.role_of(Device(device="UFMP4", category="Power Distribution")) == "relay_panel"
     assert r.role_of(Device(device="foundry 4", category="Power Distribution")) == "relay_panel"
     # a rejected type never matches by text; the app library's alias does

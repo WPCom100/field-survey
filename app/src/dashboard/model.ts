@@ -141,7 +141,7 @@ export async function loadDashboard(store: Store, projectId: string): Promise<Da
   const deviceFacts: DashboardData['deviceFacts'] = new Map();
   const devices = await store.db.query<Row>(`SELECT * FROM device WHERE deleted_at IS NULL AND ${inLevels}`, [projectId]);
   const deviceLabel = new Map<string, string>();
-  const types = await loadDeviceTypes(store, projectId);
+  const types = await loadDeviceTypes(store);
   const codes = await loadDeviceCodes(store, projectId);
   const ruleParams = await loadRuleParams(store, projectId);
   for (const d of devices) {

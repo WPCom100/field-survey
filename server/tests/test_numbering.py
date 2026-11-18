@@ -11,6 +11,7 @@ import time
 import uuid
 
 import pytest
+from conftest import HDR
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from test_ops import World, outcomes
@@ -18,6 +19,7 @@ from test_ops import World, outcomes
 from app import materialise, numbering
 from app.ids import uuid7
 from app.models import Device, Level, NumberingGroup, Op, PunchItem
+from app.sync import LIBRARY_STREAM
 
 NUMBERED = [
     ("punch_item", "number", [1, 2, 3, 4]),
@@ -203,6 +205,20 @@ def ids(res):
     return numbers(res, "display_id")
 
 
+def push_types(client, *types):
+    """Device types live in the app library (T196, D287 (1)): their creates go to the library
+    stream, which the iPad pushes before the project, so a device created next names them."""
+    ops = []
+    for t in types:
+        t["project_id"] = str(LIBRARY_STREAM)
+        t["change_type"] = "Master edit"
+        t["payload"]["project_id"] = None
+        ops.append(t)
+    r = client.post("/library/ops", json={"since": None, "ops": ops}, headers=HDR)
+    assert r.status_code == 200, r.text
+    assert outcomes(r.json()) == ["applied"] * len(ops)
+
+
 def test_two_ipads_adding_devices_offline_on_one_level_get_distinct_ids(client, w):
     # An imported panel already holds 06M-03 (T27 keeps imported IDs).
     imported = w.create(w.ann, "device", {"level_id": str(w.l06m.id), "display_id": "06M-03"})
@@ -326,22 +342,20 @@ def test_the_library_type_scheme_wins_over_the_category(client, w):
     lt = lambda scheme: w.create(  # noqa: E731
         w.ann,
         "library_type",
-        {"project_id": str(w.project.id), "model": f"m-{scheme}", "id_scheme": scheme},
+        {"model": f"m-{scheme}", "id_scheme": scheme},
     )
     tag_type, number_type = lt("level_tag"), lt("level_number")
-    w.push(client, [tag_type, number_type])
+    push_types(client, tag_type, number_type)
 
     sensor_numbered = new_device(
         w, w.ann, w.l06m, category="Sensor", library_type_id=number_type["entity_id"]
     )
-    assert ids(w.push(client, [sensor_numbered], since=2)) == {
-        sensor_numbered["entity_id"]: "06M-01"
-    }
+    assert ids(w.push(client, [sensor_numbered])) == {sensor_numbered["entity_id"]: "06M-01"}
     # a tag-scheme type on a category with no ID letter is simply numbered
     panel_tagged = new_device(
         w, w.ann, w.l06m, category="Relay panel", library_type_id=tag_type["entity_id"]
     )
-    assert ids(w.push(client, [panel_tagged], since=4)) == {panel_tagged["entity_id"]: "06M-02"}
+    assert ids(w.push(client, [panel_tagged], since=2)) == {panel_tagged["entity_id"]: "06M-02"}
 
 
 def test_the_library_type_role_gives_the_tag_letter_when_the_category_names_none(client, w):
@@ -350,21 +364,16 @@ def test_the_library_type_role_gives_the_tag_letter_when_the_category_names_none
     station_type = w.create(
         w.ann,
         "library_type",
-        {
-            "project_id": str(w.project.id),
-            "model": "UH10002",
-            "category": "Equipment",
-            "role": "station",
-        },
+        {"model": "UH10002", "category": "Equipment", "role": "station"},
     )
-    w.push(client, [station_type])
+    push_types(client, station_type)
     typed = new_device(
         w, w.ann, w.l06m, category="Equipment", library_type_id=station_type["entity_id"]
     )
     loose = new_device(w, w.ann, w.l06m, category="Equipment")
     by_text = new_device(w, w.bob, w.l06m, category="Equipment", device="UH10002")
     renamed = new_device(w, w.bob, w.l06m, category="Equipment Panels")
-    got = ids(w.push(client, [typed, loose, by_text, renamed], since=1))
+    got = ids(w.push(client, [typed, loose, by_text, renamed]))
     # by link: S; a bare category: numbered (the server does not match by Device text on create)
     assert [got[o["entity_id"]] for o in (typed, loose, by_text, renamed)] == [
         "06M-S1",

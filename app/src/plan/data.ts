@@ -140,7 +140,7 @@ export async function loadLevelPlan(
     params: [levelId],
     includeDeleted: opts.includeDeleted,
   });
-  const types = await loadDeviceTypes(store, level.projectId);
+  const types = await loadDeviceTypes(store);
 
   const photos = new Map<string, number>();
   for (const r of await store.db.query<{ device_id: string; n: number }>(

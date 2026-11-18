@@ -743,7 +743,7 @@ def _name_key(s: str) -> str:
 
 def name_keys(types: Iterable[tuple[str | None, Sequence[Any] | None]]) -> frozenset[str]:
     """The device types a sheet may print beside a device (T140, D234): every model and alias of
-    the project's live library, keyed as the library matches them (spaces and case ignored), and
+    the live library, keyed as the library matches them (spaces and case ignored), and
     each **variant cut short** — an alias that extends the model with `-` parts names a variant
     (`P-DOC-C-LR-X` of `P-DOC-C`), and the drawings print it without its last parts
     (`P-DOC-C-LR`). Names shorter than `MIN_NAME_LEN` or without a letter are left out."""

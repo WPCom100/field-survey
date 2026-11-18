@@ -4,7 +4,8 @@
  * Ids are deterministic (`<kind>-<n>`), so expectations can name them.
  */
 
-import { emptySnapshot, type CableEndRow, type CableRow, type DeviceRow, type LevelRow, type LibraryTypeRow, type MissingPartRow, type PlaceholderRow, type PunchItemRow, type Snapshot } from '../snapshot';
+import { APP_VOCAB_LISTS } from '@field-survey/core';
+import { emptySnapshot, type CableEndRow, type CableRow, type DeviceRow, type LevelRow, type LibraryTypeRow, type MissingPartRow, type PlaceholderRow, type PunchItemRow, type Snapshot, type VocabRow } from '../snapshot';
 
 export const PROJECT = '0190a5f0-0000-7000-8000-00000000bb01';
 
@@ -104,24 +105,33 @@ export class Build {
     return row;
   }
 
-  /** A device type of this project (T48); accepted unless said otherwise. */
+  /** A device type of the app library, the one library (T48, T196); accepted unless said otherwise. */
   libraryType(model: string, category: string, p: Partial<LibraryTypeRow> = {}): LibraryTypeRow {
     const row: LibraryTypeRow = {
-      id: this.id('type'), project_id: this.snap.projectId, model, aliases: null, category, id_scheme: null, default_cables: null,
+      id: this.id('type'), project_id: null, model, aliases: null, category, id_scheme: null, default_cables: null,
       optional_cables: null, optional_accessories: null, needs_neuron_id: null, needs_ip_address: null, needs_dmx_address: null, role: null, state: 'accepted', deleted_at: null, ...p,
     };
     this.snap.libraryTypes.push(row);
     return row;
   }
 
+  /** The rows of `list`: the app library's for an app-level list (category, cable code; T196), else the project's. */
+  private vocabRows(list: string): { rows: VocabRow[]; project_id: string | null } {
+    if (!(APP_VOCAB_LISTS as readonly string[]).includes(list)) return { rows: this.snap.vocab, project_id: this.snap.projectId };
+    this.snap.appVocab ??= [];
+    return { rows: this.snap.appVocab, project_id: null };
+  }
+
   vocab(list: string, ...values: string[]): void {
-    for (const value of values) this.snap.vocab.push({ id: this.id('vocab'), project_id: this.snap.projectId, list, value, canonical_of_id: null, deleted_at: null });
+    const { rows, project_id } = this.vocabRows(list);
+    for (const value of values) rows.push({ id: this.id('vocab'), project_id, list, value, canonical_of_id: null, deleted_at: null });
   }
 
   /** An old spelling of a value already in the list (`vocab.canonical_of`, D179). */
   vocabVariant(list: string, value: string, canonical: string): void {
-    const c = this.snap.vocab.find((v) => v.list === list && v.value === canonical && !v.canonical_of_id);
+    const { rows, project_id } = this.vocabRows(list);
+    const c = rows.find((v) => v.list === list && v.value === canonical && !v.canonical_of_id);
     if (!c) throw new Error(`no canonical ${list} value ${canonical}`);
-    this.snap.vocab.push({ id: this.id('vocab'), project_id: this.snap.projectId, list, value, canonical_of_id: c.id, deleted_at: null });
+    rows.push({ id: this.id('vocab'), project_id, list, value, canonical_of_id: c.id, deleted_at: null });
   }
 }

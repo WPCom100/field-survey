@@ -352,7 +352,7 @@ def load(
     if project is None:
         raise LookupError(f"unknown project {project_id}")
     settings = project.settings or {}
-    roles = DeviceRoles.load(session, project_id)  # T112: the devices' roles, by their types
+    roles = DeviceRoles.load(session)  # T112: the devices' roles, by their (app library) types
     levels_all = [
         lv
         for lv in session.scalars(

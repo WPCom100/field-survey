@@ -422,15 +422,40 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     ops = session.scalars(select(Op).where(Op.entity_kind == "library_type")).all()
     assert len(ops) == 37 and all(o.project_id is None and o.kind == "create" for o in ops)
     assert all(o.reason == "DaVinci library import" and o.state == "applied" for o in ops)
-    # the unmapped protocols are vocab(cable_code) drafts in the uploading project
-    vocab = session.scalars(
-        select(Vocab).where(Vocab.project_id == pid, Vocab.list == "cable_code")
-    ).all()
+    # the unmapped protocols are vocab(cable_code) drafts in the app library (T196)
+    vocab = session.scalars(select(Vocab).where(Vocab.list == "cable_code")).all()
     assert vocab == []  # Contact and EBDK Switch are not surveyed (D200): no draft
     assert s["not_surveyed_protocols"] == {"Contact": 4, "EBDK Switch": 1}
     # the same pair of files again is skipped
     again = _run(session, store, factory, pid, sample, categories)
     assert again.job_state == "skipped" and again.stats["earlier_batch"] == str(batch.id)
+
+
+@needs_sample
+@needs_categories
+def test_an_unmapped_protocol_is_an_app_level_cable_code_draft(
+    session, store, factory, sample, categories, monkeypatch
+):
+    """T196 (D292 (9)): the cable codes are one app-level list, so a protocol nobody has ruled on
+    becomes a `vocab(cable_code)` draft in the app library, on the library stream, never in the
+    project the batch is filed under."""
+    real = dl.read_library
+
+    def with_telepathy(data, name):
+        lib = real(data, name)
+        kit = lib.types["1d37a7d1-f519-4710-8a37-46930085cff6"]  # the NSPS kit
+        kit.ports = (*kit.ports, dl.Port("Telepathy", "Bus", ""))
+        return lib
+
+    monkeypatch.setattr(dl, "read_library", with_telepathy)
+    pid = _project(session)
+    batch = _run(session, store, factory, pid, sample, categories)
+    assert batch.job_state == "done", batch.stats
+    assert batch.stats["vocab_drafts"] == 1
+    rows = session.scalars(select(Vocab).where(Vocab.list == "cable_code")).all()
+    assert [(v.project_id, v.value, v.state) for v in rows] == [(None, "Telepathy", "draft")]
+    op = session.scalars(select(Op).where(Op.entity_kind == "vocab")).one()
+    assert op.project_id is None and op.server_seq == batch.stats["last_library_seq"]
 
 
 @needs_sample
@@ -562,13 +587,13 @@ def _old_category_of(self, t):
 
 @needs_sample
 @needs_categories
-def test_rerun_corrects_categories_the_import_set_on_app_types_and_project_copies(
+def test_rerun_corrects_categories_the_import_set_on_app_types(
     session, store, factory, sample, categories, monkeypatch
 ):
-    """D232: the ERn enclosure the import filed under Equipment, accepted and copied into two
-    projects, moves to Equipment Panels on the next import — a Correction op on the app type and
-    on the copy nobody edited; the copy Ann regrouped and the draft whose category Ann set keep
-    theirs; a draft the import filed elsewhere follows the mapping."""
+    """D232: the ERn enclosure the import filed under Equipment, accepted, moves to Equipment
+    Panels on the next import — a Correction op on the app type; the draft whose category Ann set
+    keeps hers; a draft the import filed elsewhere follows the mapping. Projects hold no copies
+    (T196, D287 (1)), so nothing is written in a project's stream."""
     landry = upsert_user(session, "Landry")
     pid = _project(session)
     with monkeypatch.context() as m:  # the mapping as it was
@@ -579,32 +604,20 @@ def test_rerun_corrects_categories_the_import_set_on_app_types_and_project_copie
     assert types[ERN2].category == "Equipment" and types[ERN2].role == "equipment_rack"
     types[ERN2].state = "accepted"
     session.commit()
-    # two projects created since copy the accepted enclosure (D65)
-    copies = {}
-    for name in ("Annex", "Garage"):
-        out = projects.create_project(
-            session, projects.ProjectIn(name=name, levels=[projects.LevelIn(level="01")]), landry
-        )
-        copies[name] = session.scalars(
-            select(LibraryType).where(
-                LibraryType.project_id == uuid.UUID(out.id),
-                LibraryType.model == types[ERN2].model,
-            )
-        ).one()
-    assert {c.category for c in copies.values()} == {"Equipment"}
-    # Ann regroups the Garage's copy and sets the touchscreen draft's category by hand
+    # a project created since holds no copy of it (T196)
+    out = projects.create_project(
+        session, projects.ProjectIn(name="Annex", levels=[projects.LevelIn(level="01")]), landry
+    )
+    annex = uuid.UUID(out.id)
+    assert session.scalars(select(LibraryType).where(LibraryType.project_id == annex)).all() == []
+    # Ann sets the touchscreen draft's category by hand
     ann = upsert_user(session, "Ann")
-    garage = copies["Garage"]
-    for stream, entity, now in (
-        (garage.project_id, garage.id, "Equipment Rack"),
-        (dl.LIBRARY_STREAM, types[TS7].id, "Wall Plates"),
-    ):
-        hand = dl._Ops(stream, ann.id)
-        head = dl._head(session, entity, "category")
-        hand.set("library_type", entity, "category", None, now, head)
-        for op in hand.ops:
-            op.change_type, op.reason = "Field survey", None
-        dl._push(session, stream, hand.ops, library=stream == dl.LIBRARY_STREAM)
+    hand = dl._Ops(dl.LIBRARY_STREAM, ann.id)
+    head = dl._head(session, types[TS7].id, "category")
+    hand.set("library_type", types[TS7].id, "category", None, "Wall Plates", head)
+    for op in hand.ops:
+        op.change_type, op.reason = "Field survey", None
+    dl._push(session, dl.LIBRARY_STREAM, hand.ops, library=True)
     session.commit()
 
     # Landry uploads the regrouped mapping with the next library
@@ -615,15 +628,13 @@ def test_rerun_corrects_categories_the_import_set_on_app_types_and_project_copie
     )
     assert second.job_state == "done", second.stats
     s = second.stats
-    assert s["categories_corrected"] == 3  # the app ERn2, the Annex copy, the UH10002 draft
+    assert s["categories_corrected"] == 2  # the app ERn2, the UH10002 draft
     assert s["kept_accepted"] == 1 and s["neuron_flags_corrected"] == 0
     session.expire_all()
     types = _app_types(session)
     ern = types[ERN2]
     assert ern.category == "Equipment Panels" and ern.state == "accepted"
     assert ern.role == "equipment_rack" and ern.needs_neuron_id is None  # the role is unchanged
-    assert session.get(LibraryType, copies["Annex"].id).category == "Equipment Panels"
-    assert session.get(LibraryType, garage.id).category == "Equipment Rack"  # Ann's stands
     assert types[TS7].category == "Wall Plates"  # Ann's, on a draft too
     assert types[UH10002].category == "Station"
     fixes = session.scalars(
@@ -634,11 +645,11 @@ def test_rerun_corrects_categories_the_import_set_on_app_types_and_project_copie
         )
     ).all()
     by_entity = {o.entity_id: o for o in fixes}
-    assert set(by_entity) == {ern.id, copies["Annex"].id, types[UH10002].id}
-    for eid, project_id in ((ern.id, None), (copies["Annex"].id, copies["Annex"].project_id)):
-        o = by_entity[eid]
-        assert o.change_type == "Correction" and o.project_id == project_id
-        assert (o.was, o.now) == ("Equipment", "Equipment Panels") and o.base_op_id
+    assert set(by_entity) == {ern.id, types[UH10002].id}
+    assert all(o.project_id is None for o in fixes)  # the library stream only
+    o = by_entity[ern.id]
+    assert o.change_type == "Correction"
+    assert (o.was, o.now) == ("Equipment", "Equipment Panels") and o.base_op_id
     assert by_entity[types[UH10002].id].change_type == "Master edit"  # the ordinary draft update
     # the same files again: nothing left to correct
     third = _run(
@@ -673,16 +684,13 @@ def test_retire_hand_made_types_soft_deletes_them_first(
     session, store, factory, sample, categories
 ):
     """D199: with `retire_hand_made` the hand-made app-library types are soft-deleted (history
-    keeps them), so the catalogue's types take their place; project copies stay."""
+    keeps them), so the catalogue's types take their place."""
     pid = _project(session)
     hand = LibraryType(
         id=uuid7(), project_id=None, model="P-NSPS-D", category="NSPS", state="accepted"
     )
     other = LibraryType(id=uuid7(), project_id=None, model="Hand-made", state="draft")
-    copy = LibraryType(
-        id=uuid7(), project_id=pid, model="P-NSPS-D", category="NSPS", state="accepted"
-    )
-    session.add_all([hand, other, copy])
+    session.add_all([hand, other])
     session.commit()
     batch = dl.create_davinci_batch(
         session,
@@ -702,7 +710,6 @@ def test_retire_hand_made_types_soft_deletes_them_first(
     assert batch.stats["created"] == 37 and batch.stats["clashes"] == []
     assert session.get(LibraryType, hand.id).deleted_at is not None
     assert session.get(LibraryType, other.id).deleted_at is not None
-    assert session.get(LibraryType, copy.id).deleted_at is None  # the project's copy stays
     assert _app_types(session)[NSPS].model == "P-NSPS-D"
     deletes = session.scalars(
         select(Op).where(Op.entity_kind == "library_type", Op.kind == "delete")

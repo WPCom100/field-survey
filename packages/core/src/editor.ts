@@ -376,6 +376,14 @@ export class Editor {
     return this.opts.userId;
   }
 
+  /**
+   * The same user and clock on another stream: a project session's edit of the app library
+   * (T196, D292 (2): a draft type for a model the library lacks goes to `LIBRARY_STREAM`).
+   */
+  forStream(projectId: string): Editor {
+    return projectId === this.opts.projectId ? this : new Editor(this.store, { ...this.opts, projectId });
+  }
+
   async create(kind: EntityKind, payload: Row, ctx: EditContext): Promise<{ id: string; op: Op }> {
     const b = this.batch(ctx);
     const r = await b.create(kind, payload);

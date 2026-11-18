@@ -4,7 +4,7 @@
  * (D171), and the E6 / E7 / E9 quick actions.
  */
 
-import { Editor, Store, uuidv7, type EditContext } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, Store, uuidv7, type EditContext } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
@@ -99,8 +99,10 @@ describe('RULES over a store', () => {
   });
 
   it('R3c reads library_type.needs_neuron_id from the store (T68, D185): a rack type that needs one makes 06 its own item', async () => {
-    const { store, editor, engine, ids } = await project();
-    await editor.create('library_type', { project_id: PROJECT, model: 'Equipment rack', category: 'Equipment rack', needs_neuron_id: true, state: 'accepted' }, CTX);
+    const { store, engine, ids } = await project();
+    // the one library (T196): an app-library type, on the library stream
+    const library = new Editor(store, { projectId: LIBRARY_STREAM, userId: ME });
+    await library.create('library_type', { project_id: null, model: 'Equipment rack', category: 'Equipment rack', needs_neuron_id: true, state: 'accepted' }, CTX);
     await engine.run();
     const neuron = (await open(store)).filter((p) => p.rule_id === 'R3c' && p.discriminator == null);
     expect(neuron.map((p) => [p.payload!.level_id === ids.l06 ? '06' : '06M', p.payload!.notes]).sort()).toEqual([

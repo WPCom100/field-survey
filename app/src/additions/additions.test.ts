@@ -1,4 +1,4 @@
-import { Editor, Store, uuidv7 } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, Store, uuidv7 } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
@@ -85,14 +85,16 @@ describe('field additions (T23)', () => {
     expect(tagged.displayId).toBe('06M-S41');
   });
 
-  it('a free-typed model becomes a project draft type in the same group (D55); a typed known model reuses the type', async () => {
+  it('a free-typed model becomes a draft type in the one library, on its stream before the device (T196, D292 (2)); a typed known model reuses the type', async () => {
     const { store, editor, base, plan } = await setup();
     const r = await addFieldDevice(editor, store, { ...base, category: 'Relay panel', typedModel: 'ERP-XYZ 12' });
     expect(r.draftTypeId).toBeTruthy();
-    expect(r.ops.map((o) => o.entity_kind)).toEqual(['library_type', 'device']);
-    expect(new Set(r.ops.map((o) => o.group_id)).size).toBe(1);
-    expect(r.ops[0]!.payload).toMatchObject({ project_id: plan.level.projectId, model: 'ERP-XYZ 12', category: 'Relay panel', state: 'draft', created_by_id: ME });
-    expect(r.ops[1]!.payload).toMatchObject({ device: 'ERP-XYZ 12', library_type_id: r.draftTypeId });
+    expect(r.ops.map((o) => o.entity_kind)).toEqual(['device']);
+    const typeOps = await store.opsFor(r.draftTypeId!);
+    expect(typeOps.map((o) => [o.project_id, o.entity_kind, o.kind])).toEqual([[LIBRARY_STREAM, 'library_type', 'create']]);
+    expect(typeOps[0]!.payload).toMatchObject({ project_id: null, model: 'ERP-XYZ 12', category: 'Relay panel', state: 'draft', created_by_id: ME });
+    expect(typeOps[0]!.client_ts < r.ops[0]!.client_ts).toBe(true); // the library first
+    expect(r.ops[0]!.payload).toMatchObject({ device: 'ERP-XYZ 12', library_type_id: r.draftTypeId });
     const drafts = await libraryChoices(store, plan.level.projectId, 'Relay panel');
     expect(drafts).toMatchObject([{ model: 'ERP-XYZ 12', state: 'draft' }]);
     // the same model typed again uses that draft, no second draft

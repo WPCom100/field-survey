@@ -12,7 +12,7 @@
  *   status empty (Unsurveyed); the draft type and the device are one group (`Field survey`, D96).
  */
 
-import { DeviceIdError, OpError, defaultIdSchemeForRole, deviceIdFor, isRole, roleOf, type Editor, type Op, type Role, type Store } from '@field-survey/core';
+import { DeviceIdError, LIBRARY_STREAM, OpError, defaultIdSchemeForRole, deviceIdFor, isRole, roleOf, type Editor, type Op, type Role, type Store } from '@field-survey/core';
 
 import { FIELD_SURVEY } from '../card/actions';
 import { matchesQuery } from '../library/model';
@@ -144,18 +144,14 @@ export async function addFieldDevice(editor: Editor, store: Store, input: FieldD
   let draftTypeId: string | null = null;
   let deviceId = '';
   const round = (n: number) => Math.round(n * 10) / 10;
+  let libraryTypeId = type?.id ?? null;
+  if (!type) {
+    // a model the library lacks: a draft type in the one library (T196, D292 (2)) — its own op on
+    // the library stream, which syncs before the project's, so the device's link resolves there
+    const draft = await editor.forStream(LIBRARY_STREAM).create('library_type', { project_id: null, model, category, state: 'draft', created_by_id: editor.userId }, FIELD_SURVEY);
+    draftTypeId = libraryTypeId = draft.id;
+  }
   const ops = await editor.group(FIELD_SURVEY, async (g) => {
-    let libraryTypeId = type?.id ?? null;
-    if (!type) {
-      const draft = await g.create('library_type', {
-        project_id: input.projectId,
-        model,
-        category,
-        state: 'draft',
-        created_by_id: editor.userId,
-      });
-      draftTypeId = libraryTypeId = draft.id;
-    }
     const d = await g.create('device', {
       level_id: input.levelId,
       ...(displayId ? { display_id: displayId } : {}),

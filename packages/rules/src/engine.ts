@@ -14,7 +14,7 @@
  * Runs are serialised per engine; a run requested during a run follows it.
  */
 
-import { Editor, uuidv7, type EditContext, type Store } from '@field-survey/core';
+import { APP_VOCAB_LISTS, Editor, uuidv7, type EditContext, type Store } from '@field-survey/core';
 import { acceptPlan, recordDiffers, DecideError } from './decide';
 import { evaluate, type EvalOutput } from './evaluate';
 import { applyChanges, reconcileFindings, reconcileProposals, type Change, type Citation } from './reconcile';
@@ -29,10 +29,14 @@ import {
   type RulingRow,
   type Snapshot,
   type Subject,
+  type VocabRow,
 } from './snapshot';
 import type { RuleParamRow } from './params';
 import { paramRowsOf, retrofitGroups, rewordEffects, type RetrofitGroup } from './retrofit';
 import { checkRuling, parseRuling, previewRuling, vocabPlan, RULING_RULE_ID, type RewordEffects, type RulingDraft, type RulingPreview } from './rulings';
+
+/** The app-level vocabulary lists as a SQL list (T196): read from the app library only. */
+const APP_LISTS = APP_VOCAB_LISTS.map((l) => `'${l}'`).join(', ');
 
 export type RuleLog = (level: 'info' | 'warn' | 'error', event: string, data?: Record<string, unknown>) => void;
 
@@ -144,11 +148,14 @@ export class RuleEngine {
       list<Snapshot['punchItems'][number]>('punch_item', levels),
       list<Snapshot['missingParts'][number]>('missing_part', levels),
       list<Snapshot['partSources'][number]>('part_source', `missing_part_id IN (SELECT id FROM missing_part WHERE ${levels})`, 'missing_part_id, target_kind, target_id'),
-      list<Snapshot['libraryTypes'][number]>('library_type', 'project_id = ? OR project_id IS NULL'),
-      list<Snapshot['vocab'][number]>('vocab', 'project_id = ?'),
+      // one device-type library for every project (T196, D287 (1)): the app library's rows only
+      this.store.list<Snapshot['libraryTypes'][number]>('library_type', { where: 'project_id IS NULL', includeDeleted: true, orderBy: 'id' }),
+      list<Snapshot['vocab'][number]>('vocab', `project_id = ? AND list NOT IN (${APP_LISTS})`),
       list<Snapshot['proposals'][number]>('proposal', 'project_id = ?'),
       list<Snapshot['findings'][number]>('finding', 'project_id = ?'),
     ]);
+    // the device categories and cable codes: app-level lists (T196, D292 (9)), accepted rows
+    s.appVocab = await this.store.list<VocabRow>('vocab', { where: `project_id IS NULL AND state = 'accepted' AND list IN (${APP_LISTS})`, includeDeleted: true, orderBy: 'id' });
     s.rulings = await list<Snapshot['rulings'][number]>('ruling', 'project_id = ?');
     s.ruleParams = await list<NonNullable<Snapshot['ruleParams']>[number]>('rule_param', 'project_id = ?');
     // T36 lints: sheets (pin outside the sheet), unreviewed drafts (locked level), and only the

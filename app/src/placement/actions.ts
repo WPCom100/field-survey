@@ -16,7 +16,7 @@
  * draft is deleted and its cable ends wait for the draft again; a master device loses its pin.
  */
 
-import { OpError, type EditContext, type Editor, type Op, type Store } from '@field-survey/core';
+import { LIBRARY_STREAM, OpError, type EditContext, type Editor, type Op, type Store } from '@field-survey/core';
 
 import { commitWaitingCables } from '../drafts/actions';
 import { POOL_BASIS } from '../drafts/model';
@@ -85,20 +85,18 @@ async function placeDraft(editor: Editor, store: Store, item: UnplacedDraft, inp
   const model = item.model ?? item.name;
   if (!model) throw new OpError('The draft has no model: edit it in Review drafts first.');
   let deviceId = '';
+  let libraryTypeId = item.libraryTypeId;
+  if (!libraryTypeId) {
+    // a model the library lacks: a draft type in the one library, for review, with the draft's role
+    // (T196, D292 (2)) — its own op on the library stream, which syncs before the project's
+    const t = await editor.forStream(LIBRARY_STREAM).create(
+      'library_type',
+      { project_id: null, model, category: item.deviceCategory, ...(item.role !== 'other' ? { role: item.role } : {}), state: 'draft', created_by_id: editor.userId },
+      ctx(item.title),
+    );
+    libraryTypeId = t.id;
+  }
   const ops = await editor.group(ctx(item.title), async (g) => {
-    let libraryTypeId = item.libraryTypeId;
-    if (!libraryTypeId) {
-      // a model the library lacks: a draft type of this project, for review (D55), with the draft's role
-      const t = await g.create('library_type', {
-        project_id: editor.projectId,
-        model,
-        category: item.deviceCategory,
-        ...(item.role !== 'other' ? { role: item.role } : {}),
-        state: 'draft',
-        created_by_id: editor.userId,
-      });
-      libraryTypeId = t.id;
-    }
     const d = await g.create('device', {
       level_id: input.levelId,
       category: item.deviceCategory,

@@ -111,6 +111,12 @@ export const VOCAB_LIST = [
   'room_code_pattern',
   'tag_pattern',
 ] as const;
+/**
+ * T196 (D292 (9)): the lists kept at app level only — one list of device categories and one of
+ * cable codes for every project (`project_id` null, the library stream). A project's rows of these
+ * lists are neither copied at creation nor read. Mirrors `APP_VOCAB_LISTS` on the server.
+ */
+export const APP_VOCAB_LISTS = ['category', 'cable_code'] as const;
 // T99 (D174, D212): library suggestion chips — the scope a row hangs off (a type id, a category, a
 // cable code) and where it is offered (device Notes, end Note, a punch item's Item, a part's Part).
 export const SUGGESTION_SCOPE = ['type', 'category', 'code'] as const;

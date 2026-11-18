@@ -13,7 +13,7 @@ import { R1 } from './r1';
 import { RuleParams, type RuleParamRow } from '../params';
 import { CABLE_CODES, R2g, addressNeeds, cableCodes, needsNeuronId, parseLibraryCables } from './library';
 import { R2a, R2b, R2c, R2d, R2e, R2f } from './r2';
-import { LintPower, LintRelay } from './lint';
+import { LintPower, LintRelay, LintVocab } from './lint';
 import { R3a, R3b, R3c, R3d, R3f } from './r3';
 import { R4a, R4b, R4d } from './r4';
 import { RULES } from './index';
@@ -234,20 +234,24 @@ describe('R2g device-type library cables (T48, D183)', () => {
     expect(run(b, [R2g]).proposals.map((p) => p.subject.entity_id)).toEqual([panel.id]);
   });
 
-  it("a code beyond the master's counts once the project's Rules give it a signal word (T117)", () => {
+  it("a type's row is never hidden by a code the project's list lacks; the code lint flags it there (T196, D287 (5))", () => {
     const b = new Build();
     const { panel } = floor(b);
-    b.libraryType('CT06LCPA', 'Relay panel', { default_cables: [tenV, { code: 'DX', to: 'DALI-2 bus', far: 'Fixtures' }] });
-    expect(run(b, [R2g]).proposals.map((p) => p.discriminator)).toEqual(['0-10V']);
+    b.libraryType('CT06LCPA', 'Relay panel', { default_cables: [tenV, { code: 'DX', to: 'DALI-2 bus', far: 'Fixtures' }, { to: 'no code' }] });
+    // the project's Rules give DX no signal word: the run is drafted all the same
     expect(cableCodes()).toEqual(CABLE_CODES);
-    const row: RuleParamRow = { id: 'rp', project_id: b.snap.projectId, rule_id: 'R3', key: 'signal', value: { DX: 'DALI-2' }, state: 'accepted', deleted_at: null };
-    b.snap.ruleParams = [row];
     const out = run(b, [R2g]);
     expect(out.proposals.map((p) => [p.subject.entity_id, p.discriminator])).toEqual([[panel.id, '0-10V'], [panel.id, 'DX']]);
     expect(out.proposals[1]!.payload).toMatchObject({ cable: { cable: 'DX' } });
+    // a row with no code is the only one dropped
+    expect(parseLibraryCables([{ code: 'DX' }, { code: 'X' }, { code: '' }, { to: 'x' }]).map((c) => c.code)).toEqual(['DX', 'X']);
+    // the project's list is what the cable-code lint reads: DX is flagged until its Rules name it (T117)
+    b.cable('DX', { device: panel });
+    expect(run(b, [LintVocab]).findings.map((f) => f.subject.discriminator)).toEqual(['cable=DX']);
+    const row: RuleParamRow = { id: 'rp', project_id: b.snap.projectId, rule_id: 'R3', key: 'signal', value: { DX: 'DALI-2' }, state: 'accepted', deleted_at: null };
+    b.snap.ruleParams = [row];
     expect(cableCodes(new RuleParams([row]))).toEqual([...CABLE_CODES, 'DX']);
-    expect(parseLibraryCables([{ code: 'DX' }, { code: 'X' }]).map((c) => c.code)).toEqual(['X']);
-    expect(parseLibraryCables([{ code: 'DX' }, { code: 'X' }], cableCodes(new RuleParams([row]))).map((c) => c.code)).toEqual(['DX', 'X']);
+    expect(run(b, [LintVocab]).findings).toEqual([]);
   });
 });
 

@@ -93,6 +93,9 @@ VOCAB_LIST = (
     "room_code_pattern",
     "tag_pattern",
 )
+# T196 (D292 (9)): the lists kept at app level only — one list of device categories and one of
+# cable codes for every project. A project's rows of these lists are neither copied nor read.
+APP_VOCAB_LISTS = ("category", "cable_code")
 # T99 (D174, D212): library suggestion chips — what a row hangs off and where it is offered.
 SUGGESTION_SCOPE = ("type", "category", "code")
 SUGGESTION_TARGET = ("device_note", "connection_note", "punch_item", "part")

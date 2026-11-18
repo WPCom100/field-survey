@@ -5,7 +5,7 @@
  */
 
 import { defaultDeviceText, displayNumber, isNew, reviewFields, type StoredOp, type Store } from '@field-survey/core';
-import { CABLE_CODES, cableCodes, cableTitle, editableKeys, loadRuleParams, parseLibraryAccessories, parseLibraryCables, type LibraryCable } from '@field-survey/rules';
+import { cableTitle, editableKeys, loadRuleParams, parseLibraryAccessories, parseLibraryCables, type LibraryCable } from '@field-survey/rules';
 
 import { loadDraftEndLabels, waitsForDraft } from '../cables/draftEnds';
 import { codesOfDevice, deviceAddressNeeds, loadDeviceTypes, typeOf } from '../library/neuron';
@@ -403,16 +403,16 @@ type TypeLists = { state: string; default_cables?: unknown; optional_cables?: un
  * The optional cables of `type` a device with runs of `codes` lacks, each offered once the runs
  * before it of its code exist: an accepted type's default cables come first (R2g drafts them, and an
  * optional 120V added in their place would satisfy that draft with the wrong texts), then the
- * optional ones in order. A rejected type offers nothing. `known`: the project's cable codes (`cableCodes`, T117).
+ * optional ones in order. A rejected type offers nothing; every row of the type counts, whatever its code (T196, D287 (5)).
  */
-export function optionalCableOffers(type: TypeLists | null, codes: readonly (string | null)[], known: readonly string[] = CABLE_CODES): CardCableOffer[] {
+export function optionalCableOffers(type: TypeLists | null, codes: readonly (string | null)[]): CardCableOffer[] {
   if (!type || type.state === 'rejected') return [];
   const have = new Map<string, number>();
   for (const c of codes) if (c) have.set(c, (have.get(c) ?? 0) + 1);
   const seen = new Map<string, number>();
-  if (type.state === 'accepted') for (const c of parseLibraryCables(type.default_cables, known)) seen.set(c.code, (seen.get(c.code) ?? 0) + 1);
+  if (type.state === 'accepted') for (const c of parseLibraryCables(type.default_cables)) seen.set(c.code, (seen.get(c.code) ?? 0) + 1);
   const out: CardCableOffer[] = [];
-  for (const c of parseLibraryCables(type.optional_cables, known)) {
+  for (const c of parseLibraryCables(type.optional_cables)) {
     const n = seen.get(c.code) ?? 0;
     seen.set(c.code, n + 1);
     if ((have.get(c.code) ?? 0) !== n) continue; // already there, or an earlier run of the code is missing
@@ -484,7 +484,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
   const levelCode = String(level.level);
   const projectId = String(level.project_id);
   const pinRow = d.pin && typeof d.pin === 'object' ? (d.pin as Row) : null;
-  const types = await loadDeviceTypes(store, projectId);
+  const types = await loadDeviceTypes(store);
   const type = d.deleted_at ? null : typeOf(types, d);
   const ruleParams = await loadRuleParams(store, projectId);
   const needs = deviceAddressNeeds(types, d, await codesOfDevice(store, deviceId), ruleParams);
@@ -615,7 +615,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
     (a, b) => Number(a.label === 'NEW') - Number(b.label === 'NEW') || a.label.localeCompare(b.label, 'en', { numeric: true }) || a.id.localeCompare(b.id),
   );
 
-  const cableOffers = optionalCableOffers(type, connections.map((c) => c.cable), cableCodes(ruleParams));
+  const cableOffers = optionalCableOffers(type, connections.map((c) => c.cable));
   const accessoryOffers = optionalAccessoryOffers(type, accessories.map((a) => a.model));
   const accessoryOfferGroups = accessoryOfferBlocks(type, accessoryOffers, accessories);
 
@@ -699,7 +699,7 @@ export async function loadDeviceCard(store: Store, deviceId: string): Promise<De
   // project's vocabulary lists
   const vocabOf = async (list: string) =>
     (await store.list<Row>('vocab', { where: `project_id = ? AND list = ? AND canonical_of_id IS NULL`, params: [projectId, list], orderBy: 'id' })).map((v) => String(v.value));
-  const chipRows = await loadChipRows(store, projectId, [type?.id]);
+  const chipRows = await loadChipRows(store, [type?.id]);
   const chipCtx = { typeId: type?.id ?? null, category: str(d.category) };
   const deviceNotes = await vocabOf('device_note');
   const typeChips = await vocabOf('type');

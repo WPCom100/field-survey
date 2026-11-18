@@ -48,9 +48,12 @@ SERVER_INSTALL_ID = uuid.uuid5(uuid.NAMESPACE_URL, "field-survey:server")
 # both carry LIBRARY_STREAM, whose `review_item.project_id` column is NOT NULL — `op_to_json`).
 LIBRARY_STREAM = uuid.UUID("00000000-0000-7000-8000-00000000a11b")
 LIBRARY_KINDS = frozenset({"library_type", "rule_param", "suggestion", "vocab", "review_item"})
+# Records that exist at app level only (T196, D287 (1), D292 (9)): one device-type library and its
+# suggestion chips for every project. Any op on them in a project's stream is refused.
+APP_ONLY_KINDS = frozenset({"library_type", "suggestion"})
 # Records that exist at both scopes: `project_id` null in the library stream, the project's own
-# id in a project's (T61, T102, T99, T104).
-SCOPED_KINDS = frozenset({"library_type", "rule_param", "suggestion", "vocab"})
+# id in a project's (T102, T104).
+SCOPED_KINDS = frozenset({"rule_param", "vocab"})
 # Serialises library pushes as the project row lock serialises a project's (arbitrary key).
 LIBRARY_LOCK = 0x11B0A11B
 MAX_OPS_PER_PUSH = 500
@@ -228,13 +231,18 @@ def validate_op(
             "the app library holds library types, rule defaults, suggestions and vocabulary only, "
             f"not {op.entity_kind}"
         )
+    if op.entity_kind in APP_ONLY_KINDS:
+        noun = "device type" if op.entity_kind == "library_type" else "suggestion chip"
+        if not library:
+            raise ValueError(
+                f"a {noun} belongs to the app library, never to a project: "
+                "push it to /library/ops with no project_id"
+            )
+        if op.kind == "create" and (op.payload or {}).get("project_id") is not None:
+            raise ValueError(f"an app-library {noun} has no project_id")
     if op.entity_kind in SCOPED_KINDS and op.kind == "create":
         owner = (op.payload or {}).get("project_id")
-        noun = {
-            "library_type": "type",
-            "rule_param": "rule parameter",
-            "vocab": "vocabulary value",
-        }.get(op.entity_kind, op.entity_kind)
+        noun = {"rule_param": "rule parameter", "vocab": "vocabulary value"}[op.entity_kind]
         if library and owner is not None:
             raise ValueError(f"an app-library {noun} has no project_id")
         if not library and (owner is None or str(owner) != str(project_id)):

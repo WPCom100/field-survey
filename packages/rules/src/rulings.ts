@@ -546,7 +546,9 @@ export function vocabEffect(snap: Snapshot, d: RulingDraft): { change: RulingPre
   const list = vocabListOf(d.filter.entity, d.action.field);
   const label = fieldOf(d.filter.entity, d.action.field)?.label ?? d.action.field;
   if (!list) return { change: null, note: `${label} has no vocabulary list: the rename changes the records only.` };
-  const has = snap.vocab.some((v) => v.deleted_at == null && v.list === list);
+  // T196 (D292 (9)): the device categories are one app-level list, edited in the app library
+  if ((V.APP_VOCAB_LISTS as readonly string[]).includes(list)) return { change: null, note: `${label} is an app-level list: the rename changes the records only.` };
+  const has =snap.vocab.some((v) => v.deleted_at == null && v.list === list);
   if (!has) return { change: null, note: `The project has no ${list} vocabulary yet: the rename changes the records only.` };
   return { change: { list, from: d.action.from.trim(), to: d.action.to.trim() }, note: `Vocabulary ${list}: "${d.action.from.trim()}" becomes an old spelling of "${d.action.to.trim()}".` };
 }

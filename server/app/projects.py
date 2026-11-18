@@ -4,9 +4,11 @@
 push locks it, and numbering groups must exist before any op — PLAN §8), then everything the
 project starts with is written as **trusted ops** through the push loop (`app.sync.Push`): the
 project itself, one `numbering_group` per group of levels (06 and 06M share, D33), the levels
-in floor order, and the copies the caller asked for — vocabulary, device-type library (the app
-library always, D65), standing rulings, the rule parameters (the app-level defaults always, then
-a source project's values; T102, D176) and, optionally, placeholders. An iPad therefore gets
+in floor order, and the copies the caller asked for — vocabulary, standing rulings, the rule
+parameters (the app-level defaults always, then a source project's values; T102, D176) and,
+optionally, placeholders. A project holds no device types and no suggestion chips: every project
+reads the one app library (T196, D287 (1), D292 (9)), and the device categories and cable codes
+are app-level lists that are not copied either. An iPad therefore gets
 the whole project, its own `project` row included, from its first pull, and a replay of the
 op log reproduces it. Numbering-group counters live outside the log, so `materialise.replay`
 leaves `project` and `numbering_group` rows in place.
@@ -28,25 +30,24 @@ from sqlalchemy.orm import Session
 from app.ids import uuid7
 from app.models import (
     Level,
-    LibraryType,
     NumberingGroup,
     Placeholder,
     Project,
     RuleParam,
     Ruling,
-    Suggestion,
     User,
     Vocab,
 )
 from app.roles import PIN_SHAPE_RULE
 from app.rule_params import rule_param_id
 from app.sync import SERVER_INSTALL_ID, OpIn, Push, PushError, jsonable
+from app.vocab import APP_VOCAB_LISTS
 
 DEFAULT_EXPORT_TITLE = "ETC Lighting Controls Survey"
 PARTY_KEYS = ("ec", "etc", "gc")
 SETTING_KEYS = ("export_title", "disclaimer")
 CHANGE_TYPE = "Master edit"
-# The reason on every op of a new project (its copied library types too, which T144 reads).
+# The reason on every op of a new project.
 CREATED_REASON = "Project created by"
 
 
@@ -76,7 +77,6 @@ class CopyFrom(BaseModel):
 
     project_id: uuid.UUID
     vocabulary: bool = True
-    library: bool = True
     rulings: bool = True
     # T102: the source project's rule parameters, over the app-level defaults
     rule_params: bool = True
@@ -353,70 +353,10 @@ def _copy(
     source: Project | None,
     flags: CopyFrom | None,
 ) -> dict[str, int]:
-    """Copies as new rows (new ids, `canonical_of` remapped); counts per kind."""
-    counts = {
-        "vocab": 0,
-        "library_types": 0,
-        "suggestions": 0,
-        "rulings": 0,
-        "rule_params": 0,
-        "placeholders": 0,
-    }
+    """Copies as new rows (new ids, `canonical_of` remapped); counts per kind. Device types and
+    suggestion chips are never copied: every project reads the app library (T196, D287 (1))."""
+    counts = {"vocab": 0, "rulings": 0, "rule_params": 0, "placeholders": 0}
     now = datetime.now(UTC)
-
-    # The app library (D65) always seeds the project's library; a source project's accepted
-    # types follow, unless the same model is already in.
-    models: set[str] = set()
-    types = list(
-        session.scalars(
-            select(LibraryType).where(
-                LibraryType.project_id.is_(None),
-                LibraryType.state == "accepted",
-                LibraryType.deleted_at.is_(None),
-            )
-        )
-    )
-    if source is not None and flags is not None and flags.library:
-        types += list(
-            session.scalars(
-                select(LibraryType).where(
-                    LibraryType.project_id == source.id,
-                    LibraryType.state == "accepted",
-                    LibraryType.deleted_at.is_(None),
-                )
-            )
-        )
-    type_ids: dict[uuid.UUID, uuid.UUID] = {}  # source type -> its copy (T99: chips follow)
-    for t in types:
-        key = t.model.casefold()
-        if key in models:
-            continue
-        models.add(key)
-        type_ids[t.id] = ops.create(
-            "library_type",
-            {
-                "project_id": project_id,
-                "model": t.model,
-                "aliases": t.aliases,
-                "category": t.category,
-                "id_scheme": t.id_scheme,
-                "default_cables": t.default_cables,
-                "optional_cables": t.optional_cables,
-                "optional_accessories": t.optional_accessories,
-                "needs_neuron_id": t.needs_neuron_id,
-                "needs_ip_address": t.needs_ip_address,  # T146
-                "needs_dmx_address": t.needs_dmx_address,
-                "role": t.role,  # T112
-                "state": "accepted",
-                "created_by_id": user.id,
-            },
-        )
-        counts["library_types"] += 1
-
-    with_source = source is not None and flags is not None and flags.library
-    counts["suggestions"] = _copy_suggestions(
-        session, ops, project_id, user, source if with_source else None, type_ids
-    )
 
     _copy_rule_params(session, ops, project_id, source if flags and flags.rule_params else None)
     with_vocab = source is not None and flags is not None and flags.vocabulary
@@ -464,58 +404,6 @@ def _copy(
     return counts
 
 
-def _copy_suggestions(
-    session: Session,
-    ops: "_Ops",
-    project_id: uuid.UUID,
-    user: User,
-    source: Project | None,
-    type_ids: dict[uuid.UUID, uuid.UUID],
-) -> int:
-    """The new project's suggestion chips (T99, D212): the accepted ones of the app library, then
-    of the source project — a type's chips only when the type itself was copied (pointing at the
-    copy), every category and cable-code chip. One chip per (scope, what, where, text)."""
-    scopes = [Suggestion.project_id.is_(None)]
-    if source is not None:
-        scopes.append(Suggestion.project_id == source.id)
-    seen: set[tuple[str, str, str, str]] = set()
-    n = 0
-    for where in scopes:
-        rows = session.scalars(
-            select(Suggestion)
-            .where(where, Suggestion.state == "accepted", Suggestion.deleted_at.is_(None))
-            .order_by(Suggestion.id)
-        )
-        for r in rows:
-            ref = r.ref
-            if r.scope == "type":
-                try:
-                    copied = type_ids.get(uuid.UUID(r.ref))
-                except ValueError:
-                    copied = None
-                if copied is None:
-                    continue
-                ref = str(copied)
-            key = (r.scope, ref.casefold(), r.target, r.text.strip().casefold())
-            if key in seen:
-                continue
-            seen.add(key)
-            ops.create(
-                "suggestion",
-                {
-                    "project_id": project_id,
-                    "scope": r.scope,
-                    "ref": ref,
-                    "target": r.target,
-                    "text": r.text,
-                    "state": "accepted",
-                    "created_by_id": user.id,
-                },
-            )
-            n += 1
-    return n
-
-
 def _copy_vocab(
     session: Session, ops: "_Ops", project_id: uuid.UUID, source: Project | None
 ) -> int:
@@ -523,7 +411,8 @@ def _copy_vocab(
     live value of the source project (copied accepted, as before T104), leaving out a spelling
     (any case) the app library already gave. Canonicals before their variants, so `canonical_of`
     always points at a row of the new project: a source variant whose canonical the app library
-    already gave points at that copy; an app variant whose canonical is not accepted is left out."""
+    already gave points at that copy; an app variant whose canonical is not accepted is left out.
+    The device categories and cable codes stay app-level lists, read there (T196, D292 (9))."""
     scopes: list[tuple[Any, bool]] = [(Vocab.project_id.is_(None), True)]
     if source is not None:
         scopes.append((Vocab.project_id == source.id, False))
@@ -531,7 +420,9 @@ def _copy_vocab(
     n = 0
     for where, app in scopes:
         copied: dict[tuple[str, str], uuid.UUID] = {}
-        query = select(Vocab).where(where, Vocab.deleted_at.is_(None))
+        query = select(Vocab).where(
+            where, Vocab.deleted_at.is_(None), Vocab.list.not_in(APP_VOCAB_LISTS)
+        )
         if app:
             query = query.where(Vocab.state == "accepted")
         rows = list(session.scalars(query.order_by(Vocab.id)))

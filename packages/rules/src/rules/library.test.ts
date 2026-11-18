@@ -6,12 +6,12 @@ import { findDeviceType, type TypeLike } from './library';
 
 type T = TypeLike & { n: number };
 
-const type = (id: string, model: string, p: Partial<T> = {}): T => ({ id, project_id: null, model, aliases: null, state: 'accepted', n: 0, ...p });
+const type = (id: string, model: string, p: Partial<T> = {}): T => ({ id, model, aliases: null, state: 'accepted', n: 0, ...p });
 
 describe('findDeviceType (T131: indexed by model key)', () => {
-  it('matches by id, by model or alias ignoring case and spaces, the project\'s type before the app library\'s, never a rejected one', () => {
+  it('matches by id, by model or alias ignoring case and spaces, the first by id when two match (one library, T196), never a rejected one', () => {
     const app = type('t-app', 'ERP-FT-241P', { aliases: ['CT06LCPA', 'Echo Relay Panel'] });
-    const own = type('t-own', 'erp-ft-241p', { project_id: 'p1' });
+    const own = type('t-0wn', 'erp-ft-241p'); // sorts before t-app
     const rejected = type('t-rej', 'UFMP4', { state: 'rejected' });
     const draft = type('t-draft', 'UFMP 4', { state: 'draft' });
     const types = new Map([app, own, rejected, draft].map((t) => [t.id, t] as const));

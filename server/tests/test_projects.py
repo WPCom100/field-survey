@@ -56,14 +56,7 @@ def test_create_project_rows_and_ops(client, session):
         "export_title": DEFAULT_EXPORT_TITLE,
         "disclaimer": "Based on submittal drawings rev F",
     }
-    assert out["copied"] == {
-        "vocab": 0,
-        "library_types": 0,
-        "suggestions": 0,
-        "rulings": 0,
-        "rule_params": 0,
-        "placeholders": 0,
-    }
+    assert out["copied"] == {"vocab": 0, "rulings": 0, "rule_params": 0, "placeholders": 0}
     levels = out["levels"]
     assert [lv["level"] for lv in levels] == ["B2", "B1", "01", "06", "06M", "09"]
     assert [lv["floor_order"] for lv in levels] == [1, 2, 3, 4, 5, 6]
@@ -206,6 +199,9 @@ def test_copy_from(client, session):
         )
 
     canonical = Vocab(id=uuid7(), project_id=sid, list="device_note", value="Not run")
+    # the device categories and cable codes are app-level lists (T196): never copied
+    own_category = Vocab(id=uuid7(), project_id=sid, list="category", value="Dimmer rack")
+    app_code = Vocab(id=uuid7(), project_id=None, list="cable_code", value="DX", state="accepted")
     variant = Vocab(
         id=uuid7(),
         project_id=sid,
@@ -229,6 +225,8 @@ def test_copy_from(client, session):
             variant,
             canonical,
             gone,
+            own_category,
+            app_code,
             lt(None, "P-NSPS-D", category="NSPS"),
             lt(None, "X-DRAFT", state="draft"),
             lt(
@@ -258,14 +256,7 @@ def test_copy_from(client, session):
             "levels": [{"level": "02"}],
         },
     )
-    assert out["copied"] == {
-        "vocab": 2,
-        "library_types": 2,
-        "suggestions": 0,
-        "rulings": 1,
-        "rule_params": 0,
-        "placeholders": 1,
-    }
+    assert out["copied"] == {"vocab": 2, "rulings": 1, "rule_params": 0, "placeholders": 1}
     assert out["copied_from_id"] == sid
     pid = out["id"]
     vocab = session.scalars(select(Vocab).where(Vocab.project_id == pid)).all()
@@ -273,17 +264,10 @@ def test_copy_from(client, session):
     assert set(by_value) == {"Not run", "not run"}
     assert by_value["not run"].canonical_of_id == by_value["Not run"].id
     assert by_value["Not run"].id != canonical.id
+    # One device library (T196, D287 (1)): the project holds no types, the app library's nor the
+    # source project's (rows from before T196).
     types = session.scalars(select(LibraryType).where(LibraryType.project_id == pid)).all()
-    assert sorted(t.model for t in types) == ["P-NSPS-D", "PI1002"]
-    assert all(t.state == "accepted" and t.promoted_from_id is None for t in types)
-    # The Neuron ID flag comes along; null stays null (by the wires, T68 / D185, T146 / D245).
-    assert {t.model: t.needs_neuron_id for t in types} == {"P-NSPS-D": None, "PI1002": False}
-    # T146: the IP / DMX flags too
-    assert {t.model: (t.needs_ip_address, t.needs_dmx_address) for t in types} == {
-        "P-NSPS-D": (None, None),
-        "PI1002": (True, False),
-    }
-    assert {t.model: t.role for t in types} == {"P-NSPS-D": None, "PI1002": "station"}  # T112
+    assert types == []
     rulings = session.scalars(select(Ruling).where(Ruling.project_id == pid)).all()
     assert [r.text for r in rulings] == ["Wagos everywhere"]
     assert rulings[0].standing and rulings[0].scope_levels is None and rulings[0].applied_at is None
@@ -291,33 +275,21 @@ def test_copy_from(client, session):
     assert [(p.label, p.kind, p.level_id) for p in phs] == [("Fixtures", "fixtures", None)]
     # Copies are ops of the new project, so an iPad pulls them.
     kinds = [o.entity_kind for o in session.scalars(select(Op).where(Op.project_id == pid))]
-    assert kinds.count("vocab") == 2 and kinds.count("library_type") == 2
+    assert kinds.count("vocab") == 2 and "library_type" not in kinds and "suggestion" not in kinds
     assert kinds.count("ruling") == 1 and kinds.count("placeholder") == 1
 
-    # Flags off: only the app library comes along.
+    # Flags off: nothing comes along.
     plain = create(
         client,
         {
             "name": "Plain",
-            "copy_from": {
-                "project_id": sid,
-                "vocabulary": False,
-                "library": False,
-                "rulings": False,
-            },
+            "copy_from": {"project_id": sid, "vocabulary": False, "rulings": False},
         },
     )
-    assert plain["copied"] == {
-        "vocab": 0,
-        "library_types": 1,
-        "suggestions": 0,
-        "rulings": 0,
-        "rule_params": 0,
-        "placeholders": 0,
-    }
-    # No copy-from at all: the app library still seeds the project (D65).
+    assert plain["copied"] == {"vocab": 0, "rulings": 0, "rule_params": 0, "placeholders": 0}
+    # No copy-from at all: no types either (the app library is read, not copied).
     fresh = create(client, {"name": "Fresh"})
-    assert fresh["copied"]["library_types"] == 1
+    assert fresh["copied"] == {"vocab": 0, "rulings": 0, "rule_params": 0, "placeholders": 0}
 
 
 @pytest.mark.parametrize(
@@ -340,6 +312,8 @@ def test_copy_from(client, session):
         ({"name": "X", "parties": {"owner": "x"}}, 422, "unknown party"),
         ({"name": "X", "settings": {"font": "x"}}, 422, "unknown setting"),
         ({"name": "X", "copy_from": {"project_id": str(uuid7())}}, 404, "unknown project"),
+        # T196: the device-type library is never copied, so the flag is gone from the API
+        ({"name": "X", "copy_from": {"project_id": str(uuid7()), "library": True}}, 422, "library"),
         ({"name": "X", "bogus": 1}, 422, "bogus"),
     ],
 )

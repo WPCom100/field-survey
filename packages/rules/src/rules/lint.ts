@@ -123,9 +123,10 @@ function phrases(value: string, split: boolean): string[] {
 export const LintVocab: Rule = {
   id: 'lint.vocab',
   title: 'Value outside vocabulary',
-  text: 'Values come from the project vocabulary: an old spelling a rename recorded (`vocab.canonical_of`) is flagged with its canonical value, a device category outside the category list and a cable code outside the master\'s codes are flagged. Status, type and owner are fixed lists the pickers enforce; item text is R3f.',
+  text: 'Values come from the project vocabulary and the app library\'s category list: an old spelling a rename recorded (`vocab.canonical_of`) is flagged with its canonical value, a device category outside the category list and a cable code outside the master\'s codes are flagged. Status, type and owner are fixed lists the pickers enforce; item text is R3f.',
   run(ctx) {
-    const vocab = ctx.snap.vocab.filter((v) => v.deleted_at == null);
+    // the project's lists, and the app library's category list (T196, D292 (9))
+    const vocab = [...ctx.snap.vocab, ...(ctx.snap.appVocab ?? [])].filter((v) => v.deleted_at == null);
     const byId = new Map(vocab.map((v) => [v.id, v] as const));
     const seen = new Set<string>();
     const recordsOf = (entity: (typeof VOCAB_FIELDS)[number]['entity']): { id: string; level_id: string | null; row: Record<string, unknown>; name: string }[] => {
@@ -166,8 +167,8 @@ export const LintVocab: Rule = {
       }
     }
     // Device category outside the list: CLAUDE.md §3 (the D196 eleven), the master's own
-    // spellings (D1 — old spellings once the project's vocabulary says so, caught above) and the
-    // project's own `category` entries.
+    // spellings (D1 — old spellings once the vocabulary says so, caught above) and the app
+    // library's `category` entries (one list for every project, T196).
     const categories = new Set<string>([
       ...DEVICE_CATEGORIES,
       ...Object.keys(MASTER_CATEGORY_RENAME),

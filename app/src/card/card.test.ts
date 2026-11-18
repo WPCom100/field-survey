@@ -396,15 +396,16 @@ describe('optional cables and accessories of the type (T105)', () => {
     const t = await setup();
     const { store, editor, pid } = t;
     await store.applyRemote(pulled('placeholder', uuidv7(), pid, { project_id: pid, label: 'Network switch', kind: 'external', level_id: DEMO_LEVEL_ID }));
-    const typeId = await createType(editor, store, pid, { model: 'T105-NSPS', category: 'NSPS' });
-    await updateType(editor, store, typeId, {
+    const lib = editor.forStream(LIBRARY_STREAM); // the one library (T196)
+    const typeId = await createType(lib, store, null, { model: 'T105-NSPS', category: 'NSPS' });
+    await updateType(lib, store, typeId, {
       defaultCables: [run('120V', 'P-NSPS-D Power Supply', null)],
       optionalCables: [run('120V', 'Second supply', null), run('N', 'switch', 'network switch')],
       optionalAccessories: [{ model: 'Back box', expected_qty: 1 }],
     });
-    await acceptType(editor, typeId);
+    await acceptType(lib, typeId);
     const { id } = await editor.create('device', { level_id: DEMO_LEVEL_ID, category: 'NSPS', device: 'T105-NSPS', library_type_id: typeId, origin: 'field_addition' }, FIELD_SURVEY);
-    return { ...t, typeId, deviceId: id };
+    return { ...t, typeId, deviceId: id, lib };
   }
 
   it('offers the optional runs the device lacks (defaults of a code come first) and the accessories it has no row for', async () => {
@@ -442,16 +443,16 @@ describe('optional cables and accessories of the type (T105)', () => {
   });
 
   it('"+ add Back box" creates the accessory with the expected quantity; a rejected type or deleted device offers nothing', async () => {
-    const { store, editor, deviceId, typeId } = await withType();
+    const { store, editor, deviceId, typeId, lib } = await withType();
     const op = await addOptionalAccessory(editor, deviceId, 'Back box', 1);
     expect(op).toMatchObject({ entity_kind: 'accessory', kind: 'create', change_type: 'Field survey' });
     let card = (await loadDeviceCard(store, deviceId))!;
     expect(card.accessories.map((a) => [a.model, a.expected, a.found])).toEqual([['Back box', 1, null]]);
     expect(card.accessoryOffers).toEqual([]);
-    await rejectType(editor, typeId);
+    await rejectType(lib, typeId);
     card = (await loadDeviceCard(store, deviceId))!;
     expect([card.cableOffers, card.accessoryOffers]).toEqual([[], []]);
-    await acceptType(editor, typeId);
+    await acceptType(lib, typeId);
     await deleteDevice(editor, deviceId, 'test');
     card = (await loadDeviceCard(store, deviceId))!;
     expect(card.cableOffers).toEqual([]);
@@ -461,8 +462,9 @@ describe('optional cables and accessories of the type (T105)', () => {
     const t = await setup();
     const { store, editor } = t;
     const modules = { label: 'ERn Modules', min: 2, max: 2 };
-    const typeId = await createType(editor, store, t.pid, { model: 'T113-KIT', category: 'NSPS' });
-    await updateType(editor, store, typeId, {
+    const lib = editor.forStream(LIBRARY_STREAM); // the one library (T196)
+    const typeId = await createType(lib, store, null, { model: 'T113-KIT', category: 'NSPS' });
+    await updateType(lib, store, typeId, {
       optionalAccessories: [
         { model: 'P-NSPS-D Power Supply', expected_qty: 1 },
         { model: 'P-ACP-E Mk2', expected_qty: 1, max_quantity: 1, group: modules },
@@ -474,7 +476,7 @@ describe('optional cables and accessories of the type (T105)', () => {
     // the library editor's save keeps the catalogue's max quantity and group
     const stored = (await store.get<Record<string, unknown>>('library_type', typeId))!.optional_accessories as Record<string, unknown>[];
     expect(stored[1]).toEqual({ model: 'P-ACP-E Mk2', expected_qty: 1, max_quantity: 1, group: modules });
-    await acceptType(editor, typeId);
+    await acceptType(lib, typeId);
     const { id: deviceId } = await editor.create('device', { level_id: DEMO_LEVEL_ID, category: 'NSPS', device: 'T113-KIT', library_type_id: typeId, origin: 'field_addition' }, FIELD_SURVEY);
     let card = (await loadDeviceCard(store, deviceId))!;
     const blocks = () => card.accessoryOfferGroups.map((b) => [accessoryGroupLine(b), b.members, b.offers.map((o) => o.model)]);

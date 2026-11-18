@@ -6,8 +6,9 @@
  * or one with no default cables, leaves the category table in charge. `U` rows are R2e's (one
  * Unison bus per level, not per device), so R2g never offers them.
  *
- * A device's type is its `library_type_id`; an imported device has none, so the project's (then
- * the app library's) type whose model or alias equals the device's Device text is used.
+ * A device's type is its `library_type_id`; an imported device has none, so the library type whose
+ * model or alias equals the device's Device text is used. There is one library, the app's, read
+ * by every project (T196, D287 (1)): a project holds no types of its own.
  */
 
 import { roleOf, type ConnectionStatus, type Role } from '@field-survey/core';
@@ -58,15 +59,20 @@ export interface LibraryAccessory {
 
 const STATUSES: readonly string[] = ['Complete', 'Installed, untested', 'Issue', 'Not installed', 'No access', 'Not started'];
 
-/** Read a stored cable list defensively: rows without a code of `codes` (`cableCodes`) are dropped. */
-export function parseLibraryCables(v: unknown, codes: readonly string[] = CABLE_CODES): LibraryCable[] {
+/**
+ * Read a stored cable list defensively: a row without a code is dropped, and every other row is
+ * kept whatever its code (T196, D287 (5)). A type's cables are the type's, the same in every
+ * project, so a code the reading project's own list (`cableCodes`) lacks hides nothing: the run
+ * is drafted or offered all the same, and the cable-code lint (`lint.vocab`) flags its code there.
+ */
+export function parseLibraryCables(v: unknown): LibraryCable[] {
   if (!Array.isArray(v)) return [];
   const out: LibraryCable[] = [];
   for (const raw of v) {
     if (!raw || typeof raw !== 'object') continue;
     const r = raw as Record<string, unknown>;
     const code = str(r.code);
-    if (!code || !codes.includes(code)) continue;
+    if (!code) continue;
     const qty = typeof r.qty === 'number' && Number.isFinite(r.qty) ? r.qty : null;
     const status = typeof r.status === 'string' && STATUSES.includes(r.status) ? (r.status as ConnectionStatus) : null;
     out.push({ code, from: str(r.from), to: str(r.to), far: str(r.far), single_row: r.single_row === true, qty, status });
@@ -95,7 +101,7 @@ export function parseLibraryAccessories(v: unknown): LibraryAccessory[] {
 const modelKey = (s: string) => s.replace(/\s+/g, '').toUpperCase();
 
 /** What `findDeviceType` reads of a type; the app's own rows satisfy it too. */
-export type TypeLike = Pick<LibraryTypeRow, 'id' | 'project_id' | 'model' | 'aliases' | 'state'>;
+export type TypeLike = Pick<LibraryTypeRow, 'id' | 'model' | 'aliases' | 'state'>;
 
 /**
  * Types by model key (model and every alias), built once per `types` map and kept beside it
@@ -125,17 +131,15 @@ function keyIndex<T extends TypeLike>(types: ReadonlyMap<string, T>): Map<string
 }
 
 /**
- * The type a device belongs to among `types` (live rows of its project and the app library): its
+ * The type a device belongs to among `types` (the app library's live rows, T196): its
  * `library_type_id`, else a not rejected type whose model or alias matches its Device text, the
- * project's before the app library's.
+ * first by id when two do.
  */
 export function findDeviceType<T extends TypeLike>(types: ReadonlyMap<string, T>, d: Pick<DeviceRow, 'library_type_id' | 'device'>): T | null {
   if (d.library_type_id) return types.get(d.library_type_id) ?? null;
   const text = str(d.device);
   if (!text) return null;
-  const matches = (keyIndex(types).get(modelKey(text)) ?? [])
-    .filter((t) => t.state !== 'rejected')
-    .sort((a, b) => Number(a.project_id == null) - Number(b.project_id == null) || a.id.localeCompare(b.id));
+  const matches = (keyIndex(types).get(modelKey(text)) ?? []).filter((t) => t.state !== 'rejected').sort((a, b) => a.id.localeCompare(b.id));
   return matches[0] ?? null;
 }
 
@@ -205,7 +209,7 @@ export function addressNeeds(type: AddressTypeLike | null, d: { category: string
   const role = roleOf(type, d);
   const wires = new Set(codes ?? []);
   if (!wires.size && type && type.state === 'accepted') {
-    for (const c of parseLibraryCables(type.default_cables, cableCodes(params))) wires.add(c.code);
+    for (const c of parseLibraryCables(type.default_cables)) wires.add(c.code);
   }
   if (BUS_ROLES.includes(role)) wires.add('U');
   const need = (kind: AddressKind): boolean => {
@@ -247,7 +251,7 @@ export function deviceNeedsNeuronId(ctx: RuleContext, d: DeviceRow): boolean {
 export function governingCables(ctx: RuleContext, d: DeviceRow): { type: LibraryTypeRow; cables: LibraryCable[] } | null {
   const type = typeOfDevice(ctx, d);
   if (!type || type.state !== 'accepted') return null;
-  const cables = parseLibraryCables(type.default_cables, cableCodes(ctx.params));
+  const cables = parseLibraryCables(type.default_cables);
   return cables.length ? { type, cables } : null;
 }
 

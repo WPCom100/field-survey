@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { Editor, Store, uuidv7, type Op } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
@@ -127,7 +127,9 @@ describe('dashboard (T38)', () => {
     expect(asFound(data, { levelId: id.l06m })).toMatchObject({ ipCaptured: 1, ipDevices: 1, dmxCaptured: 0, dmxDevices: 1 });
     expect(drillRows(data, { table: 'asFound', key: 'ipMissing', status: null }, { levelId: id.l06m })).toEqual([]);
     // a type's explicit flag overrides the wires (D247 (2)): an NSPS type that says "no DMX address"
-    const { id: nsps } = await editor.create('library_type', { project_id: PROJECT, category: 'NSPS', role: 'nsps', model: 'P-NSPS-D', state: 'accepted', needs_dmx_address: false }, { change_type: 'Master edit', reason: 't' });
+    // (an app-library type: the one library, T196)
+    const library = new Editor(store, { projectId: LIBRARY_STREAM, userId: ME });
+    const { id: nsps } = await library.create('library_type', { project_id: null, category: 'NSPS', role: 'nsps', model: 'P-NSPS-D', state: 'accepted', needs_dmx_address: false }, { change_type: 'Master edit', reason: 't' });
     await editor.setField('device', id.d4, 'library_type_id', nsps, { change_type: 'Master edit', reason: 't' });
     const typed = await loadDashboard(store, PROJECT);
     expect(asFound(typed)).toMatchObject({ dmxCaptured: 1, dmxDevices: 1 });

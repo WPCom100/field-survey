@@ -5,6 +5,7 @@ export type { SqlDriver, SqlParam, SqlRow } from './sql-driver';
 export type { Op, StoredOp } from './op';
 export { uuidv7, isUuid, setRandomSource, type RandomBytes } from './ids';
 export * as vocab from './vocab';
+export { APP_VOCAB_LISTS } from './vocab';
 export {
   ROLE,
   ROLE_LABEL,
