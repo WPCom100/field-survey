@@ -21,6 +21,7 @@ import {
   addValue,
   copyAppVocab,
   editPlaceholder,
+  listsOf,
   loadPairs,
   loadPlaceholders,
   loadStandard,
@@ -35,7 +36,7 @@ import {
   type VocabView,
 } from '../vocab/model';
 import { loadPinShapes, setPinShape, sharedShapes } from '../vocab/pinShapes';
-import { PLACEHOLDER_KIND_LABEL, VOCAB_LISTS, VOCAB_PAIR_LISTS, type PlaceholderKind, type VocabListKey, type VocabPairListKey } from '../vocab/seed';
+import { PLACEHOLDER_KIND_LABEL, VOCAB_PAIR_LISTS, type PlaceholderKind, type VocabListKey, type VocabPairListKey } from '../vocab/seed';
 
 type Tab = 'lists' | 'pairs' | 'shapes' | 'placeholders';
 type Scope = 'project' | 'app';
@@ -46,9 +47,10 @@ const TAB_LABEL: Record<Tab, string> = { lists: 'Lists', pairs: 'Model map & lev
  * Vocabulary (T40, T104; PLAN §2.2, D26, D182, D187, D214): the picker lists (notes, punch
  * items, photo captions, device types, categories, cable codes), the BOM's model map and level
  * aliases (canonical / variant pairs), the pin shape per role and the placeholder endpoints. Two
- * scopes like the library (D65): **This project** (a new value is a draft, usable at once) and
- * **App library** (drafts for Landry; new projects copy the accepted ones). Pin shapes are always
- * the app library's and apply to every project at once. `?project=` names the project.
+ * scopes: **This project** (a new value is a draft, usable at once) and **App library** (drafts
+ * for Landry; new projects copy the accepted ones). Pin shapes, device categories and cable codes
+ * are the app library's only and apply to every project at once (D214, T197, D292 (9)): This
+ * project does not list the last two. `?project=` names the project.
  */
 export default function VocabularyScreen() {
   const params = useLocalSearchParams<{ project?: string; tab?: string }>();
@@ -123,7 +125,7 @@ export default function VocabularyScreen() {
     [app, libraryEditor, run],
   );
 
-  const drafts = (lists ? Object.values(lists).flat() : []).filter((e) => e.draft).length;
+  const drafts = (lists ? listsOf(scope).flatMap((l) => lists[l.list]) : []).filter((e) => e.draft).length;
   const pairDrafts = (pairs ? Object.values(pairs).flat().flatMap((p) => [p, ...p.variants]) : []).filter((e) => e.draft).length;
   const tabs: Tab[] = app ? ['lists', 'pairs', 'shapes'] : ['lists', 'pairs', 'shapes', 'placeholders'];
   const shown = tabs.includes(tab) ? tab : 'lists';
@@ -181,7 +183,7 @@ export default function VocabularyScreen() {
       {note ? <Banner text={note} testID="vocab.note" style={styles.note} /> : null}
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {shown === 'lists'
-          ? VOCAB_LISTS.map((l) => <ListSection key={`${scope}-${l.list}`} list={l.list} title={l.title} hint={l.hint} entries={lists?.[l.list] ?? []} canEdit={!!editor} run={run} promote={promote} />)
+          ? listsOf(scope).map((l) => <ListSection key={`${scope}-${l.list}`} list={l.list} title={l.title} hint={l.hint} entries={lists?.[l.list] ?? []} canEdit={!!editor} run={run} promote={promote} />)
           : shown === 'pairs'
             ? VOCAB_PAIR_LISTS.map((l) => <PairSection key={`${scope}-${l.list}`} spec={l} pairs={pairs?.[l.list] ?? []} canEdit={!!editor} run={run} promote={promote} />)
             : shown === 'shapes'

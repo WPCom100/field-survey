@@ -227,6 +227,29 @@ export const LintTypeCategory: Rule = {
   },
 };
 
+/**
+ * A device whose type left the library (T197, D292 (6)): its `library_type_id` names a type that
+ * was deleted or rejected — in the Library, on any iPad, since every project reads the one
+ * library. The device keeps the link (never a silent change); a person restores or reopens the
+ * type in the Library, or adds the device again with another type. A link to a type this iPad has
+ * not pulled yet is not judged.
+ */
+export const LintTypeGone: Rule = {
+  id: 'lint.type_gone',
+  title: 'Device of a deleted or rejected type',
+  text: 'A device\'s library type is live and not rejected (D292 (6)): a device linked to a type deleted from or rejected in the library is flagged; the link is never changed by itself.',
+  run(ctx) {
+    const all = new Map(ctx.snap.libraryTypes.map((t) => [t.id, t] as const));
+    for (const d of ctx.index.device.values()) {
+      const t = d.library_type_id ? all.get(d.library_type_id) : undefined;
+      if (!t) continue;
+      const how = t.deleted_at != null ? 'deleted from' : t.state === 'rejected' ? 'rejected in' : null;
+      if (!how) continue;
+      ctx.find({ subject: subjectOfDevice(d), message: `${deviceLabel(ctx, d)}: type ${t.model} was ${how} the library` });
+    }
+  },
+};
+
 // ------------------------------------------------------------------ cables
 
 /** A device, a placeholder, or a draft device not placed yet (D235; R5: far-end items wait). */
@@ -493,6 +516,7 @@ export const LINT_RULES: readonly Rule[] = [
   LintNeuronItem,
   LintVocab,
   LintTypeCategory,
+  LintTypeGone,
   LintFarEnd,
   LintEndStatus,
   LintNeuronDup,

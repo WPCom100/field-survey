@@ -1,9 +1,9 @@
 # S4 (T158) chips step 1 (T99): the app library's Suggestions… → Load standard suggestions ("Added
 # n …" on a fresh server, else "all here already"), a second tap "all here already"; the Station,
-# X and N chips the card checks need are accepted (once per server: later projects copy them at
-# creation); a chip named for this run (`Maestro <n>`, X end Note) added and accepted, so the
-# project's Copy from app library always has one to copy ("Copied n chips …", then "Nothing new").
-# Starts and ends on Levels of PROJECT. `_chips-cleanup` removes the run's chip.
+# X and N chips the card checks need are accepted (once per server: every project reads them, T197);
+# a chip named for this run (`Maestro <n>`, X end Note) added and accepted, then seen from the
+# project's Library too (one library, no copy, D292 (9)). Starts and ends on Levels of PROJECT.
+# `_chips-cleanup` removes the run's chip.
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
@@ -114,25 +114,13 @@ appId: productions.luminarytechnology.fieldsurvey
     visible:
       id: nav.needs-review
     timeout: 30000
-# the project copies them
+# the project's Library is the same library: the chip is there with nothing copied (T197)
 - tapOn:
     id: nav.library
 - tapOn:
     id: library.suggestions
-- tapOn:
+- assertNotVisible:
     id: sugg.copyApp
-- extendedWaitUntil:
-    visible:
-      id: library.note
-      text: 'Copied \d+ chips? from the app library\.'
-    timeout: 15000
-- tapOn:
-    id: sugg.copyApp
-- extendedWaitUntil:
-    visible:
-      id: library.note
-      text: 'Nothing new in the app library \(accepted category and code chips only\)\.'
-    timeout: 15000
 - tapOn:
     id: sugg.code.X
 - assertVisible:

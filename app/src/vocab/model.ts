@@ -6,11 +6,13 @@
  * editor (`scopeOf`) or a `scope` argument (a project id, or null for the app library). A value
  * added to a list is a draft, usable at once and flagged until accepted (D43/D48); removing is a
  * soft delete. A project reads its own rows only; app values reach it by copying (project
- * creation on the server, or "Copy from app library"). Every write is one op through `Editor`.
+ * creation on the server, or "Copy from app library"). The device categories and cable codes
+ * (`APP_VOCAB_LISTS`) are one app-level list (T196, T197, D292 (9)): a project neither holds,
+ * copies, seeds nor adds them. Every write is one op through `Editor`.
  * No React or Expo imports: tested in Node.
  */
 
-import { LIBRARY_STREAM, OpError, isLibraryStream, type EditBatch, type EditContext, type Editor, type Store } from '@field-survey/core';
+import { APP_VOCAB_LISTS, LIBRARY_STREAM, OpError, isLibraryStream, type EditBatch, type EditContext, type Editor, type Store } from '@field-survey/core';
 
 import { SEED_PLACEHOLDERS, SEED_VOCAB, SEED_VOCAB_VARIANTS, VOCAB_LISTS, VOCAB_PAIR_LISTS, type PlaceholderKind, type VocabListKey, type VocabPairListKey } from './seed';
 
@@ -46,6 +48,16 @@ export function cleanValue(text: string): string | null {
 }
 
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+/** An app-level list (`category`, `cable_code`): edited in the app library only. */
+export function isAppList(list: string): boolean {
+  return (APP_VOCAB_LISTS as readonly string[]).includes(list);
+}
+
+/** The plain lists a scope shows: a project's leave out the app-level ones (T197). */
+export function listsOf(scope: 'project' | 'app'): typeof VOCAB_LISTS[number][] {
+  return VOCAB_LISTS.filter((l) => scope === 'app' || !isAppList(l.list));
+}
 
 /** The scope an editor writes to: its project, or null (the app library) on `LIBRARY_STREAM`. */
 export function scopeOf(editor: Editor): string | null {
@@ -95,6 +107,7 @@ export async function addValue(editor: Editor, store: Store, list: VocabListKey,
   const value = cleanValue(text);
   if (!value) throw new OpError('Type a value first.');
   const scope = scopeOf(editor);
+  if (scope != null && isAppList(list)) throw new OpError(`${VOCAB_LISTS.find((l) => l.list === list)?.title ?? list} are one list for every project: add it in the App library.`);
   const have = (await loadVocab(store, scope))[list];
   if (have.some((e) => same(e.value, value))) throw new OpError(`"${value}" is already in this list.`);
   const { id } = await editor.create('vocab', { project_id: scope, list, value, state: 'draft' }, VOCAB_CTX);
@@ -157,7 +170,8 @@ export async function removeValue(editor: Editor, id: string, store?: Store): Pr
 /**
  * Create the standard values the scope does not have yet, and in a project its placeholders;
  * returns counts. Idempotent. In a project they are accepted; in the app library they are drafts
- * for Landry to accept (T104, D214), and placeholders stay per project. The seed's old spellings
+ * for Landry to accept (T104, D214), and placeholders stay per project. The app-level lists
+ * (categories, cable codes) are seeded in the app library only (T197). The seed's old spellings
  * (`SEED_VOCAB_VARIANTS`, T112) are recorded as variants of their canonical value: a row the
  * scope already has with that spelling is re-pointed, a missing one is created pointing at the
  * canonical row — so the vocabulary lint flags the records still using it and the rename ruling
@@ -183,6 +197,7 @@ export async function loadStandard(editor: Editor, store: Store): Promise<{ valu
   await editor.group(VOCAB_CTX, async (g) => {
     const created = new Map<string, string>(); // `${list}|${value}` → id, for variants of a value created in this group
     for (const { list } of VOCAB_LISTS) {
+      if (scope != null && isAppList(list)) continue;
       for (const value of SEED_VOCAB[list]) {
         if (rowOf(list, value)) continue;
         const { id } = await g.create('vocab', { project_id: scope, list, value, state });
@@ -267,10 +282,10 @@ export async function promoteValue(libraryEditor: Editor, store: Store, id: stri
 /**
  * "Copy from app library" for a project that exists already (project creation copies them on
  * the server): the app library's accepted values this project lacks, accepted, canonicals before
- * their variants, in one group.
+ * their variants, in one group. The app-level lists stay in the app library (T196, T197).
  */
 export async function copyAppVocab(editor: Editor, store: Store, projectId: string): Promise<number> {
-  const app = (await rowsOf(store, null)).filter((r) => r.state === 'accepted');
+  const app = (await rowsOf(store, null)).filter((r) => r.state === 'accepted' && !isAppList(String(r.list)));
   const accepted = new Set(app.map((r) => String(r.id)));
   const rows = canonicalsFirst(app.filter((r) => !r.canonical_of_id || accepted.has(String(r.canonical_of_id))));
   const have = await rowsOf(store, projectId);

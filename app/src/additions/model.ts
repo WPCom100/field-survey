@@ -2,14 +2,16 @@
  * Field additions from the plan (T23, Phase 3 §4.6): a device found on site that is not in the
  * baseline, placed where the surveyor long-pressed. No React or Expo imports: runs in Node.
  *
- * - **Type:** picked from the device-type library (this project's types and the app library, D65;
- *   rejected types left out), or a model typed freely, which becomes a **draft** library type of
- *   this project (D55) — unless it matches an existing type's model or alias, which is used instead.
+ * - **Type:** picked from the device-type library (the one library every project reads, D287;
+ *   rejected types left out, drafts flagged, D48), or a model typed freely, which becomes a
+ *   **draft** type in that library (D292 (2)) — unless it matches an existing type's model or
+ *   alias, which is used instead. Nothing here edits a type that exists (D287 (2)).
  * - **ID (D93, D118):** every field addition is created without an ID and shows `<level>-?` + `NEW`
  *   until the server's `assign` arrives (`06M-07`, or `06M-S16` / `06M-D3` for stations and
  *   sensors). A tag can still be passed (setup placement), and is then kept.
  * - **Record:** `origin = field_addition`, `found_on_site = true`, the pin in sheet coordinates,
- *   status empty (Unsurveyed); the draft type and the device are one group (`Field survey`, D96).
+ *   status empty (Unsurveyed); a draft type is its own op on the library stream, written before
+ *   the device's group (`Field survey`, D96), so the library syncs first and the link resolves.
  */
 
 import { DeviceIdError, LIBRARY_STREAM, OpError, defaultIdSchemeForRole, deviceIdFor, isRole, roleOf, type Editor, type Op, type Role, type Store } from '@field-survey/core';
@@ -27,8 +29,6 @@ export type LibraryChoice = {
   scheme: 'level_number' | 'level_tag' | null;
   /** `draft` types are usable at once, flagged until accepted (D48). */
   state: 'draft' | 'accepted';
-  /** null = app library (D65). */
-  projectId: string | null;
   /** The catalogue's display name (T111 `source_ref`), searched with the model and aliases (T114). */
   displayName: string | null;
 };
@@ -37,13 +37,14 @@ type Row = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 
 /**
- * Library types usable on this project (project first, then app library), optionally of one
- * category. Accessory-only types (T111) are never offered: they are other types' accessories.
+ * The library's types a device can be (the app library's, D287: the same in every project), by
+ * model, optionally of one category. Rejected and deleted types are left out; accessory-only types
+ * (T111) are never offered: they are other types' accessories.
  */
-export async function libraryChoices(store: Store, projectId: string, category?: string | null): Promise<LibraryChoice[]> {
+export async function libraryChoices(store: Store, category?: string | null): Promise<LibraryChoice[]> {
   const rows = await store.list<Row>('library_type', {
-    where: `(project_id = ? OR project_id IS NULL) AND state <> 'rejected' AND (accessory_only IS NULL OR accessory_only = 0)${category ? ' AND category = ?' : ''}`,
-    params: category ? [projectId, category] : [projectId],
+    where: `project_id IS NULL AND state <> 'rejected' AND (accessory_only IS NULL OR accessory_only = 0)${category ? ' AND category = ?' : ''}`,
+    params: category ? [category] : [],
   });
   const out = rows.map(
     (r): LibraryChoice => ({
@@ -54,15 +55,10 @@ export async function libraryChoices(store: Store, projectId: string, category?:
       aliases: Array.isArray(r.aliases) ? (r.aliases as unknown[]).filter((a): a is string => typeof a === 'string') : [],
       scheme: r.id_scheme === 'level_tag' || r.id_scheme === 'level_number' ? r.id_scheme : null,
       state: r.state === 'accepted' ? 'accepted' : 'draft',
-      projectId: str(r.project_id),
       displayName: displayNameOf(r.source_ref),
     }),
   );
-  // a project type shadows an app-library type of the same model (it was copied from it)
-  const projectModels = new Set(out.filter((c) => c.projectId).map((c) => c.model.toUpperCase()));
-  return out
-    .filter((c) => c.projectId || !projectModels.has(c.model.toUpperCase()))
-    .sort((a, b) => Number(!a.projectId) - Number(!b.projectId) || a.model.localeCompare(b.model, 'en', { numeric: true }));
+  return out.sort((a, b) => a.model.localeCompare(b.model, 'en', { numeric: true }) || a.id.localeCompare(b.id));
 }
 
 function displayNameOf(ref: unknown): string | null {
@@ -117,7 +113,7 @@ export type FieldDeviceResult = {
  * model) before anything is written.
  */
 export async function addFieldDevice(editor: Editor, store: Store, input: FieldDeviceInput): Promise<FieldDeviceResult> {
-  const choices = await libraryChoices(store, input.projectId);
+  const choices = await libraryChoices(store);
   let type: LibraryChoice | null = input.libraryTypeId ? (choices.find((c) => c.id === input.libraryTypeId) ?? null) : null;
   if (input.libraryTypeId && !type) throw new OpError('That device type is not in the library on this iPad.');
   const typed = str(input.typedModel);

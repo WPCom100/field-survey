@@ -32,6 +32,7 @@ export const LINT_CHECKS: readonly LintCheck[] = [
   { id: 'dmx_item', title: 'DMX address item missing or not last', lints: ['lint.dmx_item'], hint: 'Accept the R3c "Missing all Device DMX addresses" draft; it is kept sorted last.' },
   { id: 'vocab', title: 'Value outside vocabulary', lints: ['lint.vocab', 'R3f'], hint: 'Change the value to the vocabulary\'s, or fix all of them with one ruling.', ruling: true },
   { id: 'type_category', title: 'Category differs from its type', lints: ['lint.type_category'], hint: 'The type was regrouped after the device was placed: fix all of them to the type\'s category with one ruling, or change the type.', ruling: true },
+  { id: 'type_gone', title: 'Device of a deleted or rejected type', lints: ['lint.type_gone'], hint: 'Restore or reopen the type in the Library, or delete the device and add it again with another type.' },
   { id: 'far_end', title: 'Cable with missing far end', lints: ['lint.far_end'], hint: 'Open the end and pick the far end (a device or a placeholder).' },
   { id: 'end_status', title: 'Cable ends with incompatible statuses', lints: ['lint.end_status'], hint: 'A wire is run or not: survey both ends again and correct one.' },
   { id: 'riser', title: 'To does not match the riser', lints: ['R2b'], hint: 'The riser governs To: correct To, or keep the guess in the note.' },

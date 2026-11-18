@@ -21,38 +21,34 @@ async function setup() {
 }
 
 describe('field additions (T23)', () => {
-  it('lists project and app-library types, project first, and matches typed models by model or alias', async () => {
-    const { store, plan } = await setup();
-    const all = await libraryChoices(store, plan.level.projectId);
-    expect(all.map((c) => [c.model, c.projectId ? 'project' : 'app'])).toEqual([
-      ['PI1002', 'project'],
-      ['UHCI-WM', 'project'],
-      ['P-NSPS-D', 'app'],
-    ]);
-    expect((await libraryChoices(store, plan.level.projectId, 'Sensor')).map((c) => c.model)).toEqual(['UHCI-WM']);
+  it('lists the one library\'s types by model (T197, D287) and matches typed models by model or alias', async () => {
+    const { store } = await setup();
+    const all = await libraryChoices(store);
+    expect(all.map((c) => c.model)).toEqual(['P-NSPS-D', 'PI1002', 'UHCI-WM']);
+    expect((await libraryChoices(store, 'Sensor')).map((c) => c.model)).toEqual(['UHCI-WM']);
     expect(matchModel(all, ' uhci-wm ')?.model).toBe('UHCI-WM');
     expect(matchModel(all, 'p nsps d')).toBeNull(); // spaces ignored, hyphens are not
     expect(matchModel(all, 'PNSPS')).toBeNull();
     expect(schemeFor(null, 'Station')).toBe('level_tag');
-    expect(schemeFor(all[2]!, 'NSPS')).toBe('level_number');
+    expect(schemeFor(all[0]!, 'NSPS')).toBe('level_number');
   });
 
   it('an accessory-only type (T111) is never offered as a device', async () => {
-    const { store, editor, plan } = await setup();
-    await editor.create(
+    const { store, editor } = await setup();
+    await editor.forStream(LIBRARY_STREAM).create(
       'library_type',
       { project_id: null, model: 'ERP-FT-LVD', aliases: ['0-10V Option Kit - FT (24 CH)'], category: null, state: 'draft', accessory_only: true, source_ref: { kind: 'davinci', type_id: 'd22fb480' } },
       { change_type: 'Master edit', reason: 't' },
     );
-    await editor.create('library_type', { project_id: null, model: 'P-TS7-E', category: 'Touchscreen', state: 'draft', accessory_only: null }, { change_type: 'Master edit', reason: 't' });
-    const all = await libraryChoices(store, plan.level.projectId);
-    expect(all.map((c) => c.model)).toEqual(['PI1002', 'UHCI-WM', 'P-NSPS-D', 'P-TS7-E']);
+    await editor.forStream(LIBRARY_STREAM).create('library_type', { project_id: null, model: 'P-TS7-E', category: 'Touchscreen', state: 'draft', accessory_only: null }, { change_type: 'Master edit', reason: 't' });
+    const all = await libraryChoices(store);
+    expect(all.map((c) => [c.model, c.state])).toEqual([['P-NSPS-D', 'accepted'], ['P-TS7-E', 'draft'], ['PI1002', 'accepted'], ['UHCI-WM', 'accepted']]);
     expect(matchModel(all, 'ERP-FT-LVD')).toBeNull();
   });
 
   it('a numbered type is created without an ID: 06M-? + NEW, + mark, field addition, pin rounded', async () => {
-    const { store, editor, base, plan } = await setup();
-    const nsps = (await libraryChoices(store, plan.level.projectId, 'NSPS'))[0]!;
+    const { store, editor, base } = await setup();
+    const nsps = (await libraryChoices(store, 'NSPS'))[0]!;
     const r = await addFieldDevice(editor, store, { ...base, category: 'NSPS', libraryTypeId: nsps.id, room: ' XX06M-1E05 ' });
     expect(r).toMatchObject({ displayId: null, draftTypeId: null, takenBy: [] });
     expect(r.ops).toHaveLength(1);
@@ -74,8 +70,8 @@ describe('field additions (T23)', () => {
   });
 
   it('stations and sensors are created without an ID too, for the server to number (D118)', async () => {
-    const { store, editor, base, plan } = await setup();
-    const station = (await libraryChoices(store, plan.level.projectId, 'Station'))[0]!;
+    const { store, editor, base } = await setup();
+    const station = (await libraryChoices(store, 'Station'))[0]!;
     const r = await addFieldDevice(editor, store, { ...base, category: 'Station', libraryTypeId: station.id });
     expect(r).toMatchObject({ displayId: null, takenBy: [] });
     expect(r.ops[0]!.payload).not.toHaveProperty('display_id');
@@ -86,7 +82,7 @@ describe('field additions (T23)', () => {
   });
 
   it('a free-typed model becomes a draft type in the one library, on its stream before the device (T196, D292 (2)); a typed known model reuses the type', async () => {
-    const { store, editor, base, plan } = await setup();
+    const { store, editor, base } = await setup();
     const r = await addFieldDevice(editor, store, { ...base, category: 'Relay panel', typedModel: 'ERP-XYZ 12' });
     expect(r.draftTypeId).toBeTruthy();
     expect(r.ops.map((o) => o.entity_kind)).toEqual(['device']);
@@ -95,7 +91,7 @@ describe('field additions (T23)', () => {
     expect(typeOps[0]!.payload).toMatchObject({ project_id: null, model: 'ERP-XYZ 12', category: 'Relay panel', state: 'draft', created_by_id: ME });
     expect(typeOps[0]!.client_ts < r.ops[0]!.client_ts).toBe(true); // the library first
     expect(r.ops[0]!.payload).toMatchObject({ device: 'ERP-XYZ 12', library_type_id: r.draftTypeId });
-    const drafts = await libraryChoices(store, plan.level.projectId, 'Relay panel');
+    const drafts = await libraryChoices(store, 'Relay panel');
     expect(drafts).toMatchObject([{ model: 'ERP-XYZ 12', state: 'draft' }]);
     // the same model typed again uses that draft, no second draft
     const again = await addFieldDevice(editor, store, { ...base, category: 'Relay panel', typedModel: 'erp-xyz 12' });

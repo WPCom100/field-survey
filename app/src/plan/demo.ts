@@ -7,7 +7,7 @@
  * No React or Expo imports: the Node tests seed the same data.
  */
 
-import { uuidv7, type Op, type Store } from '@field-survey/core';
+import { LIBRARY_STREAM, uuidv7, type Op, type Store } from '@field-survey/core';
 
 import demoGrid from './demo-grid.json';
 // The demo stands in for an imported project (Centennial): its devices carry the master's
@@ -306,9 +306,9 @@ export async function ensureDemoJumpExtras(store: Store, log: (msg: string) => v
 const LIBRARY_SEEDED_KEY = 'demo_library_seeded';
 
 /**
- * A small device-type library on the demo (T23) so "+ Device" has types to pick: two project
- * types (a station and a sensor, both `level_tag`) and one app-library type (`project_id` null, D65).
- * Models are the master's own (CLAUDE.md §3 phrases).
+ * A small device-type library on the demo (T23) so "+ Device" has types to pick: a station and a
+ * sensor (both `level_tag`) and an NSPS, in the one library (`project_id` null, pulled on the
+ * library stream; T197, D287). Models are the master's own (CLAUDE.md §3 phrases).
  */
 export async function ensureDemoLibrary(store: Store, log: (msg: string) => void = () => {}): Promise<void> {
   if (await store.getState<boolean>(LIBRARY_SEEDED_KEY)) return;
@@ -316,11 +316,11 @@ export async function ensureDemoLibrary(store: Store, log: (msg: string) => void
   let seq = last[0]?.n ?? 0;
   const ts = '2026-10-10T13:30:00.000Z';
   const ops: Op[] = [
-    { model: 'PI1002', category: 'Station', id_scheme: 'level_tag', project_id: PROJECT },
-    { model: 'UHCI-WM', category: 'Sensor', id_scheme: 'level_tag', project_id: PROJECT },
+    { model: 'PI1002', category: 'Station', id_scheme: 'level_tag', project_id: null },
+    { model: 'UHCI-WM', category: 'Sensor', id_scheme: 'level_tag', project_id: null },
     { model: 'P-NSPS-D', category: 'NSPS', id_scheme: 'level_number', project_id: null },
   ].map((payload) => ({
-    op_id: uuidv7(), project_id: PROJECT, user_id: USER, install_id: INSTALL, client_ts: ts, server_seq: ++seq, server_ts: ts,
+    op_id: uuidv7(), project_id: LIBRARY_STREAM, user_id: USER, install_id: INSTALL, client_ts: ts, server_seq: ++seq, server_ts: ts,
     entity_kind: 'library_type', entity_id: uuidv7(), kind: 'create', payload: { ...payload, state: 'accepted' },
     change_type: 'Master edit', reason: 'Demo level (T23)', state: 'applied',
   }));

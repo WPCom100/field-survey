@@ -1,5 +1,5 @@
 import { OpError, type Editor, type Role, type Store } from '@field-survey/core';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import {
@@ -13,10 +13,9 @@ import {
   acceptAllDrafts,
   acceptType,
   blankCable,
-  copySources,
-  copyTypes,
+  clean,
   createType,
-  promoteType,
+  deleteType,
   describeCable,
   editorStamp,
   libraryGroups,
@@ -24,17 +23,19 @@ import {
   parseAliases,
   rejectType,
   reopenType,
+  restoreType,
   roleOf,
   roleOfCategory,
   sourceLine,
+  typeChangeWarning,
   updateType,
-  type CopySource,
   type IdScheme,
   type LibraryAccessory,
   type LibraryCable,
   type LibraryGroup,
   type LibraryType,
   type LibraryView,
+  type TypeChangeWarning,
 } from './model';
 import { SectionScreen } from '../home/SectionScreen';
 import { loadSuggestions, type Suggestion } from '../suggestions/model';
@@ -45,37 +46,40 @@ import { Banner, Btn, Chip, PAGE_GUTTER, color, fieldStyles, font, radius, space
 /** One row of the virtualised list: a group's header, or a type. */
 type Item = { kind: 'head'; group: LibraryGroup; total: LibraryGroup | null; collapsed: boolean } | { kind: 'type'; type: LibraryType };
 
-type Pane = { kind: 'type'; id: string } | { kind: 'new' } | { kind: 'copy' } | { kind: 'suggestions' } | null;
+type Pane = { kind: 'type'; id: string } | { kind: 'new' } | { kind: 'suggestions' } | null;
 /** Run an edit; `done` is the line shown after it (a function to word it from what the edit did). */
 type RunFn = (fn: (e: Editor, s: Store) => Promise<unknown>, done?: string | (() => string)) => Promise<boolean>;
 
 /**
- * Device-type library (T48, Phase 3 §10): the type list on the left (by category, drafts
- * flagged), the selected type's editor on the right — model, category, aliases, ID scheme,
- * default cables (the rules offer them to every device of an accepted type, R2g), optional
- * cables and accessories, Accept / Reject — plus "+ New type" and "Copy from…". `scope` is the
- * project id, or null for the app library (T61, D65): then `editor` writes to the library stream
- * (`/library/ops`, D184). A project's accepted types can be promoted with `libraryEditor`.
- * At catalogue size (T114, about 1100 types after the DaVinci import) the list has a search box
- * (model, alias, display name), a group chip filter, "Drafts only", the accessories folded,
- * and "Accept all drafts in <group>" on each group header. Suggestion chips (T99, D174): a type's
- * on its editor beside the default cables, a category's and a cable code's under "Suggestions…".
+ * Device-type library (T48, Phase 3 §10; one library since T197, D287): the type list on the left
+ * (by category, drafts flagged), the selected type's editor on the right — model, category,
+ * aliases, ID scheme, default cables (the rules offer them to every device of an accepted type,
+ * R2g), optional cables and accessories, Accept / Reject / Delete — plus "+ New type". The
+ * sidebar's Library and Projects' Library open this same library; `editor` writes to the library
+ * stream (`/library/ops`, D184) and every project reads the result. With a project open
+ * (`projectId`) each type's device count is that project's. Deleting, rejecting or renaming a type
+ * asks first with the devices this iPad knows of (D292 (6)); deleted types sit with the rejected
+ * ones, where Restore brings one back. At catalogue size (T114, about 1100 types after the
+ * DaVinci import) the list has a search box (model, alias, display name), a group chip filter,
+ * "Drafts only", the accessories folded, and "Accept all drafts in <group>" on each group header.
+ * Suggestion chips (T99, D174, D292 (9)): a type's on its editor beside the default cables, a
+ * category's and a cable code's under "Suggestions…"; they are edited nowhere else.
  */
 export function LibraryScreen(props: {
   store: Store | null;
+  /** Writes to the library stream: every type and chip edit. */
   editor: Editor | null;
-  /** Writes to the app library's stream (Promote); null where promotion is not offered. */
-  libraryEditor: Editor | null;
-  scope: string | null;
-  /** Opens Needs review for this library's conflicts. */
+  /** The open project (the sidebar's Library): each type's device count is this project's. */
+  projectId: string | null;
+  /** Opens Needs review for the library's conflicts. */
   onOpenReview?: () => void;
-  /** Changes when a pull brought new ops for this library (reload; `projectDataKey`). */
+  /** Changes when a pull brought new ops for the library (reload; `projectDataKey`). */
   dataKey: string;
   names: ReadonlyMap<string, string>;
-  /** The app library (`?scope=app`): on the shell with no section and no project of its own (T190). */
+  /** Opened from Projects (`?scope=app`): on the shell with no section lit (T190). */
   app?: boolean;
 }) {
-  const { store, editor, scope } = props;
+  const { store, editor, projectId } = props;
   const [view, setView] = useState<LibraryView | null>(null);
   const [chips, setChips] = useState<Suggestion[]>([]);
   const [pane, setPane] = useState<Pane>(null);
@@ -85,9 +89,9 @@ export function LibraryScreen(props: {
   // T186: a pull during a load no longer throws it away (useReload)
   useReload({
     name: 'library',
-    subject: store ? (scope ?? 'app') : null,
+    subject: store ? (projectId ?? 'app') : null,
     reloadKey: `${tick}|${props.dataKey}`,
-    load: () => Promise.all([loadLibrary(store!, scope), loadSuggestions(store!, scope)]),
+    load: () => Promise.all([loadLibrary(store!, projectId), loadSuggestions(store!)]),
     apply: ([v, c]) => {
       setView(v);
       setChips(c);
@@ -141,19 +145,18 @@ export function LibraryScreen(props: {
         onPress: () => {
           let done = 0;
           void run(async (e, s) => {
-            done = await acceptAllDrafts(e, s, scope, g.key);
+            done = await acceptAllDrafts(e, s, g.key);
           }, () => `Accepted ${done} draft${done === 1 ? '' : 's'} in ${g.key}.`);
         },
       },
     ]);
   };
 
-  const title = `${scope ? 'Device-type library' : 'App device-type library'} (${types.filter((t) => t.state !== 'rejected').length} types${view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})`;
+  const title = `Device-type library (${types.filter((t) => t.state !== 'rejected' && !t.deleted).length} types${view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})`;
   const actions = (
           <>
             {view?.inReview && props.onOpenReview ? <Btn kind="tertiary" title={`${view.inReview} in review ▸`} onPress={props.onOpenReview} testID="library.review" /> : null}
             <Btn title="Suggestions…" onPress={() => setPane({ kind: 'suggestions' })} testID="library.suggestions" />
-            <Btn title="Copy from…" disabled={!editor} onPress={() => setPane({ kind: 'copy' })} testID="library.copy" />
             <Btn kind="primary" title="+ New type" disabled={!editor} onPress={() => setPane({ kind: 'new' })} testID="library.new" />
           </>
   );
@@ -197,11 +200,7 @@ export function LibraryScreen(props: {
             ListEmptyComponent={
               view ? (
                 <Text style={styles.sub}>
-                  {types.length
-                    ? 'Nothing matches the search and filters.'
-                    : scope
-                      ? 'No device types yet.'
-                      : 'The app library is empty.'}
+                  {types.length ? 'Nothing matches the search and filters.' : 'No device types yet.'}
                 </Text>
               ) : null
             }
@@ -214,29 +213,25 @@ export function LibraryScreen(props: {
               type={selected}
               chips={chips.filter((c) => c.scope === 'type' && c.ref === selected.id)}
               codes={view?.codes ?? CABLE_CODES}
-              scope={scope}
               canEdit={!!editor}
               run={run}
-              libraryEditor={props.libraryEditor}
             />
           </View>
         ) : (
           <ScrollView style={styles.pane} contentContainerStyle={styles.paneBody} keyboardShouldPersistTaps="handled">
             {pane?.kind === 'new' ? (
-              <NewType scope={scope} run={run} onCreated={(id) => setPane({ kind: 'type', id })} />
-            ) : pane?.kind === 'copy' && store ? (
-              <CopyFrom store={store} scope={scope} run={run} onDone={() => setPane(null)} />
+              <NewType run={run} onCreated={(id) => setPane({ kind: 'type', id })} />
             ) : pane?.kind === 'suggestions' ? (
-              <SuggestionsPane rows={chips} codes={view?.codes ?? CABLE_CODES} noPartCodes={view?.noPartCodes ?? []} library={scope} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
+              <SuggestionsPane rows={chips} codes={view?.codes ?? CABLE_CODES} noPartCodes={view?.noPartCodes ?? []} canEdit={!!editor} run={run} />
             ) : null}
           </ScrollView>
         )}
       </View>
     </>
   );
-  // a project's Library is a section (T189); the app library, opened from Projects, lights no entry (T190)
+  // the sidebar's Library is a section (T189); opened from Projects it lights no entry (T190)
   return (
-    <SectionScreen {...(props.app ? {} : { section: 'Library' as const, projectId: scope })} title={title} backTestID="library.back" actions={actions}>
+    <SectionScreen {...(props.app ? {} : { section: 'Library' as const, projectId })} title={title} backTestID="library.back" actions={actions}>
       {body}
     </SectionScreen>
   );
@@ -268,16 +263,15 @@ function TypeRow(props: { t: LibraryType; on: boolean; names: ReadonlyMap<string
   const { t } = props;
   return (
     <Pressable onPress={props.onPress} style={[styles.typeRow, props.on && styles.typeRowOn]} testID="library.type">
-      <Text style={[styles.typeModel, t.state === 'rejected' && styles.dim]} numberOfLines={1}>
-        {t.state === 'draft' ? <Text style={styles.draft}>DRAFT </Text> : null}
-        {t.state === 'rejected' ? <Text style={styles.dim}>rejected </Text> : null}
+      <Text style={[styles.typeModel, (t.state === 'rejected' || t.deleted) && styles.dim]} numberOfLines={1}>
+        {t.deleted ? <Text style={styles.dim}>deleted </Text> : t.state === 'draft' ? <Text style={styles.draft}>DRAFT </Text> : t.state === 'rejected' ? <Text style={styles.dim}>rejected </Text> : null}
         {t.model}
         {t.aliases.length ? <Text style={styles.sub}> · {t.aliases.join(' · ')}</Text> : null}
       </Text>
       <Text style={styles.sub} numberOfLines={1}>
         {t.sourceRef?.displayName && t.sourceRef.displayName !== t.model ? `${t.sourceRef.displayName} · ` : ''}
         {t.devices} device{t.devices === 1 ? '' : 's'}
-        {t.state === 'draft' ? ` · added by ${nameOf(props.names, t.createdById)}${t.createdAt ? ` ${shortDate(t.createdAt)}` : ''} ⚑` : ''}
+        {t.state === 'draft' && !t.deleted ? ` · added by ${nameOf(props.names, t.createdById)}${t.createdAt ? ` ${shortDate(t.createdAt)}` : ''} ⚑` : ''}
       </Text>
     </Pressable>
   );
@@ -293,7 +287,7 @@ function shortDate(iso: string): string {
   return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}/${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function NewType(props: { scope: string | null; run: RunFn; onCreated: (id: string) => void }) {
+function NewType(props: { run: RunFn; onCreated: (id: string) => void }) {
   const [model, setModel] = useState('');
   const [category, setCategory] = useState<string | null>(null);
   return (
@@ -309,7 +303,7 @@ function NewType(props: { scope: string | null; run: RunFn; onCreated: (id: stri
           let id = '';
           void props
             .run(async (e, s) => {
-              id = await createType(e, s, props.scope, { model, category });
+              id = await createType(e, s, { model, category });
             }, `Added ${model.trim()} as a draft.`)
             .then((ok) => ok && props.onCreated(id));
         }}
@@ -319,74 +313,17 @@ function NewType(props: { scope: string | null; run: RunFn; onCreated: (id: stri
   );
 }
 
-function CopyFrom(props: { store: Store; scope: string | null; run: RunFn; onDone: () => void }) {
-  const [sources, setSources] = useState<CopySource[] | null>(null);
-  const [from, setFrom] = useState<string | null | undefined>(undefined);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    copySources(props.store, props.scope).then((s) => {
-      setSources(s);
-      if (s.length) setFrom(s[0]!.id);
-    }, () => setSources([]));
-  }, [props.store, props.scope]);
-  const source = sources?.find((s) => s.id === from) ?? null;
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Copy from…</Text>
-      {sources && !sources.length ? <Text style={styles.sub}>Nothing to copy.</Text> : null}
-      <View style={styles.wrap}>
-        {(sources ?? []).map((s) => (
-          <Chip
-            key={s.id ?? 'app'}
-            selected={from === s.id}
-            label={`${s.name} (${s.types.length})`}
-            onPress={() => {
-              setFrom(s.id);
-              setPicked(new Set());
-            }}
-            testID={`library.copy.source.${s.name}`}
-          />
-        ))}
-      </View>
-      {source ? (
-        <>
-          <Btn kind="tertiary" small title={picked.size === source.types.length ? 'Untick all' : `Tick all ${source.types.length}`} onPress={() => setPicked(picked.size === source.types.length ? new Set() : new Set(source.types.map((t) => t.id)))} />
-          {source.types.map((t) => (
-            <Pressable key={t.id} onPress={() => setPicked(toggle(picked, t.id))} style={[styles.row, styles.tickRow]} testID={`library.copy.type.${t.model}`}>
-              <Text style={styles.check}>{picked.has(t.id) ? '☑' : '☐'}</Text>
-              <Text style={[styles.value, styles.grow]}>
-                {t.model} <Text style={styles.sub}>{t.category ?? ''}{t.defaultCables.length ? ` · ${t.defaultCables.map((c) => c.code).join(', ')}` : ''}</Text>
-              </Text>
-            </Pressable>
-          ))}
-          <Btn
-            kind="primary"
-            title={`Copy ${picked.size || ''}`}
-            disabled={!picked.size}
-            onPress={() => {
-              let msg = '';
-              void props.run(async (e, s) => {
-                const out = await copyTypes(e, s, props.scope, [...picked]);
-                msg = `Copied ${out.copied} type${out.copied === 1 ? '' : 's'}${out.skipped.length ? `; already here: ${out.skipped.join(', ')}` : ''}.`;
-              }, () => msg).then((ok) => ok && props.onDone());
-            }}
-            testID="library.copy.go"
-          />
-        </>
-      ) : null}
-    </View>
-  );
+/** Ask first when the change reaches devices this iPad knows of (D292 (6)); no question → go at once. */
+function confirmThen(w: TypeChangeWarning | null, go: () => void): void {
+  if (!w) return go();
+  Alert.alert(w.title, w.message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: w.confirm, style: 'destructive', onPress: go },
+  ]);
 }
 
-function toggle(set: Set<string>, id: string): Set<string> {
-  const next = new Set(set);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  return next;
-}
-
-/** The selected type: a form edited locally, saved as one group. */
-function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: readonly string[]; scope: string | null; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
+/** The selected type: a form edited locally, saved as one group. A deleted type is read-only until restored. */
+function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: readonly string[]; canEdit: boolean; run: RunFn }) {
   const t = props.type;
   const [model, setModel] = useState(t.model);
   const [category, setCategory] = useState<string | null>(t.category);
@@ -411,23 +348,28 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
     JSON.stringify(defaults) !== JSON.stringify(t.defaultCables) ||
     JSON.stringify(optional) !== JSON.stringify(t.optionalCables) ||
     JSON.stringify(accessories) !== JSON.stringify(t.optionalAccessories);
-  const save = () =>
-    props.run(
-      (e, s) => updateType(e, s, t.id, { model, category, role, aliases: parseAliases(aliases), idScheme: scheme, needsNeuronId: neuron, needsIpAddress: ip, needsDmxAddress: dmx, defaultCables: defaults, optionalCables: optional, optionalAccessories: accessories }),
-      'Saved.',
-    );
-  const ro = !props.canEdit;
+  const save = () => {
+    const renamed = clean(model);
+    const go = () =>
+      void props.run(
+        (e, s) => updateType(e, s, t.id, { model, category, role, aliases: parseAliases(aliases), idScheme: scheme, needsNeuronId: neuron, needsIpAddress: ip, needsDmxAddress: dmx, defaultCables: defaults, optionalCables: optional, optionalAccessories: accessories }),
+        'Saved.',
+      );
+    confirmThen(renamed && renamed !== t.model ? typeChangeWarning(t, 'rename', renamed) : null, go);
+  };
+  const canEdit = props.canEdit && !t.deleted;
+  const ro = !canEdit;
   return (
     <View style={styles.grow}>
       <ScrollView style={styles.grow} contentContainerStyle={styles.paneBody} keyboardShouldPersistTaps="handled">
         <View style={styles.section}>
           <View style={styles.row}>
             <Text style={[styles.sectionTitle, styles.grow]}>
-              {t.state === 'draft' ? <Text style={styles.draft}>DRAFT </Text> : null}
+              {t.state === 'draft' && !t.deleted ? <Text style={styles.draft}>DRAFT </Text> : null}
               {t.model}
             </Text>
-            <Text style={styles.sub}>
-              {t.devices} device{t.devices === 1 ? '' : 's'} · {t.state}
+            <Text style={styles.sub} testID="library.type.state">
+              {t.devices} device{t.devices === 1 ? '' : 's'} · {t.deleted ? 'deleted' : t.state}
             </Text>
           </View>
           {t.sourceRef || t.description || t.accessoryOnly ? (
@@ -506,7 +448,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
             <CableList list={defaults} codes={props.codes} onChange={ro ? undefined : setDefaults} testID="library.defaults" />
           </Field>
           <Field label="Suggestions">
-            <SuggestionList rows={props.chips} scope="type" refKey={t.id} library={props.scope} canEdit={props.canEdit} run={props.run} libraryEditor={t.promotedAs ? props.libraryEditor : null} />
+            <SuggestionList rows={props.chips} scope="type" refKey={t.id} canEdit={canEdit} run={props.run} />
           </Field>
           <Field label="Optional cables">
             <CableList list={optional} codes={props.codes} onChange={ro ? undefined : setOptional} testID="library.optional" />
@@ -540,9 +482,13 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
           <Text style={styles.sub}>Rules that reference this type: {t.rules.length ? t.rules.join(', ') : 'none'}</Text>
         </View>
       </ScrollView>
-      {props.canEdit ? (
+      {props.canEdit && t.deleted ? (
         <View style={[styles.actions, styles.footer]}>
-          <Btn kind={dirty ? 'primary' : 'secondary'} title="Save" disabled={!dirty} onPress={() => void save()} testID="library.save" />
+          <Btn kind="primary" title="Restore" onPress={() => void props.run((e, s) => restoreType(e, s, t.id), `Restored: ${t.model}.`)} testID="library.restore" />
+        </View>
+      ) : props.canEdit ? (
+        <View style={[styles.actions, styles.footer]}>
+          <Btn kind={dirty ? 'primary' : 'secondary'} title="Save" disabled={!dirty} onPress={save} testID="library.save" />
           {t.state === 'draft' ? (
             <>
               <Btn
@@ -557,29 +503,16 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
                 }
                 testID="library.accept"
               />
-              <Pressable onPress={() => void props.run((e) => rejectType(e, t.id), `Rejected: ${t.model}.`)} hitSlop={space.md} testID="library.reject">
+              <Pressable onPress={() => confirmThen(typeChangeWarning(t, 'reject'), () => void props.run((e) => rejectType(e, t.id), `Rejected: ${t.model}.`))} hitSlop={space.md} testID="library.reject">
                 <Text style={styles.danger}>Reject</Text>
               </Pressable>
             </>
           ) : (
             <Btn kind="tertiary" title="Back to draft" onPress={() => void props.run((e) => reopenType(e, t.id), 'Back to draft.')} testID="library.reopen" />
           )}
-          {t.projectId && t.state === 'accepted' && props.libraryEditor ? (
-            t.promotedAs ? (
-              <Text style={styles.sub}>In the app library ✓</Text>
-            ) : (
-              <Btn
-                kind="tertiary"
-                title="Promote to app library"
-                disabled={dirty}
-                onPress={() => {
-                  const lib = props.libraryEditor!;
-                  void props.run((_e, s) => promoteType(lib, s, t.id), `Promoted: ${t.model} is in the app library; new projects copy it.`);
-                }}
-                testID="library.promote"
-              />
-            )
-          ) : null}
+          <Pressable onPress={() => confirmThen(typeChangeWarning(t, 'delete'), () => void props.run((e) => deleteType(e, t.id), `Deleted: ${t.model}.`))} hitSlop={space.md} testID="library.delete">
+            <Text style={styles.danger}>Delete</Text>
+          </Pressable>
           {dirty ? <Text style={styles.sub}>{t.state === 'draft' ? 'Unsaved changes: save before accepting.' : 'Unsaved changes.'}</Text> : null}
         </View>
       ) : null}
@@ -708,11 +641,9 @@ const styles = StyleSheet.create({
   sub: { ...font.caption, color: color.text3, fontWeight: '400' },
   draft: { ...font.badge, color: color.warning },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: space.xs },
-  tickRow: { minHeight: 44 },
   grow: { flex: 1 },
   self: { alignSelf: 'flex-start' },
   value: { ...font.body, color: color.text },
-  check: { fontSize: 22, color: color.text2 },
   input: fieldStyles.input,
   qty: { width: 64, textAlign: 'center' },
   cables: { gap: 10 },

@@ -1,7 +1,7 @@
 # S4 step 2 of `rig.sh library-two` (T158), on B as Bob after A's library-two.yaml: after a sync
-# the app library lists MAESTRO-A2-<n> accepted (T61; Bob then rejects it: new projects copy the
-# app library's accepted types); Pin shapes reads Station on Square (T104; Bob puts it back to
-# Circle — app-wide); the project's Library: `Maestro L2 station` accepted, Neuron ID Not needed,
+# Projects' Library lists MAESTRO-A2-<n> accepted (T61; Bob then rejects it: every project reads
+# the one library, T197); Pin shapes reads Station on Square (T104; Bob puts it back to
+# Circle — app-wide); the project's Library (the same one): `Maestro L2 station` accepted, Neuron ID Not needed,
 # the optional N → switch, the draft chip (T48, T68, T99); 06M-S1's card: the chip, no Neuron ID,
 # the N → switch connection and `Back box expected 1` with neither offered (T105); C-01's
 # Termination kits No (T103). Sync.
@@ -20,7 +20,7 @@ name: Library two — B sees Ann's library, card, kits and pin shape
     id: nav.projects
 - tapOn:
     id: projects.library
-- assertVisible: 'App device-type library.*'
+- assertVisible: 'Device-type library.*'
 - tapOn:
     id: library.search
 - inputText: MAESTRO-A2-${output.n}
@@ -79,7 +79,7 @@ name: Library two — B sees Ann's library, card, kits and pin shape
 - tapOn:
     id: rail.levels
 
-# the project's library
+# the project's Library (the same library)
 - tapOn:
     id: nav.library
 - tapOn:

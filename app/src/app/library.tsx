@@ -14,9 +14,10 @@ import { useSyncStatus } from '../sync/useSyncStatus';
 import { color, font, space } from '../ui';
 
 /**
- * The device-type library (Phase 3 §10): a project's (T48, `?project=`) or the app library
- * (T61, D65, `?scope=app`, opened from the Projects list, no project needed). App-library edits
- * go to the library's own op stream (`/library/ops`, D184).
+ * The device-type library (Phase 3 §10): one library for every project (T197, D287). The
+ * sidebar's Library (`?project=`) and Projects' Library (`?scope=app`, no project needed) open the
+ * same screen; every edit goes to the library's own op stream (`/library/ops`, D184). The project
+ * only gives each type its device count in that project and lights the sidebar's entry.
  */
 export default function LibraryRoute() {
   const params = useLocalSearchParams<{ project?: string; scope?: string }>();
@@ -25,6 +26,7 @@ export default function LibraryRoute() {
   const sync = useSyncStatus();
   const [store, setStore] = useState<Store | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const names = useTeamNames(store);
 
@@ -32,30 +34,26 @@ export default function LibraryRoute() {
     openAppStore().then(
       async (s) => {
         setStore(s);
-        if (!app) setProjectId(pickProject((await listProjects(s)).map((p) => p.id), params.project));
+        setProjectId(app ? null : pickProject((await listProjects(s)).map((p) => p.id), params.project));
+        setReady(true);
       },
       (e: unknown) => setError(String(e)),
     );
   }, [params.project, app]);
 
-  const libraryEditor = useMemo(() => (store ? new Editor(store, { projectId: LIBRARY_STREAM, userId: user.id }) : null), [store, user.id]);
-  const editor = useMemo(
-    () => (app ? libraryEditor : store && projectId ? new Editor(store, { projectId, userId: user.id }) : null),
-    [app, libraryEditor, store, projectId, user.id],
-  );
-  const reviewOf = app ? LIBRARY_STREAM : projectId;
+  const editor = useMemo(() => (store ? new Editor(store, { projectId: LIBRARY_STREAM, userId: user.id }) : null), [store, user.id]);
 
   return (
     <>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <LibraryScreen
-        store={app || projectId ? store : null}
+        store={ready ? store : null}
         editor={editor}
-        libraryEditor={app ? null : libraryEditor}
-        scope={app ? null : projectId}
-        dataKey={projectDataKey(sync, app ? LIBRARY_STREAM : projectId)}
+        projectId={projectId}
+        // the open project's pulls (its device counts) and the library's; from Projects the library's only
+        dataKey={projectDataKey(sync, projectId ?? LIBRARY_STREAM)}
         names={names}
-        onOpenReview={reviewOf ? () => router.push({ pathname: '/review', params: { project: reviewOf } }) : undefined}
+        onOpenReview={() => router.push({ pathname: '/review', params: { project: LIBRARY_STREAM } })}
         app={app}
       />
     </>

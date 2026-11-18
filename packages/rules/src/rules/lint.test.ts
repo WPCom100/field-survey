@@ -30,6 +30,7 @@ import {
   LintPower,
   LintRelay,
   LintTypeCategory,
+  LintTypeGone,
   LintVocab,
   LINT_RULES,
 } from './lint';
@@ -448,5 +449,24 @@ describe('library cable lints by role (T112, D201)', () => {
     expect(seeds).toEqual([
       expect.objectContaining({ entity: 'device', field: 'category', action: 'rename', from: 'Equipment', to: 'Equipment Panels', recordIds: [old.id, old2.id], text: 'Rename "Equipment" to "Equipment Panels"' }),
     ]);
+  });
+
+  it('flags a device whose type was deleted from or rejected in the library; the link stays (T197, D292 (6))', () => {
+    const b = new Build();
+    const l = b.level('06M');
+    const gone = b.libraryType('ERP-OLD', 'Power Distribution', { deleted_at: NOW });
+    const nope = b.libraryType('ERP-NOPE', 'Power Distribution', { state: 'rejected' });
+    const draft = b.libraryType('ERP-NEW', 'Power Distribution', { state: 'draft' });
+    const a = b.device(l, 'Power Distribution', { display_id: '06M-01', library_type_id: gone.id });
+    const c = b.device(l, 'Power Distribution', { display_id: '06M-02', library_type_id: nope.id });
+    b.device(l, 'Power Distribution', { display_id: '06M-03', library_type_id: draft.id }); // a draft is a live type
+    b.device(l, 'Power Distribution', { display_id: '06M-04', device: 'ERP-NOPE' }); // no link: nothing to judge
+    b.device(l, 'Power Distribution', { display_id: '06M-05', library_type_id: 'not-pulled-yet' }); // not on this iPad
+    expect(found(b, [LintTypeGone])).toEqual([
+      ['lint.type_gone', a.id, '06M-01: type ERP-OLD was deleted from the library'],
+      ['lint.type_gone', c.id, '06M-02: type ERP-NOPE was rejected in the library'],
+    ]);
+    expect(checkOf('lint.type_gone')).toMatchObject({ id: 'type_gone', title: 'Device of a deleted or rejected type' });
+    expect(LINT_RULES).toContain(LintTypeGone);
   });
 });

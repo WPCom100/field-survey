@@ -1,6 +1,7 @@
 /**
  * "+ Device (field addition)" from the plan's long-press menu (T23, Phase 3 §4.6), in the side
- * panel: category → type from the library (or a model typed freely → draft type, D55) → Add.
+ * panel: category → type from the library (or a model typed freely → a draft type in the one
+ * library, D292 (2)) → Add. The picker only picks: nothing here edits a type (D287 (2)).
  * Every ID comes from the server (D93, D118): the device shows `<level>-?` + NEW until then. The new device's
  * card opens after Add. The pin goes where the surveyor long-pressed (shown as a grey "+" pin).
  * The model box searches the choices as you type (T114: model, alias, catalogue name; the
@@ -50,8 +51,8 @@ export function AddDevicePanel(props: AddDeviceProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    libraryChoices(store, projectId).then(setAll, (e: unknown) => setError(String(e)));
-  }, [store, projectId]);
+    libraryChoices(store).then(setAll, (e: unknown) => setError(String(e)));
+  }, [store]);
 
   const picked = typeId ? (all?.find((c) => c.id === typeId) ?? null) : null;
   const matching = useMemo(() => searchChoices((all ?? []).filter((c) => !category || c.category === category), typed), [all, category, typed]);
@@ -124,7 +125,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
               <Chip
                 key={c.id}
                 testID={`add.type.${c.model}`}
-                label={`${c.model}${c.projectId ? '' : ' · app'}`}
+                label={c.model}
                 badge={c.state === 'draft' ? 'DRAFT' : undefined}
                 on={typeId === c.id}
                 onPress={() => {
@@ -162,7 +163,7 @@ export function AddDevicePanel(props: AddDeviceProps) {
           typedMatch ? (
             <Text style={styles.muted}>Matches the library type {typedMatch.model}.</Text>
           ) : (
-            <Text style={styles.note}>New model: added to this project's library as a draft.</Text>
+            <Text style={styles.note} testID="add.newModel">New model: added to the library as a draft.</Text>
           )
         ) : null}
 

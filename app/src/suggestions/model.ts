@@ -4,12 +4,13 @@
  * offered in one place (`target`): a device's Notes, a connection end's Note, a punch item's
  * Item, a missing part's Part. Every chip is the app library's (`project_id` null, written to the
  * library stream, D184; T196, D292 (9)): a project reads them directly (`loadChipRows`) and holds
- * none of its own, and the server refuses a chip in a project's stream. Chips are suggestions a
+ * none of its own, and the server refuses a chip in a project's stream. They are edited in the
+ * Library only (T197): every write here refuses an editor on a project's stream. Chips are suggestions a
  * person picks: free typing stays, and the rules keep raising their own drafts (D174 (4)).
  * No React or Expo imports: tested in Node.
  */
 
-import { LIBRARY_STREAM, OpError, canonicalCategory, type EditBatch, type EditContext, type Editor, type Store, type vocab } from '@field-survey/core';
+import { OpError, canonicalCategory, isLibraryStream, type EditContext, type Editor, type Store, type vocab } from '@field-survey/core';
 import { DEFAULT_PARAMS, RuleParams, fillTemplate, loadRuleParamRows, textParam } from '@field-survey/rules';
 
 import { SUGGESTION_SEED } from './seed';
@@ -62,13 +63,11 @@ export function kitPartChip(params: RuleParams, code: string): string {
 
 export interface Suggestion {
   id: string;
-  projectId: string | null;
   scope: SuggestionScope;
   ref: string;
   target: SuggestionTarget;
   text: string;
   state: SuggestionState;
-  promotedFromId: string | null;
 }
 
 type Row = Record<string, unknown>;
@@ -79,13 +78,11 @@ const key = (text: string): string => text.trim().replace(/\s+/g, ' ').toLowerCa
 function toSuggestion(r: Row): Suggestion {
   return {
     id: String(r.id),
-    projectId: str(r.project_id),
     scope: r.scope as SuggestionScope,
     ref: String(r.ref),
     target: r.target as SuggestionTarget,
     text: String(r.text),
     state: (str(r.state) ?? 'draft') as SuggestionState,
-    promotedFromId: str(r.promoted_from_id),
   };
 }
 
@@ -99,10 +96,15 @@ function sameRef(scope: SuggestionScope, a: string, b: string): boolean {
   return scope === 'code' ? a.toUpperCase() === b.toUpperCase() : refOf(scope, a) === refOf(scope, b);
 }
 
-/** Every live chip of one library (`library` = project id, null = the app library), oldest first. */
-export async function loadSuggestions(store: Store, library: string | null): Promise<Suggestion[]> {
-  const rows = await store.list<Row>('suggestion', library ? { where: 'project_id = ?', params: [library], orderBy: 'id' } : { where: 'project_id IS NULL', orderBy: 'id' });
+/** Every live chip of the library (the app library's: every chip is app-level, D292 (9)), oldest first. */
+export async function loadSuggestions(store: Store): Promise<Suggestion[]> {
+  const rows = await store.list<Row>('suggestion', { where: 'project_id IS NULL', orderBy: 'id' });
   return rows.map(toSuggestion);
+}
+
+/** A chip is edited in the Library only (D292 (9)): an editor on a project's stream is refused. */
+function libraryOnly(editor: Editor): void {
+  if (!isLibraryStream(editor.projectId)) throw new OpError('Suggestion chips are edited in the Library.');
 }
 
 /**
@@ -177,9 +179,9 @@ export interface SuggestionInput {
   text: string;
 }
 
-/** The accepted rule parameters of a library (a project's, or the app library's): what its kit settings read. */
-async function libraryParams(store: Store, library: string | null): Promise<RuleParams> {
-  return new RuleParams(await loadRuleParamRows(store, library));
+/** The app library's accepted rule parameters: what a chip's kit settings read when it is added. */
+async function libraryParams(store: Store): Promise<RuleParams> {
+  return new RuleParams(await loadRuleParamRows(store, null));
 }
 
 function check(input: SuggestionInput, params: RuleParams): SuggestionInput {
@@ -196,104 +198,48 @@ function duplicate(list: readonly Suggestion[], s: SuggestionInput, exceptId: st
   return list.find((x) => x.id !== exceptId && x.state !== 'rejected' && x.scope === s.scope && sameRef(s.scope, x.ref, s.ref) && x.target === s.target && key(x.text) === key(s.text));
 }
 
-/** "+ add": a draft chip in `library` (the editor writes to that library's stream). A chip already there is refused. */
-export async function addSuggestion(editor: Editor, store: Store, library: string | null, input: SuggestionInput): Promise<string> {
-  const s = check(input, await libraryParams(store, library));
-  const clash = duplicate(await loadSuggestions(store, library), s);
+/** "+ add": a draft chip in the library (on its stream). A chip already there is refused. */
+export async function addSuggestion(editor: Editor, store: Store, input: SuggestionInput): Promise<string> {
+  libraryOnly(editor);
+  const s = check(input, await libraryParams(store));
+  const clash = duplicate(await loadSuggestions(store), s);
   if (clash) throw new OpError(`"${clash.text}" is already offered there.`);
-  const { id } = await editor.create('suggestion', { project_id: library, ...s, state: 'draft', created_by_id: editor.userId }, SUGGESTION_CTX);
+  const { id } = await editor.create('suggestion', { project_id: null, ...s, state: 'draft', created_by_id: editor.userId }, SUGGESTION_CTX);
   return id;
 }
 
 export async function editSuggestion(editor: Editor, store: Store, id: string, text: string): Promise<void> {
+  libraryOnly(editor);
   const row = await store.get<Row>('suggestion', id);
   if (!row || row.deleted_at) throw new OpError('That chip is gone.');
   const cur = toSuggestion(row);
-  const s = check({ ...cur, text }, await libraryParams(store, cur.projectId));
+  const s = check({ ...cur, text }, await libraryParams(store));
   if (s.text === cur.text) return;
-  const clash = duplicate(await loadSuggestions(store, cur.projectId), s, id);
+  const clash = duplicate(await loadSuggestions(store), s, id);
   if (clash) throw new OpError(`"${clash.text}" is already offered there.`);
   await editor.setField('suggestion', id, 'text', s.text, SUGGESTION_CTX);
 }
 
 export async function acceptSuggestion(editor: Editor, id: string): Promise<void> {
+  libraryOnly(editor);
   await editor.setField('suggestion', id, 'state', 'accepted', SUGGESTION_CTX);
 }
 
 /** Reject a draft: it leaves the chips, and stays listed so the seed does not offer it again. */
 export async function rejectSuggestion(editor: Editor, id: string): Promise<void> {
+  libraryOnly(editor);
   await editor.setField('suggestion', id, 'state', 'rejected', SUGGESTION_CTX);
 }
 
 export async function reopenSuggestion(editor: Editor, id: string): Promise<void> {
+  libraryOnly(editor);
   await editor.setField('suggestion', id, 'state', 'draft', SUGGESTION_CTX);
 }
 
 /** Remove a chip (a soft delete: nothing is hard-deleted). */
 export async function removeSuggestion(editor: Editor, id: string): Promise<void> {
+  libraryOnly(editor);
   await editor.delete('suggestion', id, SUGGESTION_CTX);
-}
-
-/**
- * Inside a type copy's group (`copyTypes`): the accepted chips of `fromTypeId` onto its copy
- * `toTypeId` in `library`, accepted like the type; a promotion records `promoted_from_id`.
- */
-export async function copyTypeChips(g: EditBatch, store: Store, fromTypeId: string, toTypeId: string, library: string | null, userId: string): Promise<number> {
-  const rows = await store.list<Row>('suggestion', { where: `scope = 'type' AND ref = ? AND state = 'accepted'`, params: [fromTypeId], orderBy: 'id' });
-  for (const r of rows) {
-    await g.create('suggestion', {
-      project_id: library,
-      scope: 'type',
-      ref: toTypeId,
-      target: r.target,
-      text: r.text,
-      state: 'accepted',
-      created_by_id: userId,
-      ...(library === null && r.project_id ? { promoted_from_id: r.id } : {}),
-    });
-  }
-  return rows.length;
-}
-
-/**
- * "Promote to app library" for one accepted project chip (D65): a category or code chip becomes
- * the app library's; a type's chip goes onto the app type promoted from that type (promote the
- * type first). Refused when the app library already offers it.
- */
-export async function promoteSuggestion(libraryEditor: Editor, store: Store, id: string): Promise<string> {
-  if (libraryEditor.projectId !== LIBRARY_STREAM) throw new OpError('Promotion writes to the app library.');
-  const row = await store.get<Row>('suggestion', id);
-  if (!row || row.deleted_at || !row.project_id) throw new OpError('Only a project chip can be promoted.');
-  const s = toSuggestion(row);
-  if (s.state !== 'accepted') throw new OpError('Accept the chip before promoting it.');
-  let ref = s.ref;
-  if (s.scope === 'type') {
-    const app = await store.list<Row>('library_type', { where: 'project_id IS NULL AND promoted_from_id = ?', params: [s.ref], orderBy: 'id' });
-    if (!app.length) throw new OpError('Promote the type to the app library first; its chips go with it.');
-    ref = String(app.at(-1)!.id);
-  }
-  const target: SuggestionInput = { scope: s.scope, ref, target: s.target, text: s.text };
-  if (duplicate(await loadSuggestions(store, null), target)) throw new OpError(`The app library already offers "${s.text}" there.`);
-  const { id: made } = await libraryEditor.create('suggestion', { project_id: null, ...target, state: 'accepted', created_by_id: libraryEditor.userId, promoted_from_id: s.id }, SUGGESTION_CTX);
-  return made;
-}
-
-/**
- * "Copy from app library" for a project that exists already (project creation copies them on
- * the server): the app library's accepted category and code chips this project lacks, accepted,
- * in one group. A type's chips come with the type (Copy from… in the type list).
- */
-export async function copyAppSuggestions(editor: Editor, store: Store, projectId: string): Promise<number> {
-  const have = await loadSuggestions(store, projectId);
-  const app = (await loadSuggestions(store, null)).filter((s) => s.state === 'accepted' && s.scope !== 'type');
-  const add = app.filter((s, i) => !duplicate(have, s) && !duplicate(app.slice(0, i), s));
-  if (!add.length) return 0;
-  await editor.group({ ...SUGGESTION_CTX, reason: 'Library suggestions: copied from the app library' }, async (g) => {
-    for (const s of add) {
-      await g.create('suggestion', { project_id: projectId, scope: s.scope, ref: s.ref, target: s.target, text: s.text, state: 'accepted', created_by_id: editor.userId });
-    }
-  });
-  return add.length;
 }
 
 /**
@@ -301,8 +247,8 @@ export async function copyAppSuggestions(editor: Editor, store: Store, projectId
  * code as drafts for Landry to accept, only what is missing (a rejected one is not offered again).
  */
 export async function loadStandardSuggestions(libraryEditor: Editor, store: Store): Promise<number> {
-  if (libraryEditor.projectId !== LIBRARY_STREAM) throw new OpError('The standard suggestions go to the app library.');
-  const all = await loadSuggestions(store, null);
+  if (!isLibraryStream(libraryEditor.projectId)) throw new OpError('The standard suggestions go to the app library.');
+  const all = await loadSuggestions(store);
   const add = SUGGESTION_SEED.filter((s) => !all.some((x) => x.scope === s.scope && sameRef(s.scope, x.ref, s.ref) && x.target === s.target && key(x.text) === key(s.text)));
   if (!add.length) return 0;
   await libraryEditor.group({ ...SUGGESTION_CTX, reason: 'Library suggestions: standard seed' }, async (g) => {

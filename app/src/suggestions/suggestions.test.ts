@@ -1,26 +1,26 @@
 /**
- * Library suggestion chips (T99, D174, D212): the union a field offers (type, category, code, then
- * the project's vocabulary), the device card and the end editor reading it, chips copied and
- * promoted with their type, "Copy from app library", the standard seed, and the refusals (R4).
+ * Library suggestion chips (T99, D174, D212; app-level only since T196 / T197, D292 (9)): the
+ * union a field offers (type, category, code, then the project's vocabulary), the device card and
+ * the end editor reading it, the Library as the only place a chip is edited, the standard seed,
+ * and the refusals (R4).
  */
 
 import { Editor, LIBRARY_STREAM, Store, uuidv7, type EditContext, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
-import { RuleParams, setRuleParam, type RuleParamRow } from '@field-survey/rules';
+import { RuleParams, decideRuleParam, setRuleParam, type RuleParamRow } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
 
 import { STANDARD_PHRASES, loadDeviceCard } from '../card/model';
 import { CONNECTION_PHRASES, loadCableEnds } from '../ends/model';
-import { acceptType, copyTypes, createType, loadLibrary, promoteType } from '../library/model';
+import { acceptType, createType, loadLibrary } from '../library/model';
 import {
   acceptSuggestion,
   NO_TERM_KIT,
   addSuggestion,
   chipsFor,
-  copyAppSuggestions,
+  editSuggestion,
   loadStandardSuggestions,
   loadSuggestions,
-  promoteSuggestion,
   rejectSuggestion,
   removeSuggestion,
   type Suggestion,
@@ -41,7 +41,7 @@ function params(values: Record<string, unknown>): RuleParams {
 }
 
 function row(scope: Suggestion['scope'], ref: string, target: Suggestion['target'], text: string, state: Suggestion['state'] = 'accepted'): Suggestion {
-  return { id: uuidv7(), projectId: 'p', scope, ref, target, text, state, promotedFromId: null };
+  return { id: uuidv7(), scope, ref, target, text, state };
 }
 
 async function setup() {
@@ -132,7 +132,7 @@ describe('suggestion chips: the union (T99, D174 (2))', () => {
   it('the device card and the end editor offer the app library\'s accepted type, category and code chips before the project lists (T196)', async () => {
     const { store, lib, project } = await setup();
     const p = await project('Tower');
-    const type = await createType(lib, store, null, { model: 'PI1002', category: 'Station' });
+    const type = await createType(lib, store, { model: 'PI1002', category: 'Station' });
     await acceptType(lib, type);
     const station = await p.editor.create('device', { level_id: p.levelId, category: 'Station', device: 'PI1002' }, CTX);
     const panel = await p.editor.create('device', { level_id: p.levelId, category: 'Relay panel', device: 'ERP' }, CTX);
@@ -145,7 +145,7 @@ describe('suggestion chips: the union (T99, D174 (2))', () => {
     expect((await loadCableEnds(store, endA.id))!.phrases).toEqual(CONNECTION_PHRASES);
 
     // every chip is the app library's (D292 (9)): added there as drafts, offered once accepted
-    const add = (s: Parameters<typeof addSuggestion>[3]) => addSuggestion(lib, store, null, s);
+    const add = (s: Parameters<typeof addSuggestion>[2]) => addSuggestion(lib, store, s);
     const chips = [
       await add({ scope: 'category', ref: 'Station', target: 'device_note', text: 'Empty box on wall.' }),
       await add({ scope: 'type', ref: type, target: 'device_note', text: 'Stuck buttons' }),
@@ -203,80 +203,61 @@ describe('suggestion chips: the union (T99, D174 (2))', () => {
   });
 });
 
-describe('suggestion chips: the library (T99, D174 (3))', () => {
-  it('copies and promotes a type with its accepted chips, copies the app library into a project, seeds the app library as drafts', async () => {
+describe('suggestion chips: the library (T99, D174 (3); the only place to edit them, T197, D292 (9))', () => {
+  it("a chip is added, accepted and removed in the Library only; a type's chips hang off the library type; the standard seed as drafts, once", async () => {
     const { store, lib, project } = await setup();
     const a = await project('Tower');
-    const b = await project('Clinic');
-    const type = await createType(a.editor, store, a.id, { model: 'PI1002', category: 'Station' });
-    await acceptType(a.editor, type);
-    const kept = await addSuggestion(a.editor, store, a.id, { scope: 'type', ref: type, target: 'device_note', text: 'Stuck buttons' });
-    await acceptSuggestion(a.editor, kept);
-    await addSuggestion(a.editor, store, a.id, { scope: 'type', ref: type, target: 'device_note', text: 'Still a draft' });
-
-    // Copy from… another project: the type and its accepted chips, onto the copy
-    expect(await copyTypes(b.editor, store, b.id, [type])).toEqual({ copied: 1, skipped: [] });
-    const copy = (await loadLibrary(store, b.id)).types[0]!;
-    expect((await loadSuggestions(store, b.id)).map((s) => [s.scope, s.ref, s.text, s.state])).toEqual([['type', copy.id, 'Stuck buttons', 'accepted']]);
-
-    // a chip of a type not yet in the app library waits for the type
-    await expect(promoteSuggestion(lib, store, kept)).rejects.toThrow(/Promote the type/);
-    const appType = await promoteType(lib, store, type);
-    expect((await loadSuggestions(store, null)).map((s) => [s.ref, s.text, s.promotedFromId])).toEqual([[appType, 'Stuck buttons', kept]]);
-    // a chip added after the promotion is promoted on its own, once
-    const late = await addSuggestion(a.editor, store, a.id, { scope: 'type', ref: type, target: 'punch_item', text: 'Replace stuck buttons' });
-    await expect(promoteSuggestion(lib, store, late)).rejects.toThrow(/Accept the chip/);
-    await acceptSuggestion(a.editor, late);
-    await promoteSuggestion(lib, store, late);
-    await expect(promoteSuggestion(lib, store, late)).rejects.toThrow(/already offers/);
-    expect((await loadSuggestions(store, null)).filter((s) => s.ref === appType)).toHaveLength(2);
+    const type = await createType(lib, store, { model: 'PI1002', category: 'Station' });
+    await acceptType(lib, type);
+    // a project offers no chip editor: its editor is refused before anything is written
+    await expect(addSuggestion(a.editor, store, { scope: 'type', ref: type, target: 'device_note', text: 'Stuck buttons' })).rejects.toThrow(/edited in the Library/);
+    const kept = await addSuggestion(lib, store, { scope: 'type', ref: type, target: 'device_note', text: 'Stuck buttons' });
+    for (const write of [() => acceptSuggestion(a.editor, kept), () => rejectSuggestion(a.editor, kept), () => removeSuggestion(a.editor, kept), () => editSuggestion(a.editor, store, kept, 'Stuck keys')]) {
+      await expect(write()).rejects.toThrow(/edited in the Library/);
+    }
+    await acceptSuggestion(lib, kept);
+    await editSuggestion(lib, store, kept, ' Stuck  keys ');
+    expect((await loadSuggestions(store)).map((x) => [x.scope, x.ref, x.text, x.state])).toEqual([['type', type, 'Stuck keys', 'accepted']]);
+    expect((await store.opsFor(kept)).every((o) => o.project_id === LIBRARY_STREAM)).toBe(true);
+    expect(await store.list('suggestion', { where: 'project_id IS NOT NULL' })).toEqual([]);
 
     // the standard seed: drafts in the app library, once; a rejected one is not offered again
     expect(await loadStandardSuggestions(lib, store)).toBe(SUGGESTION_SEED.length);
     expect(await loadStandardSuggestions(lib, store)).toBe(0);
-    const seeded = (await loadSuggestions(store, null)).filter((s) => s.scope !== 'type');
-    expect(seeded.every((s) => s.state === 'draft')).toBe(true);
-    const stuck = seeded.find((s) => s.ref === 'Station' && s.text === 'Stuck buttons')!;
-    const net = seeded.find((s) => s.ref === 'N' && s.target === 'punch_item')!;
+    const seeded = (await loadSuggestions(store)).filter((x) => x.scope !== 'type');
+    expect(seeded.every((x) => x.state === 'draft')).toBe(true);
+    const stuck = seeded.find((x) => x.ref === 'Station' && x.text === 'Stuck buttons')!;
     await acceptSuggestion(lib, stuck.id);
-    await acceptSuggestion(lib, net.id);
-    await rejectSuggestion(lib, seeded.find((s) => s.ref === 'Touchscreen')!.id);
+    await rejectSuggestion(lib, seeded.find((x) => x.ref === 'Touchscreen')!.id);
     expect(await loadStandardSuggestions(lib, store)).toBe(0);
     await expect(loadStandardSuggestions(a.editor, store)).rejects.toThrow(/app library/);
-
-    // Copy from app library: the accepted category and code chips this project lacks
-    await addSuggestion(b.editor, store, b.id, { scope: 'category', ref: 'Station', target: 'device_note', text: 'stuck  BUTTONS' });
-    expect(await copyAppSuggestions(b.editor, store, b.id)).toBe(1);
-    expect(await copyAppSuggestions(b.editor, store, b.id)).toBe(0);
-    expect((await loadSuggestions(store, b.id)).filter((s) => s.scope === 'code').map((s) => [s.ref, s.target, s.text, s.state])).toEqual([['N', 'punch_item', 'Missing network termination', 'accepted']]);
   });
 
-  it('refuses an empty phrase, a chip already there, and a Part chip on a network code whose kits are off (R4, D213); the seed offers none', async () => {
-    const { store, project } = await setup();
-    const p = await project('Tower');
-    await expect(addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'X', target: 'connection_note', text: '  ' })).rejects.toThrow(/phrase first/);
-    const id = await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'X', target: 'connection_note', text: 'Missing DMX termination kit' });
-    await expect(addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'x', target: 'connection_note', text: ' missing dmx termination KIT' })).rejects.toThrow(/already offered/);
+  it("refuses an empty phrase, a chip already there, and a Part chip on a network code whose kits are off in the app library's Rules (R4, D213); the seed offers none", async () => {
+    const { store, lib } = await setup();
+    await expect(addSuggestion(lib, store, { scope: 'code', ref: 'X', target: 'connection_note', text: '  ' })).rejects.toThrow(/phrase first/);
+    const id = await addSuggestion(lib, store, { scope: 'code', ref: 'X', target: 'connection_note', text: 'Missing DMX termination kit' });
+    await expect(addSuggestion(lib, store, { scope: 'code', ref: 'x', target: 'connection_note', text: ' missing dmx termination KIT' })).rejects.toThrow(/already offered/);
     // the same words for another place, or after removal, are fine
-    await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'X', target: 'punch_item', text: 'Missing DMX termination kit' });
-    await removeSuggestion(p.editor, id);
-    await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'X', target: 'connection_note', text: 'Missing DMX termination kit' });
-    // network kits are parts by default (D213); a project that turns them off refuses the Part chip
-    await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'N', target: 'part', text: 'Network termination kit' });
-    expect((await loadLibrary(store, p.id)).noPartCodes).toEqual([]);
-    await setRuleParam(p.editor, 'R4b', 'kit', { N: false, NG: false, U: false });
+    await addSuggestion(lib, store, { scope: 'code', ref: 'X', target: 'punch_item', text: 'Missing DMX termination kit' });
+    await removeSuggestion(lib, id);
+    await addSuggestion(lib, store, { scope: 'code', ref: 'X', target: 'connection_note', text: 'Missing DMX termination kit' });
+    // network kits are parts by default (D213); the app library's accepted Rules turning them off refuse the Part chip
+    await addSuggestion(lib, store, { scope: 'code', ref: 'N', target: 'part', text: 'Network termination kit' });
+    expect((await loadLibrary(store)).noPartCodes).toEqual([]);
+    await setRuleParam(lib, 'R4b', 'kit', { N: false, NG: false, U: false });
+    expect((await loadLibrary(store)).noPartCodes).toEqual([]); // a draft setting is not enough
+    await decideRuleParam(lib, 'R4b', 'kit', 'accepted');
     for (const code of ['N', 'ng']) {
-      await expect(addSuggestion(p.editor, store, p.id, { scope: 'code', ref: code, target: 'part', text: 'Network patch cord' })).rejects.toThrow(/offers no Part chips/);
+      await expect(addSuggestion(lib, store, { scope: 'code', ref: code, target: 'part', text: 'Network patch cord' })).rejects.toThrow(/offers no Part chips/);
     }
-    expect((await loadLibrary(store, p.id)).noPartCodes).toEqual(['N', 'NG']);
-    // the app library reads its own Rules: its N kits are still on
-    expect((await loadLibrary(store, null)).noPartCodes).toEqual([]);
+    expect((await loadLibrary(store)).noPartCodes).toEqual(['N', 'NG']);
     // a non-network code with kits off still offers Part chips
-    await addSuggestion(p.editor, store, p.id, { scope: 'code', ref: 'U', target: 'part', text: 'Unison terminal block' });
-    expect(SUGGESTION_SEED.filter((s) => s.target === 'part')).toEqual([]);
-    expect(SUGGESTION_SEED.filter((s) => /network termination/i.test(s.text)).map((s) => s.target)).toEqual(['connection_note', 'punch_item', 'connection_note', 'punch_item']);
+    await addSuggestion(lib, store, { scope: 'code', ref: 'U', target: 'part', text: 'Unison terminal block' });
+    expect(SUGGESTION_SEED.filter((x) => x.target === 'part')).toEqual([]);
+    expect(SUGGESTION_SEED.filter((x) => /network termination/i.test(x.text)).map((x) => x.target)).toEqual(['connection_note', 'punch_item', 'connection_note', 'punch_item']);
     // a category chip is stored under its D196 name
-    await addSuggestion(p.editor, store, p.id, { scope: 'category', ref: 'Relay panel', target: 'device_note', text: 'Panel chip' });
-    expect((await loadSuggestions(store, p.id)).find((s) => s.scope === 'category')!.ref).toBe('Power Distribution');
+    await addSuggestion(lib, store, { scope: 'category', ref: 'Relay panel', target: 'device_note', text: 'Panel chip' });
+    expect((await loadSuggestions(store)).find((x) => x.scope === 'category')!.ref).toBe('Power Distribution');
   });
 });

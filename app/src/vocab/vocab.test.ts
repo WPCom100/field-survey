@@ -3,10 +3,10 @@ import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_PIN_SHAPE, pinShape } from '../plan/pins';
-import { acceptValue, addPair, addPlaceholder, addValue, cleanValue, copyAppVocab, editPlaceholder, loadPairs, loadPlaceholders, loadStandard, loadVocab, promoteValue, removePlaceholder, removeValue, renameValue } from './model';
+import { acceptValue, addPair, addPlaceholder, addValue, cleanValue, copyAppVocab, editPlaceholder, listsOf, loadPairs, loadPlaceholders, loadStandard, loadVocab, promoteValue, removePlaceholder, removeValue, renameValue } from './model';
 import { loadPinShapes, pinShapeRowId, resolvePinShapes, setPinShape, sharedShapes } from './pinShapes';
 import { setEndPlaceholder } from '../ends/actions';
-import { SEED_PLACEHOLDERS, SEED_VOCAB } from './seed';
+import { SEED_PLACEHOLDERS, SEED_VOCAB, VOCAB_LISTS } from './seed';
 
 async function setup() {
   const store = await Store.open(new BetterSqliteDriver(), { installId: 'i', search: 'like' });
@@ -17,22 +17,34 @@ async function setup() {
 }
 
 describe('vocabulary editor (T40)', () => {
-  it('seeds the standard lists once and only fills what is missing', async () => {
+  it('seeds the standard lists once and only fills what is missing; categories and cable codes only in the app library (T197)', async () => {
     const { store, editor, projectId } = await setup();
-    await addValue(editor, store, 'category', 'sensor'); // a draft with a seed spelling
+    let clock = 1_760_350_000_000;
+    const library = new Editor(store, { projectId: LIBRARY_STREAM, userId: uuidv7(), now: () => new Date((clock += 1000)).toISOString() });
+    // the app-level lists are no project's: neither added nor seeded there
+    await expect(addValue(editor, store, 'category', 'Sensor')).rejects.toThrow(/Device categories are one list for every project/);
+    await expect(addValue(editor, store, 'cable_code', 'DX')).rejects.toThrow(/Cable codes are one list for every project/);
+    await addValue(library, store, 'category', 'sensor'); // a draft with a seed spelling, in the app library
     const first = await loadStandard(editor, store);
     expect(first.placeholders).toBe(SEED_PLACEHOLDERS.length);
     const v = await loadVocab(store, projectId);
-    expect(v.category.map((e) => e.value).sort()).toEqual([...SEED_VOCAB.category.filter((c) => c !== 'Sensor'), 'sensor'].sort());
+    expect(v.category).toEqual([]);
+    expect(v.cable_code).toEqual([]);
     expect(v.device_note.map((e) => e.value)).toContain('Empty box on wall.');
     expect(v.device_note.every((e) => !e.draft)).toBe(true);
-    expect(v.cable_code.map((e) => e.value)).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D']); // T111 / D199: the codes, as a list
+    await loadStandard(library, store);
+    const app = await loadVocab(store, null);
+    expect(app.category.map((e) => e.value).sort()).toEqual([...SEED_VOCAB.category.filter((c) => c !== 'Sensor'), 'sensor'].sort());
+    expect(app.cable_code.map((e) => e.value)).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D']); // T111 / D199: the codes, as a list
+    // the screen's lists: a project's leave the two out
+    expect(listsOf('project').map((l) => l.list)).toEqual(VOCAB_LISTS.map((l) => l.list).filter((l) => l !== 'category' && l !== 'cable_code'));
+    expect(listsOf('app').map((l) => l.list)).toEqual(VOCAB_LISTS.map((l) => l.list));
     // T79 (D240): the Tower's plan-text patterns, as the server's built-in defaults spell them
     expect(v.room_code_pattern.map((e) => e.value)).toEqual(['[A-Z]{2}\\d{2}[A-Z]?-[A-Z0-9]{2,6}']);
     expect(v.tag_pattern.map((e) => e.value)).toEqual(['CT[0-9A-Z]{1,3}LCP[AB]', 'EBDK', 'UFMP\\d*', 'ERP\\d*', 'NSPS', 'P-[A-Z]{2,5}(?:-[A-Z]{1,2})?']);
     expect(await loadStandard(editor, store)).toEqual({ values: 0, placeholders: 0 });
     // T112 (D201): the master's renamed categories are recorded as old spellings of the D196 value
-    const rows = await store.list<{ id: string; value: string; canonical_of_id: string | null }>('vocab', { where: 'project_id = ? AND list = ?', params: [projectId, 'category'] });
+    const rows = await store.list<{ id: string; value: string; canonical_of_id: string | null }>('vocab', { where: 'project_id IS NULL AND list = ?', params: ['category'] });
     const byValue = new Map(rows.map((r) => [r.value, r]));
     const canonical = (v: string) => rows.find((r) => r.id === byValue.get(v)?.canonical_of_id)?.value ?? null;
     expect(canonical('Relay panel')).toBe('Power Distribution');
@@ -41,7 +53,7 @@ describe('vocabulary editor (T40)', () => {
     expect(canonical('NSPS')).toBe('Equipment');
     expect(canonical('Equipment rack')).toBe('Equipment Panels');
     expect(byValue.get('Equipment Rack')?.canonical_of_id).toBeNull(); // the D196 DIN-rail category stands on its own
-    expect(v.category.map((e) => e.value)).not.toContain('Relay panel'); // variants are not listed
+    expect(app.category.map((e) => e.value)).not.toContain('Relay panel'); // variants are not listed
     const ph = await loadPlaceholders(store, projectId);
     expect(ph.find((p) => p.label === 'Stations & Sensors')!.kind).toBe('station_bus');
     expect(ph.filter((p) => p.kind === 'level_not_in_scope').map((p) => p.label).sort()).toEqual(['Level 09', 'Level 10', 'Level 11', 'Level 12']);
@@ -85,16 +97,18 @@ describe('vocabulary editor (T40)', () => {
   });
 });
 
-describe('category vocabulary on an existing project (T112, D201)', () => {
+describe('category vocabulary in the app library (T112, D201; app-level since T196 / T197)', () => {
   it("re-points the master's eight to the D196 eleven without touching the new `Equipment Rack`; idempotent", async () => {
-    const { store, editor, projectId } = await setup();
+    const { store } = await setup();
+    let clock = 1_760_350_000_000;
+    const editor = new Editor(store, { projectId: LIBRARY_STREAM, userId: uuidv7(), now: () => new Date((clock += 1000)).toISOString() });
     // an older seed: the master's spellings as plain accepted rows
     for (const value of ['Relay panel', 'Foundry panel', 'EBDK', 'Equipment rack', 'NSPS', 'Touchscreen', 'Station', 'Sensor']) {
-      await editor.create('vocab', { project_id: projectId, list: 'category', value, state: 'accepted' }, { change_type: 'Master edit', reason: 't' });
+      await editor.create('vocab', { project_id: null, list: 'category', value, state: 'accepted' }, { change_type: 'Master edit', reason: 't' });
     }
-    const before = await store.list<{ id: string; value: string }>('vocab', { where: 'project_id = ? AND list = ?', params: [projectId, 'category'] });
+    const before = await store.list<{ id: string; value: string }>('vocab', { where: 'project_id IS NULL AND list = ?', params: ['category'] });
     const first = await loadStandard(editor, store);
-    const rows = await store.list<{ id: string; value: string; canonical_of_id: string | null }>('vocab', { where: 'project_id = ? AND list = ?', params: [projectId, 'category'], orderBy: 'id' });
+    const rows = await store.list<{ id: string; value: string; canonical_of_id: string | null }>('vocab', { where: 'project_id IS NULL AND list = ?', params: ['category'], orderBy: 'id' });
     const byValue = new Map(rows.map((r) => [r.value, r]));
     const canonical = (v: string) => rows.find((r) => r.id === byValue.get(v)?.canonical_of_id)?.value ?? null;
     // the eight rows are the same rows (no duplicates), five of them now old spellings
@@ -103,7 +117,7 @@ describe('category vocabulary on an existing project (T112, D201)', () => {
     expect(['Touchscreen', 'Station', 'Sensor', 'Equipment Rack', 'Power Distribution'].map((v) => byValue.get(v)?.canonical_of_id)).toEqual([null, null, null, null, null]);
     expect(rows).toHaveLength(8 + 8); // the eight, plus the eleven minus the three the master already spelled the same
     expect(first.values).toBeGreaterThanOrEqual(8 + 5);
-    const view = await loadVocab(store, projectId);
+    const view = await loadVocab(store, null);
     expect(view.category.map((e) => e.value).sort()).toEqual([...SEED_VOCAB.category].sort());
     expect(await loadStandard(editor, store)).toMatchObject({ values: 0 });
   });
@@ -186,6 +200,10 @@ describe('vocabulary follow-ups (T104, D187, D214)', () => {
     const got = (await loadPairs(store, other)).model_map;
     expect(got.map((p) => [p.value, p.variants.map((v) => [v.value, v.draft])])).toEqual([['p-doc-w', [['P-DOC-W-WD', false]]]]);
     expect(await copyAppVocab(otherEditor, store, other)).toBe(0);
+    // an accepted app category is not copied: the list is the app library's (T197)
+    await acceptValue(library, await addValue(library, store, 'category', 'Dimmer rack'));
+    expect(await copyAppVocab(otherEditor, store, other)).toBe(0);
+    expect((await loadVocab(store, other)).category).toEqual([]);
   });
 
   it('pin shapes: one app-library row, only the moved roles stored, applied at once and read by the plan', async () => {

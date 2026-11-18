@@ -1,10 +1,11 @@
 # S4 step 1 of `rig.sh library-two` (T158, the second-iPad halves), on A as Ann: a new project with
-# the 06M sheet and a station typed freely (`Maestro L2 station`: a draft project type, its card
+# the 06M sheet and a station typed freely (`Maestro L2 station`: a draft type in the one library, its card
 # has a Neuron ID section). The type: Neuron ID Not needed, optional N → switch (Far Network
 # switch), accessory Back box → Save, Accept, a type chip `Maestro L2 chip`. The card: the chip,
 # `+ add N → switch` and `+ add Back box` added, no Neuron ID section. After a sync the new
 # connection (C-01) → Termination kits No. Vocabulary → Pin shapes: Station → Square (app-wide;
-# B puts it back). App library: + New type MAESTRO-A2-<n> accepted (B rejects it). Sync.
+# B puts it back). Projects' Library (the same library, T197): + New type MAESTRO-A2-<n> accepted
+# (B rejects it). Sync.
 appId: productions.luminarytechnology.fieldsurvey
 name: Library two — Ann's type, chip, kits, pin shape and app-library type
 ---
@@ -233,12 +234,12 @@ name: Library two — Ann's type, chip, kits, pin shape and app-library type
 - tapOn:
     id: rail.levels
 
-# the app library: a type accepted (B sees it with no project open)
+# Projects' Library, the same one: a type accepted (B sees it with no project open)
 - tapOn:
     id: nav.projects
 - tapOn:
     id: projects.library
-- assertVisible: 'App device-type library.*'
+- assertVisible: 'Device-type library.*'
 - tapOn:
     id: library.new
 - tapOn:

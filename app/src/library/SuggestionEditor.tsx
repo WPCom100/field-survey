@@ -6,9 +6,7 @@ import {
   TARGETS,
   acceptSuggestion,
   addSuggestion,
-  copyAppSuggestions,
   loadStandardSuggestions,
-  promoteSuggestion,
   rejectSuggestion,
   removeSuggestion,
   reopenSuggestion,
@@ -23,18 +21,16 @@ type RunFn = (fn: (e: Editor, s: Store) => Promise<unknown>, done?: string | (()
 
 /**
  * The suggestion chips of one type, category or cable code (T99, D174), by where they are
- * offered: each with its state and Accept / Reject / Remove / Promote, and "+ add" (a draft).
- * `library` is the project id, null for the app library.
+ * offered: each with its state and Accept / Reject / Remove, and "+ add" (a draft). Every chip is
+ * the app library's and is edited here only (D292 (9)); `run`'s editor writes to the library stream.
  */
 export function SuggestionList(props: {
   rows: readonly Suggestion[];
   scope: SuggestionScope;
   refKey: string;
-  library: string | null;
   canEdit: boolean;
   run: RunFn;
-  libraryEditor: Editor | null;
-  /** A network code whose kits are off in this scope's Rules: no Part chips (R4, D213). */
+  /** A network code whose kits are off in the app library's Rules: no Part chips (R4, D213). */
   noPart?: boolean;
 }) {
   const { scope, refKey } = props;
@@ -43,7 +39,7 @@ export function SuggestionList(props: {
   const [text, setText] = useState('');
   const add = () =>
     void props
-      .run((e, s) => addSuggestion(e, s, props.library, { scope, ref: refKey, target, text }), `Added "${text.trim()}" as a draft.`)
+      .run((e, s) => addSuggestion(e, s, { scope, ref: refKey, target, text }), `Added "${text.trim()}" as a draft.`)
       .then((ok) => ok && setText(''));
   return (
     <View style={styles.box}>
@@ -54,7 +50,7 @@ export function SuggestionList(props: {
           <View key={tg} style={styles.group}>
             <Text style={styles.label}>{label}</Text>
             {rows.map((r) => (
-              <ChipRow key={r.id} row={r} canEdit={props.canEdit} run={props.run} libraryEditor={props.libraryEditor} />
+              <ChipRow key={r.id} row={r} canEdit={props.canEdit} run={props.run} />
             ))}
           </View>
         );
@@ -79,9 +75,8 @@ export function SuggestionList(props: {
   );
 }
 
-function ChipRow(props: { row: Suggestion; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
+function ChipRow(props: { row: Suggestion; canEdit: boolean; run: RunFn }) {
   const { row: r } = props;
-  const lib = props.libraryEditor;
   return (
     <View style={styles.row}>
       <Text style={[styles.value, styles.grow, r.state === 'rejected' && styles.dim]} testID={`sugg.row.${r.text}`}>
@@ -105,11 +100,6 @@ function ChipRow(props: { row: Suggestion; canEdit: boolean; run: RunFn; library
               <Text style={styles.link}>Back to draft</Text>
             </Pressable>
           ) : null}
-          {r.projectId && r.state === 'accepted' && lib ? (
-            <Pressable onPress={() => void props.run((_e, s) => promoteSuggestion(lib, s, r.id), `Promoted: the app library offers "${r.text}".`)} hitSlop={space.md} testID={`sugg.promote.${r.text}`}>
-              <Text style={styles.link}>Promote</Text>
-            </Pressable>
-          ) : null}
           <Pressable onPress={() => void props.run((e) => removeSuggestion(e, r.id), 'Removed.')} hitSlop={space.md} testID={`sugg.remove.${r.text}`}>
             <Text style={styles.danger}>Remove</Text>
           </Pressable>
@@ -120,10 +110,10 @@ function ChipRow(props: { row: Suggestion; canEdit: boolean; run: RunFn; library
 }
 
 /**
- * "Suggestions…" (T99): the chips of a category or a cable code. The app library offers "Load
- * standard suggestions" (the seed as drafts, D174 (3)); a project "Copy from app library".
+ * "Suggestions…" (T99): the chips of a category or a cable code, with "Load standard
+ * suggestions" (the seed as drafts, D174 (3)).
  */
-export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: readonly string[]; noPartCodes: readonly string[]; library: string | null; canEdit: boolean; run: RunFn; libraryEditor: Editor | null }) {
+export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: readonly string[]; noPartCodes: readonly string[]; canEdit: boolean; run: RunFn }) {
   const [pick, setPick] = useState<{ scope: 'category' | 'code'; ref: string }>({ scope: 'category', ref: CATEGORIES[0]! });
   const count = (scope: SuggestionScope, ref: string) => props.rows.filter((r) => r.scope === scope && r.ref.toUpperCase() === ref.toUpperCase() && r.state !== 'rejected').length;
   const rows = props.rows.filter((r) => r.scope === pick.scope && r.ref.toUpperCase() === pick.ref.toUpperCase());
@@ -133,31 +123,17 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
       <Text style={styles.title}>Suggestions by category and cable code</Text>
       {props.canEdit ? (
         <View style={styles.row}>
-          {props.library === null ? (
-            <Pressable
-              onPress={() => {
-                let n = 0;
-                void props.run(async (e, s) => {
-                  n = await loadStandardSuggestions(e, s);
-                }, () => (n ? `Added ${n} standard suggestion${n === 1 ? '' : 's'} as drafts.` : 'The standard suggestions are all here already.'));
-              }}
-              hitSlop={space.md}
-              testID="sugg.loadStandard">
-              <Text style={styles.link}>Load standard suggestions</Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={() => {
-                let n = 0;
-                void props.run(async (e, s) => {
-                  n = await copyAppSuggestions(e, s, props.library!);
-                }, () => (n ? `Copied ${n} chip${n === 1 ? '' : 's'} from the app library.` : 'Nothing new in the app library (accepted category and code chips only).'));
-              }}
-              hitSlop={space.md}
-              testID="sugg.copyApp">
-              <Text style={styles.link}>Copy from app library</Text>
-            </Pressable>
-          )}
+          <Pressable
+            onPress={() => {
+              let n = 0;
+              void props.run(async (e, s) => {
+                n = await loadStandardSuggestions(e, s);
+              }, () => (n ? `Added ${n} standard suggestion${n === 1 ? '' : 's'} as drafts.` : 'The standard suggestions are all here already.'));
+            }}
+            hitSlop={space.md}
+            testID="sugg.loadStandard">
+            <Text style={styles.link}>Load standard suggestions</Text>
+          </Pressable>
           {drafts ? <Text style={styles.sub}>{drafts} draft{drafts === 1 ? '' : 's'}</Text> : null}
         </View>
       ) : null}
@@ -174,7 +150,7 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
         ))}
       </View>
       <Text style={styles.heading}>{pick.scope === 'code' ? `Cable ${pick.ref}` : pick.ref}</Text>
-      <SuggestionList key={`${pick.scope}:${pick.ref}`} rows={rows} scope={pick.scope} refKey={pick.ref} library={props.library} canEdit={props.canEdit} run={props.run} libraryEditor={props.libraryEditor} noPart={pick.scope === 'code' && props.noPartCodes.includes(pick.ref)} />
+      <SuggestionList key={`${pick.scope}:${pick.ref}`} rows={rows} scope={pick.scope} refKey={pick.ref} canEdit={props.canEdit} run={props.run} noPart={pick.scope === 'code' && props.noPartCodes.includes(pick.ref)} />
     </View>
   );
 }

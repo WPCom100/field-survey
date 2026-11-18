@@ -1,16 +1,20 @@
-# S4 (T158) library step 3 (T48, T61): three cable-less types named for this run (the app library is
-# server-wide and new projects copy its accepted types, so nothing with cables goes there).
-# MAESTRO-R-<n>: Reject → `rejected` in the list, Back to draft → DRAFT. MAESTRO-P-<n>: Accept →
-# Promote to app library → "Promoted: …", `In the app library ✓`. MAESTRO-C-<n>: Accept. Then the
-# app library (Projects → Device-type library): MAESTRO-P accepted there; Copy from… this project →
-# tick MAESTRO-C → "Copied 1 type." and it arrives accepted; again → "already here: MAESTRO-C-<n>".
-# Both are rejected in the app library at the end (new projects copy nothing of the rig's).
-# Starts and ends on Levels.
+# S4 (T158) library step 3 (T48; one library since T197, D287, D292 (6)): three cable-less types
+# named for this run, made from the project's Library (the sidebar's), which is the app library.
+# MAESTRO-R-<n>: Reject → `rejected` in the list, Back to draft → DRAFT (no device uses it, so no
+# question). MAESTRO-D-<n>: Delete → the question ("No device on this iPad uses it …") → Delete →
+# `deleted` in the list, read-only with Restore → Restore → DRAFT again. No Copy from… and no
+# Promote any more. Then Projects → Device-type library: the same library (the same title, both
+# types found, MAESTRO-R a draft with 0 devices). Both are deleted at the end (a delete with no
+# device asks; Delete confirms), and so is the run's P-NSPS-D-KIT (its question names devices),
+# so the server-wide library keeps nothing of the rig's but deleted rows. Starts and ends on Levels.
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
 - tapOn:
     id: nav.library
+- assertVisible: 'Device-type library.*'
+- assertNotVisible:
+    id: library.copy
 # reject and back
 - tapOn:
     id: library.new
@@ -24,6 +28,8 @@ appId: productions.luminarytechnology.fieldsurvey
       id: library.note
       text: Added MAESTRO-R-${output.n} as a draft.
     timeout: 10000
+- assertNotVisible:
+    id: library.promote
 - tapOn:
     id: library.reject
 - extendedWaitUntil:
@@ -44,148 +50,136 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible:
     id: library.type
     text: DRAFT MAESTRO-R-${output.n}.*
-# promote
+# delete asks, then Restore brings it back
 - tapOn:
     id: library.new
 - tapOn:
     id: library.new.model
-- inputText: MAESTRO-P-${output.n}
+- inputText: MAESTRO-D-${output.n}
 - tapOn:
     id: library.new.add
 - extendedWaitUntil:
     visible:
       id: library.note
-      text: Added MAESTRO-P-${output.n} as a draft.
+      text: Added MAESTRO-D-${output.n} as a draft.
     timeout: 10000
 - tapOn:
-    id: library.accept
+    id: library.delete
+- extendedWaitUntil:
+    visible: 'Delete MAESTRO-D-${output.n}\?'
+    timeout: 10000
+- assertVisible: No device on this iPad uses it. Every project loses the type.
+# the alert's Delete, not the footer's (the alert container spans its buttons, T151)
+- tapOn:
+    text: Delete
+    rightOf: Cancel
 - extendedWaitUntil:
     visible:
       id: library.note
-      text: Accepted.
+      text: 'Deleted: MAESTRO-D-${output.n}.'
     timeout: 10000
+- assertVisible:
+    id: library.type
+    text: deleted MAESTRO-D-${output.n}.*
+- assertVisible:
+    id: library.type.state
+    text: 0 devices · deleted
+- assertNotVisible:
+    id: library.save
 - tapOn:
-    id: library.promote
+    id: library.restore
 - extendedWaitUntil:
     visible:
       id: library.note
-      text: 'Promoted: MAESTRO-P-${output.n} is in the app library; new projects copy it.'
+      text: 'Restored: MAESTRO-D-${output.n}.'
     timeout: 10000
-- assertVisible: In the app library ✓
-# a third, accepted, to copy
-- tapOn:
-    id: library.new
-- tapOn:
-    id: library.new.model
-- inputText: MAESTRO-C-${output.n}
-- tapOn:
-    id: library.new.add
-- extendedWaitUntil:
-    visible:
-      id: library.note
-      text: Added MAESTRO-C-${output.n} as a draft.
-    timeout: 10000
-- tapOn:
-    id: library.accept
-- extendedWaitUntil:
-    visible:
-      id: library.note
-      text: Accepted.
-    timeout: 10000
+- assertVisible:
+    id: library.type
+    text: DRAFT MAESTRO-D-${output.n}.*
 - tapOn:
     id: rail.levels
 
-# the app library
+# Projects' Library: the same library
 - tapOn:
     id: nav.projects
 - tapOn:
     id: projects.library
-- assertVisible: 'App device-type library.*'
+- assertVisible: 'Device-type library.*'
 - tapOn:
     id: library.search
-- inputText: MAESTRO-P-${output.n}
+- inputText: MAESTRO-R-${output.n}
 - pressKey: Enter
 - tapOn:
     id: library.type
-    text: MAESTRO-P-${output.n}.*
-- assertVisible: 0 devices · accepted
+    text: DRAFT MAESTRO-R-${output.n}.*
+- assertVisible:
+    id: library.type.state
+    text: 0 devices · draft
+# clean up: delete both (no device uses them: the question, then Delete)
 - tapOn:
-    id: library.copy
+    id: library.delete
+- extendedWaitUntil:
+    visible: 'Delete MAESTRO-R-${output.n}\?'
+    timeout: 10000
 - tapOn:
-    id: library.copy.source.${PROJECT}
-- tapOn:
-    id: library.copy.type.MAESTRO-C-${output.n}
-- tapOn:
-    id: library.copy.go
+    text: Delete
+    rightOf: Cancel
 - extendedWaitUntil:
     visible:
       id: library.note
-      text: Copied 1 type.
+      text: 'Deleted: MAESTRO-R-${output.n}.'
     timeout: 10000
-- tapOn:
-    id: library.copy
-- tapOn:
-    id: library.copy.source.${PROJECT}
-- tapOn:
-    id: library.copy.type.MAESTRO-C-${output.n}
-- tapOn:
-    id: library.copy.go
-- extendedWaitUntil:
-    visible:
-      id: library.note
-      text: 'Copied 0 types; already here: MAESTRO-C-${output.n}.'
-    timeout: 10000
-# MAESTRO-C arrived accepted; reject both so new projects copy neither
 - tapOn:
     id: library.search
 - eraseText: 40
 - tapOn:
     id: library.search
 - eraseText: 40
-- inputText: MAESTRO-C-${output.n}
+- inputText: MAESTRO-D-${output.n}
 - pressKey: Enter
 - tapOn:
     id: library.type
-    text: MAESTRO-C-${output.n}.*
-- assertVisible: 0 devices · accepted
+    text: DRAFT MAESTRO-D-${output.n}.*
 - tapOn:
-    id: library.reopen
+    id: library.delete
+- extendedWaitUntil:
+    visible: 'Delete MAESTRO-D-${output.n}\?'
+    timeout: 10000
+- tapOn:
+    text: Delete
+    rightOf: Cancel
 - extendedWaitUntil:
     visible:
       id: library.note
-      text: Back to draft.
+      text: 'Deleted: MAESTRO-D-${output.n}.'
     timeout: 10000
-- tapOn:
-    id: library.reject
-- extendedWaitUntil:
-    visible:
-      id: library.note
-      text: 'Rejected: .*'
-    timeout: 10000
+# the run's P-NSPS-D-KIT (`_library-type`, accepted by `_library-card`) leaves the server-wide
+# library too, so the next run can make it again and other projects stop reading it; the seed
+# copy's NSPS use it, so the question names the devices
 - tapOn:
     id: library.search
 - eraseText: 40
 - tapOn:
     id: library.search
 - eraseText: 40
-- inputText: MAESTRO-P-${output.n}
+- inputText: P-NSPS-D-KIT
 - pressKey: Enter
 - tapOn:
     id: library.type
-    text: MAESTRO-P-${output.n}.*
+    text: 'P-NSPS-D-KIT · .*'
 - tapOn:
-    id: library.reopen
+    id: library.delete
 - extendedWaitUntil:
-    visible:
-      id: library.note
-      text: Back to draft.
+    visible: 'Delete P-NSPS-D-KIT\?'
     timeout: 10000
+- assertVisible: '\d+ devices? on this iPad uses? it\. .*Lint flags.*'
 - tapOn:
-    id: library.reject
+    text: Delete
+    rightOf: Cancel
 - extendedWaitUntil:
     visible:
       id: library.note
-      text: 'Rejected: .*'
+      text: 'Deleted: P-NSPS-D-KIT.'
     timeout: 10000
 - tapOn:
     id: library.back

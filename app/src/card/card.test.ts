@@ -397,7 +397,7 @@ describe('optional cables and accessories of the type (T105)', () => {
     const { store, editor, pid } = t;
     await store.applyRemote(pulled('placeholder', uuidv7(), pid, { project_id: pid, label: 'Network switch', kind: 'external', level_id: DEMO_LEVEL_ID }));
     const lib = editor.forStream(LIBRARY_STREAM); // the one library (T196)
-    const typeId = await createType(lib, store, null, { model: 'T105-NSPS', category: 'NSPS' });
+    const typeId = await createType(lib, store, { model: 'T105-NSPS', category: 'NSPS' });
     await updateType(lib, store, typeId, {
       defaultCables: [run('120V', 'P-NSPS-D Power Supply', null)],
       optionalCables: [run('120V', 'Second supply', null), run('N', 'switch', 'network switch')],
@@ -463,7 +463,7 @@ describe('optional cables and accessories of the type (T105)', () => {
     const { store, editor } = t;
     const modules = { label: 'ERn Modules', min: 2, max: 2 };
     const lib = editor.forStream(LIBRARY_STREAM); // the one library (T196)
-    const typeId = await createType(lib, store, null, { model: 'T113-KIT', category: 'NSPS' });
+    const typeId = await createType(lib, store, { model: 'T113-KIT', category: 'NSPS' });
     await updateType(lib, store, typeId, {
       optionalAccessories: [
         { model: 'P-NSPS-D Power Supply', expected_qty: 1 },

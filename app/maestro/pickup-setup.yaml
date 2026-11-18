@@ -19,7 +19,7 @@ name: Pickup — A's project, station and app type; the card left open
     id: nav.projects
 - tapOn:
     id: projects.library
-- assertVisible: 'App device-type library.*'
+- assertVisible: 'Device-type library.*'
 - tapOn:
     id: library.new
 - tapOn:

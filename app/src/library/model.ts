@@ -1,17 +1,20 @@
 /**
- * Device-type library editor (T48, Phase 3 §10, D43, D48, D55, D65, D183): reads and edits of a
- * project's `library_type` rows. A new type is a **draft**, usable on the plan at once and
- * flagged until accepted (D48); a model typed freely in the field arrives here as a draft too
- * (T23, D55). Accepting a type with default cables lets R2g propose them for the devices that
- * already exist (rule drafts, never automatic edits). "Copy from…" copies accepted types from
- * another project or the app library. Every write is an op through `Editor` (`Master edit`).
+ * Device-type library editor (T48, Phase 3 §10, D43, D48, D183; one library since T196 / T197,
+ * D287, D292): reads and edits of the app library's `library_type` rows (`project_id` null), the
+ * one library every project reads. Every write goes to the library stream (`/library/ops`, D184):
+ * the functions refuse an editor on a project's stream, so nothing in a project edits a type
+ * (D287 (2)). A new type is a **draft**, usable on the plan at once and flagged until accepted
+ * (D48); a model typed freely in the field arrives here as a draft too (D292 (2)). Accepting a
+ * type with default cables lets R2g propose them for the devices that already exist (rule
+ * drafts, never automatic edits). Deleting, rejecting or renaming a type reaches every project:
+ * the screen warns with the devices this iPad knows of (`typeChangeWarning`, D292 (6)).
  * No React or Expo imports: tested in Node.
  */
 
-import { DEVICE_CATEGORIES, LIBRARY_STREAM, OpError, ROLE, ROLE_LABEL, canonicalCategory, isRole, roleOf, roleOfCategory, type EditContext, type Editor, type Role, type Store } from '@field-survey/core';
+import { DEVICE_CATEGORIES, LIBRARY_STREAM, OpError, ROLE, ROLE_LABEL, canonicalCategory, isLibraryStream, isRole, roleOf, roleOfCategory, type EditContext, type Editor, type Role, type Store } from '@field-survey/core';
 import { CABLE_CODES, RuleParams, addressNeeds, cableCodes, loadRuleParamRows, parseLibraryAccessories, parseLibraryCables, type AddressNeeds, type LibraryAccessory, type LibraryCable } from '@field-survey/rules';
 
-import { copyTypeChips, offersPartChips } from '../suggestions/model';
+import { offersPartChips } from '../suggestions/model';
 
 export const LIBRARY_CTX: EditContext = { change_type: 'Master edit', reason: 'Device-type library' };
 
@@ -41,8 +44,6 @@ export type IdScheme = 'level_number' | 'level_tag';
 
 export interface LibraryType {
   id: string;
-  /** null = the app library (D65). */
-  projectId: string | null;
   model: string;
   aliases: string[];
   category: string | null;
@@ -67,17 +68,21 @@ export interface LibraryType {
   createdById: string | null;
   /** When the type's first op was made (the "added … 10/09" line). */
   createdAt: string | null;
-  promotedFromId: string | null;
   /** T111 (D197): what a catalogue import kept on the type (null for a hand-made one). */
   description: string | null;
   datasheetUrl: string | null;
   sourceRef: SourceRef | null;
   /** Imported as another type's accessory: kept for the accessory lists, never offered as a device. */
   accessoryOnly: boolean;
-  /** A project type already promoted: the app-library type made from it (D65). */
-  promotedAs: string | null;
-  /** Live devices of this project of the type (by link, or by model / alias for imported ones). */
+  /** Deleted (soft): listed with the rejected ones, where Restore brings it back (D292 (6)). */
+  deleted: boolean;
+  /**
+   * Live devices of the type (by link, or by model / alias for one with no link): in the open
+   * project when the library was loaded for one, else in every project on this iPad.
+   */
   devices: number;
+  /** Live devices of the type in every project on this iPad: what a delete, reject or rename warns with (D292 (6)). */
+  devicesOnIpad: number;
   /** Rules that read this type (Phase 3 §10 "Rules that reference this type"). */
   rules: string[];
 }
@@ -85,21 +90,26 @@ export interface LibraryType {
 export interface LibraryView {
   types: LibraryType[];
   drafts: number;
-  /** Open sync-conflict items on this library's types (Needs review, D184). */
+  /** Open sync-conflict items on the library's types (Needs review, D184). */
   inReview: number;
-  /** The cable codes this scope's types may name: the master's, then its Rules' own (T117). */
+  /** The cable codes the types may name: the master's, then the app library's Rules' own (T117). */
   codes: string[];
-  /** The codes that offer no Part chips here: network codes whose kits this scope's Rules turn off (T118, D213). */
+  /** The codes that offer no Part chips: network codes whose kits the app library's Rules turn off (T118, D213). */
   noPartCodes: string[];
 }
 
-/** The cable codes a scope accepts (`cableCodes` over its accepted Rules: a project's, or the app library's). */
-export async function scopeCableCodes(store: Store, scope: string | null): Promise<string[]> {
-  return cableCodes(await scopeParams(store, scope));
+/** The cable codes a type may name (`cableCodes` over the app library's accepted Rules). */
+export async function libraryCableCodes(store: Store): Promise<string[]> {
+  return cableCodes(await libraryParams(store));
 }
 
-async function scopeParams(store: Store, scope: string | null): Promise<RuleParams> {
-  return new RuleParams(await loadRuleParamRows(store, scope));
+async function libraryParams(store: Store): Promise<RuleParams> {
+  return new RuleParams(await loadRuleParamRows(store, null));
+}
+
+/** A type is edited in the library only (D287 (2)): an editor on a project's stream is refused. */
+function libraryOnly(editor: Editor): void {
+  if (!isLibraryStream(editor.projectId)) throw new OpError('Device types are edited in the Library.');
 }
 
 type Row = Record<string, unknown>;
@@ -118,7 +128,7 @@ export function clean(text: string | null | undefined): string | null {
  * change pulled from another iPad still refreshes the form.
  */
 export function editorStamp(t: LibraryType): string {
-  return JSON.stringify([t.id, t.model, t.category, t.role, t.aliases, t.idScheme, t.needsNeuronId, t.needsIpAddress, t.needsDmxAddress, t.defaultCables, t.optionalCables, t.optionalAccessories, t.state, t.promotedAs]);
+  return JSON.stringify([t.id, t.model, t.category, t.role, t.aliases, t.idScheme, t.needsNeuronId, t.needsIpAddress, t.needsDmxAddress, t.defaultCables, t.optionalCables, t.optionalAccessories, t.state]);
 }
 
 /** "A, B ,a" → ["A", "B"]: comma-separated aliases, deduplicated ignoring case and spaces. */
@@ -148,11 +158,7 @@ export function describeCable(c: LibraryCable): string {
   return [c.code, route || null, c.single_row ? 'single row' : '2 ends', c.qty != null ? `qty ${c.qty}` : null, c.status].filter(Boolean).join(' · ');
 }
 
-function scopeWhere(scope: string | null): { where: string; params: string[] } {
-  return scope ? { where: 'project_id = ?', params: [scope] } : { where: 'project_id IS NULL', params: [] };
-}
-
-function toType(r: Row, params: RuleParams): Omit<LibraryType, 'devices' | 'rules' | 'createdAt' | 'promotedAs'> {
+function toType(r: Row, params: RuleParams): Omit<LibraryType, 'devices' | 'devicesOnIpad' | 'rules' | 'createdAt'> {
   const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
   // what the type alone implies for a device of it with no cable record (T146): its flags, else its default cables and role
   const needs = addressNeeds(
@@ -163,7 +169,6 @@ function toType(r: Row, params: RuleParams): Omit<LibraryType, 'devices' | 'rule
   );
   return {
     id: String(r.id),
-    projectId: str(r.project_id),
     model: String(r.model),
     aliases: Array.isArray(r.aliases) ? (r.aliases as unknown[]).filter((a): a is string => typeof a === 'string') : [],
     category: str(r.category),
@@ -181,11 +186,11 @@ function toType(r: Row, params: RuleParams): Omit<LibraryType, 'devices' | 'rule
     dmxAddress: needs.dmx,
     state: r.state === 'accepted' || r.state === 'rejected' ? r.state : 'draft',
     createdById: str(r.created_by_id),
-    promotedFromId: str(r.promoted_from_id),
     description: str(r.description),
     datasheetUrl: str(r.datasheet_url),
     sourceRef: sourceRefOf(r.source_ref),
     accessoryOnly: r.accessory_only === true,
+    deleted: r.deleted_at != null,
   };
 }
 
@@ -205,44 +210,73 @@ export function sourceLine(ref: SourceRef | null): string | null {
   return [name, where || null, ref.displayName].filter(Boolean).join(' · ');
 }
 
+/** Live devices per type on this iPad: by link, and by Device text (model key) for the ones with none. */
+interface DeviceTally {
+  byLink: Map<string, { all: number; here: number }>;
+  byText: Map<string, { all: number; here: number }>;
+}
+
+async function tallyDevices(store: Store, projectId: string | null): Promise<DeviceTally> {
+  const rows = await store.db.query<{ library_type_id: string | null; device: string | null; project_id: string | null }>(
+    `SELECT d.library_type_id, d.device, l.project_id FROM device d JOIN level l ON l.id = d.level_id
+     WHERE d.deleted_at IS NULL AND l.deleted_at IS NULL`,
+  );
+  const tally: DeviceTally = { byLink: new Map(), byText: new Map() };
+  const bump = (map: Map<string, { all: number; here: number }>, key: string, here: boolean) => {
+    const n = map.get(key) ?? { all: 0, here: 0 };
+    n.all++;
+    if (here) n.here++;
+    map.set(key, n);
+  };
+  for (const d of rows) {
+    const here = projectId != null && d.project_id === projectId;
+    if (d.library_type_id) bump(tally.byLink, d.library_type_id, here);
+    else if (d.device && d.device.trim()) bump(tally.byText, modelKey(d.device), here);
+  }
+  return tally;
+}
+
 /**
- * The library of a project (or the app library, `scope` null): live types by category in the
- * CLAUDE.md §3 order, drafts first within a category, rejected ones last.
+ * A type's devices in the tally: its links, plus the unlinked devices named like its model or an
+ * alias — only while it is live and not rejected, as the rules match them (`findDeviceType`).
  */
-export async function loadLibrary(store: Store, scope: string | null): Promise<LibraryView> {
-  const { where, params } = scopeWhere(scope);
-  const rows = await store.list<Row>('library_type', { where, params, orderBy: 'id' });
-  const ruleParams = await scopeParams(store, scope);
+function countOf(tally: DeviceTally, t: Pick<LibraryType, 'id' | 'model' | 'aliases' | 'state' | 'deleted'>): { all: number; here: number } {
+  const out = { ...(tally.byLink.get(t.id) ?? { all: 0, here: 0 }) };
+  if (t.deleted || t.state === 'rejected') return out;
+  for (const k of new Set([t.model, ...t.aliases].map(modelKey))) {
+    const n = tally.byText.get(k);
+    if (!n) continue;
+    out.all += n.all;
+    out.here += n.here;
+  }
+  return out;
+}
+
+/**
+ * The library (the app library's types, D287 (1)) by category in the CLAUDE.md §3 order, drafts
+ * first within a category, rejected and deleted ones last. `projectId` (the open project, from
+ * the sidebar's Library) makes each type's `devices` that project's count; without one it is
+ * every project's on this iPad.
+ */
+export async function loadLibrary(store: Store, projectId: string | null = null): Promise<LibraryView> {
+  const rows = await store.list<Row>('library_type', { where: 'project_id IS NULL', orderBy: 'id', includeDeleted: true });
+  const ruleParams = await libraryParams(store);
   const codes = cableCodes(ruleParams);
   const noPartCodes = codes.filter((c) => !offersPartChips(ruleParams, c));
-  // devices of the project, to count each type's (by link, else by Device text = model or alias)
-  const devices = scope
-    ? await store.db.query<{ library_type_id: string | null; device: string | null }>(
-        `SELECT d.library_type_id, d.device FROM device d JOIN level l ON l.id = d.level_id
-         WHERE l.project_id = ? AND d.deleted_at IS NULL`,
-        [scope],
-      )
-    : [];
-  // project types promoted to the app library (its rows' promoted_from_id)
-  const promoted = new Map<string, string>();
-  if (scope) {
-    const app = await store.list<Row>('library_type', { where: 'project_id IS NULL AND promoted_from_id IS NOT NULL' });
-    for (const a of app) promoted.set(String(a.promoted_from_id), String(a.id));
-  }
+  const tally = await tallyDevices(store, projectId);
   const types: LibraryType[] = [];
   for (const r of rows) {
     const t = toType(r, ruleParams);
-    const keys = new Set([t.model, ...t.aliases].map(modelKey));
-    const count = devices.filter((d) => (d.library_type_id ? d.library_type_id === t.id : !!d.device && keys.has(modelKey(d.device)))).length;
+    const n = countOf(tally, t);
     const first = (await store.opsFor(t.id))[0];
-    types.push({ ...t, createdAt: first?.client_ts ?? null, promotedAs: promoted.get(t.id) ?? null, devices: count, rules: rulesForType(t.effectiveRole, t.defaultCables) });
+    types.push({ ...t, createdAt: first?.client_ts ?? null, devices: projectId ? n.here : n.all, devicesOnIpad: n.all, rules: rulesForType(t.effectiveRole, t.defaultCables) });
   }
-  // the eleven in order (an old master spelling sorts with its canonical value), then the project's own
+  // the eleven in order (an old master spelling sorts with its canonical value), then any other
   const catIndex = (c: string | null) => {
     const i = CATEGORIES.indexOf(canonicalCategory(c) as (typeof CATEGORIES)[number]);
     return i < 0 ? CATEGORIES.length : i;
   };
-  const rejected = (t: LibraryType) => Number(t.state === 'rejected');
+  const rejected = (t: LibraryType) => Number(t.state === 'rejected' || t.deleted);
   types.sort(
     (a, b) =>
       rejected(a) - rejected(b) ||
@@ -252,27 +286,29 @@ export async function loadLibrary(store: Store, scope: string | null): Promise<L
   );
   const open = await store.list<{ subject: { entity_kind?: string } | null }>('review_item', {
     where: `state = 'open' AND project_id = ?`,
-    params: [scope ?? LIBRARY_STREAM],
+    params: [LIBRARY_STREAM],
   });
   const inReview = open.filter((i) => i.subject?.entity_kind === 'library_type').length;
-  return { types, drafts: types.filter((t) => t.state === 'draft').length, inReview, codes, noPartCodes };
+  return { types, drafts: types.filter((t) => t.state === 'draft' && !t.deleted).length, inReview, codes, noPartCodes };
 }
 
-async function assertFreeModel(store: Store, scope: string | null, model: string, exceptId: string | null): Promise<void> {
-  const { types } = await loadLibrary(store, scope);
+async function assertFreeModel(store: Store, model: string, exceptId: string | null): Promise<void> {
+  const rows = await store.list<Row>('library_type', { where: `project_id IS NULL AND state <> 'rejected'`, orderBy: 'id' });
   const k = modelKey(model);
-  const clash = types.find((t) => t.id !== exceptId && t.state !== 'rejected' && (modelKey(t.model) === k || t.aliases.some((a) => modelKey(a) === k)));
-  if (clash) throw new OpError(`"${model}" is already in the library (${clash.model}).`);
+  const aliasesOf = (r: Row) => (Array.isArray(r.aliases) ? (r.aliases as unknown[]).filter((a): a is string => typeof a === 'string') : []);
+  const clash = rows.find((r) => String(r.id) !== exceptId && (modelKey(String(r.model)) === k || aliasesOf(r).some((a) => modelKey(a) === k)));
+  if (clash) throw new OpError(`"${model}" is already in the library (${String(clash.model)}).`);
 }
 
-/** "+ New type": a draft of this scope; a model already there (model or alias) is refused. */
-export async function createType(editor: Editor, store: Store, scope: string | null, input: { model: string; category: string | null }): Promise<string> {
+/** "+ New type": a draft in the library; a model already there (model or alias) is refused. */
+export async function createType(editor: Editor, store: Store, input: { model: string; category: string | null }): Promise<string> {
+  libraryOnly(editor);
   const model = clean(input.model);
   if (!model) throw new OpError('Type the model first.');
-  await assertFreeModel(store, scope, model, null);
+  await assertFreeModel(store, model, null);
   const { id } = await editor.create(
     'library_type',
-    { project_id: scope, model, category: clean(input.category), state: 'draft', created_by_id: editor.userId },
+    { project_id: null, model, category: clean(input.category), state: 'draft', created_by_id: editor.userId },
     LIBRARY_CTX,
   );
   return id;
@@ -305,14 +341,14 @@ function checkCables(list: readonly LibraryCable[], what: string, codes: readonl
 
 /** Save an edit of a type as one group of field sets; unchanged fields write nothing. */
 export async function updateType(editor: Editor, store: Store, id: string, patch: TypePatch): Promise<void> {
+  libraryOnly(editor);
   const row = await store.get<Row>('library_type', id);
   if (!row || row.deleted_at) throw new OpError('This type is not on this iPad.');
-  const scope = str(row.project_id);
   const values: Row = {};
   if (patch.model !== undefined) {
     const model = clean(patch.model);
     if (!model) throw new OpError('A type needs a model.');
-    if (model !== row.model) await assertFreeModel(store, scope, model, id);
+    if (model !== row.model) await assertFreeModel(store, model, id);
     values.model = model;
   }
   if (patch.category !== undefined) values.category = clean(patch.category);
@@ -322,7 +358,7 @@ export async function updateType(editor: Editor, store: Store, id: string, patch
   }
   if (patch.aliases !== undefined) values.aliases = patch.aliases.length ? patch.aliases : null;
   if (patch.idScheme !== undefined) values.id_scheme = patch.idScheme;
-  const codes = patch.defaultCables !== undefined || patch.optionalCables !== undefined ? await scopeCableCodes(store, scope) : [];
+  const codes = patch.defaultCables !== undefined || patch.optionalCables !== undefined ? await libraryCableCodes(store) : [];
   if (patch.defaultCables !== undefined) values.default_cables = checkCables(patch.defaultCables, 'Default cables', codes);
   if (patch.optionalCables !== undefined) values.optional_cables = checkCables(patch.optionalCables, 'Optional cables', codes);
   if (patch.needsNeuronId !== undefined) values.needs_neuron_id = patch.needsNeuronId;
@@ -344,111 +380,73 @@ export async function updateType(editor: Editor, store: Store, id: string, patch
 }
 
 export async function acceptType(editor: Editor, id: string): Promise<void> {
+  libraryOnly(editor);
   await editor.setField('library_type', id, 'state', 'accepted', LIBRARY_CTX);
 }
 
-/** Reject a draft (devices keep their link; the type leaves the pickers). */
+/** Reject a type (devices keep their link and Lint flags them, D292 (6); the type leaves the pickers). */
 export async function rejectType(editor: Editor, id: string): Promise<void> {
+  libraryOnly(editor);
   await editor.setField('library_type', id, 'state', 'rejected', LIBRARY_CTX);
 }
 
 /** Back to draft (a rejected type, or an accepted one to rework). */
 export async function reopenType(editor: Editor, id: string): Promise<void> {
+  libraryOnly(editor);
   await editor.setField('library_type', id, 'state', 'draft', LIBRARY_CTX);
 }
 
-export interface CopySource {
-  /** null = the app library. */
-  id: string | null;
-  name: string;
-  types: LibraryType[];
+/**
+ * Delete a type (a soft delete: nothing is hard-deleted). Its devices keep their link and Lint
+ * flags them (`lint.type_gone`, D292 (6)); the type is listed with the rejected ones, where
+ * `restoreType` brings it back.
+ */
+export async function deleteType(editor: Editor, id: string): Promise<void> {
+  libraryOnly(editor);
+  await editor.delete('library_type', id, LIBRARY_CTX);
 }
 
-/** Where "Copy from…" can copy: the app library and every other project on this iPad, accepted types only. */
-export async function copySources(store: Store, scope: string | null): Promise<CopySource[]> {
-  const out: CopySource[] = [];
-  if (scope) out.push({ id: null, name: 'App library', types: (await loadLibrary(store, null)).types.filter((t) => t.state === 'accepted') });
-  const projects = await store.list<Row>('project', { orderBy: 'created_at' });
-  for (const p of projects) {
-    if (String(p.id) === scope) continue;
-    const types = (await loadLibrary(store, String(p.id))).types.filter((t) => t.state === 'accepted');
-    out.push({ id: String(p.id), name: String(p.name), types });
-  }
-  return out.filter((s) => s.types.length);
+/** Undo a delete: the type is live again in its state; a model taken meanwhile by another type is refused. */
+export async function restoreType(editor: Editor, store: Store, id: string): Promise<void> {
+  libraryOnly(editor);
+  const row = await store.get<Row>('library_type', id);
+  if (!row) throw new OpError('This type is not on this iPad.');
+  if (!row.deleted_at) return;
+  if (row.state !== 'rejected') await assertFreeModel(store, String(row.model), id);
+  await editor.restore('library_type', id, LIBRARY_CTX);
+}
+
+export type TypeChange = 'delete' | 'reject' | 'rename';
+
+/** What the Library asks before a change that reaches every project (D292 (6)). */
+export interface TypeChangeWarning {
+  title: string;
+  message: string;
+  /** The confirm button's word. */
+  confirm: string;
 }
 
 /**
- * Copy types into `scope` as new accepted rows (they were accepted at the source; the server's
- * copy at project creation does the same, D65). A model the target already has is skipped.
- * One group for the whole copy. Copying a project's type into the app library (`scope` null) is
- * a promotion: the copy records `promoted_from_id`. The editor must write to the target's
- * stream (`libraryEditor` for the app library). The type's accepted suggestion chips are copied
- * with it (T99).
+ * The question before deleting, rejecting or renaming a type (D292 (6)): every project reads the
+ * one library, so the change reaches all of them; the count is the devices this iPad knows of
+ * (`devicesOnIpad`). A delete always asks; a reject or a rename that no device here uses goes
+ * ahead without a question (null).
  */
-export async function copyTypes(editor: Editor, store: Store, scope: string | null, typeIds: readonly string[]): Promise<{ copied: number; skipped: string[] }> {
-  const have = new Set((await loadLibrary(store, scope)).types.filter((t) => t.state !== 'rejected').flatMap((t) => [t.model, ...t.aliases].map(modelKey)));
-  const rows: Row[] = [];
-  for (const id of typeIds) {
-    const r = await store.get<Row>('library_type', id);
-    if (r && !r.deleted_at) rows.push(r);
+export function typeChangeWarning(t: Pick<LibraryType, 'model' | 'devicesOnIpad'>, change: TypeChange, newModel?: string): TypeChangeWarning | null {
+  const n = t.devicesOnIpad;
+  const used = `${n} device${n === 1 ? '' : 's'} on this iPad ${n === 1 ? 'uses' : 'use'} it`;
+  switch (change) {
+    case 'delete':
+      return {
+        title: `Delete ${t.model}?`,
+        message: n ? `${used}. ${n === 1 ? 'It keeps' : 'They keep'} the type and Lint flags ${n === 1 ? 'it' : 'them'}, in every project.` : 'No device on this iPad uses it. Every project loses the type.',
+        confirm: 'Delete',
+      };
+    case 'reject':
+      return n ? { title: `Reject ${t.model}?`, message: `${used}. ${n === 1 ? 'It keeps' : 'They keep'} the type and Lint flags ${n === 1 ? 'it' : 'them'}, in every project.`, confirm: 'Reject' } : null;
+    case 'rename':
+      return n && newModel ? { title: `Rename ${t.model} to ${newModel}?`, message: `${used}. Every project reads the new model.`, confirm: 'Rename' } : null;
   }
-  const skipped: string[] = [];
-  let copied = 0;
-  await editor.group(LIBRARY_CTX, async (g) => {
-    for (const r of rows) {
-      const k = modelKey(String(r.model));
-      if (have.has(k)) {
-        skipped.push(String(r.model));
-        continue;
-      }
-      have.add(k);
-      const { id: copy } = await g.create('library_type', {
-        project_id: scope,
-        model: r.model,
-        aliases: r.aliases ?? null,
-        category: r.category ?? null,
-        id_scheme: r.id_scheme ?? null,
-        default_cables: r.default_cables ?? null,
-        optional_cables: r.optional_cables ?? null,
-        optional_accessories: r.optional_accessories ?? null,
-        // only when set: a server without migration 0010 refuses the column (T68)
-        ...(r.needs_neuron_id != null ? { needs_neuron_id: r.needs_neuron_id } : {}),
-        // and the T146 flags (migration 0019 / Alembic 0020)
-        ...(r.needs_ip_address != null ? { needs_ip_address: r.needs_ip_address } : {}),
-        ...(r.needs_dmx_address != null ? { needs_dmx_address: r.needs_dmx_address } : {}),
-        // likewise the T111 columns (Alembic 0011); `source_ref` travels with the copy
-        ...(r.description != null ? { description: r.description } : {}),
-        ...(r.datasheet_url != null ? { datasheet_url: r.datasheet_url } : {}),
-        ...(r.source_ref != null ? { source_ref: r.source_ref } : {}),
-        ...(r.accessory_only != null ? { accessory_only: r.accessory_only } : {}),
-        // and the T112 role (migration 0011 / Alembic 0012)
-        ...(r.role != null ? { role: r.role } : {}),
-        state: 'accepted',
-        created_by_id: editor.userId,
-        ...(scope === null && r.project_id ? { promoted_from_id: r.id } : {}),
-      });
-      // its accepted suggestion chips go with it (T99, D174 (3))
-      await copyTypeChips(g, store, String(r.id), copy, scope, editor.userId);
-      copied++;
-    }
-  });
-  return { copied, skipped };
-}
-
-/**
- * "Promote to app library" (D65): an accepted project type becomes an app-library type (new row,
- * `promoted_from_id` = the project type), which every project created afterwards copies. Refused
- * for a draft, and when the app library already has the model (or an alias of it).
- */
-export async function promoteType(libraryEditor: Editor, store: Store, typeId: string): Promise<string> {
-  if (libraryEditor.projectId !== LIBRARY_STREAM) throw new OpError('Promotion writes to the app library.');
-  const row = await store.get<Row>('library_type', typeId);
-  if (!row || row.deleted_at || !row.project_id) throw new OpError('Only a project type can be promoted.');
-  if (row.state !== 'accepted') throw new OpError('Accept the type before promoting it.');
-  const out = await copyTypes(libraryEditor, store, null, [typeId]);
-  if (!out.copied) throw new OpError(`The app library already has ${String(row.model)}.`);
-  const made = await store.list<Row>('library_type', { where: 'project_id IS NULL AND promoted_from_id = ?', params: [typeId], orderBy: 'id' });
-  return String(made.at(-1)!.id);
 }
 
 /**
@@ -465,12 +463,12 @@ export function matchesQuery(names: readonly (string | null | undefined)[], quer
 }
 
 export const ACCESSORY_GROUP = 'Accessories (not placeable)';
-export const REJECTED_GROUP = 'Rejected';
+export const REJECTED_GROUP = 'Rejected and deleted';
 export const NO_CATEGORY_GROUP = 'No category';
 
-/** The list group a type sits in: its category, the accessories (T111), or the rejected ones. */
-export function groupOf(t: Pick<LibraryType, 'state' | 'accessoryOnly' | 'category'>): string {
-  return t.state === 'rejected' ? REJECTED_GROUP : t.accessoryOnly ? ACCESSORY_GROUP : (t.category ?? NO_CATEGORY_GROUP);
+/** The list group a type sits in: its category, the accessories (T111), or the rejected and deleted ones. */
+export function groupOf(t: Pick<LibraryType, 'state' | 'accessoryOnly' | 'category' | 'deleted'>): string {
+  return t.state === 'rejected' || t.deleted ? REJECTED_GROUP : t.accessoryOnly ? ACCESSORY_GROUP : (t.category ?? NO_CATEGORY_GROUP);
 }
 
 export interface LibraryGroup {
@@ -495,14 +493,14 @@ export function libraryGroups(types: readonly LibraryType[], filter: LibraryFilt
   for (const t of types) {
     const key = groupOf(t);
     if (filter.group && key !== filter.group) continue;
-    if (filter.draftsOnly && t.state !== 'draft') continue;
+    if (filter.draftsOnly && (t.state !== 'draft' || t.deleted)) continue;
     if (!matchesQuery([t.model, ...t.aliases, t.sourceRef?.displayName], filter.query ?? '')) continue;
     out.set(key, [...(out.get(key) ?? []), t]);
   }
   const rank = (k: string) => (k === REJECTED_GROUP ? 2 : k === ACCESSORY_GROUP ? 1 : 0);
   return [...out.entries()]
     .sort(([a], [b]) => rank(a) - rank(b))
-    .map(([key, list]) => ({ key, types: list, drafts: list.filter((t) => t.state === 'draft').length }));
+    .map(([key, list]) => ({ key, types: list, drafts: list.filter((t) => t.state === 'draft' && !t.deleted).length }));
 }
 
 /**
@@ -510,10 +508,11 @@ export function libraryGroups(types: readonly LibraryType[], filter: LibraryFilt
  * in one group, so each accept is still recorded as reviewed by this person (prompt Must).
  * Returns how many.
  */
-export async function acceptAllDrafts(editor: Editor, store: Store, scope: string | null, group: string): Promise<number> {
+export async function acceptAllDrafts(editor: Editor, store: Store, group: string): Promise<number> {
+  libraryOnly(editor);
   if (group === REJECTED_GROUP) throw new OpError('Rejected types are reopened one by one.');
-  const { types } = await loadLibrary(store, scope);
-  const drafts = types.filter((t) => t.state === 'draft' && groupOf(t) === group);
+  const { types } = await loadLibrary(store);
+  const drafts = types.filter((t) => t.state === 'draft' && !t.deleted && groupOf(t) === group);
   if (!drafts.length) return 0;
   await editor.group({ ...LIBRARY_CTX, reason: `Device-type library: Accept all drafts in ${group}` }, async (g) => {
     for (const t of drafts) await g.setField('library_type', t.id, 'state', 'accepted');
