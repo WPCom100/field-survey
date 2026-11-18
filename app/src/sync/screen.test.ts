@@ -189,11 +189,11 @@ describe('the board copy (T178)', () => {
   });
 
   it('the Edits and Photos tiles say what waits', () => {
-    expect(editsTileSub(null, now)).toBe('Sent in order when online. Nothing is lost.');
-    expect(editsTileSub(at(9, 3, 9), now)).toBe('Oldest Nov 9, 09:03 · sent in order when online');
+    expect(editsTileSub(null, now)).toBe('Nothing to send');
+    expect(editsTileSub(at(9, 3, 9), now)).toBe('Oldest Nov 9, 09:03');
     expect(photosTileSub({ uploadsPending: 0, uploadBytesPending: 0 })).toBe('Nothing to upload');
-    expect(photosTileSub({ uploadsPending: 3, uploadBytesPending: 1.4 * 1024 ** 2 })).toBe('3 files · 1.4 MB · thumbnails go first');
-    expect(photosTileSub({ uploadsPending: 1, uploadBytesPending: 2048 })).toBe('1 file · 2 KB · thumbnails go first');
+    expect(photosTileSub({ uploadsPending: 3, uploadBytesPending: 1.4 * 1024 ** 2 })).toBe('3 files · 1.4 MB');
+    expect(photosTileSub({ uploadsPending: 1, uploadBytesPending: 2048 })).toBe('1 file · 2 KB');
   });
 
   it('the storage bar shares add up to one, and are zero with nothing stored', () => {

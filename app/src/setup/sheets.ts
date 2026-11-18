@@ -69,11 +69,11 @@ export async function startSheetImport(identity: Identity, projectId: string, le
 export function sheetJobLine(b: ImportBatch): string {
   switch (b.job_state) {
     case 'queued':
-      return 'Queued — the server picks it up within a few seconds';
+      return 'Queued';
     case 'running':
-      return 'Reading the sheet (grid bubbles, rooms, tags, boundaries)…';
+      return 'Reading the sheet…';
     case 'skipped':
-      return 'Already uploaded — this exact file was imported for this level before';
+      return 'Already uploaded';
     case 'failed':
       return `Failed: ${b.stats?.error ?? 'see the server log'}`;
     default: {

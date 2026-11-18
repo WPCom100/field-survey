@@ -520,7 +520,7 @@ function PhotoEditor(props: {
               <Text style={styles.muted}>{deviceId ? props.title : 'Level only (no device)'}</Text>
               {links.length ? (
                 <>
-                  <Text style={styles.muted}>Also linked to (tap any number; nearest first):</Text>
+                  <Text style={styles.muted}>Also linked to:</Text>
                   <View style={styles.rowWrap}>
                     {links.map((l) => (
                       <LinkChip
@@ -574,7 +574,6 @@ function PhotoEditor(props: {
                   <Text style={styles.muted}>Tap the photo where the text goes.</Text>
                 )
               ) : null}
-              <Text style={styles.muted}>Original kept; markup saved separately.</Text>
             </>
           ) : null}
         </ScrollView>

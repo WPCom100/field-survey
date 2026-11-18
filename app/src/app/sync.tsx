@@ -137,8 +137,8 @@ export default function SyncScreen() {
     Alert.alert(
       'Re-sign in?',
       signedInMicrosoft
-        ? 'You will enter the server again and sign in (with Microsoft or a token). Edits on this iPad are kept and still sync afterwards.'
-        : 'You will enter the server and token again. Edits on this iPad are kept and still sync afterwards.',
+        ? 'You will enter the server again and sign in. Edits on this iPad are kept.'
+        : 'You will enter the server and token again. Edits on this iPad are kept.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Re-sign in', onPress: () => void signOut() },
@@ -172,7 +172,7 @@ export default function SyncScreen() {
     const n = await countQueuedDownloads();
     await q.requestRun();
     if (!n) return 'Nothing to download: every plan for your levels is already on this iPad.';
-    return `Downloading ${plural(n, 'file')} for your levels (all in-scope levels when you have no assignment, D97).`;
+    return `Downloading ${plural(n, 'file')} for your levels.`;
   });
   const freePhotos = () =>
     Alert.alert('Free photos?', 'Full-size photos the server already has are removed from this iPad and download again when opened.', [
@@ -231,7 +231,6 @@ export default function SyncScreen() {
           onBlur={saveLabel}
           testID="sync.label"
         />
-        <Text style={[styles.caption, styles.flex]}>How Needs review names this iPad.</Text>
       </View>
     </Card>
   );
@@ -248,11 +247,11 @@ export default function SyncScreen() {
       ))}
       {data && !levels.length ? (
         <Text style={[styles.caption, styles.rowPad]}>
-          {hasProject ? 'This project has no levels yet.' : 'No levels on this iPad yet (a project arrives with setup).'}
+          {hasProject ? 'This project has no levels yet.' : 'No levels on this iPad yet.'}
         </Text>
       ) : null}
       <View style={[styles.lr, styles.footer]}>
-        <Text style={[styles.caption, styles.flex]}>Plans of your levels; every in-scope level when none is assigned to you.</Text>
+        <View style={styles.flex} />
         <Btn kind="tertiary" title="Download assigned levels" disabled={data ? !levels.some((l) => l.cache !== 'no sheet') : false} onPress={downloadAssigned} />
       </View>
     </Card>
@@ -291,7 +290,6 @@ export default function SyncScreen() {
         title="Details"
         open={showDetails}
         onToggle={setDetailsOpen}
-        right={<Text style={styles.caption}>For support</Text>}
         testID="sync.details"
       >
         <View style={styles.details}>
@@ -344,7 +342,6 @@ export default function SyncScreen() {
       section="Sync"
       projectId={projectId}
       title="Sync & uploads"
-      intro="Edits never need sign-in or a connection. Sync, uploads and exports do, on any network, cellular included."
       backTestID="sync.back"
       actions={<Btn kind="primary" title="Sync now" testID="sync.now" icon={<Icon name="sync" size={18} color={color.onPrimary} />} onPress={syncNow} />}
     >
@@ -372,7 +369,7 @@ export default function SyncScreen() {
         {refused.length ? (
           <Banner
             tone="danger"
-            text={`${plural(refused.length, 'edit')} the server refused. The other edits keep syncing; these wait under Details until Retry refused edits.`}
+            text={`${plural(refused.length, 'edit')} the server refused. See Details.`}
           />
         ) : null}
         {/* the notice and its button before the rows: a lost user refuses hundreds of edits (T160) */}
@@ -401,7 +398,7 @@ export default function SyncScreen() {
           />
         ) : null}
         {hasProject === false ? (
-          <Banner text={'No project on this iPad yet, so there is nothing to push or pull; "Synced" means the server answered. The demo plan never syncs.'} />
+          <Banner text="No project on this iPad yet." />
         ) : null}
         {note ? <Banner tone={note.tone} text={note.text} testID="sync.note" /> : null}
 

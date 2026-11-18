@@ -66,15 +66,9 @@ export function AssignmentsStep({ projectId, dataKey }: { projectId: string; dat
 
   return (
     <Section title="Assignments">
-      <Text style={styles.hint}>
-        Tap a cell to assign a level to a person; a level can have several people, and anyone can change this. Each
-        person&apos;s Levels screen marks their levels with ● and filters on &quot;Assigned to me&quot;, and Download
-        assigned levels caches those plans. Someone with no assignment at all gets every in-scope level. Other iPads see
-        changes after a sync.
-      </Text>
       <Notice text={error} error />
       <Notice text={notice} />
-      {levels.length === 0 ? <Text style={styles.hint}>No levels yet: add them under 2 Levels.</Text> : null}
+      {levels.length === 0 ? <Text style={styles.hint}>No levels yet.</Text> : null}
       <ScrollView horizontal contentContainerStyle={{ flexDirection: 'column' }}>
         <View style={styles.head}>
           <Text style={[styles.cLevel, w.label]}>Level</Text>

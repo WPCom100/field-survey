@@ -10,7 +10,7 @@ appId: productions.luminarytechnology.fieldsurvey
 - assertVisible: '○ BOM 1'
 - assertVisible: '○ Riser 2'
 - tapOn: '• SR or LR\? P-DOC-C-SR / P-DOC-C-LR — pick one'
-- assertVisible: 'Model — pick one; nothing is chosen for you \(D28\)'
+- assertVisible: 'Model — pick one'
 - tapOn: '○ P-DOC-C-SR'
 - tapOn:
     id: draft.accept

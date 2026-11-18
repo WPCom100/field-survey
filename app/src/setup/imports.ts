@@ -79,11 +79,11 @@ export const isFinished = (s: JobState): boolean => s === 'done' || s === 'skipp
 export function jobLine(b: ImportBatch): string {
   switch (b.job_state) {
     case 'queued':
-      return 'Queued — the server picks it up within a few seconds';
+      return 'Queued';
     case 'running':
       return 'Importing…';
     case 'skipped':
-      return 'Already imported — this exact file was imported before, nothing changed';
+      return 'Already imported — nothing changed';
     case 'failed':
       return `Failed: ${b.stats?.error ?? 'see the server log'}`;
     default:

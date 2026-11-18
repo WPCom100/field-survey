@@ -156,7 +156,6 @@ export default function RulingsScreen() {
       section="Rulings"
       projectId={projectId}
       title={title}
-      intro="One decision applied to every matching record, previewed before anything changes."
       backTestID="rulings.bar.back"
       actions={<Btn label="+ New ruling" onPress={() => setMode({ kind: 'edit', draft: emptyDraft(), source: null })} disabled={!engine} testID="rulings.new" />}
     >
@@ -178,7 +177,7 @@ export default function RulingsScreen() {
               </Text>
             </Pressable>
           )}
-          ListEmptyComponent={<Text style={styles.empty}>{view ? 'No rulings yet. A ruling applies one decision to every record that matches it.' : 'Loading…'}</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{view ? 'No rulings yet.' : 'Loading…'}</Text>}
         />
         <View style={styles.panel}>
           {mode.kind === 'preview' ? (
@@ -221,7 +220,7 @@ export default function RulingsScreen() {
                   onStanding={(on) =>
                     engine.setRulingStanding(selected.id, on).then(
                       () => {
-                        setNote(on ? 'Standing: future matches are proposed.' : 'No longer standing: its open proposals are withdrawn.');
+                        setNote(on ? 'Standing.' : 'No longer standing.');
                         bumpRulesVersion();
                         setTick((n) => n + 1);
                       },
@@ -254,9 +253,7 @@ export default function RulingsScreen() {
                     )
                   }
                 />
-              ) : (
-                <Text style={styles.empty}>Select a ruling, or + New ruling. From the Lint view, &quot;Fix all via ruling&quot;; from a level&apos;s lists, Select → &quot;Apply as ruling…&quot;.</Text>
-              )}
+              ) : null}
               {note ? <Text style={styles.note} testID="rulings.note">{note}</Text> : null}
             </ScrollView>
           )}
@@ -296,7 +293,7 @@ function EditorPanel({
     <>
       <Text style={styles.panelTitle} testID="rulings.editor.title">New ruling{source ? ` · from ${source}` : ''}</Text>
       <Label text="Reason" />
-      <TextInput style={styles.input} placeholderTextColor={color.text3} value={d.text} onChangeText={(text) => onChange({ ...d, text })} placeholder="0-10V rows read Fixtures (the Change Log's Reason)" testID="rulings.reason" />
+      <TextInput style={styles.input} placeholderTextColor={color.text3} value={d.text} onChangeText={(text) => onChange({ ...d, text })} placeholder="0-10V rows read Fixtures" testID="rulings.reason" />
 
       <Label text="Scope" />
       <View style={styles.wrap}>
@@ -337,7 +334,7 @@ function EditorPanel({
       </View>
       {a.kind === 'item' ? (
         <View style={styles.block}>
-          <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.item} onChangeText={(item) => setAction({ item })} placeholder="Item text (short; qualifiers go in Notes)" testID="rulings.item" />
+          <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.item} onChangeText={(item) => setAction({ item })} placeholder="Item text" testID="rulings.item" />
           <View style={styles.wrap}>
             {vocab.PUNCH_TYPE.map((t) => (
               <Chip key={t} label={t} on={a.type === t} onPress={() => setAction({ type: t })} />
@@ -357,15 +354,11 @@ function EditorPanel({
             <ValueInput field={fieldOf(entity, a.field, cables ?? undefined)} value={a.value} onChange={(value) => setAction({ value })} placeholder="New value" testID="rulings.value" />
           ) : a.kind === 'rename' ? (
             <>
-              <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.from} onChangeText={(from) => setAction({ from })} placeholder="Old phrase (the whole value or one ; phrase)" testID="rulings.rename.from" />
+              <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.from} onChangeText={(from) => setAction({ from })} placeholder="Old phrase" testID="rulings.rename.from" />
               <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.to} onChangeText={(to) => setAction({ to })} placeholder="New phrase" testID="rulings.rename.to" />
             </>
-          ) : a.kind === 'reword' ? (
-            <Text style={styles.sub}>
-              Each record gets what its rule now words (Setup → Rules as it stands). A field changed by hand, or one no rule words any more, is left as it is; the preview names them.
-            </Text>
-          ) : (
-            <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.text} onChangeText={(text) => setAction({ text })} placeholder="Phrase to append (once, after '; ')" testID="rulings.append" />
+          ) : a.kind === 'reword' ? null : (
+            <TextInput style={styles.input} placeholderTextColor={color.text3} value={a.text} onChangeText={(text) => setAction({ text })} placeholder="Phrase to append" testID="rulings.append" />
           )}
         </View>
       )}
@@ -531,7 +524,7 @@ function PreviewPanel({
         ListEmptyComponent={<Text style={styles.empty}>Nothing to change: every matching record is already right.</Text>}
         ListFooterComponent={
           <View style={styles.footer}>
-            {previewFooter(p, mode.draft).map((t) => (
+            {previewFooter(p).map((t) => (
               <Text key={t} style={styles.sub}>
                 {t}
               </Text>
@@ -602,7 +595,7 @@ function DetailPanel({
       </View>
       {deleting ? (
         <View style={styles.block}>
-          <TextInput style={styles.input} placeholderTextColor={color.text3} value={reason} onChangeText={setReason} placeholder="Why delete it? (what it changed stays)" testID="rulings.delete.reason" />
+          <TextInput style={styles.input} placeholderTextColor={color.text3} value={reason} onChangeText={setReason} placeholder="Why delete it?" testID="rulings.delete.reason" />
           <FormActions>
             <Btn label="Cancel" onPress={() => setDeleting(false)} secondary />
             <Btn label="Delete" kind="destructive" onPress={() => onDelete(reason)} disabled={!reason.trim()} testID="rulings.delete.ok" />
@@ -615,7 +608,7 @@ function DetailPanel({
           <Btn label={`Accept all ${proposals.length}`} onPress={() => onDecide(proposals.map((p) => p.id), 'accept')} />
         </View>
       ) : (
-        <Text style={styles.sub}>{r.standing ? 'Nothing waiting: every matching record is right, or unticked.' : 'Not standing: nothing is proposed.'}</Text>
+        <Text style={styles.sub}>{r.standing ? 'Nothing waiting.' : 'Not standing: nothing is proposed.'}</Text>
       )}
       {proposals.map((p) => (
         <View key={p.id} style={styles.prop}>

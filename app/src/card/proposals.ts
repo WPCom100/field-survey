@@ -21,7 +21,7 @@ export interface ProposalDecider {
 
 export const NOT_WIRED: ProposalDecider = {
   wired: false,
-  decide: () => Promise.reject(new Error('Read-only: open the card with an editor to decide (T33).')),
+  decide: () => Promise.reject(new Error('Read-only: open the card with an editor to decide.')),
   explain: () => Promise.resolve(null),
 };
 

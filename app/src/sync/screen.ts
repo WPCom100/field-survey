@@ -257,15 +257,15 @@ export function connectionTile(
   }
 }
 
-/** The Photos waiting tile's line: "3 files · 1.4 MB · thumbnails go first", or "Nothing to upload". */
+/** The Photos waiting tile's line: "3 files · 1.4 MB", or "Nothing to upload". */
 export function photosTileSub(b: { uploadsPending: number; uploadBytesPending: number }): string {
   if (!b.uploadsPending) return 'Nothing to upload';
-  return `${plural(b.uploadsPending, 'file')} · ${formatBytes(b.uploadBytesPending)} · thumbnails go first`;
+  return `${plural(b.uploadsPending, 'file')} · ${formatBytes(b.uploadBytesPending)}`;
 }
 
-/** The Edits waiting tile's line: "Oldest Nov 9, 13:40 · sent in order when online", or the board's reassurance. */
+/** The Edits waiting tile's line: "Oldest Nov 9, 13:40", or "Nothing to send". */
 export function editsTileSub(oldestAt: string | null, now: Date = new Date()): string {
-  return oldestAt ? `Oldest ${stamp(oldestAt, now)} · sent in order when online` : 'Sent in order when online. Nothing is lost.';
+  return oldestAt ? `Oldest ${stamp(oldestAt, now)}` : 'Nothing to send';
 }
 
 /** A level row's state: On iPad · Downloading… · Not on iPad · No sheet yet. */

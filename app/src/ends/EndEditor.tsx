@@ -143,7 +143,7 @@ export function EndEditor(props: EndEditorProps) {
             style={fieldStyles.input}
             value={pending.reason}
             onChangeText={(t) => setPending({ ...pending, reason: t })}
-            placeholder="Reason (kept in the history)"
+            placeholder="Reason"
             placeholderTextColor={color.text3}
             autoFocus
             returnKeyType="done"
@@ -218,10 +218,7 @@ export function EndEditor(props: EndEditorProps) {
           ) : view.riser.state === 'match' ? (
             <Text style={styles.ok}>Riser says To: “{view.riser.riser}” ✓ matches</Text>
           ) : (
-            <>
-              <Text style={styles.finding}>Riser says To: “{view.riser.riser}” ≠ To text</Text>
-              <Text style={styles.muted}>The riser governs To (R2); correct the To text above if the riser is right.</Text>
-            </>
+            <Text style={styles.finding}>Riser says To: “{view.riser.riser}” ≠ To text</Text>
           )}
         </View>
         {props.footer}
@@ -235,7 +232,7 @@ export function EndEditor(props: EndEditorProps) {
  * follows the project's Rules setting for the code; Yes / No set this cable alone.
  */
 function TermKitSection({ view, readOnly, run }: { view: CableView; readOnly: boolean; run: Run }) {
-  const { own, code, takes } = view.termKit;
+  const { own, code } = view.termKit;
   const options: { value: boolean | null; label: string; id: string }[] = [
     { value: null, label: `As ${view.code ?? 'its code'} (${code ? 'yes' : 'no'})`, id: 'as' },
     { value: true, label: 'Yes', id: 'yes' },
@@ -262,11 +259,6 @@ function TermKitSection({ view, readOnly, run }: { view: CableView; readOnly: bo
           );
         })}
       </View>
-      <Text style={styles.muted}>
-        {takes
-          ? 'A kit part at each device end: once the Run item is accepted, or the kit item of an end Issue “no term kit”.'
-          : 'No kit items or kit parts for this cable.'}
-      </Text>
     </View>
   );
 }
@@ -318,7 +310,7 @@ function EndSection(props: {
         </Text>
         <Text style={styles.endLabel}>{end.label}</Text>
       </View>
-      {ep.kind === 'draft' ? <Text style={styles.muted}>Its device is not on the plan yet: place the draft (Setup → Place devices), then survey this end.</Text> : null}
+      {ep.kind === 'draft' ? <Text style={styles.muted}>Its device is not on the plan yet.</Text> : null}
       {canPick && !picking ? (
         <Btn title={ep.kind === 'placeholder' ? 'Change placeholder…' : 'Choose placeholder…'} small onPress={() => setPicking(true)} testID={`end.${props.side}.placeholder`} />
       ) : null}
@@ -359,7 +351,7 @@ function EndSection(props: {
       </View>
       <Text style={styles.muted}>
         {end.status ? '' : 'No status yet · '}
-        {end.statusSource === 'copied' ? 'copied from the other end (R2f) · ' : end.statusSource === 'derived' ? 'derived · ' : ''}
+        {end.statusSource === 'copied' ? 'copied from the other end · ' : end.statusSource === 'derived' ? 'derived · ' : ''}
         {who ? `surveyed by ${who} ${fmt(end.surveyedAt)}` : 'not surveyed'}
         {marks('status') ? ` · ${marks('status')}` : ''}
       </Text>

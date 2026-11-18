@@ -113,10 +113,10 @@ export function PlacePanel(props: PlacePanelProps) {
         {props.proposals > 0 ? (
           <Text style={styles.note}>
             {props.proposals} dashed pin{props.proposals === 1 ? '' : 's'} where the sheet prints the type or tag: tap one to confirm it.
-            {props.guesses > 0 ? ` ${props.guesses} faint one${props.guesses === 1 ? ' is a guess' : 's are guesses'} by type alone: check the plan first.` : ''}
+            {props.guesses > 0 ? ` ${props.guesses} faint one${props.guesses === 1 ? ' is a guess' : 's are guesses'} by type alone.` : ''}
           </Text>
         ) : null}
-        {spot && props.spotGuess ? <Text style={styles.warn}>Guess: the sheet prints {props.spotGuess} here, not this model. Check it is this unit before placing.</Text> : null}
+        {spot && props.spotGuess ? <Text style={styles.warn}>Guess: the sheet prints {props.spotGuess} here, not this model.</Text> : null}
         {!editor ? <Text style={styles.warn}>Pick who you are to place devices.</Text> : null}
         {note ? <Text style={styles.note} testID="place.note">{note}</Text> : null}
         {last ? (
@@ -274,7 +274,6 @@ function Selected(props: {
       </Text>
       {!spot ? (
         <>
-          <Text style={styles.muted}>Tap the plan where it is, or drag the handle onto the plan.</Text>
           <View style={styles.rowWrap}>
             <View {...responder.panHandlers} style={styles.handle}>
               <Text style={styles.handleText}>⠿ Drag onto the plan</Text>
@@ -307,7 +306,6 @@ function Selected(props: {
           <View style={styles.rowWrap}>
             <Text style={styles.idText}>{id}</Text>
             {isNew ? <Text style={chipStyles.badge}>NEW</Text> : null}
-            {isNew ? <Text style={styles.muted}>numbered by the server at the next sync</Text> : null}
           </View>
           {tagged ? (
             <>
@@ -329,7 +327,6 @@ function Selected(props: {
               onPress={() => props.onPlace({ drawingPosition: dp, room, ...(tagged ? { panelName: panel } : {}) })}
             />
           </FormActions>
-          <Text style={styles.muted}>Tap the plan again to move the spot.</Text>
         </>
       )}
     </View>

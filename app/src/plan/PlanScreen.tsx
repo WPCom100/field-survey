@@ -1107,12 +1107,10 @@ export function PlanScreen(props: PlanScreenProps) {
           ) : !plan ? (
             <Centered spinner />
           ) : !plan.sheet ? (
-            <Centered text={`No plan sheet yet — level ${plan.level.code} has no display sheet. Use the list on the right; the plan appears once a sheet is assigned (setup, T45).`} />
+            <Centered text={`No plan sheet yet for level ${plan.level.code}.`} />
           ) : !sheetUri ? (
             <View style={styles.centered}>
-              <Text style={styles.centeredText}>
-                Plan not downloaded — {plan.level.code}'s sheet is not on this iPad yet. Use the list on the right; the sheet downloads with the next sync on Wi-Fi.
-              </Text>
+              <Text style={styles.centeredText}>Plan not downloaded.</Text>
               {props.blobs && plan.sheet.blob ? (
                 <Btn kind="primary" title={sheetFetch === 'busy' ? 'Downloading…' : '⤓ Download plan now'} onPress={downloadSheet} disabled={sheetFetch === 'busy'} />
               ) : null}
@@ -1295,11 +1293,6 @@ export function PlanScreen(props: PlanScreenProps) {
                 </View>
               ) : null}
               {dragAt ? <View pointerEvents="none" style={[styles.dragDot, { left: dragAt.x - 14, top: dragAt.y - 14 }]} /> : null}
-              {placing && !placeKey ? (
-                <View style={styles.moveBanner} pointerEvents="none">
-                  <Text style={styles.moveText}>Pick a device in the list on the right, then tap where it is on the plan — or tap a dashed pin.</Text>
-                </View>
-              ) : null}
             </>
           )}
           {/* floating tools (the board): Fit · Grid · Layers · Legend, bottom-right */}
@@ -1662,7 +1655,7 @@ export function PlanScreen(props: PlanScreenProps) {
                     />
                   ))}
                 </FilterGroup>
-                <FilterGroup title="Owner" note="Open punch items and missing parts. EC and ETC each include EC/ETC." testID="plan.filter.owner">
+                <FilterGroup title="Owner" testID="plan.filter.owner">
                   {OWNERS.map((o) => (
                     <Chip key={o} small label={o} selected={prefs.filter.owners.includes(o)} onPress={() => setFilter((f) => ({ ...f, owners: toggle(f.owners, o, OWNERS) }))} testID={`plan.filter.owner.${o}`} />
                   ))}
@@ -1854,30 +1847,22 @@ function InkBar(props: {
           <Text style={[styles.inkBtnText, styles.inkBtnTextOn]}>Done</Text>
         </Pressable>
       </View>
-      {props.tool === 'text' ? (
-        props.noteAt ? (
-          <View style={styles.inkRow}>
-            <TextInput
-              style={styles.inkInput}
-              value={props.noteText}
-              onChangeText={props.onNoteText}
-              placeholder="Note text"
-              placeholderTextColor={color.text3}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={props.onPlaceNote}
-            />
-            <Pressable onPress={props.onPlaceNote} disabled={!props.noteText.trim()} style={[styles.inkBtn, styles.inkDone, !props.noteText.trim() && styles.inkBtnOff]}>
-              <Text style={[styles.inkBtnText, styles.inkBtnTextOn]}>Place</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Text style={styles.inkNote}>Tap the plan where the note goes.</Text>
-        )
-      ) : props.tool === 'erase' ? (
-        <Text style={styles.inkNote}>Touch any stroke to erase it, yours or someone else's (it stays in their layer).</Text>
-      ) : props.tool === 'recolor' ? (
-        <Text style={styles.inkNote}>Pick a colour, then touch any stroke to give it that colour.</Text>
+      {props.tool === 'text' && props.noteAt ? (
+        <View style={styles.inkRow}>
+          <TextInput
+            style={styles.inkInput}
+            value={props.noteText}
+            onChangeText={props.onNoteText}
+            placeholder="Note text"
+            placeholderTextColor={color.text3}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={props.onPlaceNote}
+          />
+          <Pressable onPress={props.onPlaceNote} disabled={!props.noteText.trim()} style={[styles.inkBtn, styles.inkDone, !props.noteText.trim() && styles.inkBtnOff]}>
+            <Text style={[styles.inkBtnText, styles.inkBtnTextOn]}>Place</Text>
+          </Pressable>
+        </View>
       ) : null}
       {props.error ? <Text style={[styles.inkNote, styles.inkErr]}>{props.error}</Text> : null}
       {props.missing ? <Text style={styles.inkNote}>{props.missing} ink layer{props.missing === 1 ? '' : 's'} not downloaded yet.</Text> : null}
@@ -1929,13 +1914,12 @@ function SideLink({ label, onPress, disabled, testID }: { label: string; onPress
   );
 }
 
-/** One group of the Filter popover: its title, its chips, an optional note under them. */
-function FilterGroup({ title, note, testID, children }: { title: string; note?: string; testID: string; children: ReactNode }) {
+/** One group of the Filter popover: its title and its chips. */
+function FilterGroup({ title, testID, children }: { title: string; testID: string; children: ReactNode }) {
   return (
     <View style={styles.filterGroup} testID={testID}>
       <Text style={styles.filterTitle}>{title}</Text>
       <View style={styles.filterChips}>{children}</View>
-      {note ? <Text style={styles.menuNote}>{note}</Text> : null}
     </View>
   );
 }
@@ -2136,7 +2120,6 @@ const styles = StyleSheet.create({
   menuCheckOn: { color: color.primary },
   menuLabelBox: { flexShrink: 1 },
   menuLabel: { ...font.callout, color: color.text },
-  menuNote: { ...font.caption, color: color.text3 },
   menuNoteInline: { ...font.caption, color: color.text3 },
   disabled: { color: color.text3 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md, padding: space.xxl },

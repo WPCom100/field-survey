@@ -81,8 +81,8 @@ export type LintView = {
 export type LintQuery = { levelId?: string | null; groupBy?: 'check' | 'level'; dismissed?: boolean };
 
 const LOCAL_TEXT: Record<LocalRow['reason'], string> = {
-  refused: 'The server refused its create (it names a record the server does not know). It stays on this iPad until the data is fixed: see Sync.',
-  unnumbered: 'The server accepted it but gave it no number (its level has no numbering group or code).',
+  refused: 'The server refused it (it names a record the server does not know). See Sync.',
+  unnumbered: 'The server gave it no number (its level has no numbering group or code).',
 };
 
 async function subjectLabel(store: Store, kind: string, id: string, codes: ReadonlyMap<string, string>): Promise<{ label: string; levelId: string | null; deviceId: string | null }> {

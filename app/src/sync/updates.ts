@@ -47,7 +47,7 @@ export function plainError(e: Error | null | undefined): string {
 export interface InstallLines {
   /** "runtime 9099e69e · channel production" */
   runtime: string;
-  /** "embedded (the JS this build shipped with)" or "update 01a13303 · <date> · T84: …" */
+  /** "embedded" or "update 01a13303 · <date> · T84: …" */
   running: string;
 }
 
@@ -61,7 +61,7 @@ export function describeRunning(r: RunningInfo, formatDate: (d: Date) => string 
   const runtime = `runtime ${short(r.runtimeVersion)} · channel ${r.channel || '—'}`;
   let running: string;
   if (r.isEmbeddedLaunch || !r.updateId) {
-    running = 'embedded (the JS this build shipped with)';
+    running = 'embedded';
   } else {
     const parts = [`update ${short(r.updateId)}`];
     if (r.createdAt) parts.push(formatDate(r.createdAt));

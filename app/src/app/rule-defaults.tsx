@@ -26,7 +26,7 @@ export default function RuleDefaultsRoute() {
   }, []);
   const editor = useMemo(() => (store ? new Editor(store, { projectId: LIBRARY_STREAM, userId: user.id }) : null), [store, user.id]);
   return (
-    <SectionScreen title="Rule defaults" intro="What a new project's Rules start from. A change is a draft until accepted." backTestID="ruleDefaults.back">
+    <SectionScreen title="Rule defaults" backTestID="ruleDefaults.back">
       {error ? (
         <View style={styles.notice}>
           <Notice text={error} error />

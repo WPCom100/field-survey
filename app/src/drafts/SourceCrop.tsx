@@ -50,7 +50,6 @@ function CropImage({ identity, url, label, onPress }: { identity: Identity; url:
   return (
     <Pressable onPress={onPress}>
       <Image source={{ uri: crop.uri }} style={styles.small} resizeMode="contain" accessibilityLabel={`Source crop: ${label}`} />
-      <Text style={styles.hint}>Tap to enlarge, with more around it; pinch to zoom</Text>
     </Pressable>
   );
 }
@@ -63,9 +62,7 @@ function BigCrop({ identity, batch, source, onClose }: { identity: Identity; bat
       <View style={styles.modal}>
         {/* closes to nothing: × at the top right (D280 (5), T191; was a Close button) */}
         <View style={styles.bar}>
-          <PanelHeader title={source.label} close={{ onPress: onClose, testID: 'crop.close' }}>
-            <Text style={styles.hint}>Pinch to zoom · drag to pan · double-tap to zoom / fit</Text>
-          </PanelHeader>
+          <PanelHeader title={source.label} close={{ onPress: onClose, testID: 'crop.close' }} />
         </View>
         {crop.state === 'ok' ? (
           <ZoomableImage uri={crop.uri} accessibilityLabel={`Source crop: ${source.label}`} />
@@ -98,7 +95,6 @@ const styles = StyleSheet.create({
   label: { ...font.captionBold, color: color.text2 },
   small: { width: '100%', height: 170, backgroundColor: color.surface2, borderRadius: radius.swatch },
   loading: { textAlign: 'center', textAlignVertical: 'center', lineHeight: 170, color: color.text3, fontSize: 13 },
-  hint: { ...font.caption, color: color.text3 },
   dim: { ...font.caption, color: color.text3 },
   error: { ...font.caption, color: color.danger },
   failed: { gap: 6, padding: space.sm, borderRadius: radius.swatch, backgroundColor: color.dangerTint },

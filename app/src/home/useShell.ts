@@ -35,7 +35,7 @@ export function useShell(store: Store | null, projectId: string | null, user: { 
         counts: { review: nav?.reviewOpen, lint: nav?.lintOpen },
         user: {
           name: user.name,
-          sub: `This iPad: ${installName(store!.installId, labels)}${labels.has(store!.installId) ? '' : ' (name it on the Sync screen)'}`,
+          sub: `This iPad: ${installName(store!.installId, labels)}`,
           label: homeIdentityLine(user.name, store!.installId, labels),
         },
       }),

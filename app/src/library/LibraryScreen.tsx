@@ -134,7 +134,7 @@ export function LibraryScreen(props: {
 
   const acceptGroup = (g: LibraryGroup) => {
     const n = g.drafts;
-    Alert.alert(`Accept all ${n} draft${n === 1 ? '' : 's'} in ${g.key}?`, 'Each accept is recorded under your name, the same as accepting them one by one. The search and Drafts only do not narrow this.', [
+    Alert.alert(`Accept all ${n} draft${n === 1 ? '' : 's'} in ${g.key}?`, 'The search and Drafts only do not narrow this.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: `Accept ${n}`,
@@ -149,7 +149,6 @@ export function LibraryScreen(props: {
   };
 
   const title = `${scope ? 'Device-type library' : 'App device-type library'} (${types.filter((t) => t.state !== 'rejected').length} types${view?.drafts ? ` · ${view.drafts} draft${view.drafts === 1 ? '' : 's'}` : ''})`;
-  const intro = scope ? "This project's device types: what the plan offers and what the rules key on." : 'What every new project copies: the accepted types and their suggestion chips.';
   const actions = (
           <>
             {view?.inReview && props.onOpenReview ? <Btn kind="tertiary" title={`${view.inReview} in review ▸`} onPress={props.onOpenReview} testID="library.review" /> : null}
@@ -201,8 +200,8 @@ export function LibraryScreen(props: {
                   {types.length
                     ? 'Nothing matches the search and filters.'
                     : scope
-                      ? 'No device types yet. Add one, or copy them from another project or the app library.'
-                      : "The app library is empty. New projects copy its accepted types; add one, copy from a project, or promote a project's type."}
+                      ? 'No device types yet.'
+                      : 'The app library is empty.'}
                 </Text>
               ) : null
             }
@@ -229,9 +228,7 @@ export function LibraryScreen(props: {
               <CopyFrom store={store} scope={scope} run={run} onDone={() => setPane(null)} />
             ) : pane?.kind === 'suggestions' ? (
               <SuggestionsPane rows={chips} codes={view?.codes ?? CABLE_CODES} noPartCodes={view?.noPartCodes ?? []} library={scope} canEdit={!!editor} run={run} libraryEditor={props.libraryEditor} />
-            ) : (
-              <Text style={styles.sub}>Pick a type to see and edit it.</Text>
-            )}
+            ) : null}
           </ScrollView>
         )}
       </View>
@@ -239,7 +236,7 @@ export function LibraryScreen(props: {
   );
   // a project's Library is a section (T189); the app library, opened from Projects, lights no entry (T190)
   return (
-    <SectionScreen {...(props.app ? {} : { section: 'Library' as const, projectId: scope })} title={title} intro={intro} backTestID="library.back" actions={actions}>
+    <SectionScreen {...(props.app ? {} : { section: 'Library' as const, projectId: scope })} title={title} backTestID="library.back" actions={actions}>
       {body}
     </SectionScreen>
   );
@@ -302,8 +299,7 @@ function NewType(props: { scope: string | null; run: RunFn; onCreated: (id: stri
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>New device type</Text>
-      <Text style={styles.sub}>It starts as a draft: usable on the plan at once, flagged until someone accepts it.</Text>
-      <TextInput value={model} onChangeText={setModel} placeholder="Model (as the BOM spells it)" placeholderTextColor={color.text3} style={styles.input} autoFocus testID="library.new.model" />
+      <TextInput value={model} onChangeText={setModel} placeholder="Model" placeholderTextColor={color.text3} style={styles.input} autoFocus testID="library.new.model" />
       <Chips options={CATEGORIES} value={category} onPick={setCategory} testID="library.new.category" />
       <Btn
         kind="primary"
@@ -337,8 +333,7 @@ function CopyFrom(props: { store: Store; scope: string | null; run: RunFn; onDon
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Copy from…</Text>
-      <Text style={styles.sub}>Accepted types of another project on this iPad, or of the app library. A model this library already has is skipped.</Text>
-      {sources && !sources.length ? <Text style={styles.sub}>Nothing to copy: no other library on this iPad has accepted types.</Text> : null}
+      {sources && !sources.length ? <Text style={styles.sub}>Nothing to copy.</Text> : null}
       <View style={styles.wrap}>
         {(sources ?? []).map((s) => (
           <Chip
@@ -439,7 +434,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
             <View style={styles.source}>
               {t.sourceRef ? <Text style={styles.sub}>From {sourceLine(t.sourceRef)}{t.sourceRef.libraryTimestamp ? ` (library ${t.sourceRef.libraryTimestamp.slice(0, 10)})` : ''}</Text> : null}
               {t.description ? <Text style={styles.desc}>{t.description}</Text> : null}
-              {t.accessoryOnly ? <Text style={styles.sub}>Accessory only: listed as other types' accessory, never offered as a device.</Text> : null}
+              {t.accessoryOnly ? <Text style={styles.sub}>Accessory only</Text> : null}
               {t.datasheetUrl ? (
                 <Pressable onPress={() => void Linking.openURL(t.datasheetUrl!)} hitSlop={space.md} style={styles.self}>
                   <Text style={styles.link}>Datasheet ↗</Text>
@@ -453,7 +448,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
           <Field label="Category">
             <Chips options={CATEGORIES} value={category} onPick={ro ? undefined : setCategory} testID="library.category" />
           </Field>
-          <Field label="Role" hint="What its devices are to the rules, the ID scheme, the Punch List Device text and the pin shape (T112). Category default = the role the category names, if any.">
+          <Field label="Role">
             <View style={styles.wrap}>
               {([null, ...ROLES] as const).map((v) => (
                 <Chip
@@ -467,10 +462,10 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
               ))}
             </View>
           </Field>
-          <Field label="Aliases (BOM)" hint="Comma-separated. A device whose Device text is the model or an alias is of this type.">
+          <Field label="Aliases (BOM)" hint="Comma-separated.">
             <TextInput value={aliases} onChangeText={setAliases} editable={!ro} testID="library.aliases" placeholder="P-NSPS-D, P-NSPS-D-KIT" placeholderTextColor={color.text3} style={[styles.input, ro && fieldStyles.off]} />
           </Field>
-          <Field label="ID scheme" hint="Level-number: 06M-04. Level-tag: 06M-S16 for stations, 06M-D3 for sensors. The server assigns the ID either way.">
+          <Field label="ID scheme" hint="Level-number: 06M-04. Level-tag: 06M-S16 for stations, 06M-D3 for sensors.">
             <View style={styles.wrap}>
               {([null, 'level_number', 'level_tag'] as const).map((v) => (
                 <Chip
@@ -487,12 +482,12 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
           {/* T146 (D245): what the type's devices need; null = by the wires they get (U → Neuron ID, N / NG → IP address, X → DMX address). */}
           {(
             [
-              ['Neuron ID', neuron, setNeuron, 'neuron', 'A Unison (U) run needs one; stations and sensors ride the bus; an NSPS or rack hosts it and needs none. Needed / Not needed overrides the wires: the card hides the section and the device leaves its floor’s “Missing all / some Device Neuron IDs” item and the dashboard count.'],
-              ['IP address', ip, setIp, 'ip', 'A network (N, NG) run needs one. Needed / Not needed overrides the wires; the device leaves its floor’s “Missing all / some Device IP addresses” item when not needed.'],
-              ['DMX address', dmx, setDmx, 'dmx', 'A DMX (X) run needs one. Needed / Not needed overrides the wires; the device leaves its floor’s “Missing all / some Device DMX addresses” item when not needed.'],
+              ['Neuron ID', neuron, setNeuron, 'neuron'],
+              ['IP address', ip, setIp, 'ip'],
+              ['DMX address', dmx, setDmx, 'dmx'],
             ] as const
-          ).map(([label, value, set, key, hint]) => (
-            <Field key={label} label={label} hint={hint}>
+          ).map(([label, value, set, key]) => (
+            <Field key={label} label={label}>
               <View style={styles.wrap}>
                 {([null, true, false] as const).map((v) => (
                   <Chip
@@ -507,17 +502,13 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
               </View>
             </Field>
           ))}
-          <Field
-            label="Default cables (always generated)"
-            hint="Once the type is accepted, the rules offer each run as a draft to every device of this type that lacks it, instead of the category's (R2c / R2d). Unison (U) stays one bus per level (R2e).">
+          <Field label="Default cables (always generated)">
             <CableList list={defaults} codes={props.codes} onChange={ro ? undefined : setDefaults} testID="library.defaults" />
           </Field>
-          <Field
-            label="Suggestions"
-            hint="Chips offered for this type's devices, before its category's and the project's (D174): under Notes, under an end's Note, for a punch item or a part. Saved as you add them; copied and promoted with the type (a chip added after the promotion has its own Promote).">
+          <Field label="Suggestions">
             <SuggestionList rows={props.chips} scope="type" refKey={t.id} library={props.scope} canEdit={props.canEdit} run={props.run} libraryEditor={t.promotedAs ? props.libraryEditor : null} />
           </Field>
-          <Field label="Optional cables" hint="Kept with the type; not generated.">
+          <Field label="Optional cables">
             <CableList list={optional} codes={props.codes} onChange={ro ? undefined : setOptional} testID="library.optional" />
           </Field>
           <Field label="Optional accessories">
@@ -540,7 +531,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
                 </Pressable>
                 {roleOf({ role, category }, null) === 'nsps' && !accessories.some((a) => a.model === NSPS_POWER_SUPPLY.model) ? (
                   <Pressable onPress={() => setAccessories([...accessories, NSPS_POWER_SUPPLY])} hitSlop={space.md} testID="library.acc.nsps">
-                    <Text style={styles.link}>+ {NSPS_POWER_SUPPLY.model} (expected 1, D52)</Text>
+                    <Text style={styles.link}>+ {NSPS_POWER_SUPPLY.model} (expected 1)</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -566,7 +557,7 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
                 }
                 testID="library.accept"
               />
-              <Pressable onPress={() => void props.run((e) => rejectType(e, t.id), 'Rejected: the type leaves the pickers; its devices keep it.')} hitSlop={space.md} testID="library.reject">
+              <Pressable onPress={() => void props.run((e) => rejectType(e, t.id), `Rejected: ${t.model}.`)} hitSlop={space.md} testID="library.reject">
                 <Text style={styles.danger}>Reject</Text>
               </Pressable>
             </>

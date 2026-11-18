@@ -858,6 +858,14 @@ Decision D279 (Claude's calls, T184): (1) the selected status, Tracking / Part s
 
 Decision D281–D284 (Claude's calls, T188–T191): (D281) the shell is a wrapper each screen renders, and a section switch appears without a slide; (D282) the nine section screens share one bar: title, short caption and the screen's buttons in it, the long description on one line under it; Export's left column became three chips; Rulings' bar back is `rulings.bar.back`; (D283) Projects, New project, Rule defaults, the app library and Setup on the same bar, Setup and New project keep a narrower (168-pt) step column; (D284) panels on `‹` / `×`, Cancel left of the primary, the photo sheet keeps its buttons in its top bar. → Approve / change each:
 
+## T195 — UI text trim: no decision numbers, no design notes, little coaching  ·  Needs: no new build (a JS update after T194's)
+
+**Why it matters:** the screens carried decision and task numbers (D55, T44, K12), paragraphs about how the app works, and step-by-step coaching. Landry asked for them out (D286, the aggressive level). Only the iPad can tell whether a screen now leaves you stuck.
+
+- [ ] **No citation anywhere.** Walk Levels, a plan, a device card, a connection end, an item, Needs review, Lint, Rulings, Dashboard, Cable / riser, Export, Sync, every Setup step, Library, Vocabulary, Projects, New project and Rule defaults. You should see no "(Dnn)", "(Tnn)", "K12", "R2", "CLAUDE.md" or "PLAN §" in any text, hint, placeholder or dialog. → saw:
+- [ ] **No screen leaves you stuck.** Do the work each screen is for without its old coaching: place a device (⊕ Place → pick a device → tap the plan; the banner "Pick a device in the list…" is gone), place an ink text note and use Erase / Recolor (their one-line hints are gone), calibrate a grid, confirm a riser cable's endpoint in Review drafts, and set a rule default in Rule defaults (only the labels show now: the group descriptions and the "what this changes" lines are gone). Note any place where you did not know what to do next; that hint comes back. → saw:
+- [ ] **Errors, warnings and empty states still say what is wrong.** Airplane mode on: Export, Sync, Review drafts' source crop and excluded BOM lines each say they need a connection; an empty Vocabulary placeholder list reads "No placeholders yet."; a draft in conflict shows "⚑ Source conflict with the master's count." → saw:
+
 ## Rules for this file
 
 1. **Each finished task appends its checks** under a heading `## T<nn> — <title>  ·  Needs: <no new build | new dev build>`. Each check says *what to do*, *what you should see* and *why it matters* (one line), with `→ saw:` at the end. Put checks Claude cannot do (anything needing the iPad, Pencil, camera, airplane mode, two devices or a TestFlight build) here instead of burying them in TASKS.md; TASKS.md just says "checks added to docs/ON_DEVICE_CHECKLIST.md".

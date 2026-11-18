@@ -136,7 +136,6 @@ export default function CablesScreen() {
       section="Cable / riser"
       projectId={projectId}
       title={title}
-      intro="Every cable of the project with both ends; the project's consistency checks along the bottom."
       backTestID="cables.back"
       actions={
           <>
@@ -254,7 +253,7 @@ export default function CablesScreen() {
             </ScrollView>
           ) : (
             // a selected cable that left the list was deleted (T138): its devices' History restores it
-            <Text style={styles.empty}>{selected && data ? 'This cable is deleted. Restore it from the History of a device at either end.' : 'Select a cable.'}</Text>
+            selected && data ? <Text style={styles.empty}>This cable is deleted. Restore it from the History of a device at either end.</Text> : null
           )}
           {note ? (
             <Text style={styles.note} testID="cables.note">

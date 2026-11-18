@@ -30,6 +30,6 @@ describe('install label (D155)', () => {
   it('the Levels home names the team member and this iPad (T87)', () => {
     const labels = new Map([['i-111111', 'Field 1']]);
     expect(homeIdentityLine('Landry', 'i-111111', labels)).toBe('Signed in as Landry · This iPad: Field 1');
-    expect(homeIdentityLine('Landry', 'i-abcdef', labels)).toBe('Signed in as Landry · This iPad: iPad …abcdef (name it on the Sync screen)');
+    expect(homeIdentityLine('Landry', 'i-abcdef', labels)).toBe('Signed in as Landry · This iPad: iPad …abcdef');
   });
 });

@@ -27,7 +27,7 @@ name: Needs review — Save combined; the links
       - assertVisible: Note A
       - assertVisible: Note B
       - tapOn: Combine ▸
-      - assertVisible: 'Combined text \(pre-filled "A; B", A first — edit as needed\)'
+      - assertVisible: 'Combined text'
       - assertVisible: 'Note A; Note B|Note B; Note A'   # official first: whichever iPad's sync reached the server first
       - tapOn: Save combined
       - tapOn:

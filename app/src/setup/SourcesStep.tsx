@@ -129,9 +129,6 @@ export function SourcesStep({ projectId }: { projectId: string }) {
       <ExtractionSources projectId={projectId} />
       <FloorPlans projectId={projectId} />
       <Section title="Seed import">
-        <Text style={styles.hint}>
-          Import a master workbook, or one floor's workbook, as the project's starting records. The server reads the file, so this needs a connection. Rows that do not fit the vocabulary go to Needs review; nothing is locked.
-        </Text>
         <View style={styles.row}>
           {(Object.keys(KIND_LABEL) as ImportKind[]).map((k) => (
             <Btn key={k} title={KIND_LABEL[k]} small primary={kind === k} disabled={running} onPress={() => setKind(k)} testID={`seed.kind.${k}`} />
@@ -168,7 +165,7 @@ export function SourcesStep({ projectId }: { projectId: string }) {
             ))}
             {open.length ? (
               <Text style={styles.warn} testID="seed.unmatched">
-                {open.length} column{open.length === 1 ? '' : 's'} not matched: {open.map((o) => `${o.tab} › ${fieldLabel(o.field)}`).join(', ')}. Map them below, or import without.
+                {open.length} column{open.length === 1 ? '' : 's'} not matched: {open.map((o) => `${o.tab} › ${fieldLabel(o.field)}`).join(', ')}.
               </Text>
             ) : (
               <Text style={styles.ok} testID="seed.matched">

@@ -61,27 +61,25 @@ export function GridPanel(props: GridPanelProps) {
       <View style={styles.head}>
         {/* closes to the plan's panel: × at the top right (D280 (5), T191; was "◀ Back") */}
         <PanelHeader title={`Grid calibration — ${props.levelCode}`} close={{ onPress: props.onClose, testID: 'grid.close' }} />
-        <Text style={styles.muted}>Drawing Position is read from these grids when a pin is placed or moved.</Text>
       </View>
       <ScrollView style={styles.flex} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         {props.error ? <Text style={styles.error}>{props.error}</Text> : null}
 
         <Text style={styles.label}>Grid sets</Text>
-        {sets.length === 0 ? <Text style={styles.muted}>No grid on this sheet yet: the text pass found no bubbles. Calibrate by hand below.</Text> : null}
+        {sets.length === 0 ? <Text style={styles.muted}>No grid on this sheet yet.</Text> : null}
         {sets.map((gs, i) => (
           <SetRow key={`${i}:${gs.name}`} index={i} set={gs} canEdit={props.canEdit} onRename={props.onRename} onRemove={props.onRemove} />
         ))}
 
         <Text style={styles.label}>Test</Text>
         <Pressable style={[styles.btn, mode === 'test' && styles.btnOn]} onPress={props.onTest}>
-          <Text style={[styles.btnText, mode === 'test' && styles.btnTextOn]}>{mode === 'test' ? 'Testing: tap a point on the plan (tap here to stop)' : 'Test: tap a point → its Drawing Position'}</Text>
+          <Text style={[styles.btnText, mode === 'test' && styles.btnTextOn]}>{mode === 'test' ? 'Stop testing' : 'Test a point'}</Text>
         </Pressable>
         {props.testResult ? <Text style={styles.result}>{props.testResult.text ?? 'Off every grid on this sheet'}</Text> : null}
 
-        <Text style={styles.label}>If wrong: calibrate by hand</Text>
+        <Text style={styles.label}>Calibrate by hand</Text>
         {mode !== 'calibrate' ? (
           <>
-            <Text style={styles.muted}>Tap three bubbles on the plan — two of one axis (A and H, say) and one of the other (9) — and say which label each is. A fourth tap on the other axis fixes its spacing.</Text>
             <Pressable style={[styles.btn, !props.canEdit && styles.btnOff]} onPress={props.onStartCalibrate} disabled={!props.canEdit}>
               <Text style={styles.btnText}>Recalibrate: tap three bubbles</Text>
             </Pressable>
@@ -119,15 +117,10 @@ export function GridPanel(props: GridPanelProps) {
                   </Pressable>
                 </View>
               </View>
-            ) : (
-              <Text style={styles.hint}>Tap the next bubble on the plan.</Text>
-            )}
-            {alpha >= 2 || nums >= 2 ? (
-              <Text style={styles.muted}>Dashed rings: the bubbles this set would claim. If one sits beside its printed bubble instead of on it, a tap or a label is wrong: Undo tap.</Text>
             ) : null}
             <Text style={styles.label}>New set</Text>
-            <TextInput style={styles.input} value={newName} onChangeText={setNewName} placeholder="Name (optional, e.g. Walter Tower)" placeholderTextColor={color.text3} />
-            <TextInput style={styles.input} value={newPrefix} onChangeText={setNewPrefix} placeholder="Prefix for Drawing Position (e.g. WT)" placeholderTextColor={color.text3} autoCapitalize="characters" autoCorrect={false} />
+            <TextInput style={styles.input} value={newName} onChangeText={setNewName} placeholder="Name (optional)" placeholderTextColor={color.text3} />
+            <TextInput style={styles.input} value={newPrefix} onChangeText={setNewPrefix} placeholder="Drawing Position prefix" placeholderTextColor={color.text3} autoCapitalize="characters" autoCorrect={false} />
             <View style={styles.row}>
               <Pressable style={[styles.btn, !canFinish && styles.btnOff]} disabled={!canFinish} onPress={() => props.onFinishCalibrate(newName.trim(), newPrefix.trim())}>
                 <Text style={styles.btnText}>Finish</Text>
@@ -161,7 +154,7 @@ function SetRow({ index, set, canEdit, onRename, onRemove }: { index: number; se
         <TextInput style={[styles.input, styles.prefix]} value={prefix} onChangeText={setPrefix} editable={canEdit} placeholder="Prefix" placeholderTextColor={color.text3} autoCapitalize="characters" autoCorrect={false} />
       </View>
       <Text style={styles.setLine}>
-        {set.mode === 'auto' ? '● auto' : set.mode === 'manual' ? '● manual' : '○ not usable — calibrate by hand'}
+        {set.mode === 'auto' ? '● auto' : set.mode === 'manual' ? '● manual' : '○ not usable'}
         {set.mode === 'auto' ? ` · residual ${set.residual.toFixed(1)} pt` : ''}
         {set.angle && Math.abs(set.angle) > 2 ? ` · rotated ${set.angle.toFixed(0)}°` : ''}
       </Text>
@@ -189,7 +182,6 @@ const styles = StyleSheet.create({
   body: { padding: space.md, gap: space.sm, paddingBottom: 40 },
   label: { ...font.captionBold, color: color.text2, marginTop: 6 },
   muted: { ...font.caption, color: color.text3 },
-  hint: { ...font.captionBold, color: color.primary },
   error: { ...font.caption, color: color.danger },
   result: { ...font.headline, color: color.text },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },

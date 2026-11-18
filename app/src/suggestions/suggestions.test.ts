@@ -258,7 +258,7 @@ describe('suggestion chips: the library (T99, D174 (3))', () => {
     expect((await loadLibrary(store, p.id)).noPartCodes).toEqual([]);
     await setRuleParam(p.editor, 'R4b', 'kit', { N: false, NG: false, U: false });
     for (const code of ['N', 'ng']) {
-      await expect(addSuggestion(p.editor, store, p.id, { scope: 'code', ref: code, target: 'part', text: 'Network patch cord' })).rejects.toThrow(/never missing parts \(R4\)/);
+      await expect(addSuggestion(p.editor, store, p.id, { scope: 'code', ref: code, target: 'part', text: 'Network patch cord' })).rejects.toThrow(/offers no Part chips/);
     }
     expect((await loadLibrary(store, p.id)).noPartCodes).toEqual(['N', 'NG']);
     // the app library reads its own Rules: its N kits are still on

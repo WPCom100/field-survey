@@ -68,7 +68,7 @@ export function SuggestionList(props: {
             ))}
           </View>
           <View style={styles.row}>
-            <TextInput value={text} onChangeText={setText} placeholder="Phrase, as the surveyor would type it" placeholderTextColor={color.text3} style={[styles.input, styles.grow]} onSubmitEditing={add} testID="sugg.input" />
+            <TextInput value={text} onChangeText={setText} placeholder="Phrase" placeholderTextColor={color.text3} style={[styles.input, styles.grow]} onSubmitEditing={add} testID="sugg.input" />
             <Pressable disabled={!text.trim()} onPress={add} hitSlop={space.md} style={!text.trim() && styles.off} testID="sugg.add">
               <Text style={styles.link}>+ add</Text>
             </Pressable>
@@ -131,10 +131,6 @@ export function SuggestionsPane(props: { rows: readonly Suggestion[]; codes: rea
   return (
     <View style={styles.section}>
       <Text style={styles.title}>Suggestions by category and cable code</Text>
-      <Text style={styles.sub}>
-        Chips offered on the device card and the end editor: a device's type first, then its category, then the project's vocabulary; an end shows its cable code's. Anything can still be typed. A type's own chips are on the type.
-        {props.library ? ' This project reads its own chips; the app library reaches it by copying.' : ' New projects copy the accepted ones.'}
-      </Text>
       {props.canEdit ? (
         <View style={styles.row}>
           {props.library === null ? (
