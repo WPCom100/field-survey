@@ -7,13 +7,14 @@ import { describe, expect, it } from 'vitest';
 
 import { evaluate } from '../evaluate';
 import { inputsHash, proposalKey, type Rule } from '../rule';
+import { indexSnapshot } from '../snapshot';
 import { Build } from '../testing/build';
 import { Acc, E5 } from './e5';
 import { R1 } from './r1';
 import { RuleParams, type RuleParamRow } from '../params';
-import { CABLE_CODES, R2g, addressNeeds, cableCodes, needsNeuronId, parseLibraryCables } from './library';
+import { CABLE_CODES, R2g, addressNeeds, cableCodes, cablesOfDevice, fillLibraryCable, needsNeuronId, parseLibraryCables } from './library';
 import { R2a, R2b, R2c, R2d, R2e, R2f } from './r2';
-import { LintPower, LintRelay, LintVocab } from './lint';
+import { LintCableNeedsAccessory, LintFarEnd, LintVocab } from './lint';
 import { R3a, R3b, R3c, R3d, R3f } from './r3';
 import { R4a, R4b, R4d } from './r4';
 import { RULES } from './index';
@@ -22,6 +23,8 @@ const NOW = '2026-10-15T12:00:00.000Z';
 const run = (b: Build, rules: readonly Rule[]) => evaluate(b.snap, rules, undefined, { now: NOW });
 const items = (b: Build, rules: readonly Rule[]) => run(b, rules).proposals.map((p) => p.payload.item ?? p.payload.part ?? p.payload.now);
 const messages = (b: Build, rules: readonly Rule[]) => run(b, rules).findings.map((f) => f.message);
+/** The library's live types as the rules index them. */
+const typesOf = (b: Build) => indexSnapshot(b.snap).libraryType;
 
 /** A floor with a surveyed date, a relay panel and the Fixtures / bus / power placeholders. */
 function floor(b: Build, code = '06M') {
@@ -103,52 +106,22 @@ describe('R2b To ≠ riser', () => {
   });
 });
 
-describe('R2c / R2d / R2e library cables as drafts (D173)', () => {
-  it('offers a Relay panel its 0-10V → Fixtures and P → EBDK panic wire single rows, paired to its EBDK', () => {
+describe('no cable by role (T199, D289, D290); R2e, the level\'s Unison bus, stays a draft (D173)', () => {
+  it('being a relay panel, an NSPS or a rack gives a device no cable: no draft, no finding', () => {
     const b = new Build();
-    const { level, panel, fixtures } = floor(b);
-    const ebdk = b.device(level, 'EBDK', { display_id: '06M-03', device: 'EBDK', panel_name: 'CT06LCPA' });
-    b.device(level, 'EBDK', { display_id: '06M-04', device: 'EBDK', panel_name: 'CT06LCPB' });
-    const out = run(b, [R2c]);
-    expect(out.proposals.map((p) => [p.kind, p.discriminator])).toEqual([
-      ['cable', '0-10V'],
-      ['cable', 'P'],
-    ]);
-    const [v, p] = out.proposals;
-    expect(v!.payload).toMatchObject({
-      cable: { cable: '0-10V', qty: 1, single_row: true, origin: 'library', endpoint_confirmed: true },
-      ends: [
-        { side: 'A', endpoint_kind: 'device', device_id: panel.id, level_id: level.id, from_text: 'CT06LCPA', to_text: 'Fixtures' },
-        { side: 'B', endpoint_kind: 'placeholder', placeholder_id: fixtures.id, from_text: 'Fixtures' },
-      ],
-    });
-    expect(p!.payload).toMatchObject({
-      cable: { cable: 'P', qty: 1, single_row: true },
-      ends: [
-        { side: 'A', device_id: panel.id, from_text: 'CT06LCPA', to_text: 'EBDK panic wire', status: 'Installed, untested', status_source: 'derived' },
-        { side: 'B', endpoint_kind: 'device', device_id: ebdk.id, from_text: 'EBDK panic wire', to_text: 'CT06LCPA' },
-      ],
-    });
-    expect(p!.why).toContain('its EBDK 06M-03');
-    // once the panel has both codes, nothing is offered
-    b.cable('0-10V', { device: panel, to_text: 'Fixtures' }, { placeholder: fixtures }, { single_row: true });
-    b.cable('P', { device: panel, to_text: 'EBDK panic wire' }, { device: ebdk }, { single_row: true });
-    expect(run(b, [R2c]).proposals).toEqual([]);
-  });
-
-  it('offers an NSPS and a rack their 120V row with the D52 To texts', () => {
-    const b = new Build();
-    const { level, power } = floor(b);
+    const { level, panel } = floor(b);
+    b.device(level, 'EBDK', { display_id: '06M-03', device: 'EBDK', panel_name: 'CT06LCPA' });
     const nsps = b.device(level, 'NSPS', { display_id: '06M-05', device: 'P-NSPS-D-KIT' });
     const rack = b.device(level, 'Equipment rack', { display_id: '06M-06', device: 'Equipment rack' });
-    const out = run(b, [R2d]);
-    expect(out.proposals.map((p) => (p.payload.ends as Record<string, unknown>[]).map((e) => [e.device_id ?? e.placeholder_id, e.from_text, e.to_text]))).toEqual([
-      [[nsps.id, '120v Power', 'P-NSPS-D Power Supply'], [power.id, '120v Power', null]],
-      [[rack.id, '120v Power', 'Equipment rack'], [power.id, '120v Power', null]],
-    ]);
-    expect(out.proposals.every((p) => (p.payload.cable as Record<string, unknown>).single_row === true)).toBe(true);
-    b.cable('120V', { device: nsps, from_text: '120v Power', to_text: 'P-NSPS-D Power Supply' }, { placeholder: power }, { single_row: true });
-    expect(run(b, [R2d]).proposals.map((p) => p.subject.entity_id)).toEqual([rack.id]);
+    const out = run(b, RULES);
+    expect(out.problems).toEqual([]);
+    const cables = out.proposals.filter((p) => p.kind === 'cable');
+    // the only cable draft is the level's bus (R2e), hosted by the NSPS
+    expect(cables.map((p) => [p.rule_id, p.subject.entity_kind, p.discriminator])).toEqual([['R2e', 'level', 'U']]);
+    expect(out.findings.filter((x) => [panel.id, nsps.id, rack.id].includes(x.subject.entity_id)).map((x) => x.lint_id)).toEqual([]);
+    // R2c and R2d stay registered and draft nothing; their lints are gone
+    expect(run(b, [R2c, R2d])).toMatchObject({ proposals: [], findings: [] });
+    expect(RULES.map((r) => r.id).filter((id) => /power_120v|relay_cables/.test(id))).toEqual([]);
   });
 
   it('offers one Unison pair per in-scope level, Stations & Sensors ↔ the NSPS, or the rack where there is none', () => {
@@ -208,19 +181,21 @@ describe('R2g device-type library cables (T48, D183)', () => {
     expect(run(b, [R2g]).proposals.filter((p) => p.subject.entity_id === panel.id).map((p) => p.discriminator)).toEqual(['0-10V', 'X#2']);
   });
 
-  it('only an accepted type with default cables governs; then R2c / R2d and their lints stand aside', () => {
+  it('only an accepted type\'s default cables are required: a draft type and an optional cable draft nothing (D183 (2), D292 (3))', () => {
     const b = new Build();
     const { level, panel } = floor(b);
     const nsps = b.device(level, 'NSPS', { display_id: '06M-05', device: 'P-NSPS-D-KIT' });
     const draft = b.libraryType('CT06LCPA', 'Relay panel', { state: 'draft', default_cables: [tenV] });
-    const empty = b.libraryType('P-NSPS-D-KIT', 'NSPS');
+    // the import writes a type's rows undecided: optional, nothing required (D292 (1))
+    const empty = b.libraryType('P-NSPS-D-KIT', 'NSPS', { optional_cables: [{ code: '120V', single_row: true, qty: 1 }, { code: 'N' }] });
     expect(run(b, [R2g]).proposals).toEqual([]);
-    expect(run(b, [R2c, R2d]).proposals.map((p) => [p.rule_id, p.discriminator])).toEqual([['R2c', '0-10V'], ['R2c', 'P'], ['R2d', '120V']]);
-    // accepting the draft and giving the NSPS type a cable list hands both devices to R2g
+    // a draft type's rows, and an accepted type's optional ones, are offered on the card only
+    expect(cablesOfDevice(typesOf(b), panel).optional.map((r) => r.cable.code)).toEqual(['0-10V']);
+    expect(cablesOfDevice(typesOf(b), nsps)).toMatchObject({ required: [], optional: [{ cable: { code: '120V' }, via: null }, { cable: { code: 'N' }, via: null }] });
+    // accepting the draft, and answering Required for the NSPS's 120V, makes both runs R2g's
     draft.state = 'accepted';
+    empty.optional_cables = [{ code: 'N' }];
     empty.default_cables = [{ code: '120V', from: '120v Power', to: 'P-NSPS-D Power Supply', far: '120v Power', single_row: true, qty: 1 }];
-    expect(run(b, [R2c, R2d]).proposals).toEqual([]);
-    expect(run(b, [LintRelay, LintPower]).findings).toEqual([]);
     const out = run(b, [R2g]);
     expect(out.proposals.map((p) => [p.subject.entity_id, p.discriminator])).toEqual([[panel.id, '0-10V'], [nsps.id, '120V']]);
     // editing the template changes the inputs, so the open draft is re-proposed with the new text
@@ -840,8 +815,6 @@ describe('the registry', () => {
     expect(a.proposals.map((p) => p.id)).toEqual(c.proposals.map((p) => p.id));
     expect(a.proposals.map((p) => `${p.rule_id} ${p.payload.item ?? p.payload.part ?? p.payload.now ?? (p.payload.cable as { cable: string }).cable}`).sort()).toEqual(
       [
-        'R2c P',
-        'R2d 120V',
         'R3a Land 0-10V control wiring',
         'R3a Run Unison to Stations & Sensors',
         'R3b Terminate DMX to 06M-09',
@@ -849,11 +822,11 @@ describe('the registry', () => {
         'R3c Missing all Device DMX addresses',
       ].sort(),
     );
-    // the T36 lints name what the drafts would add: the rack's 120V, the panel's P, the Neuron and DMX items
-    expect(a.findings.map((f) => f.lint_id).sort()).toEqual(['Acc', 'R1.no_item', 'lint.neuron_item', 'lint.dmx_item', 'lint.power_120v', 'lint.relay_cables'].sort());
+    // the T36 lints name what the drafts would add: the Neuron and DMX items (no cable by role any more, T199)
+    expect(a.findings.map((f) => f.lint_id).sort()).toEqual(['Acc', 'R1.no_item', 'lint.neuron_item', 'lint.dmx_item'].sort());
     expect(RULES.map((r) => r.id)).toEqual([
       'R1', 'R2a', 'R2b', 'R2c', 'R2d', 'R2e', 'R2f', 'R2g', 'R3a', 'R3b', 'R3c', 'R3d', 'R3f', 'R4a', 'R4b', 'R4d', 'E5', 'Acc',
-      'lint.power_120v', 'lint.relay_cables', 'lint.item_owner', 'lint.neuron_item', 'lint.vocab', 'lint.type_category', 'lint.type_gone', 'lint.far_end', 'lint.end_status',
+      'lint.cable_needs_accessory', 'lint.item_owner', 'lint.neuron_item', 'lint.vocab', 'lint.type_category', 'lint.type_gone', 'lint.far_end', 'lint.end_status',
       'lint.neuron_dup', 'lint.ip_dup', 'lint.id_dup', 'lint.deleted_link', 'lint.pin_sheet', 'lint.locked_drafts', 'lint.accessory_group', 'ruling',
     ]);
     const empty = run(new Build(), RULES);
@@ -861,50 +834,32 @@ describe('the registry', () => {
   });
 });
 
-describe('roles (T112, D201): R2c / R2d / R2e and the Neuron ID exception read the device role, not the category string', () => {
+describe('roles (T112, D201): R2e, the 120V To text and the Neuron ID exception read the device role, not the category string', () => {
   it("a type's role governs; the D196 categories with no type imply a role only where one is named", () => {
     const b = new Build();
     const { level, power } = floor(b);
-    // an NSPS of the D196 `Equipment` category: its type says what it is
-    const nspsType = b.libraryType('P-NSPS-D-KIT', 'Equipment', { role: 'nsps' });
+    // an NSPS of the D196 `Equipment` category: its type says what it is, and requires a 120V feed
+    const feed = { code: '120V', single_row: true, qty: 1 };
+    const nspsType = b.libraryType('P-NSPS-D-KIT', 'Equipment', { role: 'nsps', default_cables: [feed] });
     const nsps = b.device(level, 'Equipment', { display_id: '06M-05', device: 'P-NSPS-D-KIT', library_type_id: nspsType.id });
-    // a gateway of the same category, no type: nothing is offered
-    b.device(level, 'Equipment', { display_id: '06M-06', device: 'RSN-DMX8-R' });
-    // a rack renamed to Equipment Panels with no type: the category names one role
+    // a gateway of the same category, its type naming no role: the feed has no To by role
+    const gwType = b.libraryType('RSN-DMX8-R', 'Equipment', { default_cables: [feed] });
+    const gateway = b.device(level, 'Equipment', { display_id: '06M-06', device: 'RSN-DMX8-R', library_type_id: gwType.id });
+    // a rack shell in Equipment Panels: the category names the role
+    const rackType = b.libraryType('Equipment Rack 18U', 'Equipment Panels', { default_cables: [feed] });
     const rack = b.device(level, 'Equipment Panels', { display_id: '06M-07', device: 'Equipment Rack 18U' });
-    const out = run(b, [R2d]);
-    expect(out.proposals.map((p) => [p.subject.entity_id, (p.payload.ends as Record<string, unknown>[])[0]!.to_text])).toEqual([
-      [nsps.id, 'P-NSPS-D Power Supply'],
-      [rack.id, 'Equipment rack'],
+    const out = run(b, [R2g]);
+    expect(out.proposals.map((p) => [p.subject.entity_id, ...(['from_text', 'to_text'] as const).map((k) => (p.payload.ends as Record<string, unknown>[])[0]![k])])).toEqual([
+      [nsps.id, '120v Power', 'P-NSPS-D Power Supply'],
+      [gateway.id, '120v Power', null],
+      [rack.id, '120v Power', 'Equipment rack'],
     ]);
-    expect(out.proposals[0]!.why).toContain('is an NSPS with no 120V row');
+    expect(out.proposals[0]!.why).toBe('06M-05 is a P-NSPS-D-KIT (library: 120V → P-NSPS-D Power Supply).');
     expect(out.proposals.every((p) => (p.payload.ends as Record<string, unknown>[])[1]!.placeholder_id === power.id)).toBe(true);
+    expect(rackType.role).toBeNull();
     // R2e: the NSPS hosts the bus by role
     const bus = run(b, [R2e]).proposals[0]!;
     expect((bus.payload.ends as Record<string, unknown>[])[0]).toMatchObject({ device_id: nsps.id, from_text: 'P-NSPS-D-KIT' });
-  });
-
-  it('R2c: a relay panel is one by role; a Foundry panel of the same Power Distribution category is not; the EBDK is paired by role', () => {
-    const b = new Build();
-    const { level } = floor(b);
-    const erp = b.libraryType('ERP24-FT', 'Power Distribution', { role: 'relay_panel', aliases: ['ERP-FT-241P'] });
-    b.libraryType('UFMP4', 'Power Distribution', { role: 'foundry_panel' });
-    const panel = b.device(level, 'Power Distribution', { display_id: '06M-01', device: 'ERP-FT-241P', panel_name: 'CT06LCPA' });
-    const ufmp = b.device(level, 'Power Distribution', { display_id: '06M-02', device: 'UFMP4' });
-    // the panel's EBDK, in the D196 category: `Emergency Equipment` names the ebdk role
-    const ebdk = b.device(level, 'Emergency Equipment', { display_id: '06M-03', device: 'EBDK', panel_name: 'CT06LCPA' });
-    // a Power Distribution device with no type and no matching model: no role, nothing offered
-    const loose = b.device(level, 'Power Distribution', { display_id: '06M-04', device: 'CT06LCPB', panel_name: 'CT06LCPB' });
-    const mine = new Set([panel.id, ufmp.id, ebdk.id, loose.id]);
-    const out = { proposals: run(b, [R2c]).proposals.filter((p) => mine.has(p.subject.entity_id)) };
-    expect(out.proposals.map((p) => [p.subject.entity_id, p.discriminator])).toEqual([
-      [panel.id, '0-10V'],
-      [panel.id, 'P'],
-    ]);
-    expect((out.proposals[1]!.payload.ends as Record<string, unknown>[])[1]).toMatchObject({ device_id: ebdk.id, from_text: 'EBDK panic wire' });
-    expect(out.proposals[0]!.why).toContain(`is a Relay panel`);
-    // the type was matched by alias (D183 (4)); its role, not its category, made it a relay panel
-    expect(erp.category).toBe('Power Distribution');
   });
 
   it('addressNeeds: the Neuron exception reads the role of the type (its role, else its category), else the device category', () => {
@@ -916,5 +871,225 @@ describe('roles (T112, D201): R2c / R2d / R2e and the Neuron ID exception read t
     expect(needsNeuronId(null, { category: 'Power Distribution' }, ['U'])).toBe(true);
     // a station type of a category naming no role still rides the bus by its role
     expect(needsNeuronId({ needs_neuron_id: null, category: 'Equipment', role: 'station' }, { category: 'Equipment' }, [])).toBe(true);
+  });
+});
+
+describe("a device's cables come from the library: accessories add theirs (T199, D288–D294)", () => {
+  const ends = (p: { payload: Record<string, unknown> }) => p.payload.ends as Record<string, unknown>[];
+  const cableOf = (p: { payload: Record<string, unknown> }) => p.payload.cable as Record<string, unknown>;
+
+  /** An Echo relay panel type: DMX and panic of its own, a 0-10V option-card slot and a DALI kit slot. */
+  function echo(b: Build) {
+    const f = floor(b);
+    const card = b.libraryType('ERP-FT-LVD', 'Power Distribution', { aliases: ['0-10V Option Kit - FT (24 CH)'], default_cables: [{ code: '0-10V', single_row: true, qty: 24 }] });
+    const dali = b.libraryType('ERP-FT-DALI', 'Power Distribution', { default_cables: [{ code: 'D', single_row: true, qty: 24 }] });
+    const type = b.libraryType('ERP24-FT', 'Power Distribution', {
+      role: 'relay_panel',
+      aliases: ['CT06LCPA'],
+      default_cables: [{ code: 'X' }],
+      optional_accessories: [
+        { model: 'ERP-FT-LVD', expected_qty: null, max_quantity: 2 },
+        { model: 'ERP-FT-DALI', expected_qty: null, max_quantity: 2 },
+      ],
+    });
+    return { ...f, card, dali, type };
+  }
+
+  it('golden case: no 0-10V card → no 0-10V draft, no offer, and a 0-10V end is a finding; card added → the run is drafted (required) or offered (optional), × the card count; card row deleted → the finding, the cable untouched', () => {
+    const b = new Build();
+    const { panel, fixtures, card } = echo(b);
+    // no card: the panel takes X only; 0-10V is neither drafted nor offered (D288 (4), D289 (1))
+    let plan = cablesOfDevice(typesOf(b), panel, []);
+    expect(plan.required.map((r) => r.cable.code)).toEqual(['X']);
+    expect(plan.optional).toEqual([]);
+    expect(plan.absent).toEqual([{ model: 'ERP-FT-LVD', codes: ['0-10V'] }, { model: 'ERP-FT-DALI', codes: ['D'] }]);
+    expect(run(b, [R2g]).proposals.map((p) => p.discriminator)).toEqual(['X']);
+    expect(run(b, [LintCableNeedsAccessory]).findings).toEqual([]);
+    // a 0-10V end on it: the finding names the accessory; nothing is changed
+    const run10 = b.cable('0-10V', { device: panel, to_text: 'Fixtures' }, { placeholder: fixtures }, { single_row: true });
+    const flagged = run(b, [R2g, LintCableNeedsAccessory]);
+    expect(flagged.findings.map((x) => [x.lint_id, x.subject.entity_id, x.subject.discriminator, x.message])).toEqual([['lint.cable_needs_accessory', panel.id, '0-10V', '06M-01: 0-10V needs ERP-FT-LVD']]);
+    expect(flagged.upkeep).toEqual([]);
+    run10.cable.deleted_at = NOW; // set the run aside for the draft checks below
+
+    // two cards (the row's expected quantity): the card's required run is the panel's, one row of 2 × 24
+    const row = b.accessory(panel, '0-10V Option Kit - FT (24 CH)', 2, null); // named by its alias, as a BOM line does
+    plan = cablesOfDevice(typesOf(b), panel, b.snap.accessories);
+    expect(plan.carried.map((c) => [c.model, c.count, c.forced])).toEqual([['ERP-FT-LVD', 2, false]]);
+    expect(plan.required.map((r) => [r.cable.code, r.cable.qty, r.via])).toEqual([['X', null, null], ['0-10V', 48, 'ERP-FT-LVD']]);
+    const drafted = run(b, [R2g]).proposals.find((p) => p.discriminator === '0-10V')!;
+    expect(drafted.payload).toMatchObject({
+      cable: { cable: '0-10V', qty: 48, single_row: true, origin: 'library' },
+      ends: [
+        { side: 'A', device_id: panel.id, from_text: 'CT06LCPA', to_text: 'Fixtures' },
+        { side: 'B', endpoint_kind: 'placeholder', placeholder_id: fixtures.id, from_text: 'Fixtures' },
+      ],
+    });
+    expect(drafted.why).toBe('06M-01 carries ERP-FT-LVD (library: 0-10V → Fixtures).');
+    // found counts where nothing is expected; a row with neither still counts once (found or not)
+    row.expected_qty = null;
+    row.found_qty = 1;
+    expect(cablesOfDevice(typesOf(b), panel, b.snap.accessories).required[1]!.cable.qty).toBe(24);
+    row.found_qty = 0;
+    expect(cablesOfDevice(typesOf(b), panel, b.snap.accessories).carried[0]!.count).toBe(1);
+    row.expected_qty = 2;
+
+    // "just because a panel has a card does not mean it has to have a 0-10V run" (D292 (1)): the
+    // card's row answered Optional is offered, never drafted
+    card.optional_cables = card.default_cables;
+    card.default_cables = null;
+    plan = cablesOfDevice(typesOf(b), panel, b.snap.accessories);
+    expect(plan.optional.map((r) => [r.cable.code, r.cable.qty, r.via])).toEqual([['0-10V', 48, 'ERP-FT-LVD']]);
+    expect(run(b, [R2g]).proposals.map((p) => p.discriminator)).toEqual(['X']);
+    // a draft card type's rows are offered only, default ones too (D288 (2))
+    card.default_cables = card.optional_cables;
+    card.optional_cables = null;
+    card.state = 'draft';
+    expect(cablesOfDevice(typesOf(b), panel, b.snap.accessories)).toMatchObject({ required: [{ cable: { code: 'X' } }], optional: [{ cable: { code: '0-10V', qty: 48 } }] });
+    card.state = 'accepted';
+
+    // with the card and the run there, all is quiet; delete the card row: the finding, the cable untouched
+    run10.cable.deleted_at = null;
+    expect(run(b, [R2g, LintCableNeedsAccessory])).toMatchObject({ findings: [], proposals: [{ discriminator: 'X' }] });
+    (row as { deleted_at: string | null }).deleted_at = NOW;
+    const after = run(b, [R2g, LintCableNeedsAccessory]);
+    expect(after.findings.map((x) => x.message)).toEqual(['06M-01: 0-10V needs ERP-FT-LVD']);
+    expect(after.proposals.map((p) => p.discriminator)).toEqual(['X']);
+    expect(after.upkeep).toEqual([]);
+    expect(run10.cable.deleted_at).toBeNull();
+  });
+
+  it('a DALI option kit adds D × 24, one row per device (two kits: 48); a run that is not single-row comes once per accessory; a code no slot could give is not the lint\'s business', () => {
+    const b = new Build();
+    const { panel, level } = echo(b);
+    b.accessory(panel, 'ERP-FT-DALI', 1, null);
+    let out = run(b, [R2g]);
+    expect(out.proposals.map((p) => [p.discriminator, cableOf(p).qty, cableOf(p).single_row])).toEqual([['X', null, false], ['D', 24, true]]);
+    // D has no far end among the settings: the row's far end is left for a person
+    expect(ends(out.proposals[1]!)).toMatchObject([{ device_id: panel.id, to_text: null }, { endpoint_kind: null, from_text: null }]);
+    b.snap.accessories[0]!.expected_qty = 2;
+    expect(run(b, [R2g]).proposals.map((p) => [p.discriminator, cableOf(p).qty])).toEqual([['X', null], ['D', 48]]);
+    // a network module ×2 with one N port each: two runs, after the type's own
+    const net = b.libraryType('ERn-Net', 'Equipment', { default_cables: [{ code: 'N' }] });
+    const rackType = b.libraryType('ERn2', 'Equipment Panels', { default_cables: [{ code: 'N' }], optional_accessories: [{ model: 'ERn-Net', expected_qty: null, max_quantity: 2 }] });
+    const rack = b.device(level, 'Equipment Panels', { display_id: '06M-09', library_type_id: rackType.id });
+    b.accessory(rack, 'ERn-Net', 2, null);
+    out = run(b, [R2g]);
+    expect(out.proposals.filter((p) => p.subject.entity_id === rack.id).map((p) => [p.discriminator, (p.inputs_hash ? p.why : '')])).toEqual([
+      ['N', '06M-09 is a ERn2 (library: N → its far end).'],
+      ['N#2', '06M-09 carries ERn-Net (library: N → its far end).'],
+      ['N#3', '06M-09 carries ERn-Net (library: N → its far end).'],
+    ]);
+    expect(net.state).toBe('accepted');
+    // a fiber end on the rack: no slot of its type gives F, so this lint says nothing
+    b.cable('F', { device: rack });
+    expect(run(b, [LintCableNeedsAccessory]).findings).toEqual([]);
+  });
+
+  it("the NSPS kit's forced supply counts without a row: its 120V is the kit's, once (D288 (3)); a choose-among alternative does not", () => {
+    const b = new Build();
+    const { level, power } = floor(b);
+    const supply = b.libraryType('P-NSPS-D Power Supply', 'Power Supplies', { accessory_only: true, default_cables: [{ code: '120V', single_row: true, qty: 1 }] } as never);
+    const boxA = b.libraryType('Back box A', 'Wall Plates', { default_cables: [{ code: 'NG' }] });
+    const kit = b.libraryType('P-NSPS-D-KIT', 'Equipment', {
+      role: 'nsps',
+      default_cables: [{ code: 'N' }],
+      optional_accessories: [
+        { model: 'P-NSPS-D Power Supply', expected_qty: 1, max_quantity: 1 },
+        // one of these back boxes (D202): an alternative has no expected quantity of its own
+        { model: 'Back box A', expected_qty: null, max_quantity: 1, group: { label: 'Back boxes', min: 1, max: 1 } },
+      ],
+    });
+    const nsps = b.device(level, 'Equipment', { display_id: '06M-05', device: 'P-NSPS-D-KIT', library_type_id: kit.id });
+    const plan = cablesOfDevice(typesOf(b), nsps, []);
+    expect(plan.carried.map((c) => [c.model, c.count, c.forced])).toEqual([['P-NSPS-D Power Supply', 1, true]]);
+    expect(plan.absent).toEqual([{ model: 'Back box A', codes: ['NG'] }]);
+    const out = run(b, [R2g]);
+    expect(out.proposals.map((p) => p.discriminator)).toEqual(['N', '120V']);
+    // the feed reads From 120v Power, To by what it feeds (an NSPS, D52), the far end the placeholder
+    expect(out.proposals[1]!.payload).toMatchObject({
+      cable: { cable: '120V', qty: 1, single_row: true },
+      ends: [
+        { side: 'A', device_id: nsps.id, from_text: '120v Power', to_text: 'P-NSPS-D Power Supply' },
+        { side: 'B', endpoint_kind: 'placeholder', placeholder_id: power.id, from_text: '120v Power' },
+      ],
+    });
+    // the supply's own row on the device changes nothing (a row wins over its slot): still once
+    b.accessory(nsps, 'P-NSPS-D Power Supply', 1, 0);
+    expect(run(b, [R2g]).proposals.map((p) => [p.discriminator, cableOf(p).qty])).toEqual([['N', null], ['120V', 1]]);
+    expect(supply.state).toBe('accepted');
+    expect(boxA.state).toBe('accepted');
+    // a forced slot inside a group still counts (the ERn2's processor is one of its "two ERn modules")
+    kit.optional_accessories = [{ model: 'Back box A', expected_qty: 1, max_quantity: 1, group: { label: 'Modules', min: 2, max: 2 } }];
+    expect(cablesOfDevice(typesOf(b), nsps, []).carried.map((c) => [c.model, c.count, c.forced])).toEqual([['Back box A', 1, true]]);
+  });
+
+  it("a panic run is never paired by a rule: the required run is offered with its far end empty and the far-end lint flags it once made (D293 (1), D294)", () => {
+    const b = new Build();
+    const { level, panel } = floor(b);
+    b.libraryType('CT06LCPA', 'Power Distribution', { role: 'relay_panel', default_cables: [{ code: 'P', single_row: true, qty: 1 }] });
+    const ebdk = b.device(level, 'EBDK', { display_id: '06M-03', device: 'EBDK', panel_name: 'CT06LCPA' }); // the level's one EBDK: still not assumed
+    const [p] = run(b, [R2g]).proposals;
+    expect(p!.payload).toMatchObject({
+      cable: { cable: 'P', single_row: true, qty: 1 },
+      ends: [
+        { side: 'A', device_id: panel.id, from_text: 'CT06LCPA', to_text: null, status: 'Installed, untested', status_source: 'derived' },
+        { side: 'B', endpoint_kind: null, from_text: null, to_text: null },
+      ],
+    });
+    expect(JSON.stringify(p!.payload)).not.toContain('EBDK');
+    expect(JSON.stringify(p!.payload)).not.toContain(ebdk.id);
+    expect(p!.why).toBe('06M-01 is a CT06LCPA (library: P → its far end).');
+    // accepted as it stands, the run has no far end until a person picks the device
+    b.cable('P', { device: panel }, {}, { single_row: true });
+    expect(run(b, [R2g]).proposals).toEqual([]);
+    expect(run(b, [LintFarEnd]).findings.map((x) => x.message)).toEqual(['06M-01 panic end: panic cable, the far end names no device or placeholder']);
+  });
+
+  it('the texts a row leaves empty are per-code settings, listed on the draft; a text typed on the row wins (D290 (3), D293)', () => {
+    const blank = { code: '0-10V', from: null, to: null, far: null, single_row: true, qty: 1, status: null };
+    expect(fillLibraryCable(blank, 'relay_panel')).toEqual({
+      cable: { ...blank, to: 'Fixtures', far: 'Fixtures' },
+      params: [['R2g', 'from', '0-10V'], ['R2g', 'to', '0-10V'], ['R2g', 'far', '0-10V'], ['R2g', 'status', '0-10V']],
+    });
+    expect(fillLibraryCable({ ...blank, code: 'P' }, 'relay_panel').cable).toMatchObject({ from: null, to: null, far: null, status: 'Installed, untested' });
+    expect(fillLibraryCable({ ...blank, code: '120V' }, 'equipment_rack').cable).toMatchObject({ from: '120v Power', to: 'Equipment rack', far: '120v Power', status: null });
+    expect(fillLibraryCable({ ...blank, code: '120V' }, 'relay_panel').cable).toMatchObject({ from: '120v Power', to: null, far: '120v Power' });
+    expect(fillLibraryCable({ ...blank, code: 'X' }, 'other').cable).toEqual({ ...blank, code: 'X' });
+    // the row's own texts win, and then no setting is read for them
+    const own = fillLibraryCable({ ...blank, code: '120V', from: 'Panel LP-2', to: 'NSPS PS', far: 'LP-2', status: 'Not started' }, 'nsps');
+    expect(own).toEqual({ cable: { ...blank, code: '120V', from: 'Panel LP-2', to: 'NSPS PS', far: 'LP-2', status: 'Not started' }, params: [] });
+    // a project's own values: the list by role is Landry's to extend (D293 (3)); a changed setting re-words the draft
+    const row = (key: string, value: unknown): RuleParamRow => ({ id: key, project_id: 'p', rule_id: 'R2g', key, value, state: 'accepted', deleted_at: null });
+    const mine = new RuleParams([row('to_120v', { relay_panel: 'Relay panel feed' }), row('to', { '0-10V': 'Fixture loads' }), row('status', { P: '' })]);
+    expect(fillLibraryCable({ ...blank, code: '120V' }, 'relay_panel', mine).cable.to).toBe('Relay panel feed');
+    expect(fillLibraryCable({ ...blank, code: '120V' }, 'nsps', mine).cable.to).toBe('P-NSPS-D Power Supply');
+    expect(fillLibraryCable(blank, 'relay_panel', mine).cable.to).toBe('Fixture loads');
+    expect(fillLibraryCable({ ...blank, code: 'P' }, 'relay_panel', mine).cable.status).toBeNull();
+    const b = new Build();
+    floor(b);
+    b.libraryType('CT06LCPA', 'Power Distribution', { default_cables: [blank] });
+    const before = run(b, [R2g]).proposals[0]!;
+    b.snap.ruleParams = [{ id: 'x', project_id: b.snap.projectId, rule_id: 'R2g', key: 'to', value: { '0-10V': 'Fixture loads' }, state: 'accepted', deleted_at: null }];
+    const after = run(b, [R2g]).proposals[0]!;
+    expect(ends(after)[0]!.to_text).toBe('Fixture loads');
+    expect(after.inputs_hash).not.toBe(before.inputs_hash);
+  });
+
+  it("the addresses a device needs read its required cables, a carried accessory's with its type's (D245, D288 (2))", () => {
+    const b = new Build();
+    const { level } = floor(b);
+    const net = b.libraryType('ERn-Net', 'Equipment', { default_cables: [{ code: 'N' }] });
+    const type = b.libraryType('ERn2', 'Equipment Panels', { default_cables: [{ code: 'X' }], optional_accessories: [{ model: 'ERn-Net', expected_qty: null }] });
+    const rack = b.device(level, 'Equipment Panels', { display_id: '06M-09', library_type_id: type.id });
+    const needs = (rows: Parameters<typeof cablesOfDevice>[2]) => addressNeeds(type, rack, [], undefined, cablesOfDevice(typesOf(b), rack, rows).required.map((r) => r.cable.code));
+    expect(needs([])).toEqual({ neuron: false, ip: false, dmx: true });
+    expect(needs([{ model: 'ERn-Net', expected_qty: 1 }])).toEqual({ neuron: false, ip: true, dmx: true });
+    // an optional run is no wire the device gets until it is there
+    net.optional_cables = net.default_cables;
+    net.default_cables = null;
+    expect(needs([{ model: 'ERn-Net', expected_qty: 1 }])).toEqual({ neuron: false, ip: false, dmx: true });
+    // without the list, the type's own default cables as before
+    expect(addressNeeds(type, rack, [])).toEqual({ neuron: false, ip: false, dmx: true });
   });
 });

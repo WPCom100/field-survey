@@ -198,7 +198,7 @@ const CARD_SEEDED_KEY = 'demo_card_seeded';
  * DMX cable to 06M-03 (Issue "no term kit"), a 0-10V run to Fixtures (Issue "Not landed") and a
  * Unison run the server has not numbered (Not installed) — so every card section has something
  * to show on the iPad. The drafts and findings come from the real rules (T34): R3a on the Unison
- * run and the 0-10V landing, R3b for the DMX kit, R2c for the missing panic run, the ERP-FT-LVD
+ * run and the 0-10V landing, R3b for the DMX kit, the ERP-FT-LVD
  * accessory finding and R1 on the panel's `Installed, untested`.
  */
 export async function ensureDemoCardExtras(store: Store, log: (msg: string) => void = () => {}): Promise<void> {

@@ -26,8 +26,10 @@ import {
   restoreType,
   roleOf,
   roleOfCategory,
+  slotAdds,
   sourceLine,
   typeChangeWarning,
+  typesByModel,
   updateType,
   type IdScheme,
   type LibraryAccessory,
@@ -124,6 +126,8 @@ export function LibraryScreen(props: {
   const types = useMemo(() => view?.types ?? [], [view]);
   const selected = pane?.kind === 'type' ? (types.find((t) => t.id === pane.id) ?? null) : null;
   const all = useMemo(() => libraryGroups(types), [types]);
+  // what each accessory slot adds to its host (T199): the accessory types, by model
+  const byModel = useMemo(() => typesByModel(types), [types]);
   const filtered = !!query.trim() || draftsOnly;
   const items = useMemo((): Item[] => {
     const out: Item[] = [];
@@ -213,6 +217,7 @@ export function LibraryScreen(props: {
               type={selected}
               chips={chips.filter((c) => c.scope === 'type' && c.ref === selected.id)}
               codes={view?.codes ?? CABLE_CODES}
+              byModel={byModel}
               canEdit={!!editor}
               run={run}
             />
@@ -323,7 +328,7 @@ function confirmThen(w: TypeChangeWarning | null, go: () => void): void {
 }
 
 /** The selected type: a form edited locally, saved as one group. A deleted type is read-only until restored. */
-function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: readonly string[]; canEdit: boolean; run: RunFn }) {
+function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: readonly string[]; byModel: ReadonlyMap<string, LibraryType>; canEdit: boolean; run: RunFn }) {
   const t = props.type;
   const [model, setModel] = useState(t.model);
   const [category, setCategory] = useState<string | null>(t.category);
@@ -455,7 +460,8 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
           </Field>
           <Field label="Optional accessories">
             {accessories.map((a, i) => (
-              <View key={i} style={styles.row}>
+              <View key={i}>
+              <View style={styles.row}>
                 <TextInput value={a.model} editable={!ro} onChangeText={(v) => setAccessories(replace(accessories, i, { ...a, model: v }))} placeholder="Model" placeholderTextColor={color.text3} style={[styles.input, styles.grow]} testID={`library.acc.${i}.model`} />
                 <Text style={styles.sub}>expected</Text>
                 <TextInput value={a.expected_qty == null ? '' : String(a.expected_qty)} editable={!ro} onChangeText={(v) => setAccessories(replace(accessories, i, { ...a, expected_qty: toQty(v) }))} keyboardType="number-pad" style={[styles.input, styles.qty]} testID={`library.acc.${i}.qty`} />
@@ -464,6 +470,9 @@ function TypeEditor(props: { type: LibraryType; chips: Suggestion[]; codes: read
                     <Text style={styles.danger}>Remove</Text>
                   </Pressable>
                 ) : null}
+              </View>
+              {/* T199 (D288 (1)): the cables the accessory adds to a device that carries it; edited on the accessory's own type */}
+              {slotAdds(props.byModel, a.model) ? <Text style={styles.sub} testID={`library.acc.${i}.adds`}>{slotAdds(props.byModel, a.model)}</Text> : null}
               </View>
             ))}
             {!ro ? (

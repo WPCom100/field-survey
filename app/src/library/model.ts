@@ -141,15 +141,47 @@ export function parseAliases(text: string): string[] {
   return out;
 }
 
-/** The rules a type's devices are read by: R2c / R2d / R2e by role (T112), R2g once it has default cables. */
+/**
+ * The rules a type's devices are read by: R2e by role (the level's Unison host, T112), R2g once
+ * it has default cables. No rule gives a cable by role any more (T199, D289, D290).
+ */
 export function rulesForType(role: Role, defaultCables: readonly LibraryCable[]): string[] {
   const out: string[] = [];
-  const governs = defaultCables.length > 0;
-  if (role === 'relay_panel' && !governs) out.push('R2c');
-  if ((role === 'nsps' || role === 'equipment_rack') && !governs) out.push('R2d');
   if (role === 'nsps' || role === 'equipment_rack') out.push('R2e');
-  if (governs) out.push('R2g');
+  if (defaultCables.length > 0) out.push('R2g');
   return out;
+}
+
+/** The library's live, not rejected types by model key (model and aliases), the first by id: what a slot's model names. */
+export function typesByModel(types: readonly LibraryType[]): Map<string, LibraryType> {
+  const out = new Map<string, LibraryType>();
+  for (const t of [...types].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (t.deleted || t.state === 'rejected') continue;
+    for (const k of [t.model, ...t.aliases].map(modelKey)) if (!out.has(k)) out.set(k, t);
+  }
+  return out;
+}
+
+/**
+ * What an accessory slot adds to the device that carries it (T199, D288 (1)), for the host
+ * type's editor: `adds 0-10V × 24` from the accessory type's own cable lists — a single-row
+ * run by its quantity, any other by the number of rows — with `(optional)` after the codes the
+ * accessory only allows. Null when the library has no such type or it adds nothing. Read-only:
+ * the lists are edited on the accessory's own type.
+ */
+export function slotAdds(byModel: ReadonlyMap<string, LibraryType>, slotModel: string): string | null {
+  const t = byModel.get(modelKey(slotModel));
+  if (!t) return null;
+  const count = (list: readonly LibraryCable[]) => {
+    const n = new Map<string, number>();
+    for (const c of list) n.set(c.code, (n.get(c.code) ?? 0) + (c.single_row ? (c.qty ?? 1) : 1));
+    return n;
+  };
+  // a draft type's rows are offered only (D288 (2)), so its default cables read as optional too
+  const required = t.state === 'accepted' ? count(t.defaultCables) : new Map<string, number>();
+  const optional = count(t.state === 'accepted' ? t.optionalCables : [...t.defaultCables, ...t.optionalCables]);
+  const parts = [...[...required].map(([code, n]) => `${code} × ${n}`), ...[...optional].map(([code, n]) => `${code} × ${n} (optional)`)];
+  return parts.length ? `adds ${parts.join(', ')}` : null;
 }
 
 /** "120V · 120v Power → P-NSPS-D Power Supply · single row" for a table cell. */

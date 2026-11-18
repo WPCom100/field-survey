@@ -6,7 +6,7 @@
  * placed end and its draft end linked on placement (D235), the link to a cable the baseline already has).
  */
 
-import { Editor, Store, uuidv7, type Op } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, Store, uuidv7, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { CABLE_CODES, setRuleParam } from '@field-survey/rules';
 import { describe, expect, it } from 'vitest';
@@ -646,7 +646,8 @@ describe('cable drafts (T44, D6, D191)', () => {
     const b = realEnd(data, { kind: 'placeholder', id: ids.lvl9, label: '', levelId: null })!;
     const p = cablePayload({ id: 'x', code: 'P', qty: null, origin: 'manual', levelId: ids.l06m, toLevelId: null, sourceRef: null }, a, b, { confirm: false });
     expect(p.cable).toMatchObject({ cable: 'P', single_row: true, origin: 'manual', riser_ref: null, vertical: null, qty: 1 });
-    expect(p.ends[0]).toMatchObject({ from_text: 'CT06LCPA', to_text: 'EBDK panic wire' });
+    // a panic run reads its far end as any run does: no generic "EBDK panic wire" on a new row (T199, D293 (1))
+    expect(p.ends[0]).toMatchObject({ from_text: 'CT06LCPA', to_text: 'Panic to Level 09' });
     const q = cablePayload({ id: 'x', code: 'X', qty: 1, origin: 'riser', levelId: ids.l06m, toLevelId: null, sourceRef: null }, a, b, { confirm: false });
     expect(q.ends.map((e) => e.to_text)).toEqual(['DMX to Level 09', null]);
   });
@@ -708,9 +709,13 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
 
   it('Accept writes the picked code, clears the question and makes the library row (0-10V → Fixtures)', async () => {
     const { store, editor, ids, ctl, fixtures } = await withLines();
+    // the panel's type requires a 0-10V and a panic run (the library is what says so, T199)
+    await editor
+      .forStream(LIBRARY_STREAM)
+      .create('library_type', { project_id: null, model: 'ERP48', category: 'Relay panel', state: 'accepted', default_cables: [{ code: '0-10V', single_row: true, qty: 1 }, { code: 'P', single_row: true, qty: 1 }] }, { change_type: 'Master edit', reason: 'test' });
     const engine = engineFor(store, PROJECT, ME);
     await engine.run();
-    const r2c = async () => (await loadDeviceCard(store, ids.panel))!.drafts.filter((d) => d.ruleId === 'R2c').map((d) => (d.payload.cable as { cable: string }).cable).sort();
+    const r2c = async () => (await loadDeviceCard(store, ids.panel))!.drafts.filter((d) => d.ruleId === 'R2g').map((d) => (d.payload.cable as { cable: string }).cable).sort();
     expect(await r2c()).toEqual(['0-10V', 'P']);
     await setCableCode(editor, store, await loadDraftReview(store, PROJECT), ctl, '0-10V');
     let data = await loadDraftReview(store, PROJECT);
@@ -727,14 +732,14 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
     data = await loadDraftReview(store, PROJECT);
     expect(row(data.cables, ctl)).toMatchObject({ code: '0-10V', state: 'edited', unknownCode: false, committed: true });
     expect(row(data.cables, ctl).conflicts).toEqual(['endpoint:low_confidence']);
-    // the library's R2c draft for that row is gone: one cable, not two
+    // the library's R2g draft for that row is gone: one cable, not two
     await engine.run();
     expect(await r2c()).toEqual(['P']);
   });
 
   it('meets the library row the device already has: linked, one cable not two (120V and 0-10V)', async () => {
     const { store, editor, ids, ctl, feed, fixtures, power } = await withLines();
-    // R2c's accepted draft already made the panel's 0-10V row (another far end than the line's pick)
+    // an accepted library draft already made the panel's 0-10V row (another far end than the line's pick)
     const ends = [uuidv7(), uuidv7()];
     const { id: lib } = await editor.create('cable', { project_id: PROJECT, cable: '0-10V', qty: 1, single_row: true, origin: 'library', endpoint_confirmed: true, end_a_id: ends[0], end_b_id: ends[1] }, MASTER);
     await editor.create('cable_end', { id: ends[0], cable_id: lib, side: 'A', endpoint_kind: 'device', device_id: ids.panel, level_id: ids.l06m, from_text: 'CT06LCPA', to_text: 'Fixtures' }, MASTER);
@@ -746,7 +751,7 @@ describe('riser lines with no bubble (T108, D192, D194)', () => {
     expect(await store.list('cable', { where: "cable = '0-10V'" })).toHaveLength(1);
     expect(((await store.get<Record<string, unknown>>('cable', lib))!.riser_ref as Record<string, unknown>).draft).toBe(ctl);
     expect(fixtures).toBeTruthy();
-    // the rack's 120V feed, accepted first: it is the library's row (R2d's texts, D52)
+    // the rack's 120V feed, accepted first: it is the library's row (D52's texts)
     await setCableCode(editor, store, await loadDraftReview(store, PROJECT), feed, '120V');
     data = await loadDraftReview(store, PROJECT);
     const r = await acceptCable(editor, store, data, row(data.cables, feed), { confirm: true });
@@ -856,13 +861,15 @@ describe('changing an open cable draft’s code (T128, round 2026-10-18 C-26)', 
   it('a To picked by hand, or a code with no placeholder in the project, stays', async () => {
     const s = await withMisread();
     const { store, editor, misread, fixtures, power } = s;
-    // P: the project has no EBDK panic wire placeholder, so the To is left as it is
+    // P has no placeholder far end: it runs to a device the reviewer picks (D293 (1), D294), so the
+    // To is left as it is — also where a project still holds an "EBDK panic wire" placeholder
     await change(s, misread, 'P');
     expect(row((await loadDraftReview(store, PROJECT)).cables, misread).ends.to).toMatchObject({ id: power });
-    const panic = (await editor.create('placeholder', { project_id: PROJECT, label: 'EBDK panic wire', kind: 'custom' }, MASTER)).id;
+    await editor.create('placeholder', { project_id: PROJECT, label: 'EBDK panic wire', kind: 'custom' }, MASTER);
     await change(s, misread, '0-10V');
+    expect(row((await loadDraftReview(store, PROJECT)).cables, misread).ends.to).toMatchObject({ id: fixtures });
     await change(s, misread, 'P');
-    expect(row((await loadDraftReview(store, PROJECT)).cables, misread).ends.to).toMatchObject({ id: panic, label: 'EBDK panic wire' });
+    expect(row((await loadDraftReview(store, PROJECT)).cables, misread).ends.to).toMatchObject({ id: fixtures, label: 'Fixtures' });
     // the reviewer picks Fixtures by hand: a later code change leaves it
     await setEndpoint(editor, store, misread, 'to', { kind: 'placeholder', id: fixtures, label: 'Fixtures', levelId: null });
     await change(s, misread, '120V');
@@ -900,9 +907,9 @@ describe('draft review server helpers (T44)', () => {
     expect(extractionLine('riser', riser)).toBe("Done: 93 device drafts (40 merged into the BOM's), 71 cable drafts, 0 far ends to pick · Claude $1.93");
     expect(extractionLine('bom', bom)).toBe('Done: 108 device drafts, 1 excluded lines, 9 flagged');
     const davinci: Batch = { id: 'd1', kind: 'davinci', job_state: 'done', files: [{ name: 'library.json' }, { name: 'DaVinci_categories.xlsx' }], stats: { created: 1130, updated: 2, unchanged: 0, placeable: 501, accessory_only: 631, vocab_drafts: 33, kept_accepted: 1, kept_rejected: 0, retired: ['P-NSPS-D-KIT', 'PI1002'], clashes: [{ type_id: 'x', model: 'P-NSPS-D', held_by: null }] } };
-    expect(extractionLine('davinci', davinci)).toBe('Done: 1130 new drafts, 2 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts, 1 accepted or rejected left alone, 2 hand-made types retired, 1 model clash');
-    expect(extractionLine('davinci', { ...davinci, stats: { ...davinci.stats, neuron_flags_corrected: 2 } })).toBe('Done: 1130 new drafts, 2 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts, 1 accepted or rejected left alone, 2 Neuron flags corrected, 2 hand-made types retired, 1 model clash');
-    expect(extractionLine('davinci', { ...davinci, stats: { ...davinci.stats, neuron_flags_corrected: 1, categories_corrected: 22 } })).toBe('Done: 1130 new drafts, 2 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts, 1 accepted or rejected left alone, 1 Neuron flag corrected, 22 categories corrected, 2 hand-made types retired, 1 model clash');
+    expect(extractionLine('davinci', davinci)).toBe('Done: 1130 new drafts, 2 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts, 2 hand-made types retired, 1 model clash');
+    expect(extractionLine('davinci', { ...davinci, stats: { ...davinci.stats, neuron_flags_corrected: 2 } })).toBe('Done: 1130 new drafts, 2 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts, 2 Neuron flags corrected, 2 hand-made types retired, 1 model clash');
+    expect(extractionLine('davinci', { ...davinci, stats: { ...davinci.stats, neuron_flags_corrected: 1, categories_corrected: 22 } })).toBe('Done: 1130 new drafts, 2 updated, 0 unchanged (501 device types, 631 accessories), 33 protocol drafts, 1 Neuron flag corrected, 22 categories corrected, 2 hand-made types retired, 1 model clash');
     expect(extractionLine('davinci', { ...davinci, job_state: 'skipped' })).toBe('Already imported — this library and mapping were imported before');
   });
 

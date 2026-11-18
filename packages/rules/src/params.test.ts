@@ -55,7 +55,20 @@ describe('the catalogue', () => {
       [false, false, true],
       [false, false, false],
     ]);
-    expect([d.get('R2f', 'status'), d.get('R5', 'enabled'), d.get('R2c', 'panic.status')]).toEqual(['Not started', true, 'Installed, untested']);
+    expect([d.get('R2f', 'status'), d.get('R5', 'enabled')]).toEqual(['Not started', true]);
+    // T199 (D290 (3), D293): the library runs' texts per code, sparse maps — a code with no entry has no value
+    expect(['0-10V', '120V', 'P', 'X'].map((c) => [d.entry('R2g', 'from', c), d.entry('R2g', 'to', c), d.entry('R2g', 'far', c), d.entry('R2g', 'status', c)])).toEqual([
+      [undefined, 'Fixtures', 'Fixtures', undefined],
+      ['120v Power', undefined, '120v Power', undefined],
+      [undefined, undefined, undefined, 'Installed, untested'],
+      [undefined, undefined, undefined, undefined],
+    ]);
+    expect(['nsps', 'equipment_rack', 'relay_panel'].map((r) => d.entry('R2g', 'to_120v', r))).toEqual(['P-NSPS-D Power Supply', 'Equipment rack', undefined]);
+    expect(d.ref(['R2g', 'to', 'X'])).toBe('');
+    expect(new RuleParams([{ id: 'x', project_id: 'p', rule_id: 'R2g', key: 'to', value: { X: 'DMX out' }, state: 'accepted', deleted_at: null }]).overrides([['R2g', 'to', 'X'], ['R2g', 'to', '0-10V']])).toEqual({ 'R2g.to[X]': 'DMX out' });
+    // the by-role parameters went with R2c / R2d
+    expect(() => d.get('R2c', 'panic.to')).toThrow(/Unknown rule parameter/);
+    expect(() => d.get('R2d', 'from')).toThrow(/Unknown rule parameter/);
   });
 
   it('row ids hash (scope, rule, key) as the server does (app/rule_params.py)', () => {
@@ -93,8 +106,12 @@ describe('resolving and compacting values', () => {
     expect(compactValue('R3b', 'owner', 'EC/ETC')).toBeNull();
     expect(compactValue('R3b', 'owner', 'ETC')).toBe('ETC');
     expect(compactValue('R5', 'enabled', false)).toBe(false);
-    expect(compactValue('R2d', 'status', '')).toBeNull();
-    expect(compactValue('R2c', 'panic.status', '')).toBe('');
+    expect(compactValue('R2e', 'status', '')).toBeNull();
+    // a status per code (T199): "no status" for P is a stored entry, the default one is not
+    expect(compactValue('R2g', 'status', { P: '' })).toEqual({ P: '' });
+    expect(compactValue('R2g', 'status', { P: 'Installed, untested', X: 'Not started' })).toEqual({ X: 'Not started' });
+    expect(() => compactValue('R2g', 'status', { X: 'Done' })).toThrow(/not allowed/);
+    expect(compactValue('R2g', 'to_120v', { nsps: 'P-NSPS-D Power Supply', relay_panel: 'Relay panel feed' })).toEqual({ relay_panel: 'Relay panel feed' });
     expect(() => compactValue('R3b', 'owner', 'ETC/EC')).toThrow(/not allowed/);
     expect(() => compactValue('R3c', 'item', '  ')).toThrow(/not allowed/);
     expect(() => compactValue('R9', 'x', 'y')).toThrow(/Unknown rule parameter/);
@@ -110,7 +127,7 @@ describe('resolving and compacting values', () => {
 
   it('the Rules tab lists every group with its rule text and per-code rows', () => {
     const groups = paramGroups([]);
-    expect(groups.map((g) => g.rule)).toEqual(['R3', 'R3a', 'R3b', 'R3c', 'R4a', 'R4b', 'R2c', 'R2d', 'R2e', 'R2f', 'R5', 'E5', 'E6', 'E7', 'E9', 'not_found']);
+    expect(groups.map((g) => g.rule)).toEqual(['R3', 'R3a', 'R3b', 'R3c', 'R4a', 'R4b', 'R2g', 'R2e', 'R2f', 'R5', 'E5', 'E6', 'E7', 'E9', 'not_found']);
     expect(groups.find((g) => g.rule === 'R3a')!.text).toMatch(/Run <signal> to <far end>/);
     const owner = groups.find((g) => g.rule === 'R3a')!.items.find((i) => i.spec.key === 'terminate.owner')!;
     expect(owner.codes[0]).toBe('*');
@@ -118,6 +135,17 @@ describe('resolving and compacting values', () => {
     expect(codeValue(owner, 'P')).toEqual({ value: 'EC', inherited: true });
     expect(withCode(owner, 'N', null)).toEqual(owner.spec.default); // N back to its default
     expect(withCode(owner, 'P', 'ETC')).toMatchObject({ P: 'ETC' });
+    // T199: a sparse map lists the codes (a map by role: the roles) and shows no value where there is no entry
+    const lib = groups.find((g) => g.rule === 'R2g')!;
+    expect(lib.title).toBe('Device-type library cables');
+    const to = lib.items.find((i) => i.spec.key === 'to')!;
+    expect(to.codes).toEqual(['X', 'N', 'NG', 'U', 'F', 'P', 'UV', '0-10V', '120V', 'D']);
+    expect([codeValue(to, '0-10V'), codeValue(to, 'X')]).toEqual([{ value: 'Fixtures', inherited: false }, { value: '', inherited: true }]);
+    const byRole = lib.items.find((i) => i.spec.key === 'to_120v')!;
+    expect(byRole.codes).toEqual(['relay_panel', 'foundry_panel', 'ebdk', 'equipment_rack', 'nsps', 'touchscreen', 'station', 'sensor', 'other']);
+    expect(codeValue(byRole, 'nsps')).toEqual({ value: 'P-NSPS-D Power Supply', inherited: false });
+    expect(withCode(byRole, 'relay_panel', 'Relay panel feed')).toMatchObject({ relay_panel: 'Relay panel feed', nsps: 'P-NSPS-D Power Supply' });
+    expect(withCode({ ...byRole, value: { ...(byRole.value as object), relay_panel: 'x' } }, 'relay_panel', null)).toEqual(byRole.spec.default);
   });
 });
 

@@ -1,4 +1,4 @@
-import { OpError, vocab, type Editor, type Store } from '@field-survey/core';
+import { OpError, ROLE_LABEL, isRole, vocab, type Editor, type Store } from '@field-survey/core';
 import {
   NO_STATUS,
   codeValue,
@@ -261,14 +261,21 @@ function ParamControl({ item, onSet }: { item: ParamItem; onSet: (item: ParamIte
     case 'owner_by_code':
     case 'text_by_code':
     case 'bool_by_code':
+    case 'status_by_code':
+    case 'text_by_role':
       return <CodeTable item={item} onSet={onSet} />;
   }
 }
 
-/** One row per cable code; `*` reads "Any other code". A row without its own entry shows `*`'s value, dimmed. */
+/**
+ * One row per cable code (a `text_by_role` map: per device role); `*` reads "Any other code". A
+ * row without its own entry shows `*`'s value, dimmed — or, in a sparse map (T199), nothing.
+ */
 function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, value: ParamValue | null) => void }) {
   const owner = item.spec.kind === 'owner_by_code';
   const flag = item.spec.kind === 'bool_by_code';
+  const status = item.spec.kind === 'status_by_code';
+  const name = (code: string) => (code === '*' ? 'Any other code' : item.spec.kind === 'text_by_role' && isRole(code) ? ROLE_LABEL[code] : code);
   const signal = item.spec.rule === 'R3';
   const id = tid(item.spec);
   const [newCode, setNewCode] = useState('');
@@ -281,7 +288,7 @@ function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, 
         const def = (item.spec.default as Record<string, string | boolean>)[code];
         return (
           <View key={code} style={styles.codeRow}>
-            <Text style={[styles.code, inherited && styles.dim]}>{code === '*' ? 'Any other code' : code}</Text>
+            <Text style={[styles.code, inherited && styles.dim]}>{name(code)}</Text>
             <View style={[{ flex: 1 }, inherited && styles.dim]}>
               {flag ? (
                 <Pressable
@@ -289,7 +296,7 @@ function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, 
                   style={styles.toggle}
                   accessibilityRole="switch"
                   accessibilityState={{ checked: value === true }}
-                  accessibilityLabel={`${code === '*' ? 'Any other code' : code}: ${value === true ? 'on' : 'off'}`}
+                  accessibilityLabel={`${name(code)}: ${value === true ? 'on' : 'off'}`}
                   testID={`${id}.${code}`}
                 >
                   <View pointerEvents="none">
@@ -299,6 +306,13 @@ function CodeTable({ item, onSet }: { item: ParamItem; onSet: (item: ParamItem, 
                 </Pressable>
               ) : owner ? (
                 <Chips options={OWNERS} value={String(value)} onPick={(v) => onSet(item, withCode(item, code, v))} testID={`${id}.${code}`} />
+              ) : status ? (
+                <ChipPicker
+                  value={String(value) || null}
+                  options={STATUSES.map((s) => ({ id: s, label: s }))}
+                  none="No status (Unsurveyed)"
+                  onPick={(v) => onSet(item, withCode(item, code, v ?? NO_STATUS))}
+                />
               ) : (
                 <TextBox value={String(value)} onCommit={(v) => onSet(item, withCode(item, code, v))} testID={`${id}.${code}`} />
               )}

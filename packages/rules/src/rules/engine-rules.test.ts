@@ -36,8 +36,14 @@ async function project() {
     await g.create('placeholder', { id: ids.bus, project_id: PROJECT, label: 'Stations & Sensors', kind: 'station_bus' });
     await g.create('placeholder', { id: ids.fixtures, project_id: PROJECT, label: 'Fixtures', kind: 'fixtures' });
   });
+  // what a device takes comes from the one library (T199, D290): the panel's and the rack's types,
+  // matched by their Device text, with the runs their first-use answer made required
+  const lib = editor.forStream(LIBRARY_STREAM);
+  const seed: EditContext = { change_type: 'Master edit', reason: 'seed' };
+  await lib.create('library_type', { project_id: null, model: 'CT06LCPA', category: 'Relay panel', state: 'accepted', default_cables: [{ code: '0-10V', single_row: true, qty: 1 }, { code: 'P', single_row: true, qty: 1 }] }, seed);
+  const rackType = await lib.create('library_type', { project_id: null, model: 'Equipment rack', category: 'Equipment rack', state: 'accepted', default_cables: [{ code: '120V', single_row: true, qty: 1 }] }, seed);
   const engine = new RuleEngine(store, { projectId: PROJECT, userId: ME, rules: RULES, now: tsNext });
-  return { store, editor, engine, ids };
+  return { store, editor, engine, ids: { ...ids, rackType: rackType.id } };
 }
 
 const open = async (store: Store) => store.list<ProposalRow>('proposal', { where: `project_id = ? AND state = 'proposed'`, params: [PROJECT], orderBy: 'rule_id, discriminator, id' });
@@ -49,9 +55,9 @@ describe('RULES over a store', () => {
     expect(r1.problems).toBe(0);
     expect(r1.ops).toBeGreaterThan(0);
     const rows = await open(store);
-    // library drafts for the panel (0-10V, P) and the rack (120V), the Unison pair of 06 (06M has
-    // no NSPS or rack to host one), the Neuron ID item
-    expect(rows.map((p) => `${p.rule_id}:${p.discriminator ?? ''}`).sort()).toEqual(['R2c:0-10V', 'R2c:P', 'R2d:120V', 'R2e:U', 'R3c:'].sort());
+    // library drafts for the panel (0-10V, P) and the rack (120V) from their types (R2g), the
+    // Unison pair of 06 (06M has no NSPS or rack to host one), the Neuron ID item
+    expect(rows.map((p) => `${p.rule_id}:${p.discriminator ?? ''}`).sort()).toEqual(['R2g:0-10V', 'R2g:P', 'R2g:120V', 'R2e:U', 'R3c:'].sort());
     expect((await engine.run()).ops).toBe(0);
   });
 
@@ -102,7 +108,7 @@ describe('RULES over a store', () => {
     const { store, engine, ids } = await project();
     // the one library (T196): an app-library type, on the library stream
     const library = new Editor(store, { projectId: LIBRARY_STREAM, userId: ME });
-    await library.create('library_type', { project_id: null, model: 'Equipment rack', category: 'Equipment rack', needs_neuron_id: true, state: 'accepted' }, CTX);
+    await library.setField('library_type', ids.rackType, 'needs_neuron_id', true, CTX);
     await engine.run();
     const neuron = (await open(store)).filter((p) => p.rule_id === 'R3c' && p.discriminator == null);
     expect(neuron.map((p) => [p.payload!.level_id === ids.l06 ? '06' : '06M', p.payload!.notes]).sort()).toEqual([
@@ -135,10 +141,25 @@ describe('RULES over a store', () => {
     expect((await open(store)).filter((p) => p.rule_id === 'R3c').map((p) => `${floor(p)}:${p.discriminator ?? ''}`).sort()).toEqual(['06:dmx', '06M:', '06M:dmx']);
   });
 
-  it('accepting a library draft (R2c) makes the cable with both ends; the device then has the code and the draft stays accepted', async () => {
+  it('an open draft of a retired by-role rule (R2c, R2d) is superseded by the next run; a decided one keeps its decision (T199)', async () => {
+    const { store, editor, engine, ids } = await project();
+    const old = async (rule: string, code: string, state: string) =>
+      (await editor.create('proposal', { project_id: PROJECT, rule_id: rule, kind: 'cable', subject: { entity_kind: 'device', entity_id: ids.panel, level_id: ids.l06m }, discriminator: code, payload: { cable: { cable: code } }, inputs_hash: 'before-t199', state }, CTX)).id;
+    const open = await old('R2c', 'P', 'proposed');
+    const feed = await old('R2d', '120V', 'proposed');
+    const taken = await old('R2c', '0-10V', 'accepted');
+    await engine.run();
+    expect(await store.get<ProposalRow>('proposal', open)).toMatchObject({ state: 'superseded' });
+    expect(await store.get<ProposalRow>('proposal', feed)).toMatchObject({ state: 'superseded' });
+    expect(await store.get<ProposalRow>('proposal', taken)).toMatchObject({ state: 'accepted' });
+    expect(await engine.explain(open)).toMatch(/^R2c — Relay panel library cables \(retired\): Retired \(D289, D290\)/);
+    expect((await engine.run()).ops).toBe(0);
+  });
+
+  it('accepting a library draft (R2g) makes the cable with both ends; the device then has the code and the draft stays accepted', async () => {
     const { store, engine, ids } = await project();
     await engine.run();
-    const p = (await open(store)).find((x) => x.rule_id === 'R2c' && x.discriminator === '0-10V')!;
+    const p = (await open(store)).find((x) => x.rule_id === 'R2g' && x.discriminator === '0-10V')!;
     const res = await engine.decide(p.id, { kind: 'accept' });
     expect(res.recordIds).toHaveLength(3);
     const cable = (await store.get<Row>('cable', res.recordIds[0]!))!;
@@ -147,7 +168,7 @@ describe('RULES over a store', () => {
     expect(await store.get<Row>('cable_end', res.recordIds[2]!)).toMatchObject({ side: 'B', endpoint_kind: 'placeholder', placeholder_id: ids.fixtures });
     await engine.run();
     expect(await store.get<ProposalRow>('proposal', p.id)).toMatchObject({ state: 'accepted' });
-    expect((await open(store)).some((x) => x.rule_id === 'R2c' && x.discriminator === '0-10V')).toBe(false);
+    expect((await open(store)).some((x) => x.rule_id === 'R2g' && x.discriminator === '0-10V')).toBe(false);
     // the new unsurveyed 0-10V end has no status and gets none from anywhere (D171); the Issue
     // panel-side rules say nothing about it until someone surveys it
     expect((await open(store)).filter((x) => x.subject?.entity_id === res.recordIds[1])).toEqual([]);
@@ -156,7 +177,7 @@ describe('RULES over a store', () => {
   it('a deleted cable (T138) is absent: its open drafts are superseded, the library draft it was accepted from stays accepted and is not offered again', async () => {
     const { store, editor, engine, ids } = await project();
     await engine.run();
-    const lib = (await open(store)).find((x) => x.rule_id === 'R2c' && x.discriminator === '0-10V')!;
+    const lib = (await open(store)).find((x) => x.rule_id === 'R2g' && x.discriminator === '0-10V')!;
     const made = (await engine.decide(lib.id, { kind: 'accept' })).recordIds[0]!;
     const l09 = uuidv7();
     const net = uuidv7();
@@ -180,7 +201,7 @@ describe('RULES over a store', () => {
     await engine.run();
     expect(await onNet()).toEqual([]);
     expect(await store.get<ProposalRow>('proposal', lib.id)).toMatchObject({ state: 'accepted' });
-    expect((await open(store)).some((x) => x.rule_id === 'R2c' && x.discriminator === '0-10V')).toBe(false);
+    expect((await open(store)).some((x) => x.rule_id === 'R2g' && x.discriminator === '0-10V')).toBe(false);
     expect((await engine.run()).ops).toBe(0);
     // restored, it is read again
     await editor.restore('cable', net, { change_type: 'Correction', reason: 'Was right after all' });

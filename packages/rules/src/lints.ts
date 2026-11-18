@@ -10,7 +10,7 @@ import { DEVICE_CATEGORIES } from '@field-survey/core';
 export { DEVICE_CATEGORIES };
 
 export interface LintCheck {
-  /** Stable id for screens (`power_120v`). */
+  /** Stable id for screens (`far_end`). */
   id: string;
   /** The check as PLAN §6.3 names it. */
   title: string;
@@ -23,8 +23,7 @@ export interface LintCheck {
 }
 
 export const LINT_CHECKS: readonly LintCheck[] = [
-  { id: 'power_120v', title: 'NSPS/rack without 120V row', lints: ['lint.power_120v'], hint: 'Open the card and accept the R2d 120V draft, or add the row.' },
-  { id: 'relay_cables', title: 'Relay panel without P or 0-10V row', lints: ['lint.relay_cables'], hint: 'Open the card and accept the R2c draft, or add the row.' },
+  { id: 'cable_needs_accessory', title: 'Cable needs an accessory the device does not carry', lints: ['lint.cable_needs_accessory'], hint: 'Add the accessory on the card (found or not), or correct the cable: without it the device does not take this cable.' },
   { id: 'issue_item', title: 'Issue device without open punch item', lints: ['R1.no_item'], hint: 'Add a punch item for what is wrong, or set the status the device really has.' },
   { id: 'item_owner', title: 'Punch item without Owner', lints: ['lint.item_owner'], hint: 'Give the item an Owner: EC, ETC or EC/ETC.' },
   { id: 'neuron_item', title: 'Neuron ID item missing or not last', lints: ['lint.neuron_item'], hint: 'Accept the R3c "Missing all Device Neuron IDs" draft; it is kept sorted last.' },

@@ -36,7 +36,9 @@ import {
   reopenType,
   restoreType,
   rulesForType,
+  slotAdds,
   typeChangeWarning,
+  typesByModel,
   updateType,
 } from './model';
 
@@ -138,8 +140,10 @@ describe('device-type library editor (T48, one library: T197)', () => {
     expect(await store.opsFor(id)).toHaveLength(ops.length);
     await updateType(lib, store, id, { defaultCables: [] });
     expect(await store.get('library_type', id)).toMatchObject({ default_cables: null });
-    expect(rulesForType('nsps', [])).toEqual(['R2d', 'R2e']);
-    expect(rulesForType('relay_panel', [])).toEqual(['R2c']);
+    // no rule gives a cable by role (T199): the level's bus host is all a role still names
+    expect(rulesForType('nsps', [])).toEqual(['R2e']);
+    expect(rulesForType('relay_panel', [])).toEqual([]);
+    expect(rulesForType('relay_panel', [blankCable('P')])).toEqual(['R2g']);
     expect(rulesForType('other', [])).toEqual([]);
     await expect(updateType(lib, store, id, { defaultCables: [{ ...blankCable('Z') }] })).rejects.toThrow(/not a cable code/);
     await expect(updateType(lib, store, id, { optionalAccessories: [{ model: ' ', expected_qty: 1 }] })).rejects.toThrow(/needs a model/);
@@ -217,7 +221,7 @@ describe('device-type library editor (T48, one library: T197)', () => {
     expect([card.device.needsNeuronId, card.device.needsIpAddress, card.device.needsDmxAddress]).toEqual([false, false, false]);
   });
 
-  it('accepting a type with default cables raises R2g drafts for the devices already there (and R2d stands aside)', async () => {
+  it('accepting a type with default cables raises R2g drafts for the devices already there; a draft type requires nothing', async () => {
     const { store, userId, lib, project } = await setup();
     const p = await project('Tower');
     await p.editor.create('placeholder', { project_id: p.id, label: '120v Power', kind: 'power' }, CTX);
@@ -229,8 +233,8 @@ describe('device-type library editor (T48, one library: T197)', () => {
     const engine = engineFor(store, p.id, userId);
     await engine.run();
     const draftsOf = async () => (await loadDeviceCard(store, nsps.id))!.drafts.map((d) => `${d.ruleId} ${d.title}`).sort();
-    // a draft type governs nothing: the category table's R2d draft is offered
-    expect(await draftsOf()).toEqual(['R2d 120V → P-NSPS-D Power Supply']);
+    // a draft type requires nothing, and no rule gives an NSPS a 120V row by its role (T199, D290)
+    expect(await draftsOf()).toEqual([]);
     await acceptType(lib, id);
     await engine.run();
     expect(await draftsOf()).toEqual(['R2g 120V → NSPS PS', 'R2g N → Network switch']);
@@ -379,6 +383,30 @@ describe('one library for every project (T197, D287, D292 (6))', () => {
   });
 });
 
+describe('what an accessory adds to its host (T199, D288 (1))', () => {
+  it("the host type's editor reads each slot's cables off the accessory's own type: required, optional, a draft's all optional", async () => {
+    const { store, lib } = await setup();
+    const card = await createType(lib, store, { model: 'ERP-FT-LVD', category: null });
+    await updateType(lib, store, card, { aliases: ['0-10V Option Kit - FT (24 CH)'], defaultCables: [{ ...blankCable('0-10V'), single_row: true, qty: 24 }] });
+    const net = await createType(lib, store, { model: 'ERn-Net', category: null });
+    await updateType(lib, store, net, { defaultCables: [blankCable('N'), blankCable('N')], optionalCables: [{ ...blankCable('D'), single_row: true, qty: 24 }] });
+    await acceptType(lib, net);
+    await createType(lib, store, { model: 'Back box', category: null });
+    const gone = await createType(lib, store, { model: 'Old kit', category: null });
+    await updateType(lib, store, gone, { defaultCables: [blankCable('X')] });
+    await rejectType(lib, gone);
+    const byModel = typesByModel((await loadLibrary(store)).types);
+    // the rows of a draft accessory are offered only (D288 (2)); by alias, spaces and case ignored
+    expect(slotAdds(byModel, 'ERP-FT-LVD')).toBe('adds 0-10V × 24 (optional)');
+    expect(slotAdds(byModel, '0-10v option kit - ft (24 ch)')).toBe('adds 0-10V × 24 (optional)');
+    expect(slotAdds(byModel, 'ERn-Net')).toBe('adds N × 2, D × 24 (optional)');
+    await acceptType(lib, card);
+    expect(slotAdds(typesByModel((await loadLibrary(store)).types), 'ERP-FT-LVD')).toBe('adds 0-10V × 24');
+    // nothing to add, not in the library, or rejected: no line
+    expect([slotAdds(byModel, 'Back box'), slotAdds(byModel, 'Nowhere'), slotAdds(byModel, 'Old kit')]).toEqual([null, null, null]);
+  });
+});
+
 describe('library roles (T112, D201)', () => {
   it('a type carries a role: the rules, the Neuron ID default, the card and the ID scheme read it', async () => {
     const { store, lib, project } = await setup();
@@ -390,7 +418,7 @@ describe('library roles (T112, D201)', () => {
     await expect(updateType(lib, store, nspsType, { role: 'power supply' as never })).rejects.toThrow(/not a role/);
     await updateType(lib, store, nspsType, { role: 'nsps' });
     t = (await loadLibrary(store)).types.find((x) => x.id === nspsType)!;
-    expect([t.role, t.effectiveRole, t.neuronId, t.rules]).toEqual(['nsps', 'nsps', false, ['R2d', 'R2e']]);
+    expect([t.role, t.effectiveRole, t.neuronId, t.rules]).toEqual(['nsps', 'nsps', false, ['R2e']]);
     // by link and by Device text (D183 (4)) the devices are NSPS: no Neuron ID
     const linked = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-05', category: 'Equipment', device: 'P-NSPS-D-KIT', library_type_id: nspsType }, CTX);
     const byText = await p.editor.create('device', { level_id: p.levelId, display_id: '06M-06', category: 'Equipment', device: 'P-NSPS-D-KIT' }, CTX);

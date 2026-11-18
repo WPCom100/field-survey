@@ -59,8 +59,8 @@ product classifications, document types), `propertyTypes` (names), `scripts` (na
 | `modelInformation.generatorData.items` — strings and `{propertyTypeId}` placeholders (colour, legend…) | `model` = the strings with the placeholders removed and trailing `-`, `/`, spaces stripped (`UH10002-{Heritage Color}` → `UH10002`, `P-TS7-E{…}` → `P-TS7-E`); empty → the display name. The raw pattern is kept in `source_ref.model_pattern`. |
 | `typeInformation.displayName`, `partInformation.generatorData.lookupData[]` (`modelNumber`, `partNumber`) | `aliases` = display name, distinct part numbers, the suffixed variants (`UH10002-1` … `UH10002-X`, `P-TS7-E-4`) — everything a BOM or master might call it (D183 (4) matches a device's Device text by model or alias). |
 | family / category → the mapping workbook | `category` (D196's eleven); an `Ignore` row, an override `Ignore`, or a family / category the sheet does not list → the type is left out (`stats.rows_not_in_mapping` names what a newer library added). |
-| `ports[]` protocol | `default_cables` rows: DMX → `X`, 0-10V → `0-10V`, Panic → `P`, LinkConnect and EchoConnect → `U`, aux power (Aux Power Input, 24 / 48 V Auxiliary Power) → `UV`, Sense → `120V`, DALI → `D`, Fiber (short / long haul) → `F`; Ethernet → `NG` on `Touchscreen` and `Station` types, `N` elsewhere (D199 for the Echo, aux, Sense and DALI rows). One row per port for X / N / NG / U / F (`qty` 1); P, 0-10V, 120V and D collapse into one row with `qty` = port count (an EBDK: `P` × 3; a DALI option kit: `D` × 24). `from` / `to` / `far` / `status` are left empty — the reviewer adds the From / To templates (D183); R2g reads `from` empty as the device's panel name. |
-| `Power` ports by direction; **power supplies** (D198) | one `120V` feed row (single row) when the type has a Power **Input** or **Bus** port (`qty` = that count: an ECPB AC plate, a ColorSource relay, an ELTS), or **is a power supply**, or **carries one as an accessory** — every power supply needs a 120 V line in. DaVinci marks a supply by its `Power Supplies` category, a `PowerSupplyCurrentDraw` / `ParadigmPowerSupplyCurrentDraw` script, a `… Power Supply - Aux` capacity property (the NSPS, P-SPS-D, the DIN14 SPS kits) or "power supply" / "power module" in its name or description (not "no power supply"); the `Power Supply - Units` / `Enabled` properties sit on relay-panel hosts and are ignored. `source_ref.power_supply = {self, accessories[]}` says why (the ERn2 enclosure: its P-SPM-E module and upgrade kit; the NSPS: itself). A Power **Output** port is a load circuit, not a surveyed cable (`stats.load_outputs`; a relay panel's own feed is by others, as the master has it). |
+| `ports[]` protocol | cable rows, written **undecided** (T199, D292 (1)): all in `optional_cables`, `default_cables` null — DaVinci says what a type *can* take; whether a run is required is asked once at the type's first use (T200) and can be edited in the Library. DMX → `X`, 0-10V → `0-10V`, Panic → `P`, LinkConnect and EchoConnect → `U`, aux power (Aux Power Input, 24 / 48 V Auxiliary Power) → `UV`, Sense → `120V`, DALI → `D`, Fiber (short / long haul) → `F`; Ethernet → `NG` on `Touchscreen` and `Station` types, `N` elsewhere (D199 for the Echo, aux, Sense and DALI rows). One row per port for X / N / NG / U / F (`qty` 1); P, 0-10V, 120V and D collapse into one row with `qty` = port count (an EBDK: `P` × 3; a DALI option kit: `D` × 24). `from` / `to` / `far` / `status` are left empty: R2g fills them from the per-code rule parameters (`R2g.from` / `to` / `to_120v` / `far` / `status`, D290 (3), D293), and a text typed on the row in the Library wins. |
+| `Power` ports by direction; **power supplies** (D198) | one `120V` feed row (single row) when the type has a Power **Input** or **Bus** port (`qty` = that count: an ECPB AC plate, a ColorSource relay, an ELTS), or **is a power supply** (an exception, below) — every power supply needs a 120 V line in. A type that only **carries** a supply as an accessory gets **no** row of its own for it (T199, D288 (6)): the row is on the supply's type and reaches the host through the accessory it carries (a forced slot counts with no accessory row; `cablesOfDevice` in `packages/rules`). DaVinci marks a supply by its `Power Supplies` category, a `PowerSupplyCurrentDraw` / `ParadigmPowerSupplyCurrentDraw` script, a `… Power Supply - Aux` capacity property (the NSPS, P-SPS-D, the DIN14 SPS kits) or "power supply" / "power module" in its name or description (not "no power supply"); the `Power Supply - Units` / `Enabled` properties sit on relay-panel hosts and are ignored. `source_ref.power_supply = {self: true}` marks a type that is one (the NSPS, the P-SPM-E module; the ERn2 enclosure that carries them has neither the mark nor a row). A Power **Output** port is a load circuit, not a surveyed cable (`stats.load_outputs`; a relay panel's own feed is by others, as the master has it). |
 | Paradigm Portable (the handheld touchscreen's cable) | `N` (D200). |
 | **not surveyed** (D200): Contact, EBDK Switch, USB, Serial, MIDI, SMPTE, LSH Control, SPS Connection, Control, Emergency, CANbus, Multiverse, MeshConnect, Echoflex, Audio, the F-Drive links | no row, no draft; the ports stay on the type in `source_ref.ports` and are counted in `stats.not_surveyed_protocols`. |
 | any protocol nobody has ruled on (a newer library) | **never a code**: one `vocab(cable_code)` **draft** per protocol in the app library (the one cable-code list, T196), for Landry to accept or reject as a decision (D197); `stats.unmapped_protocols`. |
@@ -96,11 +96,26 @@ type); nothing is merged or overwritten. Delete or rename the hand-made type and
 
 **Not written** (D197): From / To templates, far-end placeholders, the NSPS -KIT power-supply
 accessory (D52, the Library screen still offers it on NSPS types), `id_scheme` (the category
-default). DaVinci has no Power port on the NSPS or the ERn enclosures (their mains is an
-enclosure property), so the `120V` row on those comes from the power-supply rule above (D198),
-not from a port. An equipment rack is not a DaVinci type at all (the racks are `Equipment
-Racks / Equipment Racks` shells with no ports): R2d's category table keeps giving racks their
-`120V` row until a type with default cables governs them (D183 (2)).
+default), and which rows are required (D292 (1)).
+
+### Exceptions (D291)
+
+What a type takes comes from DaVinci's ports (D290). An **exception** is something the ports do
+not say and Landry has ruled on. The import applies it while planning and writes it as an
+ordinary cable row on the type, named in `source_ref.exceptions` as `{code, decision, reason}`,
+so it shows in the Library and is corrected there like any row; the rules read the type only, and
+T200's first-use prompt presets these rows to Required. A further exception is a new decision
+and a line in this table (`EXCEPTION_*` in `davinci_library.py`), never a rule in
+`packages/rules`.
+
+| Exception | Row | Applies to | Decision |
+|---|---|---|---|
+| A power supply needs a 120 V feed; DaVinci gives the NSPS, the supply modules and the ERn enclosures no Power port (their mains is an enclosure property) | `120V`, single row, qty 1 | a type that **is** a power supply and has no Power Input / Bus port (with one, the row is the port's and no exception) | D198 |
+| An equipment rack takes a 120 V feed (D52); the racks are `Equipment Racks` shells with no ports | `120V`, single row, qty 1 | a kept (placeable) type of DaVinci's `Equipment Racks` category with no surveyed port at all | D291 (4) |
+| The protocol-to-code rulings (Sense → `120V`, EchoConnect → `U`, aux power → `UV`, DALI → `D`, Paradigm Portable → `N`, the not-surveyed list) | by the tables above; not listed per type | every port of that protocol | D199, D200 |
+
+Not an exception, and no row: a host that carries a power supply (D288 (6), above); a relay
+panel's own feed (by others, as the master has it).
 
 ## Re-runs, accepted types, history
 
@@ -108,16 +123,19 @@ Every created type is a **draft** (D48) in the app library, with `created_by_id`
 started the job (else the `davinci` system user), `reason` "DaVinci library import", one `create`
 op each in the library log. A later run (a newer `library.json`, or a regrouped mapping):
 
-- a type with a row of the same `source_ref.type_id`: **draft** → each changed field becomes one
-  `set` op (`was` / `now` / `base_op_id` = the field head), so History shows what ETC changed; the
-  `source_ref` always changes (timestamp, file), so every draft counts as `updated`;
-  **accepted** or **rejected** → untouched (`stats.kept_accepted`, `kept_rejected`) — Landry's
-  edits and decisions stand, however ETC's data moved — with one exception (D222, T130): a
-  `needs_neuron_id = true` that the import itself wrote (the field head's `reason` is "DaVinci
-  library import") on a type whose role (its own, else its category's) is `nsps` or
-  `equipment_rack` is cleared in one `Correction` op, in any state (`stats.neuron_flags_corrected`,
-  "n Neuron flags corrected" on the Sources card). A flag a person set after the import is never
-  touched, on a draft either;
+- a type with a row of the same `source_ref.type_id`, **in any state** (T199, D292 (4), which
+  replaced D197's "accepted → untouched"): every field whose head is still the import's own op
+  (the field head's `reason` is "DaVinci library import") and that the file now gives another
+  value becomes one `set` op (`was` / `now` / `base_op_id` = the field head), so History shows
+  what ETC changed; a field a **person** set (any later op: an edit in the Library, the first-use
+  answer to "required or optional") stands, however ETC's data moved, on a draft too. The
+  `source_ref` always changes (timestamp, file), so every type counts as `updated`;
+  `stats.kept_accepted` / `kept_rejected` now only count the rows met in those states. The
+  state itself is never written;
+- the Neuron flag (D222, T130): a `needs_neuron_id = true` the import itself wrote on a type whose
+  role (its own, else its category's) is `nsps` or `equipment_rack` is cleared — on an accepted
+  or rejected type as a `Correction` op (`stats.neuron_flags_corrected`, "n Neuron flags
+  corrected" on the Sources card);
 - a **category** the import set (the field head's `reason` is "DaVinci library import") that the
   mapping now files elsewhere is corrected in any state (D232, T144): an accepted or rejected type
   in one `Correction` op, a draft by the ordinary `set`. A category a person set (any later op)
@@ -129,11 +147,13 @@ op each in the library log. A later run (a newer `library.json`, or a regrouped 
   with Fix all via ruling;
 - a new `typeId` → created; a type ETC removed → its row stays (nothing is deleted);
 - the `cable_code` values already in the app library (any state) are not written again;
-- the same pair of files is `skipped` only against a batch run since D222 (its stats carry
-  `neuron_flags_corrected`), so re-uploading the same library still corrects the flags once.
+- the same pair of files is `skipped` only against a batch run since T199 (its stats carry
+  `undecided_cable_rows` and `neuron_flags_corrected`), so re-uploading the same library after
+  the change is read once as the import now writes it. No pass corrects rows an older import
+  wrote (D290 (6) is not built): the library starts clean (D292 (5)).
 
 `stats`: `types_in_file`, `placeable`, `accessory_only`, `by_category`, `power_supplies`,
-`load_outputs`, `created`, `updated`, `unchanged`, `fields_set`, `kept_accepted`,
+`load_outputs`, `undecided_cable_rows`, `exception_rows`, `created`, `updated`, `unchanged`, `fields_set`, `kept_accepted`,
 `kept_rejected`, `neuron_flags_corrected`, `categories_corrected`, `retired[]`, `clashes[]`, `renamed[]`, `not_surveyed_protocols{}`,
 `aliases_dropped`, `rows_not_in_mapping[]`, `rows_unassigned[]`, `unmapped_protocols{}`,
 `vocab_drafts`, `library_timestamp`, `categories_file`, `categories_reused_from`, `ops`,

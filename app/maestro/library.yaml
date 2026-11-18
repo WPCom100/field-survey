@@ -2,7 +2,8 @@
 # + New type P-NSPS-D-KIT with every field of the editor, kept after leaving (`_library-type`);
 # accepting it offers its default cables (R2g) on an NSPS that lacks one, a template edit follows
 # the open draft, the optional runs and accessory on the card, the Neuron ID override
-# (`_library-card`); reject / back to draft, delete with its question and Restore, and Projects'
+# (`_library-card`); an accessory type adding its required 0-10V run to the device that carries it
+# (`_library-accessory`, T199); reject / back to draft, delete with its question and Restore, and Projects'
 # Library as the same library (`_library-app`; one library since T197, no Promote or Copy from…);
 # sync. Suggestions, vocabulary, device types, pin shapes and the rename ruling are `chips.yaml` /
 # `vocab.yaml`.
@@ -14,5 +15,6 @@ name: Library — types, R2g, optional runs, delete and restore, one library
 - runFlow: _seed-copy.yaml
 - runFlow: _library-type.yaml
 - runFlow: _library-card.yaml
+- runFlow: _library-accessory.yaml
 - runFlow: _library-app.yaml
 - runFlow: _sync.yaml

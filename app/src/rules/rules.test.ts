@@ -31,10 +31,10 @@ describe('the rules over the demo card', () => {
     expect(run.problems).toBe(0);
     const card = (await loadDeviceCard(store, panel.id))!;
     expect(card.drafts.map((d) => `${d.ruleId} ${d.title}`).sort()).toEqual(
-      ['R2c P → EBDK panic wire', 'R3a Land 0-10V control wiring', 'R3a Run Unison to Stations & Sensors', 'R3b Terminate DMX to 06M-03'].sort(),
+      ['R3a Land 0-10V control wiring', 'R3a Run Unison to Stations & Sensors', 'R3b Terminate DMX to 06M-03'].sort(),
     );
-    // T36: the panel has no P row, so the lint names what the R2c draft would add
-    expect(card.findings.map((f) => f.lintId).sort()).toEqual(['Acc', 'R1.untested', 'lint.relay_cables']);
+    // the panel has no P row and no type: being a relay panel gives it no cable, so no draft and no lint (T199, D290)
+    expect(card.findings.map((f) => f.lintId).sort()).toEqual(['Acc', 'R1.untested']);
     const decider = ruleDecider(store, pid, ME);
     expect(decider.wired).toBe(true);
     const r3b = card.drafts.find((d) => d.ruleId === 'R3b')!;
@@ -49,7 +49,7 @@ describe('the rules over the demo card', () => {
     expect(r3a.editable).toEqual(['item', 'type', 'owner']);
     await decider.decide(r3a.id, { kind: 'accept' });
     const after = (await loadDeviceCard(store, panel.id))!;
-    expect(after.drafts.map((d) => d.ruleId)).toEqual(['R2c', 'R3a', 'R3b']);
+    expect(after.drafts.map((d) => d.ruleId)).toEqual(['R3a', 'R3b']);
     const added = after.punch.find((p) => p.item === 'Run Unison to Stations & Sensors')!;
     expect(added).toMatchObject({ type: 'Cable not run', owner: 'EC', tracking: 'Open', open: true });
     expect(await store.get('punch_item', added.id)).toMatchObject({ rule_id: 'R3a', proposal_id: r3a.id, device_id: panel.id, device_text: null });
@@ -69,7 +69,7 @@ describe('the rules over the demo card', () => {
     expect((await loadDeviceCard(store, panel.id))!.punch.map((p) => p.item)).toContain('Run Unison bus to Stations & Sensors');
     expect(await store.get('proposal', r3a.id)).toMatchObject({ state: 'edited', decided_by_id: ME });
     await decider.decide(r3b.id, { kind: 'reject' });
-    expect((await loadDeviceCard(store, panel.id))!.drafts.map((d) => d.ruleId)).toEqual(['R2c', 'R3a']);
+    expect((await loadDeviceCard(store, panel.id))!.drafts.map((d) => d.ruleId)).toEqual(['R3a']);
     expect(await store.get('proposal', r3b.id)).toMatchObject({ state: 'rejected' });
     expect((await engineFor(store, pid, ME).run()).ops).toBe(0);
     await expect(decider.decide(uuidv7(), { kind: 'accept' })).rejects.toThrow(/Unknown proposal/);

@@ -14,16 +14,26 @@ uploads the file from the setup Sources screen (or runs the CLI) whenever a refr
 What a type gets (PLAN §2.2 `library_type`): `model` = the generated model number with its
 `{property}` suffixes stripped; `aliases` = display name, part numbers and the suffixed variants
 of the part lookup; `category` from the mapping workbook (Categories tab "Our category", Types tab
-"Override"; `Ignore` rows are skipped); `default_cables` from the ports (DMX → X, 0-10V → 0-10V,
+"Override"; `Ignore` rows are skipped); its cable rows, written **undecided** — all in
+`optional_cables`, nothing in `default_cables`: DaVinci says what a type *can* take, and whether
+a run is required is asked once at the type's first use (D292 (1), T200) — from the ports (DMX →
+X, 0-10V → 0-10V,
 Panic → P, LinkConnect and EchoConnect → U, aux power → UV, Sense → 120V, DALI → D, Fiber → F,
 Ethernet → NG on Touchscreen and Station types else N, Paradigm Portable → N (D199, D200); a
 Power **input** → 120V, a Power output is a load circuit and no cable; the protocols Landry ruled
 **not surveyed** (contact closures, USB, serial, MIDI…) make no row; any protocol nobody has ruled
 on becomes a `vocab(cable_code)` draft in the app library, whose cable-code list every project
-reads (T196, D292 (9)) — never a new code). A type that
-**is a power supply** (DaVinci's Power Supplies category, a PowerSupplyCurrentDraw script, a
-"Power Supply - Aux" property, or the name) or **carries one as an accessory** gets a `120V` feed
-row too (D198: every power supply needs a 120 V line in). `optional_accessories` = the
+reads (T196, D292 (9)) — never a new code).
+
+**Exceptions** (D291: what DaVinci's ports do not say and Landry has ruled on; written as an
+ordinary cable row, with why in `source_ref.exceptions` — `{code, decision, reason}` — which is
+also what T200's first-use prompt presets to Required): a type that **is a power supply**
+(DaVinci's Power Supplies category, a PowerSupplyCurrentDraw script, a "Power Supply - Aux"
+property, or the name) gets a `120V` feed row though DaVinci gives it no Power port (D198); a
+portless **Equipment Racks** shell gets one `120V` row (D52, D291 (4)). A host that *carries* a
+supply gets no row of its own for it (D288 (6)): the supply's row is on the supply's type, and
+reaches the host through the accessory it carries (`cablesOfDevice` in packages/rules).
+`optional_accessories` = the
 accessory slots with `max_quantity`, `expected_qty`
 for forced (`userDefinable = false`) and `SetMinAccessories` slots, and the `MaxAccessoryMonitor`
 group each slot belongs to (`{label, min, max}`); `needs_neuron_id` = true when the type carries
@@ -33,14 +43,15 @@ Accessories a kept type references are imported too, even from an `Ignore` row, 
 `accessory_only` types (never offered as a device). From / To templates, far-end placeholders and
 the NSPS -KIT power-supply expectation (D52) are not written: the reviewer adds them.
 
-Re-running on a newer file updates **draft** rows by DaVinci `typeId` (field by field, as `set`
-ops with history) and never touches an accepted or rejected type — except a Neuron flag `true`
-the import itself wrote on an NSPS or rack type, which it clears in a `Correction` op (D222),
-and a category it set that the mapping now files elsewhere (D232), which it corrects in a
-`Correction` op; a flag or category a person set (any later op) stays, on a draft too. Projects
-hold no copies of types (T196, D287 (1)), so nothing else is corrected. With `retire_hand_made` the
-run first soft-deletes every app-library type that has no `source_ref` (hand-made, any state) —
-Landry's ruling once the catalogue covers them (D199).
+Re-running on a newer file updates rows by DaVinci `typeId`, field by field, as `set` ops with
+history — **in any state** (D292 (4), which replaced D197's "accepted → untouched"): every field
+whose head is still the import's own op is set to what the file now says, and a field a person
+set (any later op: an edit in the Library, the first-use answer) stands, on a draft too. On an
+accepted or rejected type the Neuron flag `true` the import wrote on an NSPS or rack (D222) and a
+category the mapping now files elsewhere (D232) are written as `Correction` ops, as before.
+Projects hold no copies of types (T196, D287 (1)), so nothing else is corrected. With
+`retire_hand_made` the run first soft-deletes every app-library type that has no `source_ref`
+(hand-made, any state) — Landry's ruling once the catalogue covers them (D199).
 The same pair of files is not imported twice (`skipped`). Everything is one transaction through
 the ordinary apply loop.
 """
@@ -146,6 +157,20 @@ POWER_SUPPLY_CATEGORY = "Power Supplies"
 POWER_SUPPLY_SCRIPTS = frozenset({"PowerSupplyCurrentDraw", "ParadigmPowerSupplyCurrentDraw"})
 POWER_SUPPLY_PROPERTY = "Power Supply - Aux"
 POWER_SUPPLY_NAME = re.compile(r"power supply|power module", re.I)
+# The exceptions to "from DaVinci's ports" (D291): each is written as an ordinary cable row and
+# named in `source_ref.exceptions`, so it shows in the Library and is corrected there. A further
+# exception is a new decision and a line here and in server/docs/library.md, never a rule.
+EQUIPMENT_RACKS_CATEGORY = "Equipment Racks"
+EXCEPTION_SUPPLY: dict[str, str] = {
+    "code": "120V",
+    "decision": "D198",
+    "reason": "a power supply needs a 120 V feed; DaVinci gives it no Power port",
+}
+EXCEPTION_RACK_SHELL: dict[str, str] = {
+    "code": "120V",
+    "decision": "D291",
+    "reason": "an equipment rack takes a 120 V feed (D52); DaVinci gives the shell no ports",
+}
 NOT_A_POWER_SUPPLY = re.compile(r"no power supply", re.I)
 # Ethernet is `NG` (network + ground) on these categories, `N` elsewhere.
 GROUND_CATEGORIES = frozenset({"Touchscreen", "Station"})
@@ -156,12 +181,13 @@ NEURON_PROPERTIES = ("IP Address", "Subnet Mask", "Gateway Address")
 DATASHEET = "Datasheet"
 MAX_ACCESSORY_MONITOR = "MaxAccessoryMonitor"
 SET_MIN_ACCESSORIES = "SetMinAccessories"
-# The `library_type` fields a re-run compares and updates on a draft.
+# The `library_type` fields a re-run compares and sets where nobody edited them (D292 (4)).
 UPDATED_FIELDS = (
     "model",
     "aliases",
     "category",
     "default_cables",
+    "optional_cables",
     "optional_accessories",
     "needs_neuron_id",
     "description",
@@ -229,7 +255,8 @@ class DType:
     properties: tuple[str, ...]
     datasheet_url: str | None
     is_power_supply: bool = False
-    """DaVinci marks it as a power supply (D198): it needs a 120 V feed, and so does its host."""
+    """DaVinci marks it as a power supply (D198): it needs a 120 V feed. A host that carries it
+    gets that feed through the accessory, not a row of its own (D288 (6))."""
 
 
 @dataclass
@@ -565,19 +592,21 @@ class Cables:
     rows: list[dict[str, Any]]
     unmapped: list[str]
     """Port protocols nobody has ruled on (no code, not in `NOT_SURVEYED`)."""
-    power_supply: dict[str, Any] | None
-    """Why the type has a 120V feed: `{self, accessories[]}` (D198), or None."""
+    exceptions: list[dict[str, str]]
+    """Rows DaVinci's ports do not give (D291): `{code, decision, reason}` each."""
     load_outputs: int
     """Power Output ports (load circuits): no cable."""
     not_surveyed: list[str]
     """Port protocols Landry ruled not surveyed (D200): no row."""
 
 
-def cables_of(t: DType, category: str | None, supplies: list[str] | None = None) -> Cables:
-    """The type's default cable rows from its ports — one row per port for X / N / NG / U / F,
-    one row with `qty` = port count for P and 0-10V — plus one `120V` feed row when a Power
-    input port, the type itself being a power supply, or one of `supplies` (the models of its
-    power-supply accessories) asks for it (D198); `qty` = the input-port count, else 1."""
+def cables_of(t: DType, category: str | None, *, rack_shell: bool = False) -> Cables:
+    """The type's cable rows from its ports — one row per port for X / N / NG / U / F, one row
+    with `qty` = port count for P, 0-10V and D — plus one `120V` feed row for its Power input
+    ports (`qty` = their count) and, as exceptions (D291) where it has none: when the type itself
+    is a power supply (D198), or (`rack_shell`) is a DaVinci Equipment Racks shell with no
+    surveyed port at all (D291 (4)). A supply the type only *carries* adds nothing here
+    (D288 (6))."""
     rows: list[dict[str, Any]] = []
     single: dict[str, int] = {}
     unmapped: list[str] = []
@@ -607,15 +636,18 @@ def cables_of(t: DType, category: str | None, supplies: list[str] | None = None)
             single[code] = single.get(code, 0) + 1
             continue
         rows.append(_cable(code, False, 1))
-    power_supply = None
-    if t.is_power_supply or supplies:
-        power_supply = {"self": t.is_power_supply, "accessories": list(supplies or [])}
-    if feeds or power_supply:
+    exceptions: list[dict[str, str]] = []
+    if not feeds:
+        if t.is_power_supply:
+            exceptions.append(dict(EXCEPTION_SUPPLY))
+        elif rack_shell and not rows and not single:
+            exceptions.append(dict(EXCEPTION_RACK_SHELL))
+    if feeds or exceptions:
         # one 120V row per device: the feed and a Sense wire (also 120V) share it
         single["120V"] = max(single.get("120V", 0), feeds or 1)
     for code, n in single.items():
         rows.append(_cable(code, True, n))
-    return Cables(rows, unmapped, power_supply, load_outputs, not_surveyed)
+    return Cables(rows, unmapped, exceptions, load_outputs, not_surveyed)
 
 
 def accessories_of(t: DType, model_of: dict[str, str]) -> list[dict[str, Any]]:
@@ -795,24 +827,26 @@ def build_plan(
     by_category: Counter[str] = Counter()
     power_feeds = 0
     load_outputs = 0
+    cable_rows = 0
+    exception_rows = 0
     for tid in model_of:
         t = lib.types[tid]
         is_accessory = tid not in kept
         category = accessory_only[tid] if is_accessory else kept[tid]
-        supplies = [
-            model_of[s.type_id]
-            for s in t.slots
-            if s.type_id in model_of and lib.types[s.type_id].is_power_supply
-        ]
-        cables = cables_of(t, category, supplies)
+        rack_shell = not is_accessory and t.category == EQUIPMENT_RACKS_CATEGORY
+        cables = cables_of(t, category, rack_shell=rack_shell)
         for u in cables.unmapped:
             plan.unmapped_protocols[u] += 1
         for u in cables.not_surveyed:
             plan.not_surveyed_protocols[u] += 1
         ref = source_ref_of(t, category or IGNORE, lib.timestamp, filename)
-        if cables.power_supply:
-            ref["power_supply"] = cables.power_supply
+        if t.is_power_supply:
+            ref["power_supply"] = {"self": True}
             power_feeds += 1
+        if cables.exceptions:
+            ref["exceptions"] = cables.exceptions
+            exception_rows += len(cables.exceptions)
+        cable_rows += len(cables.rows)
         load_outputs += cables.load_outputs
         role = None if is_accessory else role_of_davinci(t, category)
         neuron = any(p.startswith(NEURON_PROPERTIES) for p in t.properties)
@@ -820,7 +854,10 @@ def build_plan(
             "model": model_of[tid],
             "aliases": aliases_of[tid] or None,
             "category": category,
-            "default_cables": cables.rows or None,
+            # undecided (D292 (1)): every row optional, nothing required until the first use of
+            # the type answers; the exception rows are named in `source_ref.exceptions`
+            "default_cables": None,
+            "optional_cables": cables.rows or None,
             "optional_accessories": accessories_of(t, model_of) or None,
             "needs_neuron_id": neuron_flag(neuron, role or role_of_category(category)),
             "description": t.description or None,
@@ -846,6 +883,8 @@ def build_plan(
         "by_category": dict(sorted(by_category.items())),
         "power_supplies": power_feeds,
         "load_outputs": load_outputs,
+        "undecided_cable_rows": cable_rows,
+        "exception_rows": exception_rows,
         "renamed": renamed,
         "clashes": clashes,
         "aliases_dropped": dropped_aliases,
@@ -1067,8 +1106,10 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
     ).all()
     pair = {lib_entry.get("sha256"), cat_entry.get("sha256")}
     for b in earlier:
-        # a batch from before D222 does not count: the same files must still correct the flags
-        if "neuron_flags_corrected" not in (b.stats or {}):
+        # a batch from before T199 does not count: the same files must still be read as the
+        # import now writes them (cables undecided, D292 (1); the Neuron flags, D222)
+        stats_then = b.stats or {}
+        if "undecided_cable_rows" not in stats_then or "neuron_flags_corrected" not in stats_then:
             continue
         if {f.get("sha256") for f in (b.files or [])} == pair:
             return {"skipped": "already imported", "earlier_batch": str(b.id)}
@@ -1128,7 +1169,6 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
                 {
                     "project_id": None,
                     "id_scheme": None,
-                    "optional_cables": None,
                     **tp.payload,
                     "role": tp.role,  # on create only (D199 (3)): a role edited by hand stands
                     "state": "draft",
@@ -1137,50 +1177,35 @@ def import_davinci(session: Session, store: ObjectStore, batch: ImportBatch) -> 
             )
             counts["created"] += 1
             continue
-        # The Neuron flag follows the row's role (a role edited by hand counts) and is never
-        # written over a person's value (D222).
+        # D292 (4): in any state, every field whose head is still the import's is set to what
+        # the file now says; a field a person set (an edit in the Library, the first-use answer)
+        # stands. The Neuron flag follows the row's role (a role edited by hand counts, D222).
+        # On an accepted or rejected type the two older fixes stay `Correction` ops: a Neuron
+        # flag the import wrote on an NSPS or rack (D222) and a category the mapping now files
+        # elsewhere (D232). Projects hold no copies to correct (T196).
         role = role_of(row, None)
-        neuron_head = _head(session, row.id, "needs_neuron_id")
-        by_import = _set_by_import(session, neuron_head)
-        if row.needs_neuron_id is True and role in NO_NEURON_ROLES and by_import:
-            counts["neuron_flags_corrected"] += 1
-        # The category the mapping files the type under replaces the one the import set, in any
-        # state; a person's category stands (D232). Projects hold no copies to correct (T196).
-        category = tp.payload.get("category")
-        category_head = _head(session, row.id, "category")
-        category_by_import = _set_by_import(session, category_head)
-        if category_by_import and not _same(row.category, category):
-            counts["categories_corrected"] += 1
-        if row.state != "draft":
+        decided = row.state != "draft"
+        if decided:
             counts["kept_" + row.state] += 1
-            if row.needs_neuron_id is True and role in NO_NEURON_ROLES and by_import:
-                ops.set(
-                    "library_type", row.id, "needs_neuron_id", True, None, neuron_head, CORRECTION
-                )
-            if category_by_import and not _same(row.category, category):
-                ops.set(
-                    "library_type",
-                    row.id,
-                    "category",
-                    row.category,
-                    category,
-                    category_head,
-                    CORRECTION,
-                )
-            continue
         changed = 0
         for f in UPDATED_FIELDS:
             was = getattr(row, f)
             now = tp.payload.get(f)
-            if f == "category" and not category_by_import:
-                continue
             if f == "needs_neuron_id":
-                if not by_import:
-                    continue
                 now = neuron_flag(tp.neuron_property, role)
             if _same(was, now):
                 continue
-            ops.set("library_type", row.id, f, was, now, _head(session, row.id, f))
+            head = _head(session, row.id, f)
+            if not _set_by_import(session, head):
+                continue
+            change = CHANGE_TYPE
+            if f == "needs_neuron_id" and was is True and role in NO_NEURON_ROLES:
+                counts["neuron_flags_corrected"] += 1
+                change = CORRECTION if decided else CHANGE_TYPE
+            elif f == "category":
+                counts["categories_corrected"] += 1
+                change = CORRECTION if decided else CHANGE_TYPE
+            ops.set("library_type", row.id, f, was, now, head, change)
             changed += 1
         counts["updated" if changed else "unchanged"] += 1
         counts["fields_set"] += changed

@@ -14,7 +14,7 @@ import { vocab, type Store } from '@field-survey/core';
 
 import { loadRuleParams } from '@field-survey/rules';
 
-import { deviceAddressNeeds, loadDeviceCodes, loadDeviceTypes } from '../library/neuron';
+import { deviceAddressNeeds, loadDeviceAccessories, loadDeviceCodes, loadDeviceTypes } from '../library/neuron';
 import { connectionMatches, projectCableCodes } from '../plan/lists';
 
 export const UNSURVEYED = 'Unsurveyed';
@@ -143,13 +143,14 @@ export async function loadDashboard(store: Store, projectId: string): Promise<Da
   const deviceLabel = new Map<string, string>();
   const types = await loadDeviceTypes(store);
   const codes = await loadDeviceCodes(store, projectId);
+  const carried = await loadDeviceAccessories(store, projectId);
   const ruleParams = await loadRuleParams(store, projectId);
   for (const d of devices) {
     const levelId = String(d.level_id);
     const label = str(d.display_id) ?? `${code.get(levelId)}-? NEW`;
     deviceLabel.set(String(d.id), label);
     rows.push({ entity: 'device', id: String(d.id), levelId, levelCode: code.get(levelId)!, status: str(d.status) ?? UNSURVEYED, owner: null, label, text: join(d.device ?? d.type ?? d.category, d.room_location), deviceId: String(d.id) });
-    const needs = deviceAddressNeeds(types, d, codes.get(String(d.id)), ruleParams);
+    const needs = deviceAddressNeeds(types, d, codes.get(String(d.id)), ruleParams, carried.get(String(d.id)));
     deviceFacts.set(String(d.id), {
       fieldAddition: d.origin === 'field_addition',
       neverFound: d.found_on_site === 0 || d.found_on_site === false,

@@ -314,8 +314,11 @@ export async function setEndpoint(editor: Editor, store: Store, draftId: string,
   return editor.setField('draft_cable', draftId, 'candidates', withChosen(raw.candidates, side, pick), ctx(`Draft review: ${side} end ${pick ? `→ ${pick.label}` : 'cleared'}`));
 }
 
-/** A code's placeholder far end (CLAUDE.md §3, R2c / R2d): the To that follows a changed code (T128). */
-export const CODE_TO: Readonly<Record<string, string>> = { '0-10V': 'Fixtures', '120V': '120v Power', P: 'EBDK panic wire' };
+/**
+ * A code's placeholder far end (CLAUDE.md §3; `R2g.far`'s defaults): the To that follows a changed
+ * code (T128). A panic run has none: it runs to a device the reviewer picks (D293 (1), D294).
+ */
+export const CODE_TO: Readonly<Record<string, string>> = { '0-10V': 'Fixtures', '120V': '120v Power' };
 const CODE_TO_LABELS = new Set(Object.values(CODE_TO).map((l) => l.toLowerCase()));
 
 /**
@@ -363,15 +366,19 @@ const SIGNAL_TO: Readonly<Record<string, string>> = {
   NG: 'Network & ground',
   U: 'Unison',
   F: 'Fiber',
+  P: 'Panic',
   UV: 'UHCI-WM partition sensor',
   '0-10V': '0-10V',
   '120V': '120V',
 };
 const SINGLE_ROW = new Set(['P', '0-10V', '120V']);
 
-/** The master's To template (D32): `<signal> to [Level nn ]<far end>`, the far end's level only when it is on another floor; a panic run reads "EBDK panic wire". */
+/**
+ * The master's To template (D32): `<signal> to [Level nn ]<far end>`, the far end's level only when
+ * it is on another floor. A panic run reads its far end as any run does (`Panic to <device>`): the
+ * generic "EBDK panic wire" is no longer written on a new row (T199, D293 (1)); rows that hold it keep it.
+ */
 export function toText(code: string, farLevelCode: string | null, farText: string): string {
-  if (code === 'P') return 'EBDK panic wire';
   return `${SIGNAL_TO[code] ?? code} to ${farLevelCode ? `Level ${farLevelCode} ` : ''}${farText}`;
 }
 
@@ -427,8 +434,8 @@ export function makeEnds(data: DraftReviewData, c: Pick<CableDraftRow, 'ends'>):
 }
 
 /**
- * The library's one row per device for a riser line accepted as `0-10V` or `120V` (D194, R2c /
- * R2d, D52): a Relay panel's 0-10V run to its far end (`Fixtures`), an NSPS's or rack's 120V row
+ * The library's one row per device for a riser line accepted as `0-10V` or `120V` (D194, D52; the
+ * texts R2c / R2d wrote, kept for an accepted riser line — D289 (3)): a Relay panel's 0-10V run to its far end (`Fixtures`), an NSPS's or rack's 120V row
  * `120v Power` → `P-NSPS-D Power Supply` / `Equipment rack`; and a relay or Foundry panel's load
  * circuits, `120V` → `Fixtures` (D221) — `exact`: matched by its two ends only, since the panel's
  * 120V feed is another cable. Null when the code, the device's role (T112: its type's, else its
@@ -446,7 +453,7 @@ export function libraryRow(code: string, a: RealEnd, b: RealEnd): { device: Real
   return null;
 }
 
-/** A live cable of this code with an end on this device (the library's row R2c / R2d look for). */
+/** A live cable of this code with an end on this device (the library's one row per device). */
 async function deviceCableOfCode(store: Store, projectId: string, code: string, deviceId: string): Promise<Record<string, unknown> | null> {
   const rows = await store.db.query<Record<string, unknown>>(
     `SELECT c.* FROM cable c JOIN cable_end e ON e.cable_id = c.id
@@ -460,7 +467,7 @@ async function deviceCableOfCode(store: Store, projectId: string, code: string, 
  * The cable and its ends for an accepted draft (D32: From / To written once from the master's
  * templates, then stored): side A on the draft's From end — From its text, To "<signal> to [Level
  * nn ]<far end>"; side B likewise back, or the placeholder's own label as From with no To (as the
- * library's runs, T48). A panic run reads "EBDK panic wire"; P, 0-10V and 120V are single-row.
+ * library's runs, T48). P, 0-10V and 120V are single-row.
  * A riser draft's `source_ref` becomes `riser_ref` in its blob form (D191) and its A end names
  * the vertical.
  */
@@ -496,7 +503,7 @@ export function cablePayload(
   };
 }
 
-/** `cablePayload` with the library's texts (R2c / R2d's): the device end A, the placeholder B reading its own label. */
+/** `cablePayload` with the library's texts (`libraryRow`): the device end A, the placeholder B reading its own label. */
 export function libraryPayload(
   c: Parameters<typeof cablePayload>[0],
   lib: NonNullable<ReturnType<typeof libraryRow>>,
@@ -691,7 +698,8 @@ export async function draftEndsToLink(
  * (T167, D260): an end's To names its far end's level when the two are on different floors (D32's
  * template, `toText`). Only a To still as its cable was made — its field head is the `create`
  * (D81) — and still in the template's form (`<signal> to [Level nn ]…`, the far end's text kept as
- * written) is rewritten; an edited one, a panic run's, and one naming a placeholder are left alone.
+ * written) is rewritten; an edited one, one not in that form (an older panic row's "EBDK panic wire",
+ * D293) and one naming a placeholder are left alone.
  * Returns the ends whose text changes.
  */
 export async function toTextsToRegenerate(
@@ -717,7 +725,7 @@ export async function toTextsToRegenerate(
   const out: { endId: string; toText: string }[] = [];
   for (const me of rows) {
     const far = rows.find((r) => r.cable_id === me.cable_id && r.id !== me.id);
-    if (!far || far.placeholder_id || me.to_text == null || me.code === 'P' || me.head !== 'create') continue;
+    if (!far || far.placeholder_id || me.to_text == null || me.head !== 'create') continue;
     const signal = toText(me.code, null, '');
     if (!me.to_text.startsWith(signal)) continue;
     let rest = me.to_text.slice(signal.length);

@@ -17,6 +17,7 @@ import { Build } from '../testing/build';
 import { RULES } from './index';
 import {
   LintAccessoryGroup,
+  LintCableNeedsAccessory,
   LintDeletedLink,
   LintEndStatus,
   LintFarEnd,
@@ -27,8 +28,6 @@ import {
   LintNeuronItem,
   LintOwner,
   LintPin,
-  LintPower,
-  LintRelay,
   LintTypeCategory,
   LintTypeGone,
   LintVocab,
@@ -38,23 +37,38 @@ import {
 const NOW = '2026-10-15T12:00:00.000Z';
 const found = (b: Build, rules: readonly Rule[]) => evaluate(b.snap, rules, undefined, { now: NOW }).findings.map((f) => [f.lint_id, f.subject.entity_id, f.message]);
 
-describe('library cable lints', () => {
-  it('flags an NSPS or rack without 120V and a Relay panel without P or 0-10V, and is quiet once the rows exist', () => {
+describe('library cable lints (T199: no check by role; a cable needs the accessory that gives it, D288 (4))', () => {
+  it('a relay panel, an NSPS and a rack with no cables raise nothing; a cable only an absent accessory would give is flagged on the device', () => {
     const b = new Build();
     const l = b.level('06M');
-    const nsps = b.device(l, 'NSPS', { display_id: '06M-04' });
-    const rack = b.device(l, 'Equipment rack', { display_id: '06M-05' });
-    const panel = b.device(l, 'Relay panel', { display_id: '06M-01' });
+    b.device(l, 'NSPS', { display_id: '06M-04' });
+    b.device(l, 'Equipment rack', { display_id: '06M-05' });
+    const plain = b.device(l, 'Relay panel', { display_id: '06M-01' });
+    b.cable('0-10V', { device: plain }, null, { single_row: true }); // no type: nothing says what it takes
+    expect(found(b, RULES.filter((r) => r.id.startsWith('lint.')))).toEqual([['lint.far_end', expect.any(String), expect.stringContaining('no far end')]]);
+    b.libraryType('ERP-FT-LVD', 'Power Distribution', { default_cables: [{ code: '0-10V', single_row: true, qty: 24 }] });
+    b.libraryType('ERP-FT-CI', 'Power Distribution', { state: 'draft', optional_cables: [{ code: '0-10V' }, { code: 'UV' }] });
+    const type = b.libraryType('ERP24-FT', 'Power Distribution', {
+      state: 'draft', // the type's slots say what could give the cable, in any state but rejected
+      default_cables: [{ code: 'X' }],
+      optional_accessories: [{ model: 'ERP-FT-LVD', expected_qty: null }, { model: 'ERP-FT-CI', expected_qty: null }, { model: 'Not in the library', expected_qty: null }],
+    });
+    const panel = b.device(l, 'Power Distribution', { display_id: '06M-02', library_type_id: type.id });
+    b.cable('X', { device: panel });
     b.cable('0-10V', { device: panel }, null, { single_row: true });
-    expect(found(b, [LintPower, LintRelay])).toEqual([
-      ['lint.power_120v', nsps.id, '06M-04: NSPS without a 120V row'],
-      ['lint.power_120v', rack.id, '06M-05: Equipment rack without a 120V row'],
-      ['lint.relay_cables', panel.id, '06M-01: Relay panel without a P row'],
+    b.cable('0-10V', { device: panel }, null, { single_row: true }); // one finding per code
+    b.cable('UV', { device: panel });
+    b.cable('F', { device: panel }); // no slot gives fiber: not this lint's business
+    expect(found(b, [LintCableNeedsAccessory])).toEqual([
+      ['lint.cable_needs_accessory', panel.id, '06M-02: 0-10V needs ERP-FT-LVD or ERP-FT-CI'],
+      ['lint.cable_needs_accessory', panel.id, '06M-02: UV needs ERP-FT-CI'],
     ]);
-    b.cable('120V', { device: nsps }, null, { single_row: true });
-    b.cable('120V', { device: rack }, null, { single_row: true });
-    b.cable('P', { device: panel }, null, { single_row: true });
-    expect(found(b, [LintPower, LintRelay])).toEqual([]);
+    expect(checkOf('lint.cable_needs_accessory')).toMatchObject({ id: 'cable_needs_accessory', title: 'Cable needs an accessory the device does not carry' });
+    // the accessory row, found or not, settles it: the card's is carried, so 0-10V is the device's
+    b.accessory(panel, 'ERP-FT-LVD', null, 0);
+    expect(found(b, [LintCableNeedsAccessory]).map((x) => x[2])).toEqual(['06M-02: UV needs ERP-FT-CI']);
+    type.state = 'rejected';
+    expect(found(b, [LintCableNeedsAccessory])).toEqual([]);
   });
 });
 
@@ -390,26 +404,7 @@ describe('Dismiss with a reason, over a store (D178)', () => {
   });
 });
 
-describe('library cable lints by role (T112, D201)', () => {
-  it('reads the type role: an NSPS of the Equipment category is flagged, a gateway of it is not; a Foundry panel is never a relay panel', () => {
-    const b = new Build();
-    const l = b.level('06M');
-    const nspsType = b.libraryType('P-NSPS-D-KIT', 'Equipment', { role: 'nsps' });
-    const nsps = b.device(l, 'Equipment', { display_id: '06M-04', device: 'P-NSPS-D-KIT', library_type_id: nspsType.id });
-    b.device(l, 'Equipment', { display_id: '06M-06', device: 'RSN-DMX8-R' });
-    const rack = b.device(l, 'Equipment Panels', { display_id: '06M-05', device: 'Equipment Rack 18U' });
-    b.libraryType('UFMP4', 'Power Distribution', { role: 'foundry_panel' });
-    b.device(l, 'Power Distribution', { display_id: '06M-02', device: 'UFMP4' });
-    const erp = b.libraryType('ERP24-FT', 'Power Distribution', { role: 'relay_panel', state: 'draft' });
-    const panel = b.device(l, 'Power Distribution', { display_id: '06M-01', device: 'CT06LCPA', panel_name: 'CT06LCPA', library_type_id: erp.id });
-    expect(found(b, [LintPower, LintRelay])).toEqual([
-      ['lint.power_120v', nsps.id, '06M-04: NSPS without a 120V row'],
-      ['lint.power_120v', rack.id, '06M-05: Equipment rack without a 120V row'],
-      ['lint.relay_cables', panel.id, '06M-01: Relay panel without a P row'],
-      ['lint.relay_cables', panel.id, '06M-01: Relay panel without a 0-10V row'],
-    ]);
-  });
-
+describe('vocabulary and type lints (T112, D201, T144, T197)', () => {
   it("the vocabulary lint accepts the master's eight category spellings until the project's vocabulary marks them as old", () => {
     const b = new Build();
     const l = b.level('06M');

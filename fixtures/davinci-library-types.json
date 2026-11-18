@@ -1,0 +1,2113 @@
+{
+ "source": "fixtures/davinci-library-sample.json + fixtures/DaVinci_categories.xlsx as app.jobs.davinci_library.build_plan plans them (server/tests/dump_davinci_types.py)",
+ "types": [
+  {
+   "type_id": "0df62e93-5094-4ef3-8e28-97611c11164e",
+   "role": "station",
+   "model": "UH10002",
+   "aliases": [
+    "2-Button Heritage Station",
+    "7181B2005",
+    "UH10002-X",
+    "UH10002-3",
+    "UH10002-1",
+    "UH10002-2",
+    "UH10002-5",
+    "UH10002-4"
+   ],
+   "category": "Station",
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "U",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": [
+    {
+     "model": "SBB1",
+     "expected_qty": null,
+     "max_quantity": 1
+    },
+    {
+     "model": "Heritage 2 Button Faceplate",
+     "expected_qty": 1,
+     "max_quantity": 1
+    },
+    {
+     "model": "SL1",
+     "expected_qty": null,
+     "max_quantity": 1
+    },
+    {
+     "model": "FLC-1",
+     "expected_qty": null,
+     "max_quantity": 1
+    },
+    {
+     "model": "SLC-1",
+     "expected_qty": null,
+     "max_quantity": 1
+    },
+    {
+     "model": "LBB1",
+     "expected_qty": null,
+     "max_quantity": 1
+    }
+   ],
+   "needs_neuron_id": null,
+   "description": "Paradigm 2-Button Heritage Station",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737478159",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "0df62e93-5094-4ef3-8e28-97611c11164e",
+    "display_name": "2-Button Heritage Station",
+    "family": "Paradigm",
+    "category": "Heritage Stations",
+    "mapped_to": "Station",
+    "classification": "Product",
+    "legacy": false,
+    "model_pattern": "UH10002-{Heritage Color with TBD}",
+    "part_numbers": [
+     "7181B2005"
+    ],
+    "ports": [
+     {
+      "protocol": "LinkConnect",
+      "direction": "Bus",
+      "count": 1
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": null
+  },
+  {
+   "type_id": "1649d29d-55b0-4cd6-ab9e-1b0fa45bd6cb",
+   "role": "sensor",
+   "model": "UHCI-WM",
+   "aliases": [
+    "Wall-Mount Contact Interface",
+    "7181A1022"
+   ],
+   "category": "Sensor",
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "U",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "UV",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": [
+    {
+     "model": "AD-ST18A",
+     "expected_qty": null,
+     "max_quantity": 16
+    },
+    {
+     "model": "AD-C18E-00-2A",
+     "expected_qty": null,
+     "max_quantity": 8
+    },
+    {
+     "model": "AD-C18R-0P-2A",
+     "expected_qty": null,
+     "max_quantity": 8
+    }
+   ],
+   "needs_neuron_id": null,
+   "description": "Wall-Mount Contact Interface",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737459978",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "1649d29d-55b0-4cd6-ab9e-1b0fa45bd6cb",
+    "display_name": "Wall-Mount Contact Interface",
+    "family": "Paradigm",
+    "category": "Contact Interfaces",
+    "mapped_to": "Sensor",
+    "classification": "Product",
+    "legacy": false,
+    "model_pattern": "UHCI-WM",
+    "part_numbers": [
+     "7181A1022"
+    ],
+    "ports": [
+     {
+      "protocol": "Aux Power Input",
+      "direction": "Bus",
+      "count": 1
+     },
+     {
+      "protocol": "Contact",
+      "direction": "Input",
+      "count": 8
+     },
+     {
+      "protocol": "Contact",
+      "direction": "Output",
+      "count": 8
+     },
+     {
+      "protocol": "LinkConnect",
+      "direction": "Bus",
+      "count": 1
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": null
+  },
+  {
+   "type_id": "1d37a7d1-f519-4710-8a37-46930085cff6",
+   "role": "nsps",
+   "model": "P-NSPS-D-KIT",
+   "aliases": [
+    "NSPS-KIT",
+    "7182K1711"
+   ],
+   "category": "Equipment",
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "U",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "N",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "UV",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "120V",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "P-NSPS-D Kit with DIN8 Enclosure",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737507329",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "1d37a7d1-f519-4710-8a37-46930085cff6",
+    "display_name": "NSPS-KIT",
+    "family": "Paradigm",
+    "category": "Controllers",
+    "mapped_to": "Equipment",
+    "classification": "Product",
+    "legacy": false,
+    "model_pattern": "P-NSPS-D-KIT",
+    "part_numbers": [
+     "7182K1711"
+    ],
+    "ports": [
+     {
+      "protocol": "48vdc Auxiliary Power",
+      "direction": "Bus",
+      "count": 1
+     },
+     {
+      "protocol": "Ethernet",
+      "direction": "Bidirectional",
+      "count": 1
+     },
+     {
+      "protocol": "LinkConnect",
+      "direction": "Bus",
+      "count": 1
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json",
+    "power_supply": {
+     "self": true
+    },
+    "exceptions": [
+     {
+      "code": "120V",
+      "decision": "D198",
+      "reason": "a power supply needs a 120 V feed; DaVinci gives it no Power port"
+     }
+    ]
+   },
+   "accessory_only": null
+  },
+  {
+   "type_id": "42d3aab8-fca8-43e5-a4f9-171e593cdacc",
+   "role": "touchscreen",
+   "model": "P-TS7-E",
+   "aliases": [
+    "Paradigm 7\" Touchscreen",
+    "7184A1542-3",
+    "7184A1542-5",
+    "7184A1542-4",
+    "7184A1542-TBD",
+    "7184A1542-1",
+    "P-TS7-E-3",
+    "P-TS7-E-5",
+    "P-TS7-E-4",
+    "P-TS7-E-X",
+    "P-TS7-E-1"
+   ],
+   "category": "Touchscreen",
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "NG",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": [
+    {
+     "model": "P-LCD-FBB",
+     "expected_qty": null,
+     "max_quantity": 1,
+     "group": {
+      "label": "backbox accessory",
+      "min": 1,
+      "max": 1
+     }
+    },
+    {
+     "model": "P-LCD-SBB",
+     "expected_qty": null,
+     "max_quantity": 1,
+     "group": {
+      "label": "backbox accessory",
+      "min": 1,
+      "max": 1
+     }
+    },
+    {
+     "model": "P-LCD-SLBB",
+     "expected_qty": null,
+     "max_quantity": 1,
+     "group": {
+      "label": "backbox accessory",
+      "min": 1,
+      "max": 1
+     }
+    },
+    {
+     "model": "P-LCD-LC",
+     "expected_qty": null,
+     "max_quantity": 1
+    },
+    {
+     "model": "P-LCD-SBB-5",
+     "expected_qty": null,
+     "max_quantity": 1,
+     "group": {
+      "label": "backbox accessory",
+      "min": 1,
+      "max": 1
+     }
+    }
+   ],
+   "needs_neuron_id": true,
+   "description": "Paradigm 7\" Wall-mount Touchscreen",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737479944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "42d3aab8-fca8-43e5-a4f9-171e593cdacc",
+    "display_name": "Paradigm 7\" Touchscreen",
+    "family": "Paradigm",
+    "category": "Touchscreen Stations",
+    "mapped_to": "Touchscreen",
+    "classification": "Product",
+    "legacy": false,
+    "model_pattern": "P-TS7-E{Heritage Color-Wall-Mount Touchscreen}",
+    "part_numbers": [
+     "7184A1542-3",
+     "7184A1542-5",
+     "7184A1542-4",
+     "7184A1542-TBD",
+     "7184A1542-1"
+    ],
+    "ports": [
+     {
+      "protocol": "Ethernet",
+      "direction": "Bidirectional",
+      "count": 1
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": null
+  },
+  {
+   "type_id": "e1179d8b-2ba9-4401-80df-b8637d2f2ce0",
+   "role": "equipment_rack",
+   "model": "ERn2-W-120 Mk2",
+   "aliases": [
+    "ERn2 Mk2",
+    "7180A1710"
+   ],
+   "category": "Equipment Panels",
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": [
+    {
+     "model": "ERn-BM",
+     "expected_qty": null,
+     "max_quantity": 1,
+     "group": {
+      "label": "ERn Modules",
+      "min": 2,
+      "max": 2
+     }
+    },
+    {
+     "model": "ERn-Net",
+     "expected_qty": null,
+     "max_quantity": 1,
+     "group": {
+      "label": "ERn Accessories",
+      "min": 0,
+      "max": 1
+     }
+    },
+    {
+     "model": "P-SPM-E",
+     "expected_qty": null,
+     "max_quantity": 1,
+     "group": {
+      "label": "ERn Modules",
+      "min": 2,
+      "max": 2
+     }
+    },
+    {
+     "model": "ERn-RPS Mk2",
+     "expected_qty": null,
+     "max_quantity": 1,
+     "group": {
+      "label": "ERn Accessories",
+      "min": 0,
+      "max": 1
+     }
+    },
+    {
+     "model": "P-ACP-E Mk2",
+     "expected_qty": 1,
+     "max_quantity": 1,
+     "group": {
+      "label": "ERn Modules",
+      "min": 2,
+      "max": 2
+     }
+    },
+    {
+     "model": "URTO Mk2",
+     "expected_qty": null,
+     "max_quantity": 1
+    },
+    {
+     "model": "ERn2-W-UPG",
+     "expected_qty": null,
+     "max_quantity": 1
+    }
+   ],
+   "needs_neuron_id": null,
+   "description": "ERn2 Enclosure Wall Mount 100-120V Mk2",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737518831",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "e1179d8b-2ba9-4401-80df-b8637d2f2ce0",
+    "display_name": "ERn2 Mk2",
+    "family": "Paradigm",
+    "category": "Controllers",
+    "mapped_to": "Equipment Panels",
+    "classification": "Product",
+    "legacy": false,
+    "model_pattern": "ERn2-W-120 Mk2",
+    "part_numbers": [
+     "7180A1710"
+    ],
+    "ports": [
+     {
+      "protocol": "Contact",
+      "direction": "Input",
+      "count": 4
+     },
+     {
+      "protocol": "Contact",
+      "direction": "Output",
+      "count": 4
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": null
+  },
+  {
+   "type_id": "e55eba99-a39f-453f-b94c-3560fa3af0ea",
+   "role": "relay_panel",
+   "model": "ERP Feedthrough 24",
+   "aliases": [
+    "7123A1123",
+    "7123A1122",
+    "ERP24-FT121P",
+    "ERP24-FT241P"
+   ],
+   "category": "Power Distribution",
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "N",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "X",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "X",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "U",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "P",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": [
+    {
+     "model": "ERP-FT-LVD",
+     "expected_qty": null,
+     "max_quantity": 1,
+     "group": {
+      "label": "Option Cards",
+      "min": 0,
+      "max": 2
+     }
+    },
+    {
+     "model": "ERP-FT-CI",
+     "expected_qty": null,
+     "max_quantity": 2,
+     "group": {
+      "label": "Option Cards",
+      "min": 0,
+      "max": 2
+     }
+    },
+    {
+     "model": "ERP-FT-DALI",
+     "expected_qty": null,
+     "max_quantity": 2,
+     "group": {
+      "label": "Option Cards",
+      "min": 0,
+      "max": 2
+     }
+    },
+    {
+     "model": "ERP-RTO",
+     "expected_qty": null,
+     "max_quantity": 1
+    },
+    {
+     "model": "ERP-FT-TPH",
+     "expected_qty": null,
+     "max_quantity": 1
+    },
+    {
+     "model": "ERP-FT-VB",
+     "expected_qty": null,
+     "max_quantity": 23
+    },
+    {
+     "model": "ERP-TPH",
+     "expected_qty": null,
+     "max_quantity": 1
+    },
+    {
+     "model": "SS UPGRADE24",
+     "expected_qty": null,
+     "max_quantity": 1
+    }
+   ],
+   "needs_neuron_id": true,
+   "description": "Unison Echo 24-Way Relay Panel Feedthrough",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737483942",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "e55eba99-a39f-453f-b94c-3560fa3af0ea",
+    "display_name": "ERP Feedthrough 24",
+    "family": "Power Control",
+    "category": "Echo Relay Panels",
+    "mapped_to": "Power Distribution",
+    "classification": "Product",
+    "legacy": false,
+    "model_pattern": "{ERP Feedthrough 24 Options}",
+    "part_numbers": [
+     "7123A1123",
+     "7123A1122"
+    ],
+    "ports": [
+     {
+      "protocol": "DMX",
+      "direction": "Input",
+      "count": 1
+     },
+     {
+      "protocol": "DMX",
+      "direction": "Output",
+      "count": 1
+     },
+     {
+      "protocol": "EchoConnect",
+      "direction": "Bus",
+      "count": 1
+     },
+     {
+      "protocol": "Ethernet",
+      "direction": "Bidirectional",
+      "count": 1
+     },
+     {
+      "protocol": "Panic",
+      "direction": "Bus",
+      "count": 1
+     },
+     {
+      "protocol": "Power",
+      "direction": "Output",
+      "count": 24
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": null
+  },
+  {
+   "type_id": "fbe5485b-d8c7-442e-aeb4-2e40a8bc3f25",
+   "role": "ebdk",
+   "model": "EBDK",
+   "aliases": [
+    "7180A1200"
+   ],
+   "category": "Emergency Equipment",
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "120V",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "P",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 3,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Emergency Bypass Detection Kit",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460518",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "fbe5485b-d8c7-442e-aeb4-2e40a8bc3f25",
+    "display_name": "EBDK",
+    "family": "Emergency Lighting Control",
+    "category": "Emergency Bypass Detection Kit",
+    "mapped_to": "Emergency Equipment",
+    "classification": "Product",
+    "legacy": false,
+    "model_pattern": "EBDK",
+    "part_numbers": [
+     "7180A1200"
+    ],
+    "ports": [
+     {
+      "protocol": "Contact",
+      "direction": "Input",
+      "count": 1
+     },
+     {
+      "protocol": "EBDK Switch",
+      "direction": "Bus",
+      "count": 1
+     },
+     {
+      "protocol": "Panic",
+      "direction": "Bus",
+      "count": 3
+     },
+     {
+      "protocol": "Sense",
+      "direction": "Bidirectional",
+      "count": 1
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": null
+  },
+  {
+   "type_id": "ff6d4887-353a-4919-bcc2-50ad725ecc8d",
+   "role": "nsps",
+   "model": "P-NSPS-D",
+   "aliases": [
+    "NSPS",
+    "7182A1711"
+   ],
+   "category": "Equipment",
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "U",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "N",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "UV",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "120V",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Paradigm Network Station Power Supply",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737507329",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "ff6d4887-353a-4919-bcc2-50ad725ecc8d",
+    "display_name": "NSPS",
+    "family": "Paradigm",
+    "category": "Controllers",
+    "mapped_to": "Equipment",
+    "classification": "Product",
+    "legacy": false,
+    "model_pattern": "P-NSPS-D",
+    "part_numbers": [
+     "7182A1711"
+    ],
+    "ports": [
+     {
+      "protocol": "48vdc Auxiliary Power",
+      "direction": "Bus",
+      "count": 1
+     },
+     {
+      "protocol": "Ethernet",
+      "direction": "Bidirectional",
+      "count": 1
+     },
+     {
+      "protocol": "LinkConnect",
+      "direction": "Bus",
+      "count": 1
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json",
+    "power_supply": {
+     "self": true
+    },
+    "exceptions": [
+     {
+      "code": "120V",
+      "decision": "D198",
+      "reason": "a power supply needs a 120 V feed; DaVinci gives it no Power port"
+     }
+    ]
+   },
+   "accessory_only": null
+  },
+  {
+   "type_id": "5e23fe68-e9ae-42cf-a3b3-4148c1cc31da",
+   "role": null,
+   "model": "SBB1",
+   "aliases": [
+    "1 Gang Surface Back Box",
+    "7081A2005-1",
+    "7081A2006-1",
+    "7081A2004-1",
+    "SBB1-1",
+    "SBB1-5",
+    "SBB1-4"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "2.5\" Deep 1 Gang Surface Mount Back Box",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "5e23fe68-e9ae-42cf-a3b3-4148c1cc31da",
+    "display_name": "1 Gang Surface Back Box",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "SBB1-{Surface Back Box Colors}",
+    "part_numbers": [
+     "7081A2005-1",
+     "7081A2006-1",
+     "7081A2004-1"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "73007934-a2bb-4fce-9d6d-30d4dc12da74",
+   "role": null,
+   "model": "Heritage 2 Button Faceplate",
+   "aliases": [
+    "7181A2202-1B",
+    "7181A2202-2Z",
+    "7181A2202-2A",
+    "7181A2202-4Z",
+    "7181A2202-TBD",
+    "7181A2202-3B",
+    "7181A2202-2B",
+    "7181A2202-4B",
+    "7181A2202-3A",
+    "7181A2202-1A",
+    "7181A2202-3Z",
+    "7181A2202-1Z",
+    "7181A2202-5B",
+    "7181A2202-5Z",
+    "7181A2202-5A",
+    "7181A2202-4A",
+    "UH10002-12",
+    "UH10002-2Z",
+    "UH10002-21",
+    "UH10002-4Z",
+    "UH10002-X1",
+    "UH10002-XZ",
+    "UH10002-32",
+    "UH10002-22",
+    "UH10002-42",
+    "UH10002-X2",
+    "UH10002-31",
+    "UH10002-11",
+    "UH10002-3Z",
+    "UH10002-1Z",
+    "UH10002-52",
+    "UH10002-5Z",
+    "UH10002-51",
+    "UH10002-41"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Heritage 2 Button Faceplate",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737478159",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "73007934-a2bb-4fce-9d6d-30d4dc12da74",
+    "display_name": "Heritage 2 Button Faceplate",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "UH10002-{Heritage Color with TBD}{Paradigm Two Button Legends}",
+    "part_numbers": [
+     "7181A2202-1B",
+     "7181A2202-2Z",
+     "7181A2202-2A",
+     "7181A2202-4Z",
+     "7181A2202-TBD",
+     "7181A2202-3B",
+     "7181A2202-2B",
+     "7181A2202-4B",
+     "7181A2202-3A",
+     "7181A2202-1A",
+     "7181A2202-3Z",
+     "7181A2202-1Z",
+     "7181A2202-5B",
+     "7181A2202-5Z",
+     "7181A2202-5A",
+     "7181A2202-4A"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "305bf56e-b505-4918-888f-a511364d3b01",
+   "role": null,
+   "model": "SL1",
+   "aliases": [
+    "Sliding Locking Cover",
+    "7181A1071-3",
+    "7181A1071-TBD",
+    "7181A1071-1",
+    "7181A1071-4",
+    "7181A1071-5",
+    "SL1-G",
+    "SL1-X",
+    "SL1-C",
+    "SL1-B",
+    "SL1-W"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Unison 1-Gang Sliding Locking Cover",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460243",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "305bf56e-b505-4918-888f-a511364d3b01",
+    "display_name": "Sliding Locking Cover",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "SL1-{Locking Cover Colors w/ TBD}",
+    "part_numbers": [
+     "7181A1071-3",
+     "7181A1071-TBD",
+     "7181A1071-1",
+     "7181A1071-4",
+     "7181A1071-5"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "aa123850-9f14-4b14-809b-29d9a8c85da3",
+   "role": null,
+   "model": "FLC-1",
+   "aliases": [
+    "1 Gang Flush Mount Hinged Locking Cover",
+    "1064A2007-1"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "1 Gang Flush Mount Hinged Locking Cover",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737479944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "aa123850-9f14-4b14-809b-29d9a8c85da3",
+    "display_name": "1 Gang Flush Mount Hinged Locking Cover",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "FLC-1",
+    "part_numbers": [
+     "1064A2007-1"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "644f0f7b-63b0-4fea-9526-fa3add330f90",
+   "role": null,
+   "model": "SLC-1",
+   "aliases": [
+    "1 Gang Surface Mount Hinged Locking Cover",
+    "1064A2008-1"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "1 Gang Surface Mount Hinged Locking Cover",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737479944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "644f0f7b-63b0-4fea-9526-fa3add330f90",
+    "display_name": "1 Gang Surface Mount Hinged Locking Cover",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "SLC-1",
+    "part_numbers": [
+     "1064A2008-1"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "2c07be51-d1d5-4e3d-b90a-8cb2d9f06dd1",
+   "role": null,
+   "model": "LBB1",
+   "aliases": [
+    "1 Gang Locking-Cover Back Box",
+    "1064A2002-1"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "1 Gang Locking-Cover Back Box",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "2c07be51-d1d5-4e3d-b90a-8cb2d9f06dd1",
+    "display_name": "1 Gang Locking-Cover Back Box",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "LBB1",
+    "part_numbers": [
+     "1064A2002-1"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "3a620c19-8243-4df7-a700-fc55b908ae4b",
+   "role": null,
+   "model": "AD-ST18A",
+   "aliases": [
+    "Partition Sensor Mounting Bracket",
+    "SGM1638"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Through-beam emitter/receiver mounting bracket, axial, zinc plated steel",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "3a620c19-8243-4df7-a700-fc55b908ae4b",
+    "display_name": "Partition Sensor Mounting Bracket",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "AD-ST18A",
+    "part_numbers": [
+     "SGM1638"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "c3bd24fc-0cca-454e-848c-3c1675732e64",
+   "role": null,
+   "model": "AD-C18E-00-2A",
+   "aliases": [
+    "Partition Sensor Emitter",
+    "SGM1640"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Through-beam emitter, right-angle lens, 6m sensing distance, 10-36 VDC operating voltage, 3-wire pigtail *Requires 1 mounting bracket and a UHCI Interface*",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "c3bd24fc-0cca-454e-848c-3c1675732e64",
+    "display_name": "Partition Sensor Emitter",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "AD-C18E-00-2A",
+    "part_numbers": [
+     "SGM1640"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "30c8e8d9-ea52-48a6-8bc2-728c40fa72b5",
+   "role": null,
+   "model": "AD-C18R-0P-2A",
+   "aliases": [
+    "Partition Sensor Receiver",
+    "SGM1639"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Through-beam receiver, right-angle lens, 6m sensing distance, 10-36 VDC operating voltage, 4-wire pigtail. *Requires 1 mounting bracket and a UHCI Interface*",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "30c8e8d9-ea52-48a6-8bc2-728c40fa72b5",
+    "display_name": "Partition Sensor Receiver",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "AD-C18R-0P-2A",
+    "part_numbers": [
+     "SGM1639"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "eafb8d33-b707-491b-ad1a-3e97961cc9d3",
+   "role": null,
+   "model": "P-LCD-FBB",
+   "aliases": [
+    "7\" Touchscreen Flush Back Box",
+    "7184A1502"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "7\" Touchscreen Flush Back Box",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737479944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "eafb8d33-b707-491b-ad1a-3e97961cc9d3",
+    "display_name": "7\" Touchscreen Flush Back Box",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "P-LCD-FBB",
+    "part_numbers": [
+     "7184A1502"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "828f8270-6aa1-4770-a9f2-5e3e29ee48f6",
+   "role": null,
+   "model": "P-LCD-SBB",
+   "aliases": [
+    "7\" Touchscreen Surface Back Box",
+    "7184A1503"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "7\" Touchscreen Surface Back Box",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737479944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "828f8270-6aa1-4770-a9f2-5e3e29ee48f6",
+    "display_name": "7\" Touchscreen Surface Back Box",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "P-LCD-SBB",
+    "part_numbers": [
+     "7184A1503"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "761947c7-76ac-4a8e-8151-e1bbbb189091",
+   "role": null,
+   "model": "P-LCD-SLBB",
+   "aliases": [
+    "7\" Touchscreen Surface Back Box - Locking Cover",
+    "7184A1505"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "7\" Touchscreen Surface Back Box - Locking Cover",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737479944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "761947c7-76ac-4a8e-8151-e1bbbb189091",
+    "display_name": "7\" Touchscreen Surface Back Box - Locking Cover",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "P-LCD-SLBB",
+    "part_numbers": [
+     "7184A1505"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "15547e0b-0ba8-4c37-8931-952cc97aacef",
+   "role": null,
+   "model": "P-LCD-LC",
+   "aliases": [
+    "7\" Touchscreen Hinged Locking Cover",
+    "7184A1504-5",
+    "7184A1504-4",
+    "7184A1504-TBD",
+    "7184A1504-3",
+    "7184A1504-1",
+    "P-LCD-LC-5",
+    "P-LCD-LC-4",
+    "P-LCD-LC-X",
+    "P-LCD-LC-3",
+    "P-LCD-LC-1"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Paradigm Touchscreen Wall Mount Locking Cover",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737479944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "15547e0b-0ba8-4c37-8931-952cc97aacef",
+    "display_name": "7\" Touchscreen Hinged Locking Cover",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "P-LCD-LC{Heritage Color-Wall-Mount Touchscreen}",
+    "part_numbers": [
+     "7184A1504-5",
+     "7184A1504-4",
+     "7184A1504-TBD",
+     "7184A1504-3",
+     "7184A1504-1"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "943ef1b6-3c5d-4f65-8c6d-2abcc413b7fa",
+   "role": null,
+   "model": "P-LCD-SBB-5",
+   "aliases": [
+    "7\" Touchscreen Surface Back Box - white",
+    "7184A1503-5"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "7\u201d Touchscreen Surface Back Box - white",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737479944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "943ef1b6-3c5d-4f65-8c6d-2abcc413b7fa",
+    "display_name": "7\" Touchscreen Surface Back Box - white",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "P-LCD-SBB-5",
+    "part_numbers": [
+     "7184A1503-5"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "4534a57d-254b-48e0-ba18-4ce4bf1a0f35",
+   "role": null,
+   "model": "ERn-BM",
+   "aliases": [
+    "7180A1006"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "ERn Blank Module",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737518831",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "4534a57d-254b-48e0-ba18-4ce4bf1a0f35",
+    "display_name": "ERn-BM",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERn-BM",
+    "part_numbers": [
+     "7180A1006"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "df54a4ef-f60a-49f3-8ee2-5df8fd1d5821",
+   "role": null,
+   "model": "ERn-Net",
+   "aliases": [
+    "7180A1004"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "N",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "N",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "N",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "N",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": true,
+   "description": "ERn Ethernet Switch with Power over Ethernet",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460142",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "df54a4ef-f60a-49f3-8ee2-5df8fd1d5821",
+    "display_name": "ERn-Net",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERn-Net",
+    "part_numbers": [
+     "7180A1004"
+    ],
+    "ports": [
+     {
+      "protocol": "Ethernet",
+      "direction": "Bidirectional",
+      "count": 4
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "77d22bee-a1bf-4023-a0a2-63869f002b40",
+   "role": null,
+   "model": "P-SPM-E",
+   "aliases": [
+    "7182A1701"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "U",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "UV",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "120V",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": true,
+   "description": "Unison Paradigm Station Power Module Mk2",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737500988",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "77d22bee-a1bf-4023-a0a2-63869f002b40",
+    "display_name": "P-SPM-E",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "P-SPM-E",
+    "part_numbers": [
+     "7182A1701"
+    ],
+    "ports": [
+     {
+      "protocol": "24vdc Auxiliary Power",
+      "direction": "Bus",
+      "count": 1
+     },
+     {
+      "protocol": "LinkConnect",
+      "direction": "Bus",
+      "count": 1
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json",
+    "power_supply": {
+     "self": true
+    },
+    "exceptions": [
+     {
+      "code": "120V",
+      "decision": "D198",
+      "reason": "a power supply needs a 120 V feed; DaVinci gives it no Power port"
+     }
+    ]
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "eca9da88-ff23-4b52-85ab-bf9d5b48465c",
+   "role": null,
+   "model": "ERn-RPS Mk2",
+   "aliases": [
+    "7180A1705"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "ERn-RPS Mk2",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "eca9da88-ff23-4b52-85ab-bf9d5b48465c",
+    "display_name": "ERn-RPS Mk2",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERn-RPS Mk2",
+    "part_numbers": [
+     "7180A1705"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "41d79f81-b073-4600-970d-2c19db7245c9",
+   "role": null,
+   "model": "P-ACP-E Mk2",
+   "aliases": [
+    "7180A1701"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "N",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "X",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "X",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": false,
+     "qty": 1,
+     "status": null
+    },
+    {
+     "code": "P",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": true,
+   "description": "Paradigm Processor Mk2 - Enclosure",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737518830",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "41d79f81-b073-4600-970d-2c19db7245c9",
+    "display_name": "P-ACP-E Mk2",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "P-ACP-E Mk2",
+    "part_numbers": [
+     "7180A1701"
+    ],
+    "ports": [
+     {
+      "protocol": "DMX",
+      "direction": "Output",
+      "count": 2
+     },
+     {
+      "protocol": "Ethernet",
+      "direction": "Bidirectional",
+      "count": 1
+     },
+     {
+      "protocol": "Panic",
+      "direction": "Bus",
+      "count": 1
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "5db5a236-ffd1-4114-9d24-f51aa30c669e",
+   "role": null,
+   "model": "URTO Mk2",
+   "aliases": [
+    "7180A1709"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "URTO Mk2",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "5db5a236-ffd1-4114-9d24-f51aa30c669e",
+    "display_name": "URTO Mk2",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "URTO Mk2",
+    "part_numbers": [
+     "7180A1709"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "16a5dbc1-c0d3-4d02-bb79-8ee7717a5b5f",
+   "role": null,
+   "model": "ERn2-W-UPG",
+   "aliases": [
+    "ERn2 Mk2 Upgrade Kit - 120V/240V",
+    "7180A1731"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "120V",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "ERn2 Mk2 upgrade kit to include ERn wall mount left & right I/Os and 120/240V power supply",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "16a5dbc1-c0d3-4d02-bb79-8ee7717a5b5f",
+    "display_name": "ERn2 Mk2 Upgrade Kit - 120V/240V",
+    "family": "Paradigm",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERn2-W-UPG",
+    "part_numbers": [
+     "7180A1731"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json",
+    "power_supply": {
+     "self": true
+    },
+    "exceptions": [
+     {
+      "code": "120V",
+      "decision": "D198",
+      "reason": "a power supply needs a 120 V feed; DaVinci gives it no Power port"
+     }
+    ]
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "d22fb480-10b7-4bb9-9b07-e5520d880ea1",
+   "role": null,
+   "model": "ERP-FT-LVD",
+   "aliases": [
+    "0-10V Option Kit - FT (24 CH)",
+    "7123K1204"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "0-10V",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 24,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "ERP-FT 0-10V Dimming Control Option Kit  - Supports 24 loops of 4 wire (0-10V) ballasts",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "d22fb480-10b7-4bb9-9b07-e5520d880ea1",
+    "display_name": "0-10V Option Kit - FT (24 CH)",
+    "family": "Power Control",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERP-FT-LVD",
+    "part_numbers": [
+     "7123K1204"
+    ],
+    "ports": [
+     {
+      "protocol": "0-10V",
+      "direction": "Output",
+      "count": 24
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "d460760b-c0ef-4dfd-a1b5-52840901c53b",
+   "role": null,
+   "model": "ERP-FT-CI",
+   "aliases": [
+    "Contact Input Option Kit - FT",
+    "7123K1105"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "ERP-FT Contact Input Option Kit includes 24 inputs for direct control of relays",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "d460760b-c0ef-4dfd-a1b5-52840901c53b",
+    "display_name": "Contact Input Option Kit - FT",
+    "family": "Power Control",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERP-FT-CI",
+    "part_numbers": [
+     "7123K1105"
+    ],
+    "ports": [
+     {
+      "protocol": "Contact",
+      "direction": "Input",
+      "count": 24
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "4b326a66-3fe6-40ba-8078-567c4b6a973c",
+   "role": null,
+   "model": "ERP-FT-DALI",
+   "aliases": [
+    "DALI Dimming Option Kit - FT",
+    "7123K1103"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "D",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 24,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "ERP-FT DALI Dimming Control Option Kit includes 24 loops of broadcast DALI control",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460503",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "4b326a66-3fe6-40ba-8078-567c4b6a973c",
+    "display_name": "DALI Dimming Option Kit - FT",
+    "family": "Power Control",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERP-FT-DALI",
+    "part_numbers": [
+     "7123K1103"
+    ],
+    "ports": [
+     {
+      "protocol": "DALI",
+      "direction": "Bus",
+      "count": 24
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "24047f30-bfef-4361-9e24-8cdc6ab93e60",
+   "role": null,
+   "model": "ERP-RTO",
+   "aliases": [
+    "Ride Thru Option Kit",
+    "7123K1017"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Ride Thru Option Kit",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "24047f30-bfef-4361-9e24-8cdc6ab93e60",
+    "display_name": "Ride Thru Option Kit",
+    "family": "Power Control",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERP-RTO",
+    "part_numbers": [
+     "7123K1017"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "8d4ea12d-630e-45f0-907b-123fdf752aa1",
+   "role": null,
+   "model": "ERP-FT-TPH",
+   "aliases": [
+    "Tamperproof Hardware Kit - FT",
+    "7023K1004"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "ERP-FT Tamperproof Hardware Kit",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737483944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "8d4ea12d-630e-45f0-907b-123fdf752aa1",
+    "display_name": "Tamperproof Hardware Kit - FT",
+    "family": "Power Control",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERP-FT-TPH",
+    "part_numbers": [
+     "7023K1004"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "53a4f6f5-27ab-4a06-883c-157dc8729925",
+   "role": null,
+   "model": "ERP-FT-VB",
+   "aliases": [
+    "Voltage-Barrier Kit - FT",
+    "7023K1003"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "ERP-FT Voltage-Barrier Kit",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737483942",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "53a4f6f5-27ab-4a06-883c-157dc8729925",
+    "display_name": "Voltage-Barrier Kit - FT",
+    "family": "Power Control",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERP-FT-VB",
+    "part_numbers": [
+     "7023K1003"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "16c30939-e34b-45fd-8faa-277aa06d176f",
+   "role": null,
+   "model": "ERP-TPH",
+   "aliases": [
+    "Tamperproof Hardware Kit - Echo Relay Panel",
+    "7123K1019"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": null,
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "Tamperproof Hardware Kit - Echo Relay Panel",
+   "datasheet_url": "https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737483944",
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "16c30939-e34b-45fd-8faa-277aa06d176f",
+    "display_name": "Tamperproof Hardware Kit - Echo Relay Panel",
+    "family": "Power Control",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "ERP-TPH",
+    "part_numbers": [
+     "7123K1019"
+    ],
+    "ports": [],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  },
+  {
+   "type_id": "c324a34f-7b5d-4cbf-8764-002ccc7f6c39",
+   "role": null,
+   "model": "SS UPGRADE24",
+   "aliases": [
+    "24 Channel SmartSwitch Retrofit Kit",
+    "7123K1100"
+   ],
+   "category": null,
+   "default_cables": null,
+   "optional_cables": [
+    {
+     "code": "120V",
+     "from": null,
+     "to": null,
+     "far": null,
+     "single_row": true,
+     "qty": 1,
+     "status": null
+    }
+   ],
+   "optional_accessories": null,
+   "needs_neuron_id": null,
+   "description": "24 Channel SmartSwitch Retrofit Kit",
+   "datasheet_url": null,
+   "source_ref": {
+    "kind": "davinci",
+    "type_id": "c324a34f-7b5d-4cbf-8764-002ccc7f6c39",
+    "display_name": "24 Channel SmartSwitch Retrofit Kit",
+    "family": "Power Control",
+    "category": "Accessories",
+    "mapped_to": "Ignore",
+    "classification": "Accessory",
+    "legacy": false,
+    "model_pattern": "SS UPGRADE24",
+    "part_numbers": [
+     "7123K1100"
+    ],
+    "ports": [
+     {
+      "protocol": "Sense",
+      "direction": "Bidirectional",
+      "count": 1
+     }
+    ],
+    "library_timestamp": "2026-10-13T18:57:47.923Z",
+    "file": "library.json"
+   },
+   "accessory_only": true
+  }
+ ]
+}

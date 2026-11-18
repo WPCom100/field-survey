@@ -3,25 +3,24 @@
  * propose or write. The checks already covered elsewhere: Issue device without an open item
  * (`R1.no_item`), item text outside `vocab(punch_item)` (`R3f`), To ≠ riser (`R2b`), accessory
  * found < expected (`Acc`; a type's accessory groups and max quantities are
- * `lint.accessory_group`, T113). "Ends with different code" cannot happen: a cable is one record
+ * `lint.accessory_group`, T113). The by-role checks "NSPS/rack without 120V row" and "Relay panel
+ * without P or 0-10V row" went with R2c / R2d (T199, D289, D290): a required run a device lacks is
+ * R2g's open draft; a run the device cannot take without an accessory is
+ * `lint.cable_needs_accessory` (D288 (4)). "Ends with different code" cannot happen: a cable is one record
  * with one code (CLAUDE.md §8), so only incompatible statuses are checked.
  *
  * Every message names the facts the finding follows from and nothing volatile: a dismissed
  * finding reopens when its message changes (D178).
  */
 
-import { canonicalCategory, MASTER_CATEGORY_RENAME, ROLE_LABEL } from '@field-survey/core';
+import { canonicalCategory, MASTER_CATEGORY_RENAME } from '@field-survey/core';
 
 import { DEVICE_CATEGORIES } from '../lints';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow, PunchItemRow } from '../snapshot';
-import { ADDRESS_KINDS, ADDRESS_LABEL, deviceRole, governingCables, parseLibraryAccessories, typeOfDevice, type AddressKind, type LibraryAccessory } from './library';
+import { ADDRESS_KINDS, ADDRESS_LABEL, deviceCables, parseLibraryAccessories, typeOfDevice, type AddressKind, type LibraryAccessory } from './library';
 import { addressItemText, addressItems, addressSubject, floorAddresses } from './r3';
 import { cableOf, compareIds, compareLevels, deviceLabel, endLabel, signal, str, subjectOfDevice, subjectOfEnd } from './shared';
-
-function hasCode(ctx: RuleContext, d: DeviceRow, code: string): boolean {
-  return (ctx.index.endsByDevice.get(d.id) ?? []).some((e) => cableOf(ctx, e)?.cable === code);
-}
 
 function punchLabel(p: PunchItemRow): string {
   return `Punch #${p.number ?? 'NEW'}${p.item ? ` "${p.item}"` : ''}`;
@@ -33,29 +32,33 @@ function levelNames(levels: readonly LevelRow[]): string {
 
 // ------------------------------------------------------------------ library cables
 
-export const LintPower: Rule = {
-  id: 'lint.power_120v',
-  title: 'NSPS/rack without 120V row',
-  text: 'An NSPS or equipment rack (by role, D201) has a 120V row (PLAN §6.2, D52); one without is flagged. R2d offers the row as a draft.',
+/**
+ * Without the accessory the device does not take the cable (T199, D288 (4)): a live cable end on
+ * a device whose code neither its type nor the accessories it carries give (required or optional),
+ * while a slot of its type it does not carry would. Never an automatic change: the surveyor adds
+ * the accessory row (found or not) or corrects the cable; removing an accessory row deletes no
+ * cable, this finding appears instead. A code no slot of the type could give is not this lint's
+ * business.
+ */
+export const LintCableNeedsAccessory: Rule = {
+  id: 'lint.cable_needs_accessory',
+  title: 'Cable needs an accessory the device does not carry',
+  text: 'A device takes a cable only from its type or an accessory it carries (D288): an end whose code neither gives, while an accessory slot of the type would, is flagged with the accessory to add; no cable is changed by itself.',
   run(ctx) {
     for (const d of ctx.index.device.values()) {
-      const role = deviceRole(ctx, d);
-      if (role !== 'nsps' && role !== 'equipment_rack') continue;
-      if (hasCode(ctx, d, '120V') || governingCables(ctx, d)) continue;
-      ctx.find({ subject: subjectOfDevice(d), message: `${deviceLabel(ctx, d)}: ${ROLE_LABEL[role]} without a 120V row` });
-    }
-  },
-};
-
-export const LintRelay: Rule = {
-  id: 'lint.relay_cables',
-  title: 'Relay panel without P or 0-10V row',
-  text: 'A relay panel (by role, D201) has a P row and a 0-10V row (PLAN §6.2); a missing one is flagged. R2c offers it as a draft.',
-  run(ctx) {
-    for (const d of ctx.index.device.values()) {
-      if (deviceRole(ctx, d) !== 'relay_panel' || governingCables(ctx, d)) continue;
-      for (const code of ['P', '0-10V']) {
-        if (!hasCode(ctx, d, code)) ctx.find({ subject: subjectOfDevice(d), discriminator: code, message: `${deviceLabel(ctx, d)}: Relay panel without a ${code} row` });
+      const ends = ctx.index.endsByDevice.get(d.id);
+      if (!ends?.length) continue;
+      const plan = deviceCables(ctx, d);
+      if (!plan.absent.length) continue;
+      const given = new Set([...plan.required, ...plan.optional].map((r) => r.cable.code));
+      const seen = new Set<string>();
+      for (const e of ends) {
+        const code = cableOf(ctx, e)?.cable;
+        if (!code || given.has(code) || seen.has(code)) continue;
+        seen.add(code);
+        const models = plan.absent.filter((a) => a.codes.includes(code)).map((a) => a.model);
+        if (!models.length) continue;
+        ctx.find({ subject: subjectOfDevice(d), discriminator: code, message: `${deviceLabel(ctx, d)}: ${code} needs ${models.join(' or ')}` });
       }
     }
   },
@@ -510,8 +513,7 @@ export const LintAccessoryGroup: Rule = {
 };
 
 export const LINT_RULES: readonly Rule[] = [
-  LintPower,
-  LintRelay,
+  LintCableNeedsAccessory,
   LintOwner,
   LintNeuronItem,
   LintVocab,

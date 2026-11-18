@@ -366,7 +366,7 @@ export function DeviceCard(props: DeviceCardProps) {
           ))}
           {/* The type's optional cables (Library, T105): greyed until tapped, then a real run with both ends. */}
           {card.cableOffers.map((o) => (
-            <OfferRow key={o.key} label={`+ add ${o.title}`} sub="optional" disabled={readOnly} onPress={() => void run((e) => addOptionalCable(e, store, d.id, o.cable))} />
+            <OfferRow key={o.key} label={`+ add ${o.title}`} sub={o.via ? `optional · ${o.via}` : 'optional'} disabled={readOnly} onPress={() => void run((e) => addOptionalCable(e, store, d.id, o.cable))} />
           ))}
         </Section>
 

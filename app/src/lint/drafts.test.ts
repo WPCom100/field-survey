@@ -4,7 +4,7 @@
  * order, filtered by level, and they are decided through the card's `ProposalDecider`.
  */
 
-import { Editor, Store, uuidv7 } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, Store, uuidv7 } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
@@ -26,13 +26,16 @@ async function setup() {
     await g.create('level', { id: ids.l03, project_id: PROJECT, level: '03', floor_order: 4, numbering_group_id: uuidv7(), in_scope: true });
     await g.create('level', { id: ids.l06, project_id: PROJECT, level: '06', floor_order: 7, numbering_group_id: g6, in_scope: true });
     await g.create('level', { id: ids.l06m, project_id: PROJECT, level: '06M', floor_order: 8, numbering_group_id: g6, in_scope: true });
-    // R2e: an NSPS and no Unison row on 03 (R2d's 120V draft is on the device: the card's, not listed)
+    // R2e: an NSPS and no Unison row on 03 (its type's 120V draft, R2g, is on the device: the card's, not listed)
     await g.create('device', { id: ids.nsps, level_id: ids.l03, display_id: '03-01', category: 'NSPS', device: 'P-NSPS-D' });
     // R3c: on 06 a station with no Neuron ID ("all"); on 06M one without and one with ("some") — one numbering group, an item per floor (T169)
     await g.create('device', { id: ids.s1, level_id: ids.l06, display_id: '06-S1', category: 'Station', status: 'Installed, untested' });
     await g.create('device', { id: ids.s2, level_id: ids.l06m, display_id: '06M-S1', category: 'Station', status: 'Installed, untested' });
     await g.create('device', { level_id: ids.l06m, display_id: '06M-S2', category: 'Station', status: 'Installed, untested', neuron_id: '00A1B2C3D4E5' });
   });
+  await editor
+    .forStream(LIBRARY_STREAM)
+    .create('library_type', { project_id: null, model: 'P-NSPS-D', category: 'NSPS', state: 'accepted', default_cables: [{ code: '120V', single_row: true, qty: 1 }] }, { change_type: 'Master edit', reason: 'seed' });
   const engine = engineFor(store, PROJECT, ME);
   await engine.run();
   return { store, engine, ids };
@@ -62,7 +65,7 @@ describe('Lint view: drafts without a device', () => {
     expect(r3c06).toMatchObject({ deviceId: null, device: null });
     // the NSPS's 120V draft (subject: the device) stays on its card
     const all = await store.list<Record<string, unknown>>('proposal', { where: `state = 'proposed'` });
-    expect(all.some((p) => p.rule_id === 'R2d')).toBe(true);
+    expect(all.filter((p) => p.rule_id === 'R2g').map((p) => p.discriminator)).toEqual(['120V']);
 
     expect((await loadLintView(store, PROJECT, { levelId: ids.l06 })).drafts.map((d) => d.subject)).toEqual(['Level 06']);
     expect((await loadLintView(store, PROJECT, { levelId: ids.l06m })).drafts.map((d) => d.subject)).toEqual(['Level 06M']);

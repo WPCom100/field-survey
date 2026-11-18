@@ -23,6 +23,7 @@ from app.jobs import runner
 from app.models import ImportBatch, LibraryType, Op, Vocab
 
 SAMPLE = SERVER_DIR.parent / "fixtures" / "davinci-library-sample.json"
+TYPES_FIXTURE = SERVER_DIR.parent / "fixtures" / "davinci-library-types.json"
 CATEGORIES = SERVER_DIR.parent / "fixtures" / "DaVinci_categories.xlsx"
 needs_sample = pytest.mark.skipif(
     not SAMPLE.exists(), reason=f"golden fixture missing: {SAMPLE} (CLAUDE.md §6)"
@@ -82,7 +83,32 @@ def by_type(plan: dl.Plan) -> dict[str, dict]:
 
 
 def codes(payload: dict) -> list[tuple[str, int, bool]]:
-    return [(c["code"], c["qty"], c["single_row"]) for c in (payload["default_cables"] or [])]
+    """The type's cable rows: all undecided, in `optional_cables` (D292 (1))."""
+    assert payload["default_cables"] is None
+    return [(c["code"], c["qty"], c["single_row"]) for c in (payload["optional_cables"] or [])]
+
+
+def dtype(**kw) -> dl.DType:
+    """A hand-built catalogue type, for what the sample does not hold."""
+    base = dict(
+        type_id=str(uuid7()),
+        display_name="Rack",
+        description="",
+        family="Paradigm",
+        category="Equipment Racks",
+        classification="",
+        legacy=False,
+        model_pattern="RACK",
+        model="RACK",
+        variants=(),
+        part_numbers=(),
+        ports=(),
+        slots=(),
+        groups=(),
+        properties=(),
+        datasheet_url=None,
+    )
+    return dl.DType(**{**base, **kw})
 
 
 def mapping_xlsx(rows: list[tuple[str, str, str]], overrides=()) -> bytes:
@@ -207,7 +233,10 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     ref = nsps["source_ref"]
     assert ref["kind"] == "davinci" and ref["type_id"] == NSPS and ref["mapped_to"] == "Equipment"
     assert ref["family"] == "Paradigm" and ref["category"] == "Controllers"
-    assert ref["power_supply"] == {"self": True, "accessories": []}
+    # D198, an exception to "from DaVinci's ports" (D291): named on the type, with why
+    assert ref["power_supply"] == {"self": True}
+    assert ref["exceptions"] == [dl.EXCEPTION_SUPPLY]
+    assert ref["exceptions"][0]["code"] == "120V" and ref["exceptions"][0]["decision"] == "D198"
     assert {"protocol": "48vdc Auxiliary Power", "direction": "Bus", "count": 1} in ref["ports"]
 
     ebdk = p[EBDK]
@@ -247,8 +276,9 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     # the DALI option kit: 24 loops as one D row (D199)
     dali = next(t for t in plan.types if t.payload["model"] == "ERP-FT-DALI")
     assert codes(dali.payload) == [("D", 24, True)]
-    assert "power_supply" not in erp["source_ref"]
-    # the ERn2 enclosure has no mapped port, but carries power-supply modules → a 120V feed
+    assert "power_supply" not in erp["source_ref"] and "exceptions" not in erp["source_ref"]
+    # the ERn2 enclosure has no mapped port and carries power-supply modules: the feed is the
+    # supply's own row, on the supply's type; the host gets none from the import (D288 (6))
     ern = p[ERN2]
     # an ERn enclosure is an Equipment Panel (D232), still a rack: no Neuron ID
     assert ern["category"] == "Equipment Panels" and ern["needs_neuron_id"] is None
@@ -256,18 +286,77 @@ def test_plan_categories_cables_and_neuron_ids(plan):
     modules = [t for t in plan.types if t.payload["model"] in ("ERn-Net", "ERn-BM", "ERn2-W-UPG")]
     assert len(modules) == 3
     assert all(t.payload["accessory_only"] and t.payload["category"] is None for t in modules)
-    assert codes(ern) == [("120V", 1, True)]
-    assert ern["source_ref"]["power_supply"] == {
-        "self": False,
-        "accessories": ["P-SPM-E", "ERn2-W-UPG"],
-    }
-    # NSPS, NSPS-KIT, ERn2 (by its modules), P-SPM-E and the upgrade kit; the ERP's 24 outputs
-    assert plan.stats["power_supplies"] == 5 and plan.stats["load_outputs"] == 24
+    assert codes(ern) == []
+    assert "power_supply" not in ern["source_ref"] and "exceptions" not in ern["source_ref"]
+    for model in ("P-SPM-E", "ERn2-W-UPG"):
+        supply = next(t for t in plan.types if t.payload["model"] == model).payload
+        assert ("120V", 1, True) in codes(supply), model
+        assert supply["source_ref"]["power_supply"] == {"self": True}
+        fed = any(
+            x["protocol"] == "Power" and x["direction"] in ("Input", "Bus")
+            for x in supply["source_ref"]["ports"]
+        )
+        # the row is an exception only where DaVinci gives the supply no Power port (D198)
+        assert ("exceptions" in supply["source_ref"]) == (not fed), model
+    # NSPS, NSPS-KIT, P-SPM-E and the upgrade kit are supplies themselves; the ERP's 24 outputs
+    assert plan.stats["power_supplies"] == 4 and plan.stats["load_outputs"] == 24
+    # every row is undecided (D292 (1)); the exception rows are counted and named
+    assert all(t.payload["default_cables"] is None for t in plan.types)
+    rows = sum(len(t.payload["optional_cables"] or []) for t in plan.types)
+    named = [t for t in plan.types if t.payload["source_ref"].get("exceptions")]
+    assert plan.stats["undecided_cable_rows"] == rows and rows > 20
+    assert plan.stats["exception_rows"] == len(named) >= 2
     # protocols Landry ruled not surveyed (D200): no row, no draft, counted
     assert plan.not_surveyed_protocols["Contact"] == 4
     assert plan.not_surveyed_protocols["EBDK Switch"] == 1
     assert plan.unmapped_protocols == {}  # every protocol in the sample has a ruling
     assert "Sense" not in plan.not_surveyed_protocols
+
+
+def test_exceptions_are_rows_on_the_type_never_a_host_row():
+    """D291: the exceptions to "from DaVinci's ports" — a supply with no Power port (D198), a
+    portless Equipment Racks shell (D291 (4)) — are ordinary rows the import writes, each named
+    with its decision and reason; a carried supply gives its host nothing (D288 (6))."""
+    feed = dl.Port("Power", "Input", "AC in")
+    dmx = dl.Port("DMX", "Input", "DMX")
+    contact = dl.Port("Contact", "Input", "Dry contact")
+
+    def rows(c: dl.Cables) -> list[tuple[str, int, bool]]:
+        return [(r["code"], r["qty"], r["single_row"]) for r in c.rows]
+
+    # the rack shell: no ports → one 120V row, with why
+    shell = dl.cables_of(dtype(), "Equipment Panels", rack_shell=True)
+    assert rows(shell) == [("120V", 1, True)] and shell.exceptions == [dl.EXCEPTION_RACK_SHELL]
+    assert shell.exceptions[0]["decision"] == "D291" and "D52" in shell.exceptions[0]["reason"]
+    # only not-surveyed ports: still a shell; a surveyed port, or a Power input, and it is not
+    assert rows(dl.cables_of(dtype(ports=(contact,)), None, rack_shell=True)) == [("120V", 1, True)]
+    wired = dl.cables_of(dtype(ports=(dmx,)), None, rack_shell=True)
+    assert rows(wired) == [("X", 1, False)] and wired.exceptions == []
+    fed = dl.cables_of(dtype(ports=(feed, feed)), None, rack_shell=True)
+    assert rows(fed) == [("120V", 2, True)] and fed.exceptions == []
+    # the same type that is not a rack shell (an accessory, another category) takes nothing
+    assert rows(dl.cables_of(dtype(), None)) == []
+    # a supply: its own row, an exception only without a Power port
+    own = dl.cables_of(dtype(is_power_supply=True), None)
+    assert rows(own) == [("120V", 1, True)] and own.exceptions == [dl.EXCEPTION_SUPPLY]
+    assert dl.cables_of(dtype(is_power_supply=True, ports=(feed,)), None).exceptions == []
+    # a host with a supply slot: nothing here; the supply's row reaches it through the accessory
+    host = dtype(slots=(dl.Slot(type_id="s", max_quantity=1, user_definable=False),))
+    assert rows(dl.cables_of(host, "Equipment")) == []
+
+
+@needs_sample
+@needs_categories
+def test_the_types_fixture_is_what_the_import_plans(plan):
+    """`fixtures/davinci-library-types.json` (tests/dump_davinci_types.py) feeds the rules' golden
+    test (packages/rules, TP-8): it must be this plan, or that test reads a stale library."""
+    if not TYPES_FIXTURE.exists():
+        pytest.skip(f"golden fixture missing: {TYPES_FIXTURE} (CLAUDE.md §6)")
+    from dump_davinci_types import dump
+
+    assert json.loads(TYPES_FIXTURE.read_text(encoding="utf-8")) == json.loads(
+        json.dumps(dump(plan))
+    ), "regenerate: uv run python tests/dump_davinci_types.py"
 
 
 @needs_sample
@@ -405,7 +494,11 @@ def test_job_writes_app_library_drafts_and_vocab_drafts(
     assert nsps.needs_neuron_id is None and nsps.accessory_only is None
     assert s["neuron_flags_corrected"] == 0
     assert nsps.description == "Paradigm Network Station Power Supply"
-    assert [c["code"] for c in nsps.default_cables] == ["U", "N", "UV", "120V"]
+    # the rows are undecided: optional until the type's first use answers (D292 (1))
+    assert nsps.default_cables is None
+    assert [c["code"] for c in nsps.optional_cables] == ["U", "N", "UV", "120V"]
+    assert nsps.source_ref["exceptions"] == [dl.EXCEPTION_SUPPLY]
+    assert s["undecided_cable_rows"] > 20 and s["exception_rows"] >= 2
     assert types[LVD].accessory_only is True and types[LVD].category is None
     assert types[ERN2].optional_accessories[4]["group"]["min"] == 2
     # T112 (D201): a created type gets its role from our category and DaVinci's family / name
@@ -460,27 +553,58 @@ def test_an_unmapped_protocol_is_an_app_level_cable_code_draft(
 
 @needs_sample
 @needs_categories
-def test_rerun_updates_drafts_by_type_id_and_leaves_accepted_types(
+def test_rerun_sets_every_field_nobody_edited_in_any_state(
     session, store, factory, sample, categories
 ):
+    """D292 (4): a re-run sets, on an accepted or rejected type too, every field whose head is
+    still the import's; a field a person set — an edit in the Library, the first-use answer —
+    stands (it replaced D197's "accepted → untouched")."""
     pid = _project(session)
     first = _run(session, store, factory, pid, sample, categories)
     assert first.job_state == "done", first.stats
     types = _app_types(session)
-    # Landry accepts the NSPS (with her own edits) and rejects the EBDK
-    types[NSPS].state = "accepted"
-    types[NSPS].aliases = ["NSPS", "7182A1711", "P-NSPS-D-DIN"]
-    types[EBDK].state = "rejected"
+    # Landry accepts the NSPS with her own alias and her first-use answer (the 120V required,
+    # the rest optional), and rejects the EBDK: ops of hers, so their heads are no longer the
+    # import's
+    ann = upsert_user(session, "Landry")
+    hand = dl._Ops(dl.LIBRARY_STREAM, ann.id)
+    nsps = types[NSPS]
+    answer = {
+        "aliases": ["NSPS", "7182A1711", "P-NSPS-D-DIN"],
+        "default_cables": [c for c in nsps.optional_cables if c["code"] == "120V"],
+        "optional_cables": [c for c in nsps.optional_cables if c["code"] != "120V"],
+        "state": "accepted",
+    }
+    for field, now in answer.items():
+        was, head = getattr(nsps, field), dl._head(session, nsps.id, field)
+        hand.set("library_type", nsps.id, field, was, now, head)
+    hand.set(
+        "library_type",
+        types[EBDK].id,
+        "state",
+        "draft",
+        "rejected",
+        dl._head(session, types[EBDK].id, "state"),
+    )
+    for op in hand.ops:
+        op.reason = "Device-type library"
+    dl._push(session, dl.LIBRARY_STREAM, hand.ops, library=True)
     types[TS7].role = "other"  # a role corrected by hand on a draft (D199 (3))
     session.commit()
     # a newer library: the touchscreen's description changed, the NSPS's too, a type is new
     doc = json.loads(sample)
     doc["timestamp"] = "2026-11-01T00:00:00.000Z"
+    dmx_protocol = next(
+        x["portProtocolId"] for x in doc["constants"]["portProtocols"] if x["text"] == "DMX"
+    )
     for t in doc["types"]:
         if t["typeId"] == TS7:
             t["typeInformation"]["description"] = 'Paradigm 7" Wall-mount Touchscreen (Mk2)'
-        if t["typeId"] == NSPS:
+        if t["typeId"] in (NSPS, EBDK):
             t["typeInformation"]["description"] = "changed"
+        if t["typeId"] == NSPS:
+            # the catalogue adds a DMX port to the NSPS: a cable list Landry answered stands
+            t["ports"].append({**t["ports"][0], "name": "DMX out", "portProtocolId": dmx_protocol})
     new = json.loads(json.dumps(next(t for t in doc["types"] if t["typeId"] == EBDK)))
     new["typeId"] = str(uuid7())
     new["typeInformation"]["displayName"] = "EBDK-2"
@@ -494,8 +618,8 @@ def test_rerun_updates_drafts_by_type_id_and_leaves_accepted_types(
     s = second.stats
     assert s["categories_reused_from"] == str(first.id)  # the mapping was not uploaded again
     assert s["created"] == 1 and s["kept_accepted"] == 1 and s["kept_rejected"] == 1
-    # every draft's source_ref carries the new timestamp, so all 35 drafts are "updated"
-    assert s["updated"] == 35 and s["unchanged"] == 0
+    # every type's source_ref carries the new timestamp, so all 37 are "updated", in any state
+    assert s["updated"] == 37 and s["unchanged"] == 0
     assert s["vocab_drafts"] == 0
     session.expire_all()
     types = _app_types(session)
@@ -503,9 +627,28 @@ def test_rerun_updates_drafts_by_type_id_and_leaves_accepted_types(
     assert types[TS7].state == "draft" and types[TS7].source_ref["library_timestamp"].startswith(
         "2026-11"
     )
-    assert types[NSPS].description == "Paradigm Network Station Power Supply"  # accepted: untouched
-    assert types[NSPS].aliases == ["NSPS", "7182A1711", "P-NSPS-D-DIN"]
-    assert types[EBDK].state == "rejected" and types[new["typeId"]].model == "EBDK-2"
+    # the accepted NSPS: the description nobody edited follows the file; her alias and her
+    # first-use answer stand, though the file now gives the type a DMX port
+    nsps = types[NSPS]
+    assert nsps.state == "accepted" and nsps.description == "changed"
+    assert nsps.source_ref["library_timestamp"].startswith("2026-11")
+    assert any(x["protocol"] == "DMX" for x in nsps.source_ref["ports"])
+    assert nsps.aliases == ["NSPS", "7182A1711", "P-NSPS-D-DIN"]
+    assert [c["code"] for c in nsps.default_cables] == ["120V"]
+    assert [c["code"] for c in nsps.optional_cables] == ["U", "N", "UV"]
+    # the rejected EBDK is updated too, and stays rejected
+    assert types[EBDK].state == "rejected" and types[EBDK].description == "changed"
+    assert types[new["typeId"]].model == "EBDK-2"
+    kept = session.scalars(
+        select(Op).where(
+            Op.entity_kind == "library_type",
+            Op.kind == "set",
+            Op.entity_id == nsps.id,
+            Op.reason == "DaVinci library import",
+        )
+    ).all()
+    assert {o.field for o in kept} == {"description", "source_ref"}
+    assert all(o.change_type == "Master edit" and o.base_op_id is not None for o in kept)
     # the re-run never writes `role`: the hand-corrected draft keeps it; the new type gets one
     assert types[TS7].role == "other" and types[new["typeId"]].role == "ebdk"
     sets = session.scalars(
@@ -531,6 +674,7 @@ def test_rerun_corrects_neuron_flags_the_import_wrote_on_nsps_and_racks(
         first = _run(session, store, factory, pid, sample, categories)
     assert first.job_state == "done", first.stats
     first.stats = {k: v for k, v in first.stats.items() if k != "neuron_flags_corrected"}
+    session.commit()
     types = _app_types(session)
     assert types[NSPS].needs_neuron_id is True and types[NSPS_KIT].needs_neuron_id is True
     types[NSPS].state = "accepted"

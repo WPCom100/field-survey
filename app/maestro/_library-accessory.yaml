@@ -1,0 +1,161 @@
+# S4 (T158) library step 2b (T199, D288): an accessory adds its cables to the device that carries
+# it. After `_library-card` (P-NSPS-D-KIT accepted, 04-05 its device). A type named for this run,
+# MAESTRO-CARD-<n>, with one required 0-10V run (single row), accepted; P-NSPS-D-KIT gets it as an
+# accessory slot with no expected quantity (not forced) → Save → beside the slot `adds 0-10V × 1`.
+# On 04-05's card: no 0-10V draft and no `+ add 0-10V` while the device does not carry it (D288
+# (4)); `+ add MAESTRO-CARD-<n>` → the accessory row → the rules draft `⚑ R2g 0-10V → Fixtures`
+# (the code's To, D290 (3)) whose why? says `carries MAESTRO-CARD-<n>`. The card type is deleted
+# at the end (the server-wide library keeps nothing of the run's). Starts and ends on Levels.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- evalScript: ${output.n = PROJECT.replace(/\D/g, '')}
+- tapOn:
+    id: nav.library
+# the accessory's own type: a required 0-10V run
+- tapOn:
+    id: library.new
+- tapOn:
+    id: library.new.model
+- inputText: MAESTRO-CARD-${output.n}
+- tapOn:
+    id: library.new.add
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Added MAESTRO-CARD-${output.n} as a draft.
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: library.defaults.add
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.defaults.add
+- scrollUntilVisible:
+    element:
+      id: library.defaults.0.code.0-10V
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.defaults.0.code.0-10V
+- tapOn:
+    id: library.defaults.0.single
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- tapOn:
+    id: library.accept
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Accepted\..*'
+    timeout: 10000
+
+# the host type lists it as a slot: what it adds reads beside the slot
+- tapOn:
+    id: library.search
+- inputText: P-NSPS-D-KIT
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: 'P-NSPS-D-KIT · .*'
+- scrollUntilVisible:
+    element:
+      id: library.acc.add
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: library.acc.add
+# the two slots `_library-type` made come first: the new one is the third
+- runFlow:
+    file: _lib-in.yaml
+    env:
+      ID: library.acc.2.model
+      TEXT: MAESTRO-CARD-${output.n}
+- tapOn:
+    id: library.acc.2.qty
+- eraseText: 4
+- pressKey: Enter
+- tapOn:
+    id: library.save
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: Saved.
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: library.acc.2.adds
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: library.acc.2.adds
+    text: adds 0-10V × 1
+- tapOn:
+    id: rail.levels
+
+# the card: nothing of the accessory's until the device carries it
+- runFlow:
+    file: _open-card.yaml
+    env:
+      LEVEL: '04'
+      DEVICE: 04-05
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: card.offer.MAESTRO-CARD-${output.n}
+- assertNotVisible:
+    id: 'card\.offer\.0-10V → .*'
+- assertNotVisible:
+    id: 'proposal\.accept\.0-10V → .*'
+- tapOn:
+    id: card.offer.MAESTRO-CARD-${output.n}
+- extendedWaitUntil:
+    visible: MAESTRO-CARD-${output.n}.*
+    timeout: 10000
+# the rules run after the edit: the accessory's required run is the device's draft
+- runFlow:
+    file: _side-down.yaml
+    env:
+      ID: proposal.why.0-10V → Fixtures
+- assertVisible:
+    id: proposal.accept.0-10V → Fixtures
+- tapOn:
+    id: proposal.why.0-10V → Fixtures
+- extendedWaitUntil:
+    visible: '.*carries MAESTRO-CARD-${output.n} \(library: 0-10V → Fixtures\).*'
+    timeout: 5000
+- tapOn:
+    id: card.close
+- tapOn:
+    id: plan.back
+
+# clean up: the run's card type leaves the library (no device is of it: the question, then Delete)
+- tapOn:
+    id: nav.library
+- tapOn:
+    id: library.search
+- inputText: MAESTRO-CARD-${output.n}
+- pressKey: Enter
+- tapOn:
+    id: library.type
+    text: 'MAESTRO-CARD-${output.n}.*'
+- tapOn:
+    id: library.delete
+- extendedWaitUntil:
+    visible: 'Delete MAESTRO-CARD-${output.n}\?'
+    timeout: 10000
+- tapOn:
+    text: Delete
+    rightOf: Cancel
+- extendedWaitUntil:
+    visible:
+      id: library.note
+      text: 'Deleted: MAESTRO-CARD-${output.n}.'
+    timeout: 10000
+- tapOn:
+    id: rail.levels

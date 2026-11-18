@@ -25,7 +25,13 @@
  * 7. R4b on unpulled runs (T103, D213): with the master's kits on unpulled DMX runs and their Run
  *    items removed, accepting the re-made Run items gives a kit at each device end of every
  *    cable that takes kits — the master's rows, plus the far ends and the network / fiber runs
- *    the master raised none for.
+ *    the master raised none for;
+ * 8. T199 (D288–D294): no rule gives a device a cable by its role any more, so the rows the
+ *    by-role tables used to produce (a relay panel's P and 0-10V, an NSPS's and a rack's 120V)
+ *    must come from the library — `fixtures/davinci-library-types.json`, the DaVinci sample as
+ *    the import plans it (`server/tests/dump_davinci_types.py`), with the master's devices of
+ *    those types and their accessory rows. The master rows the library **no longer produces** are
+ *    listed in `LIBRARY_NO_LONGER_PRODUCES` with why, never tuned away.
  *
  * Every difference between the engine's output and the master's rows is listed in this file
  * with the master row it stands against; the test checks that those rows exist as cited, so the
@@ -34,7 +40,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { Editor, Store, type EditContext, type Op } from '@field-survey/core';
+import { Editor, LIBRARY_STREAM, Store, type EditContext, type Op } from '@field-survey/core';
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
@@ -48,6 +54,7 @@ import type { CableEndRow, MissingPartRow, ProposalRow, PunchItemRow, Snapshot }
 
 const FILE = fileURLToPath(new URL('../../../../fixtures/master-ops.json', import.meta.url));
 const missing = !existsSync(FILE);
+const TYPES_FILE = fileURLToPath(new URL('../../../../fixtures/davinci-library-types.json', import.meta.url));
 const ME = '0199e000-0000-7000-8000-00000000c0de';
 const CTX: EditContext = { change_type: 'Field survey', reason: 'TP-8' };
 const NOW = '2026-10-15T12:00:00.000Z';
@@ -280,6 +287,53 @@ const LVD_SHORT: readonly { device: string; expected: number; found: number; end
   { device: '01-03', expected: 2, found: 1, end: '01/C-07', masterItem: ['01', 5, 'Land 0-10V control wiring'] },
   { device: '06M-02', expected: 1, found: 0, end: '06M/C-11', masterItem: ['06M', 16, 'Land 0-10V control wiring'] },
 ];
+
+// ----------------------------------------------------------------- T199: the by-role rows from the library
+
+/** The codes the retired by-role tables gave: R2c a relay panel's P and 0-10V, R2d an NSPS's and a rack's 120V. */
+const BY_ROLE_CODES: readonly string[] = ['0-10V', 'P', '120V'];
+const BY_ROLE_CATEGORIES: readonly string[] = ['Relay panel', 'NSPS', 'Equipment rack'];
+/** The sample's Echo relay panel: the type the master's eleven relay panels are given (their Device text is the panel tag). */
+const PANEL_TYPE = 'ERP Feedthrough 24';
+/**
+ * The first-use answers (D292 (1), T200) that make the by-role rows required again: the panel's
+ * panic run, the 0-10V card's run, the NSPS kit's feed (the import's D198 exception row). Every
+ * other row of the sample stays undecided, and the EBDK's type a draft.
+ */
+const REQUIRED_ANSWERS: Readonly<Record<string, readonly string[]>> = { [PANEL_TYPE]: ['P'], 'ERP-FT-LVD': ['0-10V'], 'P-NSPS-D-KIT': ['120V'] };
+
+/**
+ * **The master rows the library no longer produces** (T199's report). Over the master with its
+ * by-role rows removed, R2g re-drafts the row where the library gives the device the cable; these
+ * are the rows it does not, each with why. Nothing here is tuned: a row leaves this list only
+ * when the library (a type, an accessory row) really gives it.
+ */
+const LIBRARY_NO_LONGER_PRODUCES: readonly { device: string; code: string; why: string }[] = [
+  // a 0-10V row with no card: the panel takes 0-10V only from an ERP-FT-LVD it carries (D288 (4), D289 (1)).
+  // The seed import brings no accessory rows (they come from the BOM, T44 / T46), so only the three
+  // panels this test gives their card (E5's, `LVD_SHORT`) get the row back; on the others the lint
+  // `lint.cable_needs_accessory` flags the master's own 0-10V row until the card row exists.
+  { device: 'B2-01', code: '0-10V', why: 'no ERP-FT-LVD row on the panel' },
+  { device: 'B1-01', code: '0-10V', why: 'no ERP-FT-LVD row on the panel' },
+  { device: '02-01', code: '0-10V', why: 'no ERP-FT-LVD row on the panel' },
+  { device: '02-04', code: '0-10V', why: 'no ERP-FT-LVD row on the panel' },
+  { device: '03-01', code: '0-10V', why: 'no ERP-FT-LVD row on the panel' },
+  { device: '03-03', code: '0-10V', why: 'no ERP-FT-LVD row on the panel' },
+  { device: '04-01', code: '0-10V', why: 'no ERP-FT-LVD row on the panel' },
+  { device: '04-03', code: '0-10V', why: 'no ERP-FT-LVD row on the panel' },
+  // a rack's 120V: the master's racks are "Equipment Rack 18U", a DaVinci Equipment Racks shell with
+  // no ports. The import gives such a shell one 120V row (D291 (4)), but the trimmed sample holds no
+  // shell (its rack is the ERn2 enclosure, whose feed is its supply modules'), so here no type says it.
+  { device: '01-05', code: '120V', why: 'no library type for "Equipment Rack 18U" in the sample (the full catalogue\'s shell gets the row, D291 (4))' },
+  { device: '06M-01', code: '120V', why: 'no library type for "Equipment Rack 18U" in the sample (the full catalogue\'s shell gets the row, D291 (4))' },
+];
+
+/**
+ * Where the library's row differs from the master's it stands for: a panic run goes to a device a
+ * person picks, never to the generic text, and is not paired by a rule (D293 (1), D294) — the
+ * master's eleven read To `EBDK panic wire` with the panel's EBDK as the far end.
+ */
+const PANIC_MASTER_TO = 'EBDK panic wire';
 
 // ----------------------------------------------------------------- harness
 
@@ -737,6 +791,102 @@ describe.skipIf(missing)(`TP-8 rule golden tests over the seeded master${missing
       expect(items[0]).toMatchObject({ rule_id: 'E5', type: 'Wiring', owner: 'EC' });
     }
     expect((await openProposals(m)).filter((p) => p.rule_id === 'E5' || p.rule_id === 'R3a')).toHaveLength(KNOWN_DIFFERENCES.filter((d) => d.rule === 'R3a').length);
+  });
+
+  it.skipIf(!existsSync(TYPES_FILE))('T199: the by-role rows come from the library — the sample\'s types and their accessory rows; the master rows it no longer produces are the listed ones', async () => {
+    const m = await openMaster();
+    const types = (JSON.parse(readFileSync(TYPES_FILE, 'utf8')) as { types: Row[] }).types;
+    const MASTER_EDIT: EditContext = { change_type: 'Master edit', reason: 'TP-8' };
+    // the library as the import writes it: drafts, every cable row undecided (optional) …
+    const lib = m.editor.forStream(LIBRARY_STREAM);
+    const typeId = new Map<string, string>();
+    await lib.group(MASTER_EDIT, async (g) => {
+      for (const t of types) {
+        expect(t.default_cables, String(t.model)).toBeNull();
+        const { id } = await g.create('library_type', {
+          project_id: null, model: t.model, aliases: t.aliases, category: t.category, role: t.role, default_cables: null, optional_cables: t.optional_cables,
+          optional_accessories: t.optional_accessories, needs_neuron_id: t.needs_neuron_id, accessory_only: t.accessory_only, source_ref: t.source_ref, state: 'draft',
+        });
+        typeId.set(String(t.model), id);
+      }
+    });
+    // … then the first-use answers that make the by-role rows required
+    await lib.group(MASTER_EDIT, async (g) => {
+      for (const [model, codes] of Object.entries(REQUIRED_ANSWERS)) {
+        const rows = (types.find((t) => t.model === model)!.optional_cables as { code: string }[]) ?? [];
+        const required = rows.filter((c) => codes.includes(c.code));
+        expect(required.map((c) => c.code), model).toEqual(codes);
+        await g.setFields('library_type', typeId.get(model)!, { default_cables: required, optional_cables: rows.filter((c) => !codes.includes(c.code)), state: 'accepted' });
+      }
+    });
+    // the exception row is the import's (D198, D291): named on the NSPS kit's type
+    expect((types.find((t) => t.model === 'P-NSPS-D-KIT')!.source_ref as { exceptions: { code: string; decision: string }[] }).exceptions).toMatchObject([{ code: '120V', decision: 'D198' }]);
+
+    let snap = await m.engine.loadSnapshot();
+    const labels = new Labels(snap);
+    const byRole = snap.devices.filter((d) => !d.deleted_at && BY_ROLE_CATEGORIES.includes(d.category ?? ''));
+    const panels = byRole.filter((d) => d.category === 'Relay panel');
+    expect([panels.length, byRole.filter((d) => d.category === 'NSPS').length, byRole.filter((d) => d.category === 'Equipment rack').length]).toEqual([11, 4, 2]);
+    // the master's devices of those types: the panels by link (their Device text is the panel tag),
+    // the NSPS by its Device text; the three panels of E5 with their 0-10V cards, as the BOM lists them
+    await m.editor.group(MASTER_EDIT, async (g) => {
+      for (const p of panels) await g.setField('device', p.id, 'library_type_id', typeId.get(PANEL_TYPE)!);
+      for (const s of LVD_SHORT) await g.create('accessory', { device_id: labels.deviceByLabel.get(s.device)!, model: 'ERP-FT-LVD', expected_qty: s.expected, found_qty: s.found });
+    });
+
+    // --- over the master's own rows: every required run is there, and the 0-10V rows of the
+    // panels with no card are flagged, never changed
+    await m.engine.run();
+    expect((await openProposals(m)).filter((p) => p.rule_id === 'R2g')).toEqual([]);
+    const needs = (await m.engine.openFindings()).filter((x) => x.lint_id === 'lint.cable_needs_accessory').map((x) => String(x.message));
+    const noCard = LIBRARY_NO_LONGER_PRODUCES.filter((r) => r.code === '0-10V').map((r) => r.device);
+    expect(sorted(needs)).toEqual(sorted(noCard.map((d) => `${d}: 0-10V needs ERP-FT-LVD`)));
+
+    // --- the by-role rows removed: which does the library draft again?
+    snap = await m.engine.loadSnapshot();
+    const liveCable = new Map(snap.cables.filter((c) => !c.deleted_at).map((c) => [c.id, c] as const));
+    const ids = new Set(byRole.map((d) => d.id));
+    const rows = snap.cableEnds
+      .filter((e) => !e.deleted_at && e.device_id && ids.has(e.device_id) && liveCable.has(e.cable_id) && BY_ROLE_CODES.includes(liveCable.get(e.cable_id)!.cable ?? ''))
+      .map((e) => ({ end: e, cable: liveCable.get(e.cable_id)!, device: labels.deviceById.get(e.device_id!)!, code: liveCable.get(e.cable_id)!.cable! }));
+    // the master's by-role rows: P and 0-10V on the eleven panels, 120V on the four NSPS and the two racks
+    const count = (code: string) => rows.filter((r) => r.code === code).length;
+    expect([count('P'), count('0-10V'), count('120V'), rows.length]).toEqual([11, 11, 6, 28]);
+    await m.editor.group(CTX, async (g) => {
+      for (const id of new Set(rows.map((r) => r.cable.id))) await g.delete('cable', id);
+    });
+    await m.engine.run();
+    const drafts = (await openProposals(m)).filter((p) => p.rule_id === 'R2g');
+    const draftOf = (r: (typeof rows)[number]) => drafts.find((p) => p.subject?.entity_id === r.end.device_id && p.discriminator === r.code);
+    const notProduced = rows.filter((r) => !draftOf(r)).map((r) => `${r.device} ${r.code}`);
+    expect(sorted(notProduced)).toEqual(sorted(LIBRARY_NO_LONGER_PRODUCES.map((r) => `${r.device} ${r.code}`)));
+    // and it drafts nothing the master did not hold
+    expect(drafts).toHaveLength(rows.length - LIBRARY_NO_LONGER_PRODUCES.length);
+
+    // --- the rows it does produce, against the master's texts
+    for (const r of rows) {
+      const p = draftOf(r);
+      if (!p) continue;
+      const [near, far] = p.payload!.ends as Row[];
+      expect(near!.from_text, `${r.device} ${r.code} From`).toBe(r.end.from_text);
+      if (r.code === 'P') {
+        // a panic run goes to a device a person picks: no generic text, no pairing by a rule (D293 (1), D294)
+        expect(r.end.to_text, r.device).toBe(PANIC_MASTER_TO);
+        expect([near!.to_text, far!.endpoint_kind, far!.device_id ?? null, far!.from_text], r.device).toEqual([null, null, null, null]);
+        expect(near!.status, r.device).toBe('Installed, untested');
+      } else {
+        expect(near!.to_text, `${r.device} ${r.code} To`).toBe(r.end.to_text);
+        // the far end is the project's placeholder, as the master's row has it
+        const masterFar = snap.cableEnds.find((e) => e.cable_id === r.cable.id && e.id !== r.end.id)!;
+        expect(far!.placeholder_id, `${r.device} ${r.code} far end`).toBe(masterFar.placeholder_id);
+      }
+    }
+    // the cards: the three panels' rows come back as one row × the card count's 24 channels
+    for (const s of LVD_SHORT) {
+      const p = drafts.find((x) => x.subject?.entity_id === labels.deviceByLabel.get(s.device) && x.discriminator === '0-10V')!;
+      expect((p.payload!.cable as Row).qty, s.device).toBe(24 * s.expected);
+      expect(p.payload!.why, s.device).toBe(`${s.device} carries ERP-FT-LVD (library: 0-10V → Fixtures).`);
+    }
   });
 
   it('R4b on unpulled runs (T103, D213): accepted Run items get a kit at each device end — the master\'s kits, plus the far ends and the network / fiber runs', async () => {

@@ -7,7 +7,7 @@
  */
 
 import { isRole, roleOf, type Role, type Store } from '@field-survey/core';
-import { DEFAULT_PARAMS, addressNeeds, findDeviceType, parseLibraryAccessories, type AddressNeeds, type RuleParams, type TypeLike } from '@field-survey/rules';
+import { DEFAULT_PARAMS, addressNeeds, cablesOfDevice, findDeviceType, parseLibraryAccessories, type AddressNeeds, type CarriedRow, type DeviceCables, type RuleParams, type TypeLike } from '@field-survey/rules';
 
 /** The row as stored; the card also reads its optional cables and accessories (T105). */
 export type DeviceType = TypeLike & {
@@ -68,16 +68,49 @@ export function typeForDraft(types: DeviceTypes, d: { model: string | null; role
 }
 
 /**
- * Which addresses a device needs (T146, D245): by its type's flags, else by the wires it gets —
- * `codes`, the cable codes of its live ends (`loadDeviceCodes` / `codesOfDevice`), else its
- * accepted type's default cables; stations and sensors ride the Unison bus.
+ * The device's cables as the Library gives them (T199, D288): its type's, plus those of every
+ * accessory it carries — `accessories`, its live accessory rows; a forced slot of its type counts
+ * with no row. The rules' own `cablesOfDevice`, over the app's types.
  */
-export function deviceAddressNeeds(types: DeviceTypes, d: DeviceLike, codes: Iterable<string> | null | undefined, params: RuleParams = DEFAULT_PARAMS): AddressNeeds {
-  return addressNeeds(typeOf(types, d), { category: text(d.category) }, codes, params);
+export function cablesFor(types: DeviceTypes, d: DeviceLike, accessories: readonly CarriedRow[] = []): DeviceCables<DeviceType> {
+  return cablesOfDevice(types, { device: text(d.device), library_type_id: text(d.library_type_id) }, accessories);
 }
 
-export function deviceNeedsNeuron(types: DeviceTypes, d: DeviceLike, codes: Iterable<string> | null | undefined, params: RuleParams = DEFAULT_PARAMS): boolean {
-  return deviceAddressNeeds(types, d, codes, params).neuron;
+/**
+ * Which addresses a device needs (T146, D245): by its type's flags, else by the wires it gets —
+ * `codes`, the cable codes of its live ends (`loadDeviceCodes` / `codesOfDevice`), else its
+ * required cables (its accepted type's default cables and its carried accessories', T199);
+ * stations and sensors ride the Unison bus.
+ */
+export function deviceAddressNeeds(
+  types: DeviceTypes,
+  d: DeviceLike,
+  codes: Iterable<string> | null | undefined,
+  params: RuleParams = DEFAULT_PARAMS,
+  accessories: readonly CarriedRow[] = [],
+): AddressNeeds {
+  const plan = cablesFor(types, d, accessories);
+  return addressNeeds(plan.type, { category: text(d.category) }, codes, params, plan.required.map((r) => r.cable.code));
+}
+
+export function deviceNeedsNeuron(types: DeviceTypes, d: DeviceLike, codes: Iterable<string> | null | undefined, params: RuleParams = DEFAULT_PARAMS, accessories: readonly CarriedRow[] = []): boolean {
+  return deviceAddressNeeds(types, d, codes, params, accessories).neuron;
+}
+
+/** The live accessory rows of every device of the project, by device id (one query): what each carries (T199). */
+export async function loadDeviceAccessories(store: Store, projectId: string): Promise<Map<string, CarriedRow[]>> {
+  const rows = await store.db.query<{ device_id: string; model: string | null; expected_qty: number | null; found_qty: number | null }>(
+    `SELECT a.device_id, a.model, a.expected_qty, a.found_qty FROM accessory a JOIN device d ON d.id = a.device_id JOIN level l ON l.id = d.level_id
+     WHERE l.project_id = ? AND a.deleted_at IS NULL ORDER BY a.id`,
+    [projectId],
+  );
+  const out = new Map<string, CarriedRow[]>();
+  for (const r of rows) {
+    const list = out.get(r.device_id);
+    if (list) list.push(r);
+    else out.set(r.device_id, [r]);
+  }
+  return out;
 }
 
 /** The cable codes of every live end on a device of the project, by device id (one query). */

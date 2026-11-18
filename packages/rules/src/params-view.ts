@@ -4,6 +4,8 @@
  * set. Pure: the rows come from `loadRuleParamRows`.
  */
 
+import { ROLE } from '@field-survey/core';
+
 import { stableStringify } from './hash';
 import { PARAMS, isByCode, paramSpec, resolveValue, type CodeEntry, type ParamSpec, type ParamValue, type RuleParamRow } from './params';
 import { QUICK_ACTION_TEXT, RULES, R5_TEXT } from './rules';
@@ -17,7 +19,10 @@ export interface ParamItem {
   set: boolean;
   /** The app library's row state (`draft` until accepted); null on a project or with no row. */
   state: 'draft' | 'accepted' | 'rejected' | null;
-  /** For a per-code parameter: the codes to list (`*` first, then the known codes and any set). */
+  /**
+   * For a map parameter: the keys to list — `*` first where the default has one, then the known
+   * cable codes (a `text_by_role` map: the roles) and any other key set.
+   */
   codes: string[];
 }
 
@@ -66,19 +71,20 @@ export function paramGroups(rows: readonly RuleParamRow[], opts: { app?: boolean
   return groups;
 }
 
-function codeList(spec: ParamSpec, value: Record<string, CodeEntry>, known: readonly string[]): string[] {
+function codeList(spec: ParamSpec, value: Record<string, CodeEntry>, codes: readonly string[]): string[] {
+  const known: readonly string[] = spec.kind === 'text_by_role' ? ROLE : codes;
   const extra = Object.keys(value).filter((c) => c !== '*' && !known.includes(c));
   return [...('*' in (spec.default as object) ? ['*'] : []), ...known, ...extra.sort()];
 }
 
 /**
  * One code's value in a per-code item, and whether it comes from `*` (not set for that code). A
- * `bool_by_code` code with no entry and no `*` is off.
+ * `bool_by_code` code with no entry and no `*` is off; a sparse map's (T199) has no value (`''`).
  */
 export function codeValue(item: ParamItem, code: string): { value: CodeEntry; inherited: boolean } {
   const map = item.value as Record<string, CodeEntry>;
   if (code in map) return { value: map[code]!, inherited: false };
-  return { value: map['*'] ?? (item.spec.kind === 'bool_by_code' ? false : code), inherited: true };
+  return { value: map['*'] ?? (item.spec.kind === 'bool_by_code' ? false : item.spec.sparse ? '' : code), inherited: true };
 }
 
 /** The per-code map with one code set (or, `null`, cleared back to the default / `*`). */

@@ -12,7 +12,9 @@
  * parameters (`*_by_code`) store a map `{code: value}` merged over the default map, `*` standing
  * for any code without an entry — adding a cable code's owner or wording is an entry, not a
  * release. A plain value stored for a per-code parameter (one written before the parameter was
- * per code, T103) reads as that value for every code.
+ * per code, T103) reads as that value for every code. A **sparse** map (`sparse`, T199) has
+ * entries for some keys only and no fallback: a key with none has no value (`RuleParams.entry`).
+ * `text_by_role` is such a map keyed by device role instead of cable code.
  *
  * Templates name what they are filled with in angle brackets (`Run <signal> to <far end>`); a
  * placeholder with nothing to fill it drops out with the joining word before it ("Run DMX").
@@ -23,7 +25,7 @@ import { vocab, type ConnectionStatus, type Owner } from '@field-survey/core';
 
 import { hashUuid, stableStringify } from './hash';
 
-export type ParamKind = 'owner' | 'text' | 'status' | 'bool' | 'side' | 'owner_by_code' | 'text_by_code' | 'bool_by_code';
+export type ParamKind = 'owner' | 'text' | 'status' | 'bool' | 'side' | 'owner_by_code' | 'text_by_code' | 'bool_by_code' | 'status_by_code' | 'text_by_role';
 
 /** One code's entry of a per-code map: a string (owner, text) or a flag (`bool_by_code`). */
 export type CodeEntry = string | boolean;
@@ -43,6 +45,8 @@ export interface ParamSpec {
   default: ParamValue;
   /** Placeholders a template may use (text kinds). */
   placeholders?: readonly string[];
+  /** A map with no fallback (T199): a key without an entry has no value — not `*`'s, not the key itself. */
+  sparse?: boolean;
 }
 
 /** `[rule, key]`, or `[rule, key, code]` for one code of a per-code parameter. */
@@ -177,15 +181,32 @@ export const PARAMS: readonly ParamSpec[] = [
     placeholders: FAR,
   },
   { rule: 'R4b', key: 'notes', kind: 'text', label: 'Notes', changes: 'The Notes of each kit part.', default: 'Need to be ordered' },
-  // --- R2c / R2d / R2e: library cables (drafts)
-  { rule: 'R2c', key: 'fixtures.to', kind: 'text', label: '0-10V To text', changes: 'The To of a relay panel\'s 0-10V row.', default: 'Fixtures' },
-  { rule: 'R2c', key: 'fixtures.status', kind: 'status', label: '0-10V starting status', changes: 'The status the 0-10V row starts with (none = Unsurveyed).', default: NO_STATUS },
-  { rule: 'R2c', key: 'panic.to', kind: 'text', label: 'Panic (P) To text', changes: 'The To of a relay panel\'s panic row.', default: 'EBDK panic wire' },
-  { rule: 'R2c', key: 'panic.status', kind: 'status', label: 'Panic (P) starting status', changes: 'The status the panic row starts with (P is treated as run).', default: 'Installed, untested' },
-  { rule: 'R2d', key: 'from', kind: 'text', label: '120V From text', changes: 'The From of an NSPS\'s or rack\'s 120V row.', default: '120v Power' },
-  { rule: 'R2d', key: 'nsps.to', kind: 'text', label: 'NSPS 120V To text', changes: 'The To of an NSPS\'s 120V row (D52).', default: 'P-NSPS-D Power Supply' },
-  { rule: 'R2d', key: 'rack.to', kind: 'text', label: 'Rack 120V To text', changes: 'The To of an equipment rack\'s 120V row (D52).', default: 'Equipment rack' },
-  { rule: 'R2d', key: 'status', kind: 'status', label: '120V starting status', changes: 'The status the 120V row starts with (none = Unsurveyed).', default: NO_STATUS },
+  // --- R2g: library runs (T199, D290 (3), D293). What a run gets where its row in the Library
+  // gives no text of its own; a text typed on the row wins. These carry the values R2c / R2d wrote
+  // by role before the by-role tables retired. A panic (P) run has no far end and no To here: it
+  // runs to a device a person picks (D293 (1), D294).
+  { rule: 'R2g', key: 'from', kind: 'text_by_code', sparse: true, label: 'From text per cable code', changes: 'The From of a library run whose row gives none. No entry: the device\'s own name.', default: { '120V': '120v Power' } },
+  { rule: 'R2g', key: 'to', kind: 'text_by_code', sparse: true, label: 'To text per cable code', changes: 'The To of a library run whose row gives none. A 120V run reads the next setting first.', default: { '0-10V': 'Fixtures' } },
+  {
+    rule: 'R2g',
+    key: 'to_120v',
+    kind: 'text_by_role',
+    sparse: true,
+    label: '120V To text by what it feeds',
+    changes: 'The To of a 120V library run whose row gives none, by the role of the device it feeds (D52, D293 (3)). A role with no entry reads the To text per cable code.',
+    default: { nsps: 'P-NSPS-D Power Supply', equipment_rack: 'Equipment rack' },
+  },
+  {
+    rule: 'R2g',
+    key: 'far',
+    kind: 'text_by_code',
+    sparse: true,
+    label: 'Far end per cable code',
+    changes: 'The far end of a library run whose row names none: the project\'s placeholder of that label, else the text. No entry: the far end is left for a person to pick (a panic run\'s is a device, D294).',
+    default: { '0-10V': 'Fixtures', '120V': '120v Power' },
+  },
+  { rule: 'R2g', key: 'status', kind: 'status_by_code', sparse: true, label: 'Starting status per cable code', changes: 'The status a library run starts with where its row gives none. No entry: Unsurveyed. P is treated as run.', default: { P: 'Installed, untested' } },
+  // --- R2e: the Unison bus per level
   { rule: 'R2e', key: 'host.to', kind: 'text', label: 'Host end To text', changes: 'The To of the NSPS / rack end of each level\'s Unison bus row.', default: 'Unison from stations & sensors' },
   { rule: 'R2e', key: 'bus.to_nsps', kind: 'text', label: 'Bus end To text (NSPS)', changes: 'The To of the Stations & Sensors end when the level\'s host is an NSPS.', default: 'Devices to P-NSPS-D' },
   { rule: 'R2e', key: 'bus.to_rack', kind: 'text', label: 'Bus end To text (rack)', changes: 'The To of the Stations & Sensors end when the level\'s host is an equipment rack.', default: 'Devices to equipment rack' },
@@ -214,8 +235,9 @@ export function paramSpec(rule: string, key: string): ParamSpec | null {
   return SPEC.get(`${rule}|${key}`) ?? null;
 }
 
+/** A map kind: a value per cable code (or, `text_by_role`, per device role). */
 export function isByCode(kind: ParamKind): boolean {
-  return kind === 'owner_by_code' || kind === 'text_by_code' || kind === 'bool_by_code';
+  return kind === 'owner_by_code' || kind === 'text_by_code' || kind === 'bool_by_code' || kind === 'status_by_code' || kind === 'text_by_role';
 }
 
 /**
@@ -248,8 +270,10 @@ export function validEntry(kind: ParamKind, v: unknown): v is CodeEntry {
       return typeof v === 'string' && OWNERS.includes(v);
     case 'text':
     case 'text_by_code':
+    case 'text_by_role':
       return typeof v === 'string' && v.trim() !== '';
     case 'status':
+    case 'status_by_code':
       return typeof v === 'string' && (v === NO_STATUS || STATUSES.includes(v));
     case 'side':
       return v === 'A' || v === 'B';
@@ -313,6 +337,15 @@ export class RuleParams {
     return String((code != null ? map[code] : undefined) ?? map['*'] ?? code ?? '');
   }
 
+  /**
+   * One key of a map parameter with no fallback to the key itself (T199): its entry, else `*`'s,
+   * else undefined — what a sparse map (`R2g.to`, `R2g.status`…) is read with.
+   */
+  entry(rule: string, key: string, code: string | null | undefined): CodeEntry | undefined {
+    const map = this.get(rule, key) as Record<string, CodeEntry>;
+    return (code != null ? map[code] : undefined) ?? map['*'];
+  }
+
   /** One code of a `bool_by_code` parameter: its entry, else `*`, else off. */
   flagCode(rule: string, key: string, code: string | null | undefined): boolean {
     const map = this.get(rule, key) as Record<string, CodeEntry>;
@@ -323,7 +356,10 @@ export class RuleParams {
   ref(r: ParamRef): ParamValue {
     const [rule, key, code] = r;
     const spec = paramSpec(rule, key);
-    if (spec && isByCode(spec.kind) && code !== undefined) return spec.kind === 'bool_by_code' ? this.flagCode(rule, key, code) : this.code(rule, key, code);
+    if (spec && isByCode(spec.kind) && code !== undefined) {
+      if (spec.sparse) return this.entry(rule, key, code) ?? '';
+      return spec.kind === 'bool_by_code' ? this.flagCode(rule, key, code) : this.code(rule, key, code);
+    }
     return this.get(rule, key);
   }
 

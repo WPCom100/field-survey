@@ -93,12 +93,10 @@ export function promotedKeys(drafts: readonly { importBatchId: string | null; so
 function davinciLine(s: Record<string, unknown>, n: (k: string) => number | null): string {
   const clashes = Array.isArray(s.clashes) ? s.clashes.length : 0;
   const retired = Array.isArray(s.retired) ? s.retired.length : 0;
-  const kept = (n('kept_accepted') ?? 0) + (n('kept_rejected') ?? 0);
   const parts = [
     `Done: ${n('created') ?? 0} new drafts, ${n('updated') ?? 0} updated, ${n('unchanged') ?? 0} unchanged (${n('placeable') ?? '?'} device types, ${n('accessory_only') ?? 0} accessories)`,
     `${n('vocab_drafts') ?? 0} protocol drafts`,
   ];
-  if (kept) parts.push(`${kept} accepted or rejected left alone`);
   const corrected = n('neuron_flags_corrected') ?? 0;
   if (corrected) parts.push(`${corrected} Neuron flag${corrected === 1 ? '' : 's'} corrected`);
   const categories = n('categories_corrected') ?? 0;

@@ -2,7 +2,7 @@ import { Editor, LIBRARY_STREAM, OpError, Store, uuidv7, type Op } from '@field-
 import { BetterSqliteDriver } from '@field-survey/core/node';
 import { describe, expect, it } from 'vitest';
 
-import { libraryCablePayload } from '@field-survey/rules';
+import { cablesOfDevice, libraryCablePayload } from '@field-survey/rules';
 
 import { acceptType, createType, rejectType, updateType } from '../library/model';
 import { loadLevelPlan } from '../plan/data';
@@ -34,6 +34,7 @@ import {
 } from './actions';
 import { STANDARD_PHRASES, accessoryGroupLine, cableDraftTitle, formatValue, loadDeviceCard, optionalCableOffers } from './model';
 import { NOT_WIRED } from './proposals';
+import { engineFor } from '../rules/engine';
 
 const ME = uuidv7();
 let ts = 1_760_000_000_000;
@@ -414,15 +415,46 @@ describe('optional cables and accessories of the type (T105)', () => {
     expect(card.cableOffers.map((o) => [o.key, o.title])).toEqual([['N#1', 'N → switch']]);
     expect(card.accessoryOffers).toEqual([{ model: 'Back box', expected: 1, group: null }]);
     // pure: the default 120V comes first, then the optional ones one at a time
-    const type = { state: 'accepted', default_cables: [run('120V', 'A', null)], optional_cables: [run('120V', 'B', null), run('120V', 'C', null)] };
-    expect(optionalCableOffers(type, []).length).toBe(0);
-    expect(optionalCableOffers(type, ['120V']).map((o) => o.title)).toEqual(['120V → B']);
-    expect(optionalCableOffers(type, ['120V', '120V']).map((o) => o.title)).toEqual(['120V → C']);
-    expect(optionalCableOffers(type, ['120V', '120V', '120V'])).toEqual([]);
-    // a draft type's defaults govern nothing (D183), so its optional run is offered at once
-    expect(optionalCableOffers({ ...type, state: 'draft' }, []).map((o) => o.title)).toEqual(['120V → B']);
-    expect(optionalCableOffers({ ...type, state: 'rejected' }, ['120V'])).toEqual([]);
+    const type = { id: 't', model: 'T', aliases: null, state: 'accepted' as 'accepted' | 'draft' | 'rejected', default_cables: [run('120V', 'A', null)], optional_cables: [run('120V', 'B', null), run('120V', 'C', null)] };
+    const plan = (t: typeof type, rows: Parameters<typeof cablesOfDevice>[2] = [], more: (typeof type)[] = []) => cablesOfDevice(new Map([t, ...more].map((x) => [x.id, x] as const)), { library_type_id: t.id, device: null }, rows);
+    expect(optionalCableOffers(plan(type), []).length).toBe(0);
+    expect(optionalCableOffers(plan(type), ['120V']).map((o) => o.title)).toEqual(['120V → B']);
+    expect(optionalCableOffers(plan(type), ['120V', '120V']).map((o) => o.title)).toEqual(['120V → C']);
+    expect(optionalCableOffers(plan(type), ['120V', '120V', '120V'])).toEqual([]);
+    // a draft type requires nothing (D183): its rows are offered, never drafted, the default ones first (D288 (2))
+    expect(optionalCableOffers(plan({ ...type, state: 'draft' }), []).map((o) => o.title)).toEqual(['120V → A']);
+    expect(optionalCableOffers(plan({ ...type, state: 'draft' }), ['120V']).map((o) => o.title)).toEqual(['120V → B']);
+    expect(optionalCableOffers(plan({ ...type, state: 'rejected' }), ['120V'])).toEqual([]);
     expect(optionalCableOffers(null, [])).toEqual([]);
+  });
+
+  it("an accessory the device carries adds its cables to the card's offers, with the per-code texts; one it does not carry adds none (T199, D288)", async () => {
+    const { store, editor, deviceId, lib, typeId } = await withType();
+    // a network module of the library, allowed on the type; its N run is optional
+    const mod = await createType(lib, store, { model: 'T199-NET', category: null });
+    await updateType(lib, store, mod, { optionalCables: [run('N', null, null)], defaultCables: [{ ...run('0-10V', null, null), single_row: true, qty: 24 }] });
+    await acceptType(lib, mod);
+    await updateType(lib, store, typeId, { optionalAccessories: [{ model: 'Back box', expected_qty: 1 }, { model: 'T199-NET', expected_qty: null }] });
+    // not carried: the card offers the accessory, none of its cables
+    let card = (await loadDeviceCard(store, deviceId))!;
+    expect(card.cableOffers.map((o) => [o.key, o.title, o.via])).toEqual([['N#1', 'N → switch', null]]);
+    expect(card.accessoryOffers.map((a) => a.model)).toEqual(['Back box', 'T199-NET']);
+    // carried ×2: its optional N runs join the offers one at a time, after the type's own
+    await editor.create('accessory', { device_id: deviceId, model: 'T199-NET', expected_qty: 2 }, FIELD_SURVEY);
+    card = (await loadDeviceCard(store, deviceId))!;
+    expect(card.cableOffers.map((o) => [o.key, o.title, o.via])).toEqual([['N#1', 'N → switch', null]]);
+    await addOptionalCable(editor, store, deviceId, card.cableOffers[0]!.cable);
+    card = (await loadDeviceCard(store, deviceId))!;
+    expect(card.cableOffers.map((o) => [o.key, o.title, o.via])).toEqual([['N#2', 'N → its far end', 'T199-NET']]);
+    // its required 0-10V run is R2g's draft on the card, 2 × 24, with the code's To (Fixtures)
+    await engineFor(store, card.device.projectId, ME).run();
+    card = (await loadDeviceCard(store, deviceId))!;
+    const draft = card.drafts.find((d) => d.title.startsWith('0-10V'))!;
+    expect([draft.ruleId, draft.title, (draft.payload.cable as { qty: number }).qty, draft.why]).toEqual(['R2g', '0-10V → Fixtures', 48, expect.stringContaining('carries T199-NET (library: 0-10V → Fixtures).')]);
+    // a required run of a pure plan is never among the offers; an optional 120V on an NSPS reads its To by role
+    const feed = { id: 'f', model: 'F', aliases: null, state: 'accepted' as const, default_cables: null, optional_cables: [{ ...run('120V', null, null), single_row: true }] };
+    const offers = optionalCableOffers(cablesOfDevice(new Map([[feed.id, feed]]), { library_type_id: 'f', device: null }, []), [], 'nsps');
+    expect(offers.map((o) => [o.title, o.cable.from, o.cable.far])).toEqual([['120V → P-NSPS-D Power Supply', '120v Power', '120v Power']]);
   });
 
   it('"+ add N → switch" creates the run with both ends in one Field survey group; the offer goes', async () => {

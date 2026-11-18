@@ -3,26 +3,28 @@
  *
  * - R2a: no note is ever auto-filled; a note that contradicts the end's status is a finding.
  * - R2b: the riser governs To; a To text that does not say what the riser says is a finding.
- * - R2c / R2d / R2e: the library's default cables (PLAN §6.2) are **drafts** (`cable`
- *   proposals, D173) for a device that lacks them: a Relay panel's 0-10V → `Fixtures` and P →
- *   `EBDK panic wire` (single rows), an NSPS's or rack's 120V (`120v Power` → `P-NSPS-D Power
- *   Supply` / `Equipment rack`, D52), one Unison pair per level `Stations & Sensors` ↔ the NSPS
- *   (or the rack where the level has none).
- *   A device whose accepted library type defines default cables gets those instead (R2g,
- *   `library.ts`, T48); R2e's bus stays per level.
+ * - R2c / R2d: **retired** (T199, D289, D290): they draft nothing. Being a relay panel, an NSPS
+ *   or a rack gives a device no cable: what a device takes comes from its library type and the
+ *   accessories it carries (R2g, `library.ts`), and the texts these two wrote by role are now
+ *   R2g's per-code settings. Both stay registered, so the engine supersedes an open draft an
+ *   earlier version raised (a row of an unregistered rule is never touched) and "why?" on a
+ *   cable accepted from one still has a text.
+ * - R2e: one Unison pair per level, `Stations & Sensors` ↔ the NSPS (or the rack where the level
+ *   has none), a **draft** (`cable` proposal, D173). The bus is the level's, not something a
+ *   device type takes (D183 (3)), so it stays a rule.
  * - R2f: nothing is copied between ends (D171); an unsurveyed end stays empty (`Unsurveyed`).
  *   An end on an out-of-scope level, or whose far end is, is offered `Not started` (D171).
  *
- * The library cables' From / To texts and starting statuses, and R2f's status, are rule
- * parameters (T102, `../params.ts`); the texts above are their defaults.
+ * The bus row's To texts and starting status, and R2f's status, are rule parameters (T102,
+ * `../params.ts`); the texts above are their defaults.
  */
 
 import { riserCheck } from '@field-survey/core';
 
-import { statusParam, textParam, type ParamRef } from '../params';
+import { statusParam, textParam } from '../params';
 import type { Rule, RuleContext } from '../rule';
 import type { CableEndRow, DeviceRow, LevelRow } from '../snapshot';
-import { deviceRole, governingCables } from './library';
+import { deviceRole } from './library';
 import { BUS_LABEL, cableOf, compareIds, compareLevels, deviceLabel, endLabel, endLevel, endPlaceholder, noteHas, placeholderFor, str, subjectOfEnd, takesKits } from './shared';
 
 // ------------------------------------------------------------------ R2a
@@ -67,13 +69,9 @@ export const R2b: Rule = {
   },
 };
 
-// ------------------------------------------------------------------ R2c / R2d / R2e (library drafts, D173)
+// ------------------------------------------------------------------ R2e (the level's Unison bus, a draft: D173)
 
 type EndDraft = Record<string, unknown>;
-
-function hasCode(ctx: RuleContext, device: DeviceRow, code: string): boolean {
-  return (ctx.index.endsByDevice.get(device.id) ?? []).some((e) => cableOf(ctx, e)?.cable === code);
-}
 
 function panelName(d: DeviceRow): string | null {
   return str(d.panel_name) ?? str(d.device) ?? str(d.display_id);
@@ -88,90 +86,26 @@ function placeholderEnd(ctx: RuleContext, kind: string, label: string, side: 'A'
   return { side, endpoint_kind: p ? 'placeholder' : null, placeholder_id: p?.id ?? null, level_id: levelId, from_text: text.from ?? null, to_text: text.to ?? null };
 }
 
-/** A starting status for a library end (`R2c.panic.status`…): the fields, or none for `Unsurveyed`. */
+/** A starting status for the bus's host end (`R2e.status`): the fields, or none for `Unsurveyed`. */
 function startStatus(ctx: RuleContext, rule: string, key: string): EndDraft {
   const status = statusParam(ctx.params, rule, key);
   return status ? { status, status_source: 'derived' } : {};
 }
 
-function proposeCable(ctx: RuleContext, device: DeviceRow, code: string, cable: Record<string, unknown>, ends: EndDraft[], why: string, params: readonly ParamRef[]): void {
-  ctx.propose({
-    subject: { entity_kind: 'device', entity_id: device.id, level_id: device.level_id },
-    discriminator: code,
-    kind: 'cable',
-    payload: { cable: { cable: code, origin: 'library', endpoint_confirmed: true, ...cable }, ends },
-    inputs: { device: device.id, code },
-    params,
-    why,
-  });
-}
-
+/** Retired (T199, D289, D290): drafts nothing; registered so its old open drafts are superseded. */
 export const R2c: Rule = {
   id: 'R2c',
-  title: 'Relay panel library cables',
-  text: 'A relay panel (role `relay_panel`, D201) has a 0-10V run to `Fixtures` and a panic (P) run to `EBDK panic wire`, each a single row; P is always treated as run (`Installed, untested`). Offered as drafts to accept (D173).',
-  run(ctx) {
-    for (const d of ctx.index.device.values()) {
-      if (deviceRole(ctx, d) !== 'relay_panel' || governingCables(ctx, d)) continue; // an accepted type's cables govern (R2g)
-      const label = deviceLabel(ctx, d);
-      if (!hasCode(ctx, d, '0-10V')) {
-        const to = textParam(ctx.params, 'R2c', 'fixtures.to');
-        proposeCable(
-          ctx,
-          d,
-          '0-10V',
-          { qty: 1, single_row: true },
-          [deviceEnd(ctx, d, 'A', { to }, startStatus(ctx, 'R2c', 'fixtures.status')), placeholderEnd(ctx, 'fixtures', 'Fixtures', 'B', { from: 'Fixtures' })],
-          `${label} is a Relay panel with no 0-10V run (library: 0-10V → ${to}).`,
-          [['R2c', 'fixtures.to'], ['R2c', 'fixtures.status']],
-        );
-      }
-      if (!hasCode(ctx, d, 'P')) {
-        const name = panelName(d);
-        const ebdk = (ctx.index.devicesByLevel.get(d.level_id) ?? [])
-          .filter((x) => name && str(x.panel_name) === name && deviceRole(ctx, x) === 'ebdk')
-          .sort((a, b) => compareIds(a.display_id ?? '', b.display_id ?? ''))[0];
-        const to = textParam(ctx.params, 'R2c', 'panic.to');
-        const far: EndDraft = ebdk
-          ? deviceEnd(ctx, ebdk, 'B', { from: to, to: name })
-          : { side: 'B', endpoint_kind: null, level_id: d.level_id, from_text: to, to_text: name };
-        proposeCable(
-          ctx,
-          d,
-          'P',
-          { qty: 1, single_row: true },
-          [deviceEnd(ctx, d, 'A', { to }, startStatus(ctx, 'R2c', 'panic.status')), far],
-          `${label} is a Relay panel with no panic (P) run (library: P → ${to}${ebdk ? `, its EBDK ${deviceLabel(ctx, ebdk)}` : ''}).`,
-          [['R2c', 'panic.to'], ['R2c', 'panic.status']],
-        );
-      }
-    }
-  },
+  title: 'Relay panel library cables (retired)',
+  text: 'Retired (D289, D290): being a relay panel gives a device no cable. A 0-10V or panic run comes from the device\'s library type or an accessory it carries (R2g); a panic run\'s far end is a device a person picks (D294).',
+  run() {},
 };
 
+/** Retired (T199, D290): drafts nothing; registered so its old open drafts are superseded. */
 export const R2d: Rule = {
   id: 'R2d',
-  title: '120V library cable',
-  text: 'An NSPS or equipment rack (role `nsps` / `equipment_rack`, D201) has one 120V row, `120v Power` → `P-NSPS-D Power Supply` (NSPS) or `Equipment rack` (rack), D52. Offered as a draft to accept (D173).',
-  run(ctx) {
-    for (const d of ctx.index.device.values()) {
-      const role = deviceRole(ctx, d);
-      if (role !== 'nsps' && role !== 'equipment_rack') continue;
-      if (hasCode(ctx, d, '120V') || governingCables(ctx, d)) continue;
-      const toKey = role === 'nsps' ? 'nsps.to' : 'rack.to';
-      const to = textParam(ctx.params, 'R2d', toKey);
-      const from = textParam(ctx.params, 'R2d', 'from');
-      proposeCable(
-        ctx,
-        d,
-        '120V',
-        { qty: 1, single_row: true },
-        [deviceEnd(ctx, d, 'A', { from, to }, startStatus(ctx, 'R2d', 'status')), placeholderEnd(ctx, 'power', '120v Power', 'B', { from: '120v Power' })],
-        `${deviceLabel(ctx, d)} is a${role === 'nsps' ? 'n NSPS' : 'n Equipment rack'} with no 120V row (library: ${from} → ${to}).`,
-        [['R2d', 'from'], ['R2d', toKey], ['R2d', 'status']],
-      );
-    }
-  },
+  title: '120V library cable (retired)',
+  text: 'Retired (D290): being an NSPS or an equipment rack gives a device no cable. Its 120V feed comes from its library type or the power supply it carries (R2g, D288, D291).',
+  run() {},
 };
 
 /** The level's Unison host: its NSPS (by role, D201), else its equipment rack; lowest ID first. */

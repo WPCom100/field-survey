@@ -4,7 +4,8 @@
  * ordered. R5 is not a rule of its own: it is the `waitsForSurvey` gate R3a, R3b and R4b apply
  * (`shared.ts`). E6 / E7 / E9 are quick actions a person runs (`quick.ts`), not evaluations.
  * T36 adds the PLAN §6.3 lint checks the rules above do not raise (`lint.ts`, `LINT_RULES`).
- * T48 adds R2g, the accepted device types' default cables (`library.ts`).
+ * T48 adds R2g, the accepted device types' default cables (`library.ts`); since T199 it is the
+ * one source of a device's cables, and R2c / R2d (the by-role tables) draft nothing (D289, D290).
  * T37 adds the standing rulings (`../rulings.ts`, `RulingRule`): one rule over every standing ruling.
  */
 
@@ -50,7 +51,10 @@ export {
   libraryCablePayload,
   placeholderLabelled,
   findDeviceType,
-  governingCables,
+  cablesOfDevice,
+  deviceCables,
+  accessoryCodes,
+  fillLibraryCable,
   needsNeuronId,
   parseLibraryAccessories,
   parseLibraryCables,
@@ -58,6 +62,11 @@ export {
   type AddressKind,
   type AddressNeeds,
   type AddressTypeLike,
+  type CableTypeLike,
+  type CarriedAccessory,
+  type CarriedRow,
+  type DeviceCable,
+  type DeviceCables,
   type LibraryAccessory,
   type LibraryCable,
   type TypeLike,
