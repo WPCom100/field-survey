@@ -64,6 +64,8 @@ appId: productions.luminarytechnology.fieldsurvey
     text: '0 devices · draft'
 
 # 1: Add device of the draft type → asked → Later
+- tapOn:                     # the Library shows the rail only; Levels has the sidebar _open-level needs
+    id: rail.levels
 - runFlow:
     file: _open-level.yaml
     env:

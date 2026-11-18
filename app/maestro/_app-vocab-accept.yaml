@@ -1,5 +1,7 @@
 # One app-library vocabulary draft accepted on Vocabulary (App library scope, Lists tab): V is the
-# value. Optional throughout: a value already accepted on this server has no Accept link.
+# value. Optional throughout: a value already accepted on this server has no Accept link. The link
+# goes once the accept lands; a tap made while the list reloaded after the previous accept can
+# miss (T198: Equipment stayed a draft), so a link still there is tapped again.
 appId: productions.luminarytechnology.fieldsurvey
 ---
 - scrollUntilVisible:
@@ -9,8 +11,24 @@ appId: productions.luminarytechnology.fieldsurvey
     centerElement: true
     timeout: 20000
     optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
 - tapOn:
     id: vocab.accept.${V}
     optional: true
-- waitForAnimationToEnd:
-    timeout: 2000
+- extendedWaitUntil:
+    notVisible:
+      id: vocab.accept.${V}
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: vocab.accept.${V}
+    commands:
+      - tapOn:
+          id: vocab.accept.${V}
+      - extendedWaitUntil:
+          notVisible:
+            id: vocab.accept.${V}
+          timeout: 5000
