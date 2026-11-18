@@ -133,8 +133,8 @@ appId: productions.luminarytechnology.fieldsurvey
     id: cables.note
     text: 'Endpoint confirmed: .*'
 - assertVisible: { id: cables.check.unconfirmed, text: unconfirmed endpoint 79 }
-- runFlow:
-    file: _side-up.yaml
+- runFlow:                  # T198: the button sits under the panel's fold (counted visible), so swipe it clear
+    file: _side-down.yaml
     env:
       ID: end.other.jump
 - tapOn:

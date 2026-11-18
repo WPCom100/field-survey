@@ -1,0 +1,16 @@
+# One app-library vocabulary draft accepted on Vocabulary (App library scope, Lists tab): V is the
+# value. Optional throughout: a value already accepted on this server has no Accept link.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- scrollUntilVisible:
+    element:
+      id: vocab.accept.${V}
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+    optional: true
+- tapOn:
+    id: vocab.accept.${V}
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000

@@ -1,0 +1,34 @@
+# T198 (D295 (3), D296 (5)): since T196 the device categories are an app-level list: a project's
+# Load standard lists no longer adds them, and the rules read only the app library's ACCEPTED
+# rows. So after a fresh rig server's seed, the app library's standard lists are loaded (drafts)
+# and the D196 categories with the master's old spellings accepted, which is what Lint's
+# "Value outside vocabulary" (EBDK → Emergency Equipment, …) and the rename-ruling flows need.
+appId: productions.luminarytechnology.fieldsurvey
+---
+- tapOn:
+    id: '(nav|rail).vocabulary'
+- tapOn:
+    id: vocab.scope.app
+- tapOn:
+    id: vocab.loadStandard
+- extendedWaitUntil:
+    visible:
+      id: vocab.note
+      text: 'Added .* to the app library\.|Everything standard is already here\.'
+    timeout: 20000
+- tapOn:
+    id: vocab.tab.lists
+# accepting a canonical value accepts its hidden old spellings with it (acceptValue, T198); in screen order
+- runFlow: { file: _app-vocab-accept.yaml, env: { V: Power Distribution } }     # + Relay panel, Foundry panel
+- runFlow: { file: _app-vocab-accept.yaml, env: { V: Emergency Equipment } }    # + EBDK
+- runFlow: { file: _app-vocab-accept.yaml, env: { V: Equipment } }              # + NSPS
+- runFlow: { file: _app-vocab-accept.yaml, env: { V: Equipment Panels } }       # + Equipment rack
+- scrollUntilVisible:
+    element:
+      id: vocab.scope.project
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: vocab.scope.project
+- tapOn:
+    id: rail.levels

@@ -15,5 +15,6 @@ name: Seed — the master workbook into Maestro master
     id: rail.levels
 - runFlow: _sync.yaml
 - runFlow: _seed-vocab.yaml
+- runFlow: _app-vocab.yaml   # T198: the categories and their old spellings are app-level, accepted
 - runFlow: _seed-review.yaml
 - runFlow: _sync.yaml

@@ -150,9 +150,24 @@ export async function renameValue(editor: Editor, store: Store, id: string, text
   await editor.setField('vocab', id, 'value', value, VOCAB_CTX);
 }
 
-export async function acceptValue(editor: Editor, id: string): Promise<void> {
-  await editor.setField('vocab', id, 'state', 'accepted', VOCAB_CTX);
+/**
+ * Accept a draft value. With the store, its draft old spellings are accepted with it (one group,
+ * T198): the Lists tab does not show a list's variant rows, so an app-library category's old
+ * spellings (`EBDK` → `Emergency Equipment`, loaded as drafts) could otherwise never be accepted,
+ * and the rules read only accepted app values.
+ */
+export async function acceptValue(editor: Editor, id: string, store?: Store): Promise<void> {
+  const variants = store ? (await store.list<Row>('vocab', { where: "canonical_of_id = ? AND state = 'draft'", params: [id] })).filter((v) => !v.deleted_at) : [];
+  if (!variants.length) {
+    await editor.setField('vocab', id, 'state', 'accepted', VOCAB_CTX);
+    return;
+  }
+  await editor.group(VOCAB_CTX, async (g) => {
+    await g.setField('vocab', id, 'state', 'accepted');
+    for (const v of variants) await g.setField('vocab', String(v.id), 'state', 'accepted');
+  });
 }
+
 
 /** Remove a value; a canonical value takes its variants (old spellings, pair spellings) with it. */
 export async function removeValue(editor: Editor, id: string, store?: Store): Promise<void> {

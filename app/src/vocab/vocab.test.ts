@@ -174,6 +174,21 @@ describe('vocabulary follow-ups (T104, D187, D214)', () => {
     expect(await loadPlaceholders(store, projectId)).toEqual([]);
   });
 
+  it('accepting an app category accepts its hidden draft old spellings with it (T198)', async () => {
+    const { store, library } = await scopes();
+    await loadStandard(library, store);
+    const rows = async () => store.list<{ id: string; value: string; state: string; canonical_of_id: string | null }>('vocab', { where: "project_id IS NULL AND list = 'category'" });
+    const pd = (await rows()).find((r) => r.value === 'Power Distribution')!;
+    const olds = (await rows()).filter((r) => r.canonical_of_id === pd.id);
+    expect(olds.map((r) => [r.value, r.state]).sort()).toEqual([['Foundry panel', 'draft'], ['Relay panel', 'draft']]);
+    // the Lists tab shows the canonical only, so its Accept is the only way to the old spellings
+    expect((await loadVocab(store, null)).category.map((e) => e.value)).not.toContain('Relay panel');
+    await acceptValue(library, pd.id, store);
+    const after = await rows();
+    expect(after.filter((r) => r.id === pd.id || r.canonical_of_id === pd.id).map((r) => r.state)).toEqual(['accepted', 'accepted', 'accepted']);
+    expect(after.find((r) => r.value === 'Emergency Equipment')!.state).toBe('draft');
+  });
+
   it('promote a project value (with its pair) to the app library as drafts; copy accepted app values into a project', async () => {
     const { store, editor, library, projectId } = await scopes();
     const variant = await addPair(editor, store, 'model_map', 'P-DOC-W-WD', 'P-DOC-W');

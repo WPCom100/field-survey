@@ -220,7 +220,7 @@ function ValueRow(props: { e: VocabEntry; canEdit: boolean; run: RunFn; promote:
       {props.canEdit ? (
         <>
           {e.draft ? (
-            <Pressable onPress={() => run((ed) => acceptValue(ed, e.id))} hitSlop={space.md} testID={`vocab.accept.${e.value}`}>
+            <Pressable onPress={() => run((ed, s) => acceptValue(ed, e.id, s))} hitSlop={space.md} testID={`vocab.accept.${e.value}`}>
               <Text style={styles.link}>Accept</Text>
             </Pressable>
           ) : null}
